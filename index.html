@@ -647,19 +647,19 @@ function selectShore(btn){
     shoreDeg=null;
     manualShoreSet=false;
     $('shoreHint').textContent='Set for wind direction scoring';
-    if(cachedWx) renderGrid();
+    if(cachedWx&&cachedHrMap) renderGrid();
     return;
   }
   btn.classList.add('active');
   shoreDeg=deg;
   $('shoreHint').textContent=`Side-shore ≈ ${compass((deg+90)%360)} or ${compass((deg+270)%360)}`;
-  if(cachedWx) renderGrid();
+  if(cachedWx&&cachedHrMap) renderGrid();
 }
 function setShoreByDeg(deg){
   document.querySelectorAll('.s-btn').forEach(b=>b.classList.remove('active'));
   shoreDeg=deg;
   document.querySelectorAll('.s-btn').forEach(b=>{if(Number(b.dataset.deg)===deg)b.classList.add('active');});
-  if(cachedWx) renderGrid();
+  if(cachedWx&&cachedHrMap) renderGrid();
 }
 
 // ══════════════════════════════════
