@@ -268,6 +268,7 @@
     .m-row.kite-on { background:rgba(34,197,94,.04); border-left:3px solid rgba(34,197,94,.4); padding-left:15px; }
     .m-row.kite-on:hover { background:rgba(34,197,94,.09); }
     .m-row.night { opacity:.38; }
+    .m-row.rain-row { border-left:3px solid rgba(96,165,250,.35); padding-left:15px; }
 
     /* sun marker rows */
     .m-sun-row { padding:5px 18px; font-size:.68rem; color:#fbbf24; background:rgba(251,191,36,.04); border-bottom:1px solid rgba(37,52,80,.4); display:flex; gap:8px; align-items:center; }
@@ -479,6 +480,8 @@ const WMO = {
   95:['⛈','Thunderstorm'],96:['⛈','Thunderstorm+hail'],99:['⛈','Thunderstorm+hail'],
 };
 const wmoInfo = c => WMO[c] ?? ['🌡','—'];
+// WMO codes 51+ = precipitation (drizzle, rain, snow, showers, storms)
+const isRainy = c => c!=null && c>=51;
 
 // ══════════════════════════════════
 //  HELPERS
@@ -525,9 +528,10 @@ function windBarColor(kn){
 }
 function windBarPct(kn){ return Math.min(Math.round(kn/50*100),100); }
 
-function classifyHour(kn,dir){
+function classifyHour(kn,dir,code){
   const sp=speedTier(kn);
   if(sp===0) return {type:'light',qualifying:false};
+  if(isRainy(code)) return {type:'rain',qualifying:false};
   if(shoreDeg===null) return {type:['good','verygood','perfect'][sp-1],qualifying:true};
   const da=dirAnalysis(dir,shoreDeg);
   if(!isDirOK(da.key)) return {type:'lightdir',qualifying:false};
@@ -950,7 +954,7 @@ function buildDay(dateStr,sunrise,sunset){
     const tStr=`${dateStr}T${String(hr).padStart(2,'0')}:00`;
     // a daylight hour is one that starts at or after sunrise hour and ends before/at sunset hour
     const inDay=hr>=srHour&&hr<=ssHour;
-    const cl=classifyHour(d.kn,d.dir);
+    const cl=classifyHour(d.kn,d.dir,d.code);
     hours.push({...d,...cl,tStr,hour:hr,inDay});
   }
   const day=hours.filter(h=>h.inDay);
@@ -1059,7 +1063,7 @@ function openModal(dateStr,dayIdx){
   const maxKn=Math.max(30,...hours.map(h=>h.kn));
   $('mTimeline').innerHTML=hours.map(h=>{
     const pct=Math.max(4,Math.round(h.kn/maxKn*100));
-    const col=h.qualifying?speedBg(h.kn):h.type==='lightdir'?'rgba(234,179,8,.38)':'rgba(100,116,139,.18)';
+    const col=h.qualifying?speedBg(h.kn):h.type==='rain'?'rgba(96,165,250,.35)':h.type==='lightdir'?'rgba(234,179,8,.38)':'rgba(100,116,139,.18)';
     const isSr=h.tStr.slice(0,16)===sunrise.slice(0,16);
     const isSs=h.tStr.slice(0,16)===sunset.slice(0,16);
     const tlCls=isSr?'sr':isSs?'ss':'';
@@ -1093,9 +1097,9 @@ function openModal(dateStr,dayIdx){
     const[wxIcon]=wmoInfo(h.code);
     const barPct=windBarPct(h.kn);
     const barCol=windBarColor(h.kn);
-    const rowCls=['m-row',wsCls,h.qualifying?'kite-on':'',!h.inDay?'night':''].filter(Boolean).join(' ');
+    const rowCls=['m-row',wsCls,h.qualifying?'kite-on':'',h.type==='rain'?'rain-row':'',!h.inDay?'night':''].filter(Boolean).join(' ');
     const timeCls=h.qualifying?'c-time on':'c-time';
-    const kite=h.qualifying?'🪁 ':'';
+    const kite=h.qualifying?'🪁 ':h.type==='rain'?'🌧 ':'';
 
     let shoreTD='';
     if(ws){
