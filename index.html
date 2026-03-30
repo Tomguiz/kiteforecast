@@ -1214,7 +1214,7 @@ function renderGrid(){
       </div>
       <div class="hour-bar-wrap">
         <div class="hour-bar">${barHTML||'<div style="color:var(--tdim);font-size:.58rem;width:100%;text-align:center">—</div>'}</div>
-        <div class="hour-axis"><span>00</span><span>06</span><span>12</span><span>18</span><span>24</span></div>
+        <div class="hour-axis"><span>${String(parseInt(daily.sunrise[i].slice(11,13),10)).padStart(2,'0')}</span><span>${String(Math.round((parseInt(daily.sunrise[i].slice(11,13),10)+parseInt(daily.sunset[i].slice(11,13),10))/2)).padStart(2,'0')}</span><span>${String(parseInt(daily.sunset[i].slice(11,13),10)).padStart(2,'0')}</span></div>
       </div>
       ${windBarEl}
       ${dirPill}
