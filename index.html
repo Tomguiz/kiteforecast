@@ -168,6 +168,15 @@
     .hints .examples { display:flex; flex-wrap:wrap; justify-content:center; gap:7px; margin-top:14px; }
     .chip { padding:6px 13px; border:1px solid var(--border); border-radius:99px; font-size:.78rem; color:var(--gray); cursor:pointer; transition:border-color .2s,color .2s; }
     .chip:hover { border-color:var(--accent); color:var(--accent); }
+    .fav-chip { display:inline-flex; align-items:center; gap:5px; padding:6px 10px 6px 13px; border:1px solid rgba(251,191,36,.35); border-radius:99px; font-size:.78rem; color:#fbbf24; cursor:pointer; transition:border-color .2s,background .2s; background:rgba(251,191,36,.06); }
+    .fav-chip:hover { border-color:#fbbf24; background:rgba(251,191,36,.13); }
+    .fav-chip-label { flex:1; }
+    .fav-chip-remove { font-size:.7rem; opacity:.6; line-height:1; padding:1px 2px; border-radius:4px; }
+    .fav-chip-remove:hover { opacity:1; background:rgba(239,68,68,.2); color:#f87171; }
+    .hints-section-label { font-size:.7rem; text-transform:uppercase; letter-spacing:.08em; color:var(--tdim); opacity:.5; margin:14px 0 6px; width:100%; text-align:center; }
+    .fav-btn { background:none; border:none; cursor:pointer; font-size:1rem; padding:0 4px; line-height:1; opacity:.5; transition:opacity .2s,transform .15s; vertical-align:middle; margin-left:6px; }
+    .fav-btn:hover { opacity:1; transform:scale(1.2); }
+    .fav-btn.active { opacity:1; }
 
     /* ════════════════════════════════════════
        MODAL
@@ -352,14 +361,7 @@
   <div class="hints" id="hintState">
     <div class="big">🌊</div>
     <p>Search any kitesurf spot · tap a day card for the full hourly breakdown</p>
-    <div class="examples">
-      <span class="chip" onclick="pickSpot(SPOTS.find(s=>s.name==='Riverwoods Beachclub'))">Riverwoods (Knokke)</span>
-      <span class="chip" onclick="pickSpot(SPOTS.find(s=>s.name==='Icarus Kite School'))">Icarus (Zeebrugge)</span>
-      <span class="chip" onclick="pickSpot(SPOTS.find(s=>s.name==='Tarifa'))">Tarifa</span>
-      <span class="chip" onclick="pickSpot(SPOTS.find(s=>s.name==='Dakhla'))">Dakhla</span>
-      <span class="chip" onclick="pickSpot(SPOTS.find(s=>s.name==='Sotavento'))">Sotavento</span>
-      <span class="chip" onclick="pickSpot(SPOTS.find(s=>s.name==='Cabarete'))">Cabarete</span>
-    </div>
+    <div class="examples" id="hintChips"></div>
   </div>
 
   <!-- loading -->
@@ -821,6 +823,79 @@ async function fetchForecastFromSpot(spot){
 }
 
 // ══════════════════════════════════
+//  FAVOURITES
+// ══════════════════════════════════
+const DEFAULT_CHIPS=[
+  {name:'Riverwoods Beachclub',label:'Riverwoods (Knokke)'},
+  {name:'Icarus Kite School',  label:'Icarus (Zeebrugge)'},
+  {name:'Tarifa',              label:'Tarifa'},
+  {name:'Dakhla',              label:'Dakhla'},
+  {name:'Sotavento',           label:'Sotavento'},
+  {name:'Cabarete',            label:'Cabarete'},
+];
+
+function loadFavs(){
+  try{ return JSON.parse(localStorage.getItem('kf_favs')||'[]'); }
+  catch{ return []; }
+}
+function saveFavs(arr){ localStorage.setItem('kf_favs',JSON.stringify(arr)); }
+
+function isFavorite(loc){
+  return loadFavs().some(f=>f.name===loc.name&&f.lat===loc.latitude);
+}
+
+function toggleFavorite(){
+  const loc=cachedLoc; if(!loc) return;
+  let favs=loadFavs();
+  const idx=favs.findIndex(f=>f.name===loc.name&&f.lat===loc.latitude);
+  if(idx>=0){
+    favs.splice(idx,1);
+  } else {
+    favs.push({
+      name: loc.name,
+      label:`${loc.name}${loc.admin1?', '+loc.admin1:''}`,
+      lat:  loc.latitude,
+      lon:  loc.longitude,
+      shore:shoreDeg,
+    });
+  }
+  saveFavs(favs);
+  // update star button
+  const isFav=idx<0;
+  const btn=$('favBtn');
+  if(btn){ btn.textContent=isFav?'★':'☆'; btn.classList.toggle('active',isFav); btn.title=isFav?'Remove from favourites':'Add to favourites'; }
+}
+
+function renderHintChips(){
+  const favs=loadFavs();
+  let html='';
+  if(favs.length){
+    html+=`<div class="hints-section-label">★ My spots</div>`;
+    html+=favs.map(f=>`
+      <span class="fav-chip">
+        <span class="fav-chip-label" onclick="pickFav(${JSON.stringify(f).replace(/"/g,'&quot;')})">${f.label}</span>
+        <span class="fav-chip-remove" onclick="removeFav(${JSON.stringify(f).replace(/"/g,'&quot;')})" title="Remove">✕</span>
+      </span>`).join('');
+    html+=`<div class="hints-section-label">Suggestions</div>`;
+  }
+  html+=DEFAULT_CHIPS.map(c=>`<span class="chip" onclick="pickSpot(SPOTS.find(s=>s.name===${JSON.stringify(c.name)}))">${c.label}</span>`).join('');
+  $('hintChips').innerHTML=html;
+}
+
+function pickFav(f){
+  $('searchInput').value=f.name;
+  closeAC();
+  manualShoreSet=false;
+  fetchForecastFromSpot({name:f.name,loc:f.label,lat:f.lat,lon:f.lon,shore:f.shore});
+}
+
+function removeFav(f){
+  const favs=loadFavs().filter(x=>!(x.name===f.name&&x.lat===f.lat));
+  saveFavs(favs);
+  renderHintChips();
+}
+
+// ══════════════════════════════════
 //  SEARCH
 // ══════════════════════════════════
 function resetSearch(){
@@ -828,6 +903,7 @@ function resetSearch(){
   $('resetBtn').style.display='none';
   $('locHdr').style.display='none';
   $('shoreBar').classList.remove('visible');
+  renderHintChips();
   showOnly('hintState');
   cachedWx=null; cachedLoc=null; cachedHrMap=new Map();
   shoreDeg=null; manualShoreSet=false;
@@ -859,6 +935,7 @@ $('searchInput').addEventListener('keydown',e=>{
   if(e.key==='Enter'){doSearch();}
 });
 document.addEventListener('click',e=>{if(!e.target.closest('.search-wrap'))closeAC();});
+renderHintChips();
 
 // ══════════════════════════════════
 //  FETCH
@@ -974,7 +1051,8 @@ function renderGrid(){
   const loc=cachedLoc;
 
   const mapsUrl=`https://www.google.com/maps?q=${loc.latitude},${loc.longitude}`;
-  $('locName').innerHTML=`${loc.name}${loc.admin1?', '+loc.admin1:''}<a class="map-link" href="${mapsUrl}" target="_blank" rel="noopener" title="Open in Google Maps"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Maps</a>`;
+  const isFav=isFavorite(loc);
+  $('locName').innerHTML=`${loc.name}${loc.admin1?', '+loc.admin1:''}<a class="map-link" href="${mapsUrl}" target="_blank" rel="noopener" title="Open in Google Maps"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Maps</a><button class="fav-btn${isFav?' active':''}" id="favBtn" title="${isFav?'Remove from favourites':'Add to favourites'}" onclick="toggleFavorite()">${isFav?'★':'☆'}</button>`;
   $('locSub').textContent=`${loc.country} · ${loc.latitude.toFixed(2)}°, ${loc.longitude.toFixed(2)}°`+(shoreDeg!==null?` · Shore ${compass(shoreDeg)}`:'');
   $('locHdr').style.display='block';
   $('shoreBar').classList.add('visible');
