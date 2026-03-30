@@ -269,7 +269,7 @@
     .c-wind { display:flex; align-items:center; gap:5px; overflow:hidden; }
     .c-wind-bar { height:6px; border-radius:99px; flex-shrink:0; max-width:55px; min-width:4px; }
     .c-wind-val { font-size:.88rem; font-weight:800; white-space:nowrap; }
-    .c-gust { font-size:.74rem; color:var(--tdim); white-space:nowrap; }
+    .c-gust { font-size:.74rem; color:#94a3b8; font-weight:600; white-space:nowrap; }
     .c-dir  { display:flex; align-items:center; gap:4px; }
     .c-da   { font-size:.95rem; line-height:1; display:inline-block; }
     .c-dl   { font-size:.76rem; font-weight:600; color:var(--gray); }
@@ -495,6 +495,18 @@ function speedBg(kn){
   const t=speedTier(kn);
   return t===3?'#4ade80':t===2?'#86efac':t===1?'#bef264':'rgba(100,116,139,.25)';
 }
+// Wind bar: 0–50 kn mapped to 0–100%, color reflects actual speed
+// <8 dark red → 8-15 orange → 15-20 yellow-green → 20-25 green → 25-35 bright green → >35 purple
+function windBarColor(kn){
+  if(kn>=40) return '#7c3aed'; // purple — dangerous
+  if(kn>=35) return '#a855f7'; // light purple
+  if(kn>=25) return '#4ade80'; // bright green — perfect
+  if(kn>=20) return '#86efac'; // soft green — very good
+  if(kn>=15) return '#bef264'; // yellow-green — good
+  if(kn>=10) return '#f97316'; // orange — getting there
+  return '#b91c1c';            // dark red — too light
+}
+function windBarPct(kn){ return Math.min(Math.round(kn/50*100),100); }
 
 function classifyHour(kn,dir){
   const sp=speedTier(kn);
@@ -804,8 +816,8 @@ function openModal(dateStr,dayIdx){
     if(!ssDone&&h.tStr>sunset)  { html+=`<div class="m-sun-row ss">🌇 Sunset ${ssTime}</div>`;  ssDone=true; }
 
     const[wxIcon]=wmoInfo(h.code);
-    const barPct=Math.min(Math.round(h.kn/40*100),100);
-    const barCol=h.qualifying?speedBg(h.kn):h.type==='lightdir'?'rgba(234,179,8,.38)':'rgba(100,116,139,.22)';
+    const barPct=windBarPct(h.kn);
+    const barCol=windBarColor(h.kn);
     const rowCls=['m-row',wsCls,h.qualifying?'kite-on':'',!h.inDay?'night':''].filter(Boolean).join(' ');
     const timeCls=h.qualifying?'c-time on':'c-time';
     const kite=h.qualifying?'🪁 ':'';
@@ -832,7 +844,7 @@ function openModal(dateStr,dayIdx){
         <span class="c-wind-val" style="color:${speedColor(h.kn)}">${h.kn}</span>
         <span style="font-size:.65rem;color:var(--tdim)">kn</span>
       </div>
-      <div class="c-gust col-gust">↑${h.gustKn}<span style="font-size:.65rem"> kn</span></div>
+      <div class="c-gust col-gust">↑<span style="color:${windBarColor(h.gustKn)}">${h.gustKn}</span><span style="font-size:.65rem"> kn</span></div>
       <div class="c-dir">
         <span class="c-da" style="transform:rotate(${(h.dir+180)%360}deg)">↑</span>
         <span class="c-dl">${compass(h.dir)}<span style="font-size:.65rem;color:var(--tdim);font-weight:400"> ${h.dir}°</span></span>
