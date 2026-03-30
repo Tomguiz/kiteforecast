@@ -178,7 +178,21 @@
     .fav-chip-label { flex:1; }
     .fav-chip-remove { font-size:.7rem; opacity:.6; line-height:1; padding:1px 2px; border-radius:4px; }
     .fav-chip-remove:hover { opacity:1; background:rgba(239,68,68,.2); color:#f87171; }
-    .hints-section-label { font-size:.7rem; text-transform:uppercase; letter-spacing:.08em; color:var(--tdim); opacity:.5; margin:14px 0 6px; width:100%; text-align:center; }
+    .hints-section-label {
+      display:flex; align-items:center; gap:10px;
+      width:100%; margin:18px 0 8px;
+      font-size:.7rem; font-weight:700; letter-spacing:.1em; text-transform:uppercase;
+    }
+    .hints-section-label::before,
+    .hints-section-label::after {
+      content:''; flex:1; height:1px; background:var(--border);
+    }
+    .hints-section-label.lbl-favs  { color:#fbbf24; }
+    .hints-section-label.lbl-favs::before,
+    .hints-section-label.lbl-favs::after  { background:rgba(251,191,36,.25); }
+    .hints-section-label.lbl-sugg  { color:var(--tdim); }
+    .hints-section-label.lbl-sugg::before,
+    .hints-section-label.lbl-sugg::after  { background:var(--border); }
     .fav-btn { background:none; border:1.5px solid rgba(255,255,255,.22); border-radius:7px; cursor:pointer; font-size:1.1rem; padding:3px 7px; line-height:1; color:rgba(255,255,255,.55); transition:border-color .2s,color .2s,background .2s,transform .15s; vertical-align:middle; margin-left:8px; }
     .fav-btn:hover { border-color:rgba(250,204,21,.7); color:#fde047; background:rgba(250,204,21,.08); transform:scale(1.08); }
     .fav-btn.active { border-color:#fbbf24; color:#fbbf24; background:rgba(251,191,36,.15); }
@@ -928,7 +942,7 @@ function renderHintChips(){
 
   if(favs.length){
     const lbl=document.createElement('div');
-    lbl.className='hints-section-label'; lbl.textContent='★ My spots';
+    lbl.className='hints-section-label lbl-favs'; lbl.textContent='★ My Spots';
     wrap.appendChild(lbl);
     favs.forEach(f=>{
       const chip=document.createElement('span');
@@ -943,7 +957,7 @@ function renderHintChips(){
       wrap.appendChild(chip);
     });
     const lbl2=document.createElement('div');
-    lbl2.className='hints-section-label'; lbl2.textContent='Suggestions';
+    lbl2.className='hints-section-label lbl-sugg'; lbl2.textContent='Suggestions';
     wrap.appendChild(lbl2);
   }
 
