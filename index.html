@@ -34,10 +34,11 @@
     .tagline { color:var(--gray); margin:4px 0 18px; font-size:clamp(.78rem,.9rem + .2vw,.93rem); }
 
     /* ── SEARCH ── */
-    .search-wrap { display:flex; max-width:520px; margin:0 auto; gap:8px; position:relative; }
-    .search-wrap input { flex:1; min-width:0; padding:12px 16px; border-radius:12px; border:1.5px solid var(--border); background:var(--surface); color:var(--text); font-size:1rem; outline:none; transition:border-color .2s; }
-    .search-wrap input:focus { border-color:var(--accent); }
-    .search-wrap input::placeholder { color:var(--tdim); }
+    .search-wrap { display:flex; max-width:520px; margin:0 auto; gap:8px; }
+    .search-input-wrap { position:relative; flex:1; min-width:0; }
+    .search-input-wrap input { width:100%; box-sizing:border-box; padding:12px 16px; border-radius:12px; border:1.5px solid var(--border); background:var(--surface); color:var(--text); font-size:1rem; outline:none; transition:border-color .2s; }
+    .search-input-wrap input:focus { border-color:var(--accent); }
+    .search-input-wrap input::placeholder { color:var(--tdim); }
     .autocomplete { position:absolute; top:calc(100% + 6px); left:0; right:0; background:var(--surface); border:1.5px solid var(--border); border-radius:12px; overflow:hidden; z-index:200; box-shadow:0 8px 24px rgba(0,0,0,.4); display:none; }
     .autocomplete.open { display:block; }
     .ac-item { padding:10px 16px; cursor:pointer; font-size:.93rem; display:flex; flex-direction:column; gap:2px; border-bottom:1px solid var(--border); }
@@ -335,8 +336,10 @@
   <div class="logo">🪁 Kite<span>Forecast</span></div>
   <p class="tagline">10-day kitesurf forecast · tap any day for hourly session detail</p>
   <div class="search-wrap">
-    <input type="text" id="searchInput" placeholder="Spot name, beach or city…" autocomplete="off" />
-    <div class="autocomplete" id="acDropdown"></div>
+    <div class="search-input-wrap">
+      <input type="text" id="searchInput" placeholder="Spot name, beach or city…" autocomplete="off" />
+      <div class="autocomplete" id="acDropdown"></div>
+    </div>
     <button class="btn" onclick="doSearch()">Search</button>
     <button class="btn-reset" id="resetBtn" style="display:none" onclick="resetSearch()">✕ Reset</button>
   </div>
