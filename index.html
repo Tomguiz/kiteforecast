@@ -254,14 +254,14 @@
     .m-body::-webkit-scrollbar { width:4px; }
     .m-body::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
 
-    /* table header — 6 cols (+ optional shore) */
+    /* table header — 5 cols (+ optional conditions) */
     .m-thead, .m-row {
       display:grid;
-      grid-template-columns: 50px 24px 42px 1fr 50px 56px;
+      grid-template-columns: 50px 24px 42px 1fr 56px;
       gap:0 7px; padding:8px 18px;
       align-items:center;
     }
-    .m-thead.ws, .m-row.ws { grid-template-columns: 50px 24px 42px 1fr 50px 56px 82px; }
+    .m-thead.ws, .m-row.ws { grid-template-columns: 50px 24px 42px 1fr 56px 88px; }
     .m-thead {
       font-size:.6rem; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--tdim);
       border-bottom:1px solid var(--border);
@@ -289,14 +289,22 @@
     .c-wx   { font-size:1.2rem; line-height:1; }
     .c-temp { font-size:.86rem; font-weight:600; }
     .c-wind { position:relative; display:flex; align-items:center; height:26px; border-radius:4px; overflow:hidden; background:rgba(255,255,255,.03); }
-    .c-wind-bar { position:absolute; left:0; top:0; bottom:0; border-radius:4px; opacity:.32; }
-    .c-wind-val { position:relative; z-index:1; font-size:.88rem; font-weight:800; white-space:nowrap; padding-left:7px; }
-    .c-wind-kn  { position:relative; z-index:1; font-size:.62rem; color:rgba(255,255,255,.45); margin-left:2px; }
+    .c-wind-bar  { position:absolute; left:0; top:0; bottom:0; border-radius:4px; opacity:.35; }
+    .c-gust-bar  { position:absolute; top:0; bottom:0; border-radius:0 4px 4px 0; opacity:.14; }
+    .c-wind-val  { position:relative; z-index:1; font-size:.88rem; font-weight:800; white-space:nowrap; padding-left:7px; }
+    .c-wind-kn   { position:relative; z-index:1; font-size:.62rem; color:rgba(255,255,255,.45); margin-left:2px; }
+    .c-gust-num  { position:absolute; z-index:2; top:50%; transform:translateY(-50%) translateX(-100%); font-size:.6rem; font-weight:700; color:rgba(255,255,255,.38); padding-right:4px; white-space:nowrap; }
     .c-gust { font-size:.74rem; color:#94a3b8; font-weight:600; white-space:nowrap; }
     .c-dir  { display:flex; align-items:center; gap:4px; }
     .c-da   { font-size:.95rem; line-height:1; display:inline-block; }
     .c-dl   { font-size:.76rem; font-weight:600; color:var(--gray); }
     .c-sp   { padding:3px 6px; border-radius:5px; font-size:.6rem; font-weight:700; white-space:nowrap; }
+    /* condition badge levels */
+    .cond-bad      { background:rgba(239,68,68,.18);  color:#f87171; border:1px solid rgba(239,68,68,.3); }
+    .cond-good     { background:rgba(34,197,94,.12);  color:#86efac; border:1px solid rgba(34,197,94,.25); }
+    .cond-vgood    { background:rgba(34,197,94,.20);  color:#4ade80; border:1px solid rgba(34,197,94,.4); }
+    .cond-excellent{ background:rgba(0,212,255,.15);  color:#67e8f9; border:1px solid rgba(0,212,255,.35); }
+    .cond-perfect  { background:rgba(250,204,21,.15); color:#fde047; border:1px solid rgba(250,204,21,.35); }
 
     /* ── MOBILE: 2-line card layout per hour ── */
     @media (max-width:599px) {
@@ -315,7 +323,7 @@
         grid-template-rows: auto auto;
         grid-template-areas:
           "time  wx  temp  wind  dir"
-          "time  .   gust  wind  shore";
+          "time  .   .     wind  cond";
         gap: 1px 8px;
         padding: 9px 14px;
         min-height: auto;
@@ -327,13 +335,13 @@
       .c-time { grid-area:time; font-size:.88rem; line-height:1.3; align-self:center; }
       .c-wx   { grid-area:wx;   font-size:1.15rem; line-height:1; align-self:center; }
       .c-temp { grid-area:temp; font-size:.82rem; align-self:end; }
-      .c-wind { grid-area:wind; align-self:center; justify-self:start; height:22px; min-width:60px; }
+      .c-wind { grid-area:wind; align-self:center; justify-self:stretch; height:22px; }
       .c-wind-val { font-size:1.0rem; }
-      .c-gust { grid-area:gust; font-size:.72rem; align-self:start; }
+      .c-gust { display:none; }
       .c-dir  { grid-area:dir;  align-self:center; flex-direction:column; align-items:flex-end; gap:1px; }
       .c-da   { font-size:1.1rem; }
       .c-dl   { font-size:.72rem; text-align:right; }
-      .c-sp   { grid-area:shore; align-self:start; font-size:.62rem; padding:2px 6px; }
+      .c-sp   { grid-area:cond; align-self:start; font-size:.62rem; padding:2px 6px; }
     }
   </style>
 </head>
@@ -546,6 +554,16 @@ function classifyHour(kn,dir,code){
   if(isRainy(code)) return {type:'rain',qualifying:false};
   if(!isWindDirOK(dir)) return {type:'lightdir',qualifying:false};
   return {type:['good','verygood','perfect'][sp-1],qualifying:true};
+}
+function conditionLabel(kn,dir,code,temp){
+  const sp=speedTier(kn);
+  if(sp===0||isRainy(code)||!isWindDirOK(dir))
+    return {label:'✕ Bad',cls:'cond-bad'};
+  const warm=temp>=13;
+  if(sp>=3&&warm) return {label:'⚡ Perfect',  cls:'cond-perfect'};
+  if(sp>=2&&warm) return {label:'★ Excellent', cls:'cond-excellent'};
+  if(sp>=1&&warm) return {label:'✓ Very good', cls:'cond-vgood'};
+  return             {label:'✓ Good',       cls:'cond-good'};
 }
 
 function rateDay(gh,pk,code,badDir){
@@ -1215,14 +1233,13 @@ function openModal(dateStr,dayIdx){
   // table
   const ws=windDirs.size>0;
   const wsCls=ws?'ws':'';
-  const shoreTH=ws?'<div>Dir OK</div>':'';
+  const condTH=ws?'<div>Conditions</div>':'';
 
   let html=`<div class="m-thead ${wsCls}">
     <div>Time</div><div></div><div>Temp</div>
     <div>Wind</div>
-    <div class="col-gust">Gust</div>
     <div>Dir</div>
-    ${shoreTH}
+    ${condTH}
   </div>`;
 
   let srDone=false,ssDone=false;
@@ -1237,13 +1254,16 @@ function openModal(dateStr,dayIdx){
     const timeCls=h.qualifying?'c-time on':'c-time';
     const kite=h.qualifying?'🪁 ':h.type==='rain'?'🌧 ':'';
 
-    let shoreTD='';
+    let condTD='';
     if(ws){
-      const ok=isWindDirOK(h.dir);
-      shoreTD=`<div class="c-sp ${ok?'dir-side':'dir-sideoff'}">${ok?'✓ Good':'✗ Bad'}</div>`;
+      const {label,cls}=conditionLabel(h.kn,h.dir,h.code,h.temp);
+      condTD=`<div class="c-sp ${cls}">${label}</div>`;
     }
 
     const tempCol=h.temp<=8?'#7dd3fc':h.temp>=28?'#f97316':'var(--text)';
+    const gustPct=windBarPct(h.gustKn);
+    const gustExt=Math.max(0,gustPct-barPct);
+    const gustNumLeft=Math.min(gustPct,97);
 
     html+=`<div class="${rowCls}">
       <div class="${timeCls}">${kite}${h.tStr.slice(11,16)}</div>
@@ -1251,15 +1271,16 @@ function openModal(dateStr,dayIdx){
       <div class="c-temp" style="color:${tempCol}">${h.temp}°</div>
       <div class="c-wind">
         <div class="c-wind-bar" style="width:${barPct}%;background:${barCol}"></div>
+        <div class="c-gust-bar" style="left:${barPct}%;width:${gustExt}%;background:${barCol}"></div>
+        <span class="c-gust-num" style="left:${gustNumLeft}%">${h.gustKn}</span>
         <span class="c-wind-val" style="color:${barCol}">${h.kn}</span>
         <span class="c-wind-kn">kn</span>
       </div>
-      <div class="c-gust col-gust">↑<span style="color:${windBarColor(h.gustKn)}">${h.gustKn}</span><span style="font-size:.65rem"> kn</span></div>
       <div class="c-dir">
         <span class="c-da" style="transform:rotate(${(h.dir+180)%360}deg)">↑</span>
         <span class="c-dl">${compass(h.dir)}<span style="font-size:.65rem;color:var(--tdim);font-weight:400"> ${h.dir}°</span></span>
       </div>
-      ${shoreTD}
+      ${condTD}
     </div>`;
   });
 
