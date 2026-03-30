@@ -441,7 +441,8 @@
 // ══════════════════════════════════
 //  STATE
 // ══════════════════════════════════
-let shoreDeg    = null;
+let shoreDeg       = null;
+let manualShoreSet = false;
 let cachedWx    = null;
 let cachedLoc   = null;
 let cachedHrMap = null;
@@ -568,13 +569,64 @@ function bestWindow(good){
 }
 
 // ══════════════════════════════════
+//  AUTO SHORE DETECTION (OSM coastline)
+// ══════════════════════════════════
+// OSM coastline convention: water is always on the RIGHT of the way direction.
+// So: shore_facing = segment_bearing + 90°
+function geoBearing(lat1,lon1,lat2,lon2){
+  const dL=(lon2-lon1)*Math.PI/180;
+  const f1=lat1*Math.PI/180, f2=lat2*Math.PI/180;
+  const y=Math.sin(dL)*Math.cos(f2);
+  const x=Math.cos(f1)*Math.sin(f2)-Math.sin(f1)*Math.cos(f2)*Math.cos(dL);
+  return(Math.atan2(y,x)*180/Math.PI+360)%360;
+}
+function geoDist(lat1,lon1,lat2,lon2){
+  // simple Euclidean on degrees — fine for <20km proximity check
+  return Math.hypot(lat2-lat1,lon2-lon1);
+}
+function snapTo8(deg){
+  const dirs=[0,45,90,135,180,225,270,315];
+  return dirs.reduce((best,d)=>angleDiff(deg,d)<angleDiff(deg,best)?d:best,dirs[0]);
+}
+
+async function autoDetectShore(lat,lon){
+  try{
+    // Query OSM for coastline ways within 12km
+    const q=`[out:json][timeout:12];way["natural"="coastline"](around:12000,${lat},${lon});out geom;`;
+    const res=await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(q)}`);
+    const data=await res.json();
+    if(!data.elements?.length) return null;
+
+    // Find the closest segment midpoint to our location
+    let bestDist=Infinity, bestBearing=null;
+    for(const way of data.elements){
+      const nodes=way.geometry;
+      if(!nodes?.length) continue;
+      for(let i=0;i<nodes.length-1;i++){
+        const a=nodes[i], b=nodes[i+1];
+        const midLat=(a.lat+b.lat)/2, midLon=(a.lon+b.lon)/2;
+        const dist=geoDist(lat,lon,midLat,midLon);
+        if(dist<bestDist){
+          bestDist=dist;
+          // water is 90° clockwise from the OSM way direction
+          bestBearing=(geoBearing(a.lat,a.lon,b.lat,b.lon)+90)%360;
+        }
+      }
+    }
+    return bestBearing;
+  }catch{ return null; }
+}
+
+// ══════════════════════════════════
 //  SHORE PICKER
 // ══════════════════════════════════
 function selectShore(btn){
   const deg=Number(btn.dataset.deg);
   document.querySelectorAll('.s-btn').forEach(b=>b.classList.remove('active'));
+  manualShoreSet=true;
   if(shoreDeg===deg){
     shoreDeg=null;
+    manualShoreSet=false;
     $('shoreHint').textContent='Set for wind direction scoring';
     if(cachedWx) renderGrid();
     return;
@@ -585,7 +637,10 @@ function selectShore(btn){
   if(cachedWx) renderGrid();
 }
 function setShoreByDeg(deg){
-  document.querySelectorAll('.s-btn').forEach(b=>{if(Number(b.dataset.deg)===deg)selectShore(b);});
+  document.querySelectorAll('.s-btn').forEach(b=>b.classList.remove('active'));
+  shoreDeg=deg;
+  document.querySelectorAll('.s-btn').forEach(b=>{if(Number(b.dataset.deg)===deg)b.classList.add('active');});
+  if(cachedWx) renderGrid();
 }
 
 // ══════════════════════════════════
@@ -617,6 +672,7 @@ $('searchInput').addEventListener('keydown',e=>{if(e.key==='Enter')doSearch();})
 // ══════════════════════════════════
 async function fetchForecast(query){
   showOnly('loadingState');
+  manualShoreSet=false;
   try{
     const geo=await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=1&language=en&format=json`).then(r=>r.json());
     if(!geo.results?.length){
@@ -627,6 +683,9 @@ async function fetchForecast(query){
     const{latitude,longitude,name,country,admin1}=geo.results[0];
     cachedLoc={name,country,admin1,latitude,longitude};
 
+    // fire shore detection in parallel with weather fetch (don't await yet)
+    const shorePromise=manualShoreSet?Promise.resolve(null):autoDetectShore(latitude,longitude);
+
     const p=new URLSearchParams({
       latitude,longitude,
       hourly:['temperature_2m','weathercode','windspeed_10m','winddirection_10m','windgusts_10m','windspeed_80m','winddirection_80m'].join(','),
@@ -634,6 +693,16 @@ async function fetchForecast(query){
       forecast_days:10, timezone:'auto', windspeed_unit:'ms',
     });
     cachedWx=await fetch(`https://api.open-meteo.com/v1/forecast?${p}`).then(r=>r.json());
+
+    // apply auto-detected shore if user hasn't manually set one
+    if(!manualShoreSet){
+      const detected=await shorePromise;
+      if(detected!==null){
+        const snapped=snapTo8(detected);
+        setShoreByDeg(snapped);
+        $('shoreHint').textContent=`Auto-detected from coastline · you can override`;
+      }
+    }
 
     // build hour map: dateStr -> Map(hour 0-23 -> data)
     // Using a nested map keyed by date+hour avoids any time-string format ambiguity
