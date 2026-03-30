@@ -868,18 +868,39 @@ function toggleFavorite(){
 
 function renderHintChips(){
   const favs=loadFavs();
-  let html='';
+  const wrap=$('hintChips');
+  wrap.innerHTML='';
+
   if(favs.length){
-    html+=`<div class="hints-section-label">★ My spots</div>`;
-    html+=favs.map(f=>`
-      <span class="fav-chip">
-        <span class="fav-chip-label" onclick="pickFav(${JSON.stringify(f).replace(/"/g,'&quot;')})">${f.label}</span>
-        <span class="fav-chip-remove" onclick="removeFav(${JSON.stringify(f).replace(/"/g,'&quot;')})" title="Remove">✕</span>
-      </span>`).join('');
-    html+=`<div class="hints-section-label">Suggestions</div>`;
+    const lbl=document.createElement('div');
+    lbl.className='hints-section-label'; lbl.textContent='★ My spots';
+    wrap.appendChild(lbl);
+    favs.forEach(f=>{
+      const chip=document.createElement('span');
+      chip.className='fav-chip';
+      const label=document.createElement('span');
+      label.className='fav-chip-label'; label.textContent=f.label;
+      label.addEventListener('click',()=>pickFav(f));
+      const rm=document.createElement('span');
+      rm.className='fav-chip-remove'; rm.textContent='✕'; rm.title='Remove';
+      rm.addEventListener('click',e=>{e.stopPropagation();removeFav(f);});
+      chip.appendChild(label); chip.appendChild(rm);
+      wrap.appendChild(chip);
+    });
+    const lbl2=document.createElement('div');
+    lbl2.className='hints-section-label'; lbl2.textContent='Suggestions';
+    wrap.appendChild(lbl2);
   }
-  html+=DEFAULT_CHIPS.map(c=>`<span class="chip" onclick="pickSpot(SPOTS.find(s=>s.name===${JSON.stringify(c.name)}))">${c.label}</span>`).join('');
-  $('hintChips').innerHTML=html;
+
+  DEFAULT_CHIPS.forEach(c=>{
+    const chip=document.createElement('span');
+    chip.className='chip'; chip.textContent=c.label;
+    chip.addEventListener('click',()=>{
+      const spot=SPOTS.find(s=>s.name===c.name);
+      if(spot) pickSpot(spot);
+    });
+    wrap.appendChild(chip);
+  });
 }
 
 function pickFav(f){
