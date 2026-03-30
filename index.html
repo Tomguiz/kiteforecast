@@ -106,6 +106,8 @@
     }
     .day-card:hover  { transform:translateY(-4px); border-color:var(--accent); background:var(--card-hov); box-shadow:0 8px 28px rgba(0,0,0,.4),0 0 0 1px rgba(0,212,255,.08); }
     .day-card:active { transform:translateY(-1px); }
+    .day-card.has-session { border-color:rgba(34,197,94,.55); box-shadow:0 0 0 1px rgba(34,197,94,.18), 0 4px 20px rgba(34,197,94,.12); }
+    .day-card.has-session:hover { border-color:#4ade80; box-shadow:0 8px 28px rgba(0,0,0,.4),0 0 0 1px rgba(34,197,94,.4), 0 4px 24px rgba(34,197,94,.2); }
     /* tap indicator */
     .day-card::after { content:'tap'; position:absolute; top:7px; right:8px; font-size:.5rem; color:var(--tdim); letter-spacing:.04em; opacity:0; transition:opacity .18s; }
     @media (hover:hover) { .day-card::after { content:'↗'; } .day-card:hover::after { opacity:1; } }
@@ -118,17 +120,20 @@
     .t-range strong { color:var(--text); display:block; font-size:.86rem; }
 
     /* mini bar */
-    .hour-bar  { display:flex; gap:2px; width:100%; }
-    .hb        { flex:1; height:16px; border-radius:3px; min-width:2px; }
-    .hb-perfect  { background:#4ade80; }
-    .hb-verygood { background:#86efac; }
-    .hb-good     { background:#bef264; }
-    .hb-lightdir { background:rgba(234,179,8,.45); }
-    .hb-light    { background:rgba(100,116,139,.18); }
+    .hour-bar  { display:flex; gap:2px; width:100%; align-items:flex-end; height:20px; }
+    .hb        { flex:1; border-radius:2px 2px 0 0; min-width:2px; align-self:flex-end; }
+    .hb-perfect  { background:#4ade80; height:100%; }
+    .hb-verygood { background:#86efac; height:85%; }
+    .hb-good     { background:#bef264; height:70%; }
+    .hb-lightdir { background:rgba(234,179,8,.45); height:50%; }
+    .hb-light    { background:rgba(100,116,139,.18); height:30%; }
 
-    /* card badges */
-    .wind-peak { font-size:1.15rem; font-weight:800; line-height:1; text-align:center; }
-    .wind-peak .gust { font-size:.62rem; font-weight:400; color:var(--tdim); display:block; margin-top:2px; }
+    /* card wind range bar */
+    .card-wind { position:relative; height:22px; width:100%; border-radius:5px; overflow:hidden; background:rgba(255,255,255,.03); }
+    .cw-bar    { position:absolute; left:0; top:0; bottom:0; border-radius:5px; }
+    .cw-gust   { position:absolute; top:0; bottom:0; border-radius:0 5px 5px 0; opacity:.16; }
+    .cw-kn     { position:absolute; z-index:1; left:7px; top:50%; transform:translateY(-50%); font-size:.88rem; font-weight:800; }
+    .cw-gust-kn{ position:absolute; z-index:1; right:5px; top:50%; transform:translateY(-50%); font-size:.58rem; color:rgba(255,255,255,.38); font-weight:600; white-space:nowrap; }
     .dir-pill  { width:100%; padding:3px 0; border-radius:6px; text-align:center; font-size:.6rem; font-weight:700; letter-spacing:.03em; }
     .dir-side    { background:rgba(34,197,94,.1);  color:#4ade80; border:1px solid rgba(34,197,94,.22); }
     .dir-sideon  { background:rgba(34,197,94,.06); color:#86efac; border:1px solid rgba(34,197,94,.14); }
@@ -566,19 +571,23 @@ function conditionLabel(kn,dir,code,temp){
   return             {label:'✓ Good',       cls:'cond-good'};
 }
 
-function rateDay(gh,pk,code,badDir){
+function rateDay(gh,pk,code,badDir,peakDay){
   if([82,95,96,99].includes(code)) return {cls:'rating-danger',label:'⚡ Storm'};
-  if(gh===0) return badDir?{cls:'rating-bad',label:'❌ Bad direction'}:{cls:'rating-none',label:'😴 No wind'};
-  if(gh===1) return {cls:'rating-marginal',label:'⏱ 1h window'};
-  if(gh===2) return {cls:'rating-marginal',label:`⏱ 2h · ${pk}kn`};
+  if(gh===0){
+    if(badDir&&peakDay>=15) return {cls:'rating-bad',  label:'❌ Wrong direction'};
+    if(peakDay>=10)         return {cls:'rating-none', label:'💨 Too light'};
+    return                         {cls:'rating-none', label:'😴 No wind'};
+  }
+  if(gh===1) return {cls:'rating-bad',     label:'❌ Too brief (1h)'};
+  if(gh===2) return {cls:'rating-marginal',label:`⏱ 2h window · ${pk}kn`};
   if(gh<=4){
     if(pk>=25) return {cls:'rating-good',label:`✅ ${gh}h · 25+ kn`};
     if(pk>=20) return {cls:'rating-good',label:`✅ ${gh}h · 20+ kn`};
     return {cls:'rating-marginal',label:`🤔 ${gh}h · 15+ kn`};
   }
-  if(pk>=25) return {cls:'rating-perfect', label:`🪁 Perfect! ${gh}h`};
-  if(pk>=20) return {cls:'rating-verygood',label:`✅ Very Good ${gh}h`};
-  return {cls:'rating-good',label:`✅ Good ${gh}h`};
+  if(pk>=25) return {cls:'rating-perfect', label:`🪁 ${gh}h · Perfect!`};
+  if(pk>=20) return {cls:'rating-verygood',label:`✅ ${gh}h · Very Good`};
+  return {cls:'rating-good',label:`✅ ${gh}h · Good`};
 }
 
 function fmtDate(str){
@@ -1113,11 +1122,12 @@ function buildDay(dateStr,sunrise,sunset){
   }
   const day=hours.filter(h=>h.inDay);
   const good=day.filter(h=>h.qualifying);
-  const peakKn=good.length?Math.max(...good.map(h=>h.kn)):day.length?Math.max(...day.map(h=>h.kn)):0;
+  const peakKn=good.length?Math.max(...good.map(h=>h.kn)):0;
+  const peakDayKn=day.length?Math.max(...day.map(h=>h.kn)):0;
   const sample=good.length?good:day;
   const domDir=sample.length?circMean(sample.map(h=>h.dir)):null;
   const hasBadDir=day.some(h=>h.type==='lightdir');
-  return{hours,day,good,goodHours:good.length,peakKn,domDir,hasBadDir};
+  return{hours,day,good,goodHours:good.length,peakKn,peakDayKn,domDir,hasBadDir};
 }
 
 // ══════════════════════════════════
@@ -1144,9 +1154,9 @@ function renderGrid(){
     const tMax=Math.round(daily.temperature_2m_max[i]);
     const tMin=Math.round(daily.temperature_2m_min[i]);
     const gust=toKnotsR(daily.windgusts_10m_max[i]);
-    const{goodHours,peakKn,hasBadDir,domDir,day}=buildDay(dateStr,daily.sunrise[i],daily.sunset[i]);
+    const{goodHours,peakKn,peakDayKn,hasBadDir,domDir,day}=buildDay(dateStr,daily.sunrise[i],daily.sunset[i]);
     const{short,num}=fmtDate(dateStr);
-    const rating=rateDay(goodHours,peakKn,code,hasBadDir);
+    const rating=rateDay(goodHours,peakKn,code,hasBadDir,peakDayKn);
 
     const barHTML=day.map(h=>{
       const cls={perfect:'hb-perfect',verygood:'hb-verygood',good:'hb-good',lightdir:'hb-lightdir',light:'hb-light'}[h.type]||'hb-light';
@@ -1162,8 +1172,21 @@ function renderGrid(){
       ?`<div class="hours-pill has-wind">${goodHours}h qualifying wind</div>`
       :`<div class="hours-pill">${day.length}h daylight · no good wind</div>`;
 
+    // wind range bar: sustained up to peakKn, lighter extension to gusts
+    const dispKn=peakKn||peakDayKn;
+    const barCol=windBarColor(dispKn);
+    const sustPct=windBarPct(dispKn);
+    const gustPct=windBarPct(gust);
+    const gustExt=Math.max(0,gustPct-sustPct);
+    const windBarEl=`<div class="card-wind">
+      <div class="cw-bar" style="width:${sustPct}%;background:${barCol}"></div>
+      <div class="cw-gust" style="left:${sustPct}%;width:${gustExt}%;background:${barCol}"></div>
+      <span class="cw-kn" style="color:${barCol}">${dispKn} kn</span>
+      <span class="cw-gust-kn">↑${gust}</span>
+    </div>`;
+
     const card=document.createElement('div');
-    card.className='day-card';
+    card.className='day-card'+(goodHours>=2?' has-session':'');
     card.title='Tap for hourly detail';
     card.onclick=()=>openModal(dateStr,i);
     card.innerHTML=`
@@ -1173,7 +1196,7 @@ function renderGrid(){
         <div class="t-range"><strong>${tMax}°</strong>${tMin}°C</div>
       </div>
       <div class="hour-bar">${barHTML||'<div style="color:var(--tdim);font-size:.58rem;width:100%;text-align:center">—</div>'}</div>
-      <div class="wind-peak" style="color:${speedColor(peakKn)}">${peakKn}<span style="font-size:.6rem;font-weight:400;color:var(--tdim)"> kn</span><span class="gust">gusts ${gust} kn</span></div>
+      ${windBarEl}
       ${dirPill}
       ${hPill}
       <div class="rating-badge ${rating.cls}">${rating.label}</div>`;
