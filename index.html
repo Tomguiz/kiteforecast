@@ -495,10 +495,14 @@ function rateDay(gh,pk,code,badDir){
 }
 
 function fmtDate(str){
+  // Build today/tomorrow strings using local date components to avoid timezone rounding bugs
+  const now=new Date();
+  const pad=n=>String(n).padStart(2,'0');
+  const localStr=`${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+  const tom=new Date(now); tom.setDate(tom.getDate()+1);
+  const tomStr=`${tom.getFullYear()}-${pad(tom.getMonth()+1)}-${pad(tom.getDate())}`;
+  const short=str===localStr?'Today':str===tomStr?'Tomorrow':new Date(str+'T12:00:00').toLocaleDateString('en',{weekday:'short'});
   const d=new Date(str+'T12:00:00');
-  const today=new Date(); today.setHours(0,0,0,0);
-  const diff=Math.round((d-today)/86400000);
-  const short=diff===0?'Today':diff===1?'Tomorrow':d.toLocaleDateString('en',{weekday:'short'});
   const num=d.toLocaleDateString('en',{month:'short',day:'numeric'});
   const full=d.toLocaleDateString('en',{weekday:'long',month:'long',day:'numeric'});
   return {short,num,full};
