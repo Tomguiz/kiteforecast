@@ -387,18 +387,18 @@
 
     <!-- compact shore direction picker -->
     <div class="shore-bar" id="shoreBar">
-      <span class="shore-bar-label">Shore faces →</span>
+      <span class="shore-bar-label">Good wind dirs →</span>
       <div class="shore-btns" id="shoreBtns">
-        <button class="s-btn" data-deg="0"   onclick="selectShore(this)">N</button>
-        <button class="s-btn" data-deg="45"  onclick="selectShore(this)">NE</button>
-        <button class="s-btn" data-deg="90"  onclick="selectShore(this)">E</button>
-        <button class="s-btn" data-deg="135" onclick="selectShore(this)">SE</button>
-        <button class="s-btn" data-deg="180" onclick="selectShore(this)">S</button>
-        <button class="s-btn" data-deg="225" onclick="selectShore(this)">SW</button>
-        <button class="s-btn" data-deg="270" onclick="selectShore(this)">W</button>
-        <button class="s-btn" data-deg="315" onclick="selectShore(this)">NW</button>
+        <button class="s-btn" data-deg="0"   onclick="toggleWindDir(this)">N</button>
+        <button class="s-btn" data-deg="45"  onclick="toggleWindDir(this)">NE</button>
+        <button class="s-btn" data-deg="90"  onclick="toggleWindDir(this)">E</button>
+        <button class="s-btn" data-deg="135" onclick="toggleWindDir(this)">SE</button>
+        <button class="s-btn" data-deg="180" onclick="toggleWindDir(this)">S</button>
+        <button class="s-btn" data-deg="225" onclick="toggleWindDir(this)">SW</button>
+        <button class="s-btn" data-deg="270" onclick="toggleWindDir(this)">W</button>
+        <button class="s-btn" data-deg="315" onclick="toggleWindDir(this)">NW</button>
       </div>
-      <span class="shore-hint" id="shoreHint">Set for wind direction scoring</span>
+      <span class="shore-hint" id="shoreHint">Select good wind directions for this spot</span>
     </div>
 
     <div class="forecast-grid" id="forecastGrid"></div>
@@ -460,7 +460,7 @@
 // ══════════════════════════════════
 //  STATE
 // ══════════════════════════════════
-let shoreDeg       = null;
+let windDirs       = new Set(); // selected qualifying wind directions (degrees)
 let manualShoreSet = false;
 let cachedWx    = null;
 let cachedLoc   = null;
@@ -504,7 +504,19 @@ function dirAnalysis(wd, sf){
   if(d<=155) return {key:'sideoff', txt:'↙ Side-off',   cls:'dir-sideoff'};
   return           {key:'offshore',txt:'↑ Offshore',   cls:'dir-offshore'};
 }
-const isDirOK = k => k==='side'||k==='sideon';
+function isWindDirOK(deg){
+  if(windDirs.size===0) return true;
+  for(const d of windDirs){ if(angleDiff(deg,d)<=22.5) return true; }
+  return false;
+}
+function updateShoreHint(){
+  if(windDirs.size===0){
+    $('shoreHint').textContent='Select good wind directions for this spot';
+    return;
+  }
+  const dirs=[...windDirs].sort((a,b)=>a-b).map(d=>compass(d)).join(', ');
+  $('shoreHint').textContent=`Good winds: ${dirs}`;
+}
 
 function speedTier(kn){
   return kn>=25?3:kn>=20?2:kn>=15?1:0;
@@ -534,9 +546,7 @@ function classifyHour(kn,dir,code){
   const sp=speedTier(kn);
   if(sp===0) return {type:'light',qualifying:false};
   if(isRainy(code)) return {type:'rain',qualifying:false};
-  if(shoreDeg===null) return {type:['good','verygood','perfect'][sp-1],qualifying:true};
-  const da=dirAnalysis(dir,shoreDeg);
-  if(!isDirOK(da.key)) return {type:'lightdir',qualifying:false};
+  if(!isWindDirOK(dir)) return {type:'lightdir',qualifying:false};
   return {type:['good','verygood','perfect'][sp-1],qualifying:true};
 }
 
@@ -645,28 +655,28 @@ async function autoDetectShore(lat,lon){
 // ══════════════════════════════════
 //  SHORE PICKER
 // ══════════════════════════════════
-function selectShore(btn){
+function toggleWindDir(btn){
   const deg=Number(btn.dataset.deg);
-  document.querySelectorAll('.s-btn').forEach(b=>b.classList.remove('active'));
   manualShoreSet=true;
-  if(shoreDeg===deg){
-    shoreDeg=null;
-    manualShoreSet=false;
-    $('shoreHint').textContent='Set for wind direction scoring';
-    if(cachedWx&&cachedHrMap) renderGrid();
-    return;
+  if(windDirs.has(deg)){
+    windDirs.delete(deg);
+    btn.classList.remove('active');
+    if(windDirs.size===0) manualShoreSet=false;
+  } else {
+    windDirs.add(deg);
+    btn.classList.add('active');
   }
-  btn.classList.add('active');
-  shoreDeg=deg;
-  $('shoreHint').textContent=`Side-shore ≈ ${compass((deg+90)%360)} or ${compass((deg+270)%360)}`;
+  updateShoreHint();
   if(cachedWx&&cachedHrMap) renderGrid();
 }
-function setShoreByDeg(deg){
-  document.querySelectorAll('.s-btn').forEach(b=>b.classList.remove('active'));
-  shoreDeg=deg;
-  document.querySelectorAll('.s-btn').forEach(b=>{if(Number(b.dataset.deg)===deg)b.classList.add('active');});
+function setWindDirs(degs){
+  windDirs=new Set(degs);
+  document.querySelectorAll('.s-btn').forEach(b=>b.classList.toggle('active',windDirs.has(Number(b.dataset.deg))));
+  updateShoreHint();
   if(cachedWx&&cachedHrMap) renderGrid();
 }
+// keep for backward-compat (auto-detect still calls this with a single deg)
+function setShoreByDeg(deg){ setWindDirs([deg]); }
 
 // ══════════════════════════════════
 //  DOM
@@ -683,63 +693,63 @@ function showOnly(id){
 // ══════════════════════════════════
 const SPOTS=[
   // Belgium
-  {name:'Riverwoods Beachclub',loc:'Knokke-Heist, Belgium',lat:51.3627,lon:3.3062,shore:0},
-  {name:'Knokke Beach',loc:'Knokke-Heist, Belgium',lat:51.3590,lon:3.3100,shore:0},
-  {name:'Icarus Kite School',loc:'Zeebrugge, Belgium',lat:51.3459,lon:3.1989,shore:0},
-  {name:'Zeebrugge',loc:'Zeebrugge, Belgium',lat:51.3459,lon:3.1989,shore:0},
-  {name:'De Panne',loc:'De Panne, Belgium',lat:51.0701,lon:2.5888,shore:0},
-  {name:'Oostduinkerke',loc:'Koksijde, Belgium',lat:51.1106,lon:2.6878,shore:0},
-  {name:'Blankenberge',loc:'Blankenberge, Belgium',lat:51.3086,lon:3.1317,shore:0},
-  {name:'Middelkerke',loc:'Middelkerke, Belgium',lat:51.1892,lon:2.8267,shore:0},
+  {name:'Riverwoods Beachclub',loc:'Knokke-Heist, Belgium',lat:51.3627,lon:3.3062,dirs:[270,315]},
+  {name:'Knokke Beach',loc:'Knokke-Heist, Belgium',lat:51.3590,lon:3.3100,dirs:[270,315]},
+  {name:'Icarus Kite School',loc:'Zeebrugge, Belgium',lat:51.3459,lon:3.1989,dirs:[270,315]},
+  {name:'Zeebrugge',loc:'Zeebrugge, Belgium',lat:51.3459,lon:3.1989,dirs:[270,315]},
+  {name:'De Panne',loc:'De Panne, Belgium',lat:51.0701,lon:2.5888,dirs:[270,315]},
+  {name:'Oostduinkerke',loc:'Koksijde, Belgium',lat:51.1106,lon:2.6878,dirs:[270,315]},
+  {name:'Blankenberge',loc:'Blankenberge, Belgium',lat:51.3086,lon:3.1317,dirs:[270,315]},
+  {name:'Middelkerke',loc:'Middelkerke, Belgium',lat:51.1892,lon:2.8267,dirs:[270,315]},
   // Netherlands
-  {name:'Scheveningen',loc:'The Hague, Netherlands',lat:52.1053,lon:4.2676,shore:270},
-  {name:'Brouwersdam',loc:'Zeeland, Netherlands',lat:51.7333,lon:3.8667,shore:180},
-  {name:'Workum',loc:'Friesland, Netherlands',lat:52.9800,lon:5.4400,shore:270},
-  {name:'Maasvlakte',loc:'Rotterdam, Netherlands',lat:51.9667,lon:4.0167,shore:270},
-  {name:'Castricum',loc:'Noord-Holland, Netherlands',lat:52.5667,lon:4.6167,shore:270},
-  {name:'Wijk aan Zee',loc:'Noord-Holland, Netherlands',lat:52.5000,lon:4.6000,shore:270},
-  {name:'Hvide Sande',loc:'Jutland, Denmark',lat:56.0000,lon:8.1333,shore:270},
+  {name:'Scheveningen',loc:'The Hague, Netherlands',lat:52.1053,lon:4.2676,dirs:[180,225,315,0]},
+  {name:'Brouwersdam',loc:'Zeeland, Netherlands',lat:51.7333,lon:3.8667,dirs:[225,270,315]},
+  {name:'Workum',loc:'Friesland, Netherlands',lat:52.9800,lon:5.4400,dirs:[225,270,315]},
+  {name:'Maasvlakte',loc:'Rotterdam, Netherlands',lat:51.9667,lon:4.0167,dirs:[180,225,315]},
+  {name:'Castricum',loc:'Noord-Holland, Netherlands',lat:52.5667,lon:4.6167,dirs:[180,225,315]},
+  {name:'Wijk aan Zee',loc:'Noord-Holland, Netherlands',lat:52.5000,lon:4.6000,dirs:[180,225,315]},
+  {name:'Hvide Sande',loc:'Jutland, Denmark',lat:56.0000,lon:8.1333,dirs:[180,225,315]},
   // Spain
-  {name:'Tarifa',loc:'Tarifa, Spain',lat:36.0143,lon:-5.6044,shore:315},
-  {name:'Valdevaqueros',loc:'Tarifa, Spain',lat:36.0778,lon:-5.6778,shore:315},
-  {name:'Los Lances',loc:'Tarifa, Spain',lat:36.0400,lon:-5.6200,shore:315},
-  {name:'El Medano',loc:'Tenerife, Spain',lat:28.0444,lon:-16.5292,shore:225},
-  {name:'Fuerteventura',loc:'Canary Islands, Spain',lat:28.3587,lon:-14.0535,shore:270},
-  {name:'Sotavento',loc:'Fuerteventura, Spain',lat:28.1497,lon:-14.2369,shore:270},
+  {name:'Tarifa',loc:'Tarifa, Spain',lat:36.0143,lon:-5.6044,dirs:[90,270]},
+  {name:'Valdevaqueros',loc:'Tarifa, Spain',lat:36.0778,lon:-5.6778,dirs:[90,270]},
+  {name:'Los Lances',loc:'Tarifa, Spain',lat:36.0400,lon:-5.6200,dirs:[90,270]},
+  {name:'El Medano',loc:'Tenerife, Spain',lat:28.0444,lon:-16.5292,dirs:[225,270]},
+  {name:'Fuerteventura',loc:'Canary Islands, Spain',lat:28.3587,lon:-14.0535,dirs:[225,270]},
+  {name:'Sotavento',loc:'Fuerteventura, Spain',lat:28.1497,lon:-14.2369,dirs:[225,270]},
   // France
-  {name:'Leucate',loc:'Occitanie, France',lat:42.9064,lon:3.0347,shore:270},
-  {name:'Almanarre',loc:'Hyères, France',lat:43.0694,lon:6.1292,shore:90},
-  {name:'Saint-Malo',loc:'Brittany, France',lat:48.6500,lon:-2.0300,shore:270},
-  {name:'Gruissan',loc:'Occitanie, France',lat:43.1094,lon:3.0847,shore:270},
+  {name:'Leucate',loc:'Occitanie, France',lat:42.9064,lon:3.0347,dirs:[315,0,270]},
+  {name:'Almanarre',loc:'Hyères, France',lat:43.0694,lon:6.1292,dirs:[270,315]},
+  {name:'Saint-Malo',loc:'Brittany, France',lat:48.6500,lon:-2.0300,dirs:[270,315]},
+  {name:'Gruissan',loc:'Occitanie, France',lat:43.1094,lon:3.0847,dirs:[270,315]},
   // Morocco
-  {name:'Dakhla',loc:'Dakhla, Morocco',lat:23.7136,lon:-15.9355,shore:270},
-  {name:'Essaouira',loc:'Essaouira, Morocco',lat:31.5125,lon:-9.7700,shore:270},
+  {name:'Dakhla',loc:'Dakhla, Morocco',lat:23.7136,lon:-15.9355,dirs:[225,270]},
+  {name:'Essaouira',loc:'Essaouira, Morocco',lat:31.5125,lon:-9.7700,dirs:[270,315]},
   // Egypt
-  {name:'El Gouna',loc:'Red Sea, Egypt',lat:27.3969,lon:33.6778,shore:90},
-  {name:'Soma Bay',loc:'Red Sea, Egypt',lat:26.8917,lon:33.9333,shore:90},
+  {name:'El Gouna',loc:'Red Sea, Egypt',lat:27.3969,lon:33.6778,dirs:[45,90]},
+  {name:'Soma Bay',loc:'Red Sea, Egypt',lat:26.8917,lon:33.9333,dirs:[45,90]},
   // Greece
-  {name:'Vassiliki',loc:'Lefkada, Greece',lat:38.6333,lon:20.5833,shore:180},
-  {name:'Prasonisi',loc:'Rhodes, Greece',lat:35.8881,lon:27.7378,shore:90},
+  {name:'Vassiliki',loc:'Lefkada, Greece',lat:38.6333,lon:20.5833,dirs:[180,225]},
+  {name:'Prasonisi',loc:'Rhodes, Greece',lat:35.8881,lon:27.7378,dirs:[45,90]},
   // Italy
-  {name:'Brindisi',loc:'Puglia, Italy',lat:40.6333,lon:17.9417,shore:90},
-  {name:'Lake Garda',loc:'Lombardia, Italy',lat:45.6167,lon:10.7167,shore:180},
+  {name:'Brindisi',loc:'Puglia, Italy',lat:40.6333,lon:17.9417,dirs:[90,135]},
+  {name:'Lake Garda',loc:'Lombardia, Italy',lat:45.6167,lon:10.7167,dirs:[180,225]},
   // South Africa
-  {name:'Bloubergstrand',loc:'Cape Town, South Africa',lat:-33.8028,lon:18.4703,shore:270},
-  {name:'Cape Town',loc:'Cape Town, South Africa',lat:-33.9050,lon:18.4200,shore:270},
-  {name:'Langebaan',loc:'Western Cape, South Africa',lat:-33.1000,lon:18.0333,shore:90},
+  {name:'Bloubergstrand',loc:'Cape Town, South Africa',lat:-33.8028,lon:18.4703,dirs:[225,270]},
+  {name:'Cape Town',loc:'Cape Town, South Africa',lat:-33.9050,lon:18.4200,dirs:[225,270]},
+  {name:'Langebaan',loc:'Western Cape, South Africa',lat:-33.1000,lon:18.0333,dirs:[90,135]},
   // Hawaii
-  {name:'Kite Beach Maui',loc:'Maui, Hawaii',lat:20.9237,lon:-156.6892,shore:315},
-  {name:'Kanaha',loc:'Maui, Hawaii',lat:20.9019,lon:-156.4494,shore:270},
+  {name:'Kite Beach Maui',loc:'Maui, Hawaii',lat:20.9237,lon:-156.6892,dirs:[45,90]},
+  {name:'Kanaha',loc:'Maui, Hawaii',lat:20.9019,lon:-156.4494,dirs:[45,90]},
   // Dominican Republic
-  {name:'Cabarete',loc:'Puerto Plata, Dominican Republic',lat:19.7667,lon:-70.4167,shore:0},
+  {name:'Cabarete',loc:'Puerto Plata, Dominican Republic',lat:19.7667,lon:-70.4167,dirs:[0,45]},
   // Brazil
-  {name:'Cumbuco',loc:'Ceará, Brazil',lat:-3.6000,lon:-38.7667,shore:180},
-  {name:'Jericoacoara',loc:'Ceará, Brazil',lat:-2.7978,lon:-40.5114,shore:180},
+  {name:'Cumbuco',loc:'Ceará, Brazil',lat:-3.6000,lon:-38.7667,dirs:[90,135]},
+  {name:'Jericoacoara',loc:'Ceará, Brazil',lat:-2.7978,lon:-40.5114,dirs:[90,135]},
   // Australia
-  {name:'Lancelin',loc:'Western Australia, Australia',lat:-31.0181,lon:115.3281,shore:270},
-  {name:'Surfers Paradise',loc:'Queensland, Australia',lat:-28.0022,lon:153.4309,shore:90},
+  {name:'Lancelin',loc:'Western Australia, Australia',lat:-31.0181,lon:115.3281,dirs:[270,315]},
+  {name:'Surfers Paradise',loc:'Queensland, Australia',lat:-28.0022,lon:153.4309,dirs:[45,90]},
   // Thailand
-  {name:'Hua Hin',loc:'Prachuap Khiri Khan, Thailand',lat:12.5686,lon:99.9578,shore:270},
+  {name:'Hua Hin',loc:'Prachuap Khiri Khan, Thailand',lat:12.5686,lon:99.9578,dirs:[225,270]},
 ];
 
 function spotSearch(q){
@@ -749,6 +759,30 @@ function spotSearch(q){
     s.name.toLowerCase().includes(ql)||
     s.loc.toLowerCase().includes(ql)
   ).slice(0,6);
+}
+
+let osmSearchCache={};
+async function searchOsmSpots(q){
+  if(q.length<3) return [];
+  const key=q.toLowerCase();
+  if(osmSearchCache[key]) return osmSearchCache[key];
+  try{
+    const query=`[out:json][timeout:6];node["sport"="kitesurfing"]["name"~"${q.replace(/"/g,'')}",i];out body 8;`;
+    const ctrl=new AbortController();
+    setTimeout(()=>ctrl.abort(),6000);
+    const r=await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`,{signal:ctrl.signal});
+    const data=await r.json();
+    const results=(data.elements||[]).map(n=>({
+      name: n.tags.name||'Unknown',
+      loc:  [n.tags['addr:city'],n.tags['addr:country']].filter(Boolean).join(', ')||'Kitesurf spot',
+      lat:  n.lat,
+      lon:  n.lon,
+      dirs: [],
+      _osm: true,
+    }));
+    osmSearchCache[key]=results;
+    return results;
+  }catch{ return []; }
 }
 
 let acActive=-1;
@@ -786,15 +820,13 @@ async function fetchForecastFromSpot(spot){
     cachedWx=await safeFetch(`https://api.open-meteo.com/v1/forecast?${p}`);
     if(cachedWx.error) throw new Error(cachedWx.reason||'API error');
     if(!manualShoreSet){
-      if(spot.shore!=null){
-        setShoreByDeg(spot.shore);
-        $('shoreHint').textContent=`Known spot direction · you can override`;
-      } else {
+      if(spot.dirs&&spot.dirs.length>0){
+        setWindDirs(spot.dirs);
+        $('shoreHint').textContent=`Known good directions · you can override`;
+      } else if(spot._osm){
+        // OSM spot — try auto-detect
         const detected=await autoDetectShore(spot.lat,spot.lon).catch(()=>null);
-        if(detected!==null){
-          setShoreByDeg(snapTo8(detected));
-          $('shoreHint').textContent=`Auto-detected from coastline · you can override`;
-        }
+        if(detected!==null){ setWindDirs([snapTo8(detected)]); $('shoreHint').textContent=`Auto-detected · you can override`; }
       }
     }
     cachedHrMap=new Map();
@@ -856,7 +888,7 @@ function toggleFavorite(){
       label:`${loc.name}${loc.admin1?', '+loc.admin1:''}`,
       lat:  loc.latitude,
       lon:  loc.longitude,
-      shore:shoreDeg,
+      dirs: [...windDirs],
     });
   }
   saveFavs(favs);
@@ -907,7 +939,7 @@ function pickFav(f){
   $('searchInput').value=f.name;
   closeAC();
   manualShoreSet=false;
-  fetchForecastFromSpot({name:f.name,loc:f.label,lat:f.lat,lon:f.lon,shore:f.shore});
+  fetchForecastFromSpot({name:f.name,loc:f.label,lat:f.lat,lon:f.lon,dirs:f.dirs||[]});
 }
 
 function removeFav(f){
@@ -927,9 +959,9 @@ function resetSearch(){
   renderHintChips();
   showOnly('hintState');
   cachedWx=null; cachedLoc=null; cachedHrMap=new Map();
-  shoreDeg=null; manualShoreSet=false;
+  windDirs=new Set(); manualShoreSet=false;
   document.querySelectorAll('.s-btn').forEach(b=>b.classList.remove('active'));
-  $('shoreHint').textContent='Set for wind direction scoring';
+  $('shoreHint').textContent='Select good wind directions for this spot';
   $('searchInput').focus();
 }
 async function doSearch(){
@@ -943,9 +975,20 @@ async function doSearch(){
   await fetchForecast(q);
 }
 $('searchInput').addEventListener('input',e=>{
-  const items=spotSearch(e.target.value.trim());
-  renderAC(items);
+  const q=e.target.value.trim();
+  const local=spotSearch(q);
+  renderAC(local); // show local results immediately
   acActive=-1;
+  if(q.length>=3){
+    searchOsmSpots(q).then(osm=>{
+      // only update if input value hasn't changed
+      if($('searchInput').value.trim()===q){
+        const merged=[...local];
+        osm.forEach(o=>{ if(!merged.find(m=>m.name.toLowerCase()===o.name.toLowerCase())) merged.push(o); });
+        renderAC(merged.slice(0,8));
+      }
+    });
+  }
 });
 $('searchInput').addEventListener('keydown',e=>{
   const dd=$('acDropdown');
@@ -1004,8 +1047,7 @@ async function fetchForecast(query){
     if(!manualShoreSet){
       const detected=await shorePromise.catch(()=>null);
       if(detected!==null){
-        const snapped=snapTo8(detected);
-        setShoreByDeg(snapped);
+        setWindDirs([snapTo8(detected)]);
         $('shoreHint').textContent=`Auto-detected from coastline · you can override`;
       }
     }
@@ -1074,7 +1116,7 @@ function renderGrid(){
   const mapsUrl=`https://www.google.com/maps?q=${loc.latitude},${loc.longitude}`;
   const isFav=isFavorite(loc);
   $('locName').innerHTML=`${loc.name}${loc.admin1?', '+loc.admin1:''}<a class="map-link" href="${mapsUrl}" target="_blank" rel="noopener" title="Open in Google Maps"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Maps</a><button class="fav-btn${isFav?' active':''}" id="favBtn" title="${isFav?'Remove from favourites':'Add to favourites'}" onclick="toggleFavorite()">${isFav?'★':'☆'}</button>`;
-  $('locSub').textContent=`${loc.country} · ${loc.latitude.toFixed(2)}°, ${loc.longitude.toFixed(2)}°`+(shoreDeg!==null?` · Shore ${compass(shoreDeg)}`:'');
+  $('locSub').textContent=`${loc.country} · ${loc.latitude.toFixed(2)}°, ${loc.longitude.toFixed(2)}°`+(windDirs.size>0?` · Winds: ${[...windDirs].sort((a,b)=>a-b).map(d=>compass(d)).join('/')}`:'');
   $('locHdr').style.display='block';
   $('shoreBar').classList.add('visible');
   $('resetBtn').style.display='inline-flex';
@@ -1098,9 +1140,9 @@ function renderGrid(){
     }).join('');
 
     let dirPill='';
-    if(shoreDeg!==null&&domDir!==null){
-      const da=dirAnalysis(domDir,shoreDeg);
-      dirPill=`<div class="dir-pill ${da.cls}">${da.txt} (${compass(domDir)})</div>`;
+    if(windDirs.size>0&&domDir!==null){
+      const ok=isWindDirOK(domDir);
+      dirPill=`<div class="dir-pill ${ok?'dir-side':'dir-sideoff'}">${ok?'✓ Good wind':'✗ Bad wind'} (${compass(domDir)})</div>`;
     }
     const hPill=goodHours>0
       ?`<div class="hours-pill has-wind">${goodHours}h qualifying wind</div>`
@@ -1141,7 +1183,7 @@ function openModal(dateStr,dayIdx){
 
   $('mTitle').textContent=full;
   $('mSub').innerHTML=`${loc.name}${loc.admin1?', '+loc.admin1:''} · ${loc.country}`
-    +(shoreDeg!==null?` · Shore <strong style="color:var(--accent)">${compass(shoreDeg)}</strong>`:'');
+    +(windDirs.size>0?` · Good: <strong style="color:var(--accent)">${[...windDirs].sort((a,b)=>a-b).map(d=>compass(d)).join(' / ')}</strong>`:'');
 
   // session chips
   const win=bestWindow(good);
@@ -1154,7 +1196,7 @@ function openModal(dateStr,dayIdx){
     ${win?`<span class="m-badge green">🪁 ${win}</span>`:''}
     ${peakKn>0?`<span class="m-badge accent">Peak ${peakKn} kn</span>`:''}
     ${maxGust>0?`<span class="m-badge">Gusts ${maxGust} kn</span>`:''}
-    ${domDir!==null?(()=>{const da=dirAnalysis(domDir,shoreDeg??domDir);return`<span class="m-badge">${da.txt} (${compass(domDir)})</span>`;})():''}
+    ${domDir!==null?`<span class="m-badge">${isWindDirOK(domDir)?'✓':'✗'} ${compass(domDir)}</span>`:''}
     <span class="m-badge">🌡 avg ${avgTemp}°C</span>
     <span class="m-badge">🌅 ${srTime} · 🌇 ${ssTime}</span>`;
 
@@ -1175,9 +1217,9 @@ function openModal(dateStr,dayIdx){
   $('mTlLegend').textContent=`${goodHours} qualifying hour${goodHours!==1?'s':''}`;
 
   // table
-  const ws=shoreDeg!==null;
+  const ws=windDirs.size>0;
   const wsCls=ws?'ws':'';
-  const shoreTH=ws?'<div>Shore</div>':'';
+  const shoreTH=ws?'<div>Dir OK</div>':'';
 
   let html=`<div class="m-thead ${wsCls}">
     <div>Time</div><div></div><div>Temp</div>
@@ -1202,8 +1244,8 @@ function openModal(dateStr,dayIdx){
 
     let shoreTD='';
     if(ws){
-      const da=dirAnalysis(h.dir,shoreDeg);
-      shoreTD=`<div class="c-sp ${da.cls}">${da.txt}</div>`;
+      const ok=isWindDirOK(h.dir);
+      shoreTD=`<div class="c-sp ${ok?'dir-side':'dir-sideoff'}">${ok?'✓ Good':'✗ Bad'}</div>`;
     }
 
     const kn80html=h.kn80!=null
