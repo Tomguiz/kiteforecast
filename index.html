@@ -771,7 +771,6 @@ async function fetchForecastFromSpot(spot){
   manualShoreSet=false;
   try{
     cachedLoc={name:spot.name,country:spot.loc.split(', ').pop(),admin1:spot.loc.split(', ').slice(0,-1).join(', '),latitude:spot.lat,longitude:spot.lon};
-    const shorePromise=autoDetectShore(spot.lat,spot.lon);
     const p=new URLSearchParams({
       latitude:spot.lat,longitude:spot.lon,
       hourly:['temperature_2m','weather_code','windspeed_10m','winddirection_10m','windgusts_10m','windspeed_80m','winddirection_80m'].join(','),
@@ -781,12 +780,11 @@ async function fetchForecastFromSpot(spot){
     cachedWx=await safeFetch(`https://api.open-meteo.com/v1/forecast?${p}`);
     if(cachedWx.error) throw new Error(cachedWx.reason||'API error');
     if(!manualShoreSet){
-      // use pre-defined shore first, fall back to auto-detect
       if(spot.shore!=null){
         setShoreByDeg(spot.shore);
         $('shoreHint').textContent=`Known spot direction · you can override`;
       } else {
-        const detected=await shorePromise.catch(()=>null);
+        const detected=await autoDetectShore(spot.lat,spot.lon).catch(()=>null);
         if(detected!==null){
           setShoreByDeg(snapTo8(detected));
           $('shoreHint').textContent=`Auto-detected from coastline · you can override`;
@@ -805,14 +803,15 @@ async function fetchForecastFromSpot(spot){
         kn:     toKnotsR(h.windspeed_10m[i]),
         dir:    h.winddirection_10m[i],
         gustKn: toKnotsR(h.windgusts_10m[i]),
-        kn80:   h.windspeed_80m?.[i]    !=null ? toKnotsR(h.windspeed_80m[i])    : null,
-        dir80:  h.winddirection_80m?.[i] !=null ? h.winddirection_80m[i]          : null,
+        kn80:   h.windspeed_80m?.[i]!=null ? toKnotsR(h.windspeed_80m[i]) : null,
+        dir80:  h.winddirection_80m?.[i]!=null ? h.winddirection_80m[i] : null,
       });
     });
     renderGrid();
   }catch(err){
-    $('errorTitle').textContent='Network error';
-    $('errorMsg').textContent='Could not reach the forecast service. Please check your connection and try again.';
+    console.error('fetchForecastFromSpot error:',err);
+    $('errorTitle').textContent='Forecast unavailable';
+    $('errorMsg').textContent=err?.message||'Could not load forecast. Please try again.';
     showOnly('errorState');
   }
 }
@@ -860,7 +859,7 @@ document.addEventListener('click',e=>{if(!e.target.closest('.search-wrap'))close
 // ══════════════════════════════════
 //  FETCH
 // ══════════════════════════════════
-async function safeFetch(url,timeoutMs=10000){
+async function safeFetch(url,timeoutMs=20000){
   const ctrl=new AbortController();
   const timer=setTimeout(()=>ctrl.abort(),timeoutMs);
   try{
@@ -929,8 +928,9 @@ async function fetchForecast(query){
 
     renderGrid();
   }catch(err){
-    $('errorTitle').textContent='Network error';
-    $('errorMsg').textContent='Could not reach the forecast service. Please check your connection and try again.';
+    console.error('fetchForecast error:',err);
+    $('errorTitle').textContent='Forecast unavailable';
+    $('errorMsg').textContent=err?.message||'Could not load forecast. Please try again.';
     showOnly('errorState');
   }
 }
