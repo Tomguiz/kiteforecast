@@ -494,9 +494,9 @@ function angleDiff(a,b){
 function dirAnalysis(wd, sf){
   const d=angleDiff(wd,sf);
   if(d<=20)  return {key:'onshore', txt:'↓ Onshore',    cls:'dir-onshore'};
-  if(d<=45)  return {key:'sideon',  txt:'↗ Side-on',    cls:'dir-sideon'};
-  if(d<=135) return {key:'side',    txt:'↔ Side-shore', cls:'dir-side'};
-  if(d<=160) return {key:'sideoff', txt:'↙ Side-off',   cls:'dir-sideoff'};
+  if(d<=50)  return {key:'sideon',  txt:'↗ Side-on',    cls:'dir-sideon'};
+  if(d<=90)  return {key:'side',    txt:'↔ Side-shore', cls:'dir-side'};
+  if(d<=155) return {key:'sideoff', txt:'↙ Side-off',   cls:'dir-sideoff'};
   return           {key:'offshore',txt:'↑ Offshore',   cls:'dir-offshore'};
 }
 const isDirOK = k => k==='side'||k==='sideon';
