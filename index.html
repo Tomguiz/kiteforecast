@@ -673,11 +673,25 @@ $('searchInput').addEventListener('keydown',e=>{if(e.key==='Enter')doSearch();})
 // ══════════════════════════════════
 //  FETCH
 // ══════════════════════════════════
+async function safeFetch(url,timeoutMs=10000){
+  const ctrl=new AbortController();
+  const timer=setTimeout(()=>ctrl.abort(),timeoutMs);
+  try{
+    const r=await fetch(url,{signal:ctrl.signal});
+    clearTimeout(timer);
+    if(!r.ok) throw new Error(`HTTP ${r.status}`);
+    return await r.json();
+  }catch(e){
+    clearTimeout(timer);
+    throw e;
+  }
+}
+
 async function fetchForecast(query){
   showOnly('loadingState');
   manualShoreSet=false;
   try{
-    const geo=await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=1&language=en&format=json`).then(r=>r.json());
+    const geo=await safeFetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=1&language=en&format=json`);
     if(!geo.results?.length){
       $('errorTitle').textContent='Location not found';
       $('errorMsg').textContent=`Could not find "${query}". Try a more specific name.`;
@@ -687,15 +701,16 @@ async function fetchForecast(query){
     cachedLoc={name,country,admin1,latitude,longitude};
 
     // fire shore detection in parallel with weather fetch (don't await yet)
-    const shorePromise=manualShoreSet?Promise.resolve(null):autoDetectShore(latitude,longitude);
+    const shorePromise=autoDetectShore(latitude,longitude);
 
     const p=new URLSearchParams({
       latitude,longitude,
-      hourly:['temperature_2m','weathercode','windspeed_10m','winddirection_10m','windgusts_10m','windspeed_80m','winddirection_80m'].join(','),
-      daily:['weathercode','temperature_2m_max','temperature_2m_min','windgusts_10m_max','sunrise','sunset'].join(','),
+      hourly:['temperature_2m','weather_code','windspeed_10m','winddirection_10m','windgusts_10m','windspeed_80m','winddirection_80m'].join(','),
+      daily:['weather_code','temperature_2m_max','temperature_2m_min','windgusts_10m_max','sunrise','sunset'].join(','),
       forecast_days:10, timezone:'auto', windspeed_unit:'ms',
     });
-    cachedWx=await fetch(`https://api.open-meteo.com/v1/forecast?${p}`).then(r=>r.json());
+    cachedWx=await safeFetch(`https://api.open-meteo.com/v1/forecast?${p}`);
+    if(cachedWx.error) throw new Error(cachedWx.reason||'API error');
 
     // apply auto-detected shore if user hasn't manually set one
     if(!manualShoreSet){
@@ -708,7 +723,6 @@ async function fetchForecast(query){
     }
 
     // build hour map: dateStr -> Map(hour 0-23 -> data)
-    // Using a nested map keyed by date+hour avoids any time-string format ambiguity
     cachedHrMap=new Map();
     const h=cachedWx.hourly;
     h.time.forEach((t,i)=>{
@@ -717,7 +731,7 @@ async function fetchForecast(query){
       if(!cachedHrMap.has(dateStr)) cachedHrMap.set(dateStr,new Map());
       cachedHrMap.get(dateStr).set(hour,{
         temp:   Math.round(h.temperature_2m[i]),
-        code:   h.weathercode[i]??0,
+        code:   h.weather_code[i]??0,
         kn:     toKnotsR(h.windspeed_10m[i]),
         dir:    h.winddirection_10m[i],
         gustKn: toKnotsR(h.windgusts_10m[i]),
@@ -777,7 +791,7 @@ function renderGrid(){
   grid.innerHTML='';
 
   daily.time.forEach((dateStr,i)=>{
-    const code=daily.weathercode[i];
+    const code=daily.weather_code[i];
     const[icon]=wmoInfo(code);
     const tMax=Math.round(daily.temperature_2m_max[i]);
     const tMin=Math.round(daily.temperature_2m_min[i]);
@@ -831,7 +845,7 @@ function openModal(dateStr,dayIdx){
   const{hours,day,good,goodHours,peakKn,domDir,hasBadDir}=buildDay(dateStr,sunrise,sunset);
   const{full}=fmtDate(dateStr);
   const loc=cachedLoc;
-  const rating=rateDay(goodHours,peakKn,daily.weathercode[dayIdx],hasBadDir);
+  const rating=rateDay(goodHours,peakKn,daily.weather_code[dayIdx],hasBadDir);
 
   $('mTitle').textContent=full;
   $('mSub').innerHTML=`${loc.name}${loc.admin1?', '+loc.admin1:''} · ${loc.country}`
