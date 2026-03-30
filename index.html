@@ -792,7 +792,7 @@ function openModal(dateStr,dayIdx){
 
     const kn80html=h.kn80!=null
       ?`<span style="font-weight:800;color:${speedColor(h.kn80)}">${h.kn80}</span><span style="font-size:.65rem;color:var(--tdim)"> kn</span>`
-        +(h.dir80!=null?` <span style="display:inline-block;transform:rotate(${h.dir80}deg);font-size:.8rem;opacity:.55">↑</span>`:'')
+        +(h.dir80!=null?` <span style="display:inline-block;transform:rotate(${(h.dir80+180)%360}deg);font-size:.8rem;opacity:.55">↑</span>`:'')
       :'<span style="color:var(--tdim)">—</span>';
 
     const tempCol=h.temp<=8?'#7dd3fc':h.temp>=28?'#f97316':'var(--text)';
@@ -808,7 +808,7 @@ function openModal(dateStr,dayIdx){
       </div>
       <div class="c-gust col-gust">↑${h.gustKn}<span style="font-size:.65rem"> kn</span></div>
       <div class="c-dir">
-        <span class="c-da" style="transform:rotate(${h.dir}deg)">↑</span>
+        <span class="c-da" style="transform:rotate(${(h.dir+180)%360}deg)">↑</span>
         <span class="c-dl">${compass(h.dir)}<span style="font-size:.65rem;color:var(--tdim);font-weight:400"> ${h.dir}°</span></span>
       </div>
       <div class="c-80m col-80m">${kn80html}</div>
