@@ -828,7 +828,7 @@ function resetSearch(){
   $('resetBtn').style.display='none';
   $('locHdr').style.display='none';
   $('shoreBar').classList.remove('visible');
-  showOnly('emptyState');
+  showOnly('hintState');
   cachedWx=null; cachedLoc=null; cachedHrMap=new Map();
   shoreDeg=null; manualShoreSet=false;
   document.querySelectorAll('.s-btn').forEach(b=>b.classList.remove('active'));
