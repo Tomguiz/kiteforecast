@@ -591,9 +591,12 @@ function snapTo8(deg){
 
 async function autoDetectShore(lat,lon){
   try{
-    // Query OSM for coastline ways within 12km
-    const q=`[out:json][timeout:12];way["natural"="coastline"](around:12000,${lat},${lon});out geom;`;
-    const res=await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(q)}`);
+    // Query OSM for coastline ways within 12km — 8s hard timeout
+    const q=`[out:json][timeout:8];way["natural"="coastline"](around:12000,${lat},${lon});out geom;`;
+    const ctrl=new AbortController();
+    const timer=setTimeout(()=>ctrl.abort(),8000);
+    const res=await fetch(`https://overpass-api.de/api/interpreter?data=${encodeURIComponent(q)}`,{signal:ctrl.signal});
+    clearTimeout(timer);
     const data=await res.json();
     if(!data.elements?.length) return null;
 
@@ -696,7 +699,7 @@ async function fetchForecast(query){
 
     // apply auto-detected shore if user hasn't manually set one
     if(!manualShoreSet){
-      const detected=await shorePromise;
+      const detected=await shorePromise.catch(()=>null);
       if(detected!==null){
         const snapped=snapTo8(detected);
         setShoreByDeg(snapped);
@@ -724,9 +727,9 @@ async function fetchForecast(query){
     });
 
     renderGrid();
-  }catch{
+  }catch(err){
     $('errorTitle').textContent='Network error';
-    $('errorMsg').textContent='Could not reach forecast service.';
+    $('errorMsg').textContent='Could not reach the forecast service. Please check your connection and try again.';
     showOnly('errorState');
   }
 }
