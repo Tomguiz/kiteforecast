@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>KiteForecast — 10-Day Kitesurf Conditions</title>
+  <style>
+    :root {
+      --bg:       #070c18;
+      --surface:  #0f1623;
+      --card:     #161f30;
+      --card-hov: #1c2840;
+      --border:   #253450;
+      --blight:   #1e2d46;
+      --accent:   #00d4ff;
+      --accent2:  #0ea5e9;
+      --gray:     #7a8fa8;
+      --text:     #e2e8f0;
+      --tdim:     #4e6380;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; -webkit-tap-highlight-color: transparent; }
+
+    /* ── HERO ── */
+    .hero {
+      background: linear-gradient(160deg, #070c18 0%, #0b1a35 55%, #070f1f 100%);
+      padding: clamp(24px,5vw,44px) 20px clamp(20px,4vw,32px);
+      text-align: center; border-bottom: 1px solid var(--border);
+      position: relative; overflow: hidden;
+    }
+    .hero::before { content:''; position:absolute; inset:0; background:radial-gradient(ellipse at 50% 0%,rgba(0,212,255,.07) 0%,transparent 65%); pointer-events:none; }
+    .logo { font-size: clamp(1.7rem,5vw,2.4rem); font-weight:800; letter-spacing:-1px; background:linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+    .logo span { -webkit-text-fill-color:var(--text); }
+    .tagline { color:var(--gray); margin:4px 0 18px; font-size:clamp(.78rem,.9rem + .2vw,.93rem); }
+
+    /* ── SEARCH ── */
+    .search-wrap { display:flex; max-width:520px; margin:0 auto; gap:8px; }
+    .search-wrap input { flex:1; min-width:0; padding:12px 16px; border-radius:12px; border:1.5px solid var(--border); background:var(--surface); color:var(--text); font-size:1rem; outline:none; transition:border-color .2s; }
+    .search-wrap input:focus { border-color:var(--accent); }
+    .search-wrap input::placeholder { color:var(--tdim); }
+    .btn { padding:12px 20px; border-radius:12px; border:none; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#000; font-weight:700; font-size:.93rem; cursor:pointer; transition:opacity .15s,transform .1s; white-space:nowrap; }
+    .btn:hover  { opacity:.88; transform:translateY(-1px); }
+    .btn:active { transform:translateY(0); opacity:.95; }
+
+    /* ── MAIN ── */
+    main { max-width:1140px; margin:0 auto; padding:20px 14px 60px; }
+
+    /* ── LOCATION HEADER ── */
+    .loc-hdr { text-align:center; margin-bottom:16px; display:none; }
+    .loc-hdr h2 { font-size:clamp(1.1rem,2.5vw,1.3rem); font-weight:700; }
+    .loc-hdr p  { color:var(--gray); font-size:.83rem; margin-top:3px; }
+
+    /* ── SHORE DIRECTION PICKER (compact, in results) ── */
+    .shore-bar {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+      margin-bottom: 18px;
+      padding: 10px 14px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+    .shore-bar.visible { display: flex; }
+    .shore-bar-label { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--gray); white-space:nowrap; }
+    .shore-btns { display:flex; gap:4px; flex-wrap:wrap; justify-content:center; }
+    .s-btn {
+      padding: 5px 10px; border-radius:7px; border:1.5px solid var(--border);
+      background:var(--surface); color:var(--gray); font-size:.72rem; font-weight:700;
+      cursor:pointer; transition:border-color .14s,background .14s,color .14s;
+      line-height:1;
+    }
+    .s-btn:hover  { border-color:var(--accent); color:var(--accent); }
+    .s-btn.active { border-color:var(--accent); background:rgba(0,212,255,.13); color:var(--accent); }
+    .shore-hint { font-size:.72rem; color:var(--tdim); }
+
+    /* ── FORECAST GRID ── */
+    .forecast-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 10px;
+    }
+    @media (max-width:700px)  { .forecast-grid { grid-template-columns:repeat(4,1fr); gap:8px; } }
+    @media (max-width:520px)  { .forecast-grid { grid-template-columns:repeat(3,1fr); gap:7px; } }
+    @media (max-width:360px)  { .forecast-grid { grid-template-columns:repeat(2,1fr); gap:6px; } }
+
+    .day-card {
+      background:var(--card); border:1.5px solid var(--border); border-radius:13px;
+      padding:12px 8px 10px; display:flex; flex-direction:column; align-items:center; gap:6px;
+      cursor:pointer; transition:transform .18s,border-color .18s,background .18s,box-shadow .18s;
+      user-select:none; position:relative; -webkit-user-select:none;
+    }
+    .day-card:hover  { transform:translateY(-4px); border-color:var(--accent); background:var(--card-hov); box-shadow:0 8px 28px rgba(0,0,0,.4),0 0 0 1px rgba(0,212,255,.08); }
+    .day-card:active { transform:translateY(-1px); }
+    /* tap indicator */
+    .day-card::after { content:'tap'; position:absolute; top:7px; right:8px; font-size:.5rem; color:var(--tdim); letter-spacing:.04em; opacity:0; transition:opacity .18s; }
+    @media (hover:hover) { .day-card::after { content:'↗'; } .day-card:hover::after { opacity:1; } }
+
+    .day-label { font-size:.65rem; font-weight:600; text-transform:uppercase; letter-spacing:.07em; color:var(--gray); text-align:center; line-height:1.3; }
+    .day-label .dn { color:var(--text); font-size:.8rem; display:block; font-weight:700; margin-top:1px; }
+    .card-top  { display:flex; align-items:center; gap:5px; width:100%; justify-content:center; }
+    .wx-icon   { font-size:clamp(1.3rem,2vw,1.65rem); line-height:1; }
+    .t-range   { font-size:.75rem; color:var(--tdim); line-height:1.3; }
+    .t-range strong { color:var(--text); display:block; font-size:.86rem; }
+
+    /* mini bar */
+    .hour-bar  { display:flex; gap:2px; width:100%; }
+    .hb        { flex:1; height:16px; border-radius:3px; min-width:2px; }
+    .hb-perfect  { background:#4ade80; }
+    .hb-verygood { background:#86efac; }
+    .hb-good     { background:#bef264; }
+    .hb-lightdir { background:rgba(234,179,8,.45); }
+    .hb-light    { background:rgba(100,116,139,.18); }
+
+    /* card badges */
+    .wind-peak { font-size:1.15rem; font-weight:800; line-height:1; text-align:center; }
+    .wind-peak .gust { font-size:.62rem; font-weight:400; color:var(--tdim); display:block; margin-top:2px; }
+    .dir-pill  { width:100%; padding:3px 0; border-radius:6px; text-align:center; font-size:.6rem; font-weight:700; letter-spacing:.03em; }
+    .dir-side    { background:rgba(34,197,94,.1);  color:#4ade80; border:1px solid rgba(34,197,94,.22); }
+    .dir-sideon  { background:rgba(34,197,94,.06); color:#86efac; border:1px solid rgba(34,197,94,.14); }
+    .dir-sideoff { background:rgba(249,115,22,.1); color:#fdba74; border:1px solid rgba(249,115,22,.22); }
+    .dir-onshore { background:rgba(239,68,68,.09); color:#fca5a5; border:1px solid rgba(239,68,68,.2); }
+    .dir-offshore{ background:rgba(239,68,68,.15); color:#f87171; border:1px solid rgba(239,68,68,.3); }
+    .hours-pill  { width:100%; padding:3px 0; border-radius:6px; text-align:center; font-size:.6rem; font-weight:600; color:var(--tdim); background:rgba(148,163,184,.06); border:1px solid rgba(148,163,184,.1); }
+    .hours-pill.has-wind { color:var(--accent); background:rgba(0,212,255,.06); border-color:rgba(0,212,255,.18); }
+    .rating-badge { width:100%; padding:5px 0; border-radius:7px; text-align:center; font-weight:700; font-size:.64rem; letter-spacing:.04em; text-transform:uppercase; }
+    .rating-perfect  { background:rgba(34,197,94,.18);   color:#4ade80; border:1px solid rgba(34,197,94,.32); }
+    .rating-verygood { background:rgba(34,197,94,.1);    color:#86efac; border:1px solid rgba(34,197,94,.2); }
+    .rating-good     { background:rgba(190,242,100,.1);  color:#bef264; border:1px solid rgba(190,242,100,.22); }
+    .rating-marginal { background:rgba(234,179,8,.13);   color:#fde047; border:1px solid rgba(234,179,8,.28); }
+    .rating-none     { background:rgba(148,163,184,.08); color:#7a8fa8; border:1px solid rgba(148,163,184,.16); }
+    .rating-bad      { background:rgba(239,68,68,.08);   color:#fca5a5; border:1px solid rgba(239,68,68,.18); }
+    .rating-danger   { background:rgba(239,68,68,.16);   color:#f87171; border:1px solid rgba(239,68,68,.32); }
+
+    /* ── LEGEND ── */
+    .legend { margin-top:20px; background:var(--card); border:1px solid var(--border); border-radius:13px; padding:14px 16px; }
+    .legend h3 { font-size:.72rem; font-weight:600; text-transform:uppercase; letter-spacing:.08em; color:var(--gray); margin-bottom:10px; }
+    .legend-cols { display:grid; grid-template-columns:repeat(3,1fr); gap:12px 16px; }
+    @media (max-width:600px) { .legend-cols { grid-template-columns:1fr 1fr; } }
+    @media (max-width:380px) { .legend-cols { grid-template-columns:1fr; } }
+    .legend-sub  { font-size:.66rem; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--tdim); margin-bottom:5px; }
+    .legend-item { display:flex; align-items:center; gap:7px; font-size:.74rem; margin-bottom:3px; }
+    .legend-dot  { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+    .legend-sq   { width:9px; height:12px; border-radius:3px; flex-shrink:0; }
+
+    /* ── STATES ── */
+    .state-msg { text-align:center; padding:60px 20px; color:var(--gray); display:none; flex-direction:column; align-items:center; }
+    .state-msg h3 { font-size:1.05rem; margin-bottom:5px; color:var(--text); }
+    .spinner { width:38px; height:38px; border:3px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; margin-bottom:14px; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .hints { text-align:center; padding:40px 16px; color:var(--tdim); }
+    .hints .big { font-size:2.8rem; margin-bottom:10px; }
+    .hints p { font-size:.88rem; line-height:1.6; }
+    .hints .examples { display:flex; flex-wrap:wrap; justify-content:center; gap:7px; margin-top:14px; }
+    .chip { padding:6px 13px; border:1px solid var(--border); border-radius:99px; font-size:.78rem; color:var(--gray); cursor:pointer; transition:border-color .2s,color .2s; }
+    .chip:hover { border-color:var(--accent); color:var(--accent); }
+
+    /* ════════════════════════════════════════
+       MODAL
+    ════════════════════════════════════════ */
+    .modal-overlay {
+      position:fixed; inset:0; z-index:300;
+      background:rgba(4,7,16,.9);
+      backdrop-filter:blur(8px);
+      display:flex; align-items:flex-end; justify-content:center;
+      animation:mFadeIn .15s ease;
+    }
+    @media (min-width:600px) { .modal-overlay { align-items:center; padding:12px; } }
+    @keyframes mFadeIn  { from{opacity:0} to{opacity:1} }
+    @keyframes mSlideUp { from{transform:translateY(40px);opacity:0} to{transform:translateY(0);opacity:1} }
+
+    .modal {
+      background:var(--surface); border:1px solid var(--border);
+      width:100%; max-width:760px; max-height:95vh;
+      display:flex; flex-direction:column;
+      animation:mSlideUp .22s cubic-bezier(.22,.68,0,1.2);
+      overflow:hidden;
+      /* rounded on desktop, rounded-top on mobile */
+      border-radius:20px;
+    }
+    @media (max-width:599px) { .modal { border-radius:20px 20px 0 0; max-height:92vh; border-bottom:none; } }
+
+    /* modal header */
+    .m-hdr {
+      padding:18px 20px 12px;
+      border-bottom:1px solid var(--blight);
+      display:flex; justify-content:space-between; align-items:flex-start;
+      flex-shrink:0; gap:10px;
+    }
+    .m-hdr-info h2 { font-size:clamp(1rem,2.5vw,1.2rem); font-weight:800; }
+    .m-sub { color:var(--gray); font-size:.8rem; margin-top:3px; }
+    .m-close {
+      background:none; border:1.5px solid var(--border); color:var(--gray);
+      border-radius:9px; padding:6px 14px; cursor:pointer; font-size:.8rem; font-weight:600;
+      transition:border-color .15s,color .15s; flex-shrink:0; white-space:nowrap;
+    }
+    .m-close:hover { border-color:var(--accent); color:var(--accent); }
+    /* drag handle on mobile */
+    .m-handle { display:none; width:36px; height:4px; background:var(--border); border-radius:99px; margin:10px auto 0; }
+    @media (max-width:599px) { .m-handle { display:block; } }
+
+    /* session strip */
+    .m-session {
+      padding:10px 20px;
+      border-bottom:1px solid var(--blight);
+      display:flex; gap:8px; flex-wrap:wrap; align-items:center;
+      flex-shrink:0;
+    }
+    .m-badge {
+      padding:4px 11px; border-radius:99px; font-size:.76rem; font-weight:700;
+      border:1px solid var(--border); color:var(--tdim); background:var(--card);
+      white-space:nowrap;
+    }
+    .m-badge.accent { color:var(--accent); border-color:rgba(0,212,255,.28); background:rgba(0,212,255,.05); }
+    .m-badge.green  { color:#4ade80; border-color:rgba(34,197,94,.28); background:rgba(34,197,94,.05); }
+
+    /* timeline */
+    .m-tl-wrap { padding:12px 20px 10px; border-bottom:1px solid var(--blight); flex-shrink:0; }
+    .m-tl-lbl  { font-size:.65rem; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--tdim); margin-bottom:7px; display:flex; justify-content:space-between; align-items:center; }
+    .m-tl-lbl span { font-weight:400; text-transform:none; letter-spacing:0; color:var(--gray); }
+    .m-timeline { display:flex; gap:2px; align-items:flex-end; height:48px; }
+    .m-tl-col  { display:flex; flex-direction:column; align-items:center; justify-content:flex-end; gap:3px; flex:1; min-width:0; }
+    .m-tl-bar  { width:100%; border-radius:3px 3px 0 0; min-height:2px; }
+    .m-tl-time { font-size:.48rem; color:var(--tdim); white-space:nowrap; line-height:1; }
+    .m-tl-time.sr { color:#fbbf24; }
+    .m-tl-time.ss { color:#f97316; }
+    .m-tl-col.night .m-tl-bar { opacity:.3; }
+
+    /* scrollable body */
+    .m-body { overflow-y:auto; flex:1; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; }
+    .m-body::-webkit-scrollbar { width:4px; }
+    .m-body::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+
+    /* table header — 7 cols (+ optional shore) */
+    .m-thead, .m-row {
+      display:grid;
+      grid-template-columns: 50px 24px 42px 1fr 50px 56px 58px;
+      gap:0 7px; padding:8px 18px;
+      align-items:center;
+    }
+    .m-thead.ws, .m-row.ws { grid-template-columns: 50px 24px 42px 1fr 50px 56px 58px 82px; }
+    .m-thead {
+      font-size:.6rem; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--tdim);
+      border-bottom:1px solid var(--border);
+      position:sticky; top:0; background:var(--surface); z-index:2;
+      padding-top:10px; padding-bottom:8px;
+    }
+    .m-row {
+      border-bottom:1px solid rgba(37,52,80,.45);
+      transition:background .12s; min-height:48px;
+    }
+    .m-row:last-child { border-bottom:none; }
+    .m-row:hover { background:rgba(37,52,80,.35); }
+    .m-row.kite-on { background:rgba(34,197,94,.04); border-left:3px solid rgba(34,197,94,.4); padding-left:15px; }
+    .m-row.kite-on:hover { background:rgba(34,197,94,.09); }
+    .m-row.night { opacity:.38; }
+
+    /* sun marker rows */
+    .m-sun-row { padding:5px 18px; font-size:.68rem; color:#fbbf24; background:rgba(251,191,36,.04); border-bottom:1px solid rgba(37,52,80,.4); display:flex; gap:8px; align-items:center; }
+    .m-sun-row.ss { color:#f97316; background:rgba(249,115,22,.04); }
+
+    /* cells */
+    .c-time { font-size:.82rem; font-weight:700; color:var(--gray); white-space:nowrap; }
+    .c-time.on { color:var(--text); }
+    .c-wx   { font-size:1.2rem; line-height:1; }
+    .c-temp { font-size:.86rem; font-weight:600; }
+    .c-wind { display:flex; align-items:center; gap:5px; overflow:hidden; }
+    .c-wind-bar { height:6px; border-radius:99px; flex-shrink:0; max-width:55px; min-width:4px; }
+    .c-wind-val { font-size:.88rem; font-weight:800; white-space:nowrap; }
+    .c-gust { font-size:.74rem; color:var(--tdim); white-space:nowrap; }
+    .c-dir  { display:flex; align-items:center; gap:4px; }
+    .c-da   { font-size:.95rem; line-height:1; display:inline-block; }
+    .c-dl   { font-size:.76rem; font-weight:600; color:var(--gray); }
+    .c-80m  { font-size:.78rem; font-weight:700; }
+    .c-sp   { padding:3px 6px; border-radius:5px; font-size:.6rem; font-weight:700; white-space:nowrap; }
+
+    /* mobile: collapse cols */
+    @media (max-width:599px) {
+      .m-thead, .m-row { grid-template-columns:46px 22px 38px 1fr 48px 52px !important; gap:0 5px; padding:7px 14px; }
+      .col-80m, .col-gust { display:none; }
+      .m-row.kite-on { padding-left:11px; }
+      .m-hdr { padding:14px 16px 10px; }
+      .m-session { padding:8px 14px; }
+      .m-tl-wrap { padding:10px 14px 8px; }
+    }
+    @media (max-width:400px) {
+      .m-thead, .m-row { grid-template-columns:42px 0 34px 1fr 44px 48px !important; }
+      .c-wx { display:none; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══ HEADER ══ -->
+<header class="hero">
+  <div class="logo">🪁 Kite<span>Forecast</span></div>
+  <p class="tagline">10-day kitesurf forecast · tap any day for hourly session detail</p>
+  <div class="search-wrap">
+    <input type="text" id="searchInput" placeholder="Beach, spot or city…" autocomplete="off" />
+    <button class="btn" onclick="doSearch()">Search</button>
+  </div>
+</header>
+
+<!-- ══ MAIN ══ -->
+<main>
+  <!-- hint state -->
+  <div class="hints" id="hintState">
+    <div class="big">🌊</div>
+    <p>Search any kitesurf spot · tap a day card for the full hourly breakdown</p>
+    <div class="examples">
+      <span class="chip" onclick="quickSearch('Knokke, Belgium', 0)">Knokke, Belgium</span>
+      <span class="chip" onclick="quickSearch('Tarifa, Spain', 315)">Tarifa, Spain</span>
+      <span class="chip" onclick="quickSearch('Dakhla, Morocco', 270)">Dakhla, Morocco</span>
+      <span class="chip" onclick="quickSearch('Cape Town, South Africa', 270)">Cape Town, SA</span>
+      <span class="chip" onclick="quickSearch('Maui, Hawaii', 225)">Maui, Hawaii</span>
+      <span class="chip" onclick="quickSearch('Fuerteventura, Spain', 270)">Fuerteventura</span>
+    </div>
+  </div>
+
+  <!-- loading -->
+  <div class="state-msg" id="loadingState" style="display:none">
+    <div class="spinner"></div>
+    <h3>Fetching forecast…</h3>
+    <p style="font-size:.85rem">Loading 10 days of hourly data</p>
+  </div>
+
+  <!-- error -->
+  <div class="state-msg" id="errorState" style="display:none">
+    <div style="font-size:2.5rem;margin-bottom:10px">⚠️</div>
+    <h3 id="errorTitle">Location not found</h3>
+    <p id="errorMsg" style="font-size:.85rem;margin-top:4px">Try a different search term.</p>
+  </div>
+
+  <!-- results -->
+  <div id="results" style="display:none">
+    <div class="loc-hdr" id="locHdr">
+      <h2 id="locName"></h2>
+      <p  id="locSub"></p>
+    </div>
+
+    <!-- compact shore direction picker -->
+    <div class="shore-bar" id="shoreBar">
+      <span class="shore-bar-label">Shore faces →</span>
+      <div class="shore-btns" id="shoreBtns">
+        <button class="s-btn" data-deg="0"   onclick="selectShore(this)">N</button>
+        <button class="s-btn" data-deg="45"  onclick="selectShore(this)">NE</button>
+        <button class="s-btn" data-deg="90"  onclick="selectShore(this)">E</button>
+        <button class="s-btn" data-deg="135" onclick="selectShore(this)">SE</button>
+        <button class="s-btn" data-deg="180" onclick="selectShore(this)">S</button>
+        <button class="s-btn" data-deg="225" onclick="selectShore(this)">SW</button>
+        <button class="s-btn" data-deg="270" onclick="selectShore(this)">W</button>
+        <button class="s-btn" data-deg="315" onclick="selectShore(this)">NW</button>
+      </div>
+      <span class="shore-hint" id="shoreHint">Set for wind direction scoring</span>
+    </div>
+
+    <div class="forecast-grid" id="forecastGrid"></div>
+
+    <div class="legend">
+      <h3>How to read</h3>
+      <div class="legend-cols">
+        <div>
+          <div class="legend-sub">Day rating</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#4ade80"></div><span><strong>Perfect</strong> — 25+ kn, 5h+</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#86efac"></div><span><strong>Very Good</strong> — 20+ kn, 4h+</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#bef264"></div><span><strong>Good</strong> — 15+ kn</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#fde047"></div><span><strong>Marginal</strong> — short window</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#fca5a5"></div><span><strong>Bad</strong> — onshore / none</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#f87171"></div><span><strong>Danger</strong> — offshore / storm</span></div>
+        </div>
+        <div>
+          <div class="legend-sub">Wind speed</div>
+          <div class="legend-item"><div class="legend-sq" style="background:#4ade80"></div><span><strong>25+ kn</strong> perfect</span></div>
+          <div class="legend-item"><div class="legend-sq" style="background:#86efac"></div><span><strong>20–25 kn</strong> very good</span></div>
+          <div class="legend-item"><div class="legend-sq" style="background:#bef264"></div><span><strong>15–20 kn</strong> good</span></div>
+          <div class="legend-item"><div class="legend-sq" style="background:rgba(234,179,8,.5)"></div><span>15+ kn, wrong dir</span></div>
+          <div class="legend-item"><div class="legend-sq" style="background:rgba(100,116,139,.3)"></div><span>&lt;15 kn — too light</span></div>
+        </div>
+        <div>
+          <div class="legend-sub">Direction vs shore</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#4ade80"></div><span><strong>↔ Side-shore</strong> ideal</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#86efac"></div><span><strong>↗ Side-on</strong> safe</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#fdba74"></div><span><strong>↙ Side-off</strong> risky</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#fca5a5"></div><span><strong>↓ Onshore</strong> choppy</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#f87171"></div><span><strong>↑ Offshore</strong> danger</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</main>
+
+<!-- ══ MODAL ══ -->
+<div id="modalOverlay" style="display:none" onclick="handleOverlayClick(event)">
+  <div class="modal" id="modal">
+    <div class="m-handle"></div>
+    <div class="m-hdr">
+      <div class="m-hdr-info">
+        <h2 id="mTitle"></h2>
+        <div class="m-sub" id="mSub"></div>
+      </div>
+      <button class="m-close" onclick="closeModal()">✕ Close</button>
+    </div>
+    <div class="m-session"  id="mSession"></div>
+    <div class="m-tl-wrap">
+      <div class="m-tl-lbl">Wind throughout the day <span id="mTlLegend"></span></div>
+      <div class="m-timeline" id="mTimeline"></div>
+    </div>
+    <div class="m-body" id="mBody"></div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════
+//  STATE
+// ══════════════════════════════════
+let shoreDeg    = null;
+let cachedWx    = null;
+let cachedLoc   = null;
+let cachedHrMap = null;
+
+// ══════════════════════════════════
+//  WMO
+// ══════════════════════════════════
+const WMO = {
+  0:['☀️','Clear'],1:['🌤','Mainly clear'],2:['⛅','Partly cloudy'],3:['☁️','Overcast'],
+  45:['🌫','Fog'],48:['🌫','Icy fog'],
+  51:['🌦','Light drizzle'],53:['🌦','Drizzle'],55:['🌧','Heavy drizzle'],
+  56:['🌨','Frz drizzle'],57:['🌨','Heavy frz drizzle'],
+  61:['🌧','Slight rain'],63:['🌧','Rain'],65:['🌧','Heavy rain'],
+  66:['🌨','Frz rain'],67:['🌨','Heavy frz rain'],
+  71:['🌨','Slight snow'],73:['🌨','Snow'],75:['❄️','Heavy snow'],77:['🌨','Snow grains'],
+  80:['🌦','Showers'],81:['🌧','Showers'],82:['⛈','Violent showers'],
+  85:['🌨','Snow showers'],86:['🌨','Heavy snow showers'],
+  95:['⛈','Thunderstorm'],96:['⛈','Thunderstorm+hail'],99:['⛈','Thunderstorm+hail'],
+};
+const wmoInfo = c => WMO[c] ?? ['🌡','—'];
+
+// ══════════════════════════════════
+//  HELPERS
+// ══════════════════════════════════
+const toKnotsR = ms => Math.round(ms * 1.944);
+const DIRS8 = ['N','NE','E','SE','S','SW','W','NW'];
+const compass = deg => DIRS8[Math.round(((deg%360)+360)%360/45)%8];
+
+function angleDiff(a,b){
+  let d=Math.abs(((a%360+360)-(b%360+360))%360);
+  return d>180?360-d:d;
+}
+function dirAnalysis(wd, sf){
+  const d=angleDiff(wd,sf);
+  if(d<=20)  return {key:'onshore', txt:'↓ Onshore',    cls:'dir-onshore'};
+  if(d<=45)  return {key:'sideon',  txt:'↗ Side-on',    cls:'dir-sideon'};
+  if(d<=135) return {key:'side',    txt:'↔ Side-shore', cls:'dir-side'};
+  if(d<=160) return {key:'sideoff', txt:'↙ Side-off',   cls:'dir-sideoff'};
+  return           {key:'offshore',txt:'↑ Offshore',   cls:'dir-offshore'};
+}
+const isDirOK = k => k==='side'||k==='sideon';
+
+function speedTier(kn){
+  return kn>=25?3:kn>=20?2:kn>=15?1:0;
+}
+function speedColor(kn){
+  const t=speedTier(kn);
+  return t===3?'#4ade80':t===2?'#86efac':t===1?'#bef264':kn>=10?'var(--yellow)':'var(--gray)';
+}
+function speedBg(kn){
+  const t=speedTier(kn);
+  return t===3?'#4ade80':t===2?'#86efac':t===1?'#bef264':'rgba(100,116,139,.25)';
+}
+
+function classifyHour(kn,dir){
+  const sp=speedTier(kn);
+  if(sp===0) return {type:'light',qualifying:false};
+  if(shoreDeg===null) return {type:['good','verygood','perfect'][sp-1],qualifying:true};
+  const da=dirAnalysis(dir,shoreDeg);
+  if(!isDirOK(da.key)) return {type:'lightdir',qualifying:false};
+  return {type:['good','verygood','perfect'][sp-1],qualifying:true};
+}
+
+function rateDay(gh,pk,code,badDir){
+  if([82,95,96,99].includes(code)) return {cls:'rating-danger',label:'⚡ Storm'};
+  if(gh===0) return badDir?{cls:'rating-bad',label:'❌ Bad direction'}:{cls:'rating-none',label:'😴 No wind'};
+  if(gh===1) return {cls:'rating-marginal',label:'⏱ 1h window'};
+  if(gh===2) return {cls:'rating-marginal',label:`⏱ 2h · ${pk}kn`};
+  if(gh<=4){
+    if(pk>=25) return {cls:'rating-good',label:`✅ ${gh}h · 25+ kn`};
+    if(pk>=20) return {cls:'rating-good',label:`✅ ${gh}h · 20+ kn`};
+    return {cls:'rating-marginal',label:`🤔 ${gh}h · 15+ kn`};
+  }
+  if(pk>=25) return {cls:'rating-perfect', label:`🪁 Perfect! ${gh}h`};
+  if(pk>=20) return {cls:'rating-verygood',label:`✅ Very Good ${gh}h`};
+  return {cls:'rating-good',label:`✅ Good ${gh}h`};
+}
+
+function fmtDate(str){
+  const d=new Date(str+'T12:00:00');
+  const today=new Date(); today.setHours(0,0,0,0);
+  const diff=Math.round((d-today)/86400000);
+  const short=diff===0?'Today':diff===1?'Tomorrow':d.toLocaleDateString('en',{weekday:'short'});
+  const num=d.toLocaleDateString('en',{month:'short',day:'numeric'});
+  const full=d.toLocaleDateString('en',{weekday:'long',month:'long',day:'numeric'});
+  return {short,num,full};
+}
+
+function circMean(angs){
+  const s=angs.reduce((a,v)=>a+Math.sin(v*Math.PI/180),0);
+  const c=angs.reduce((a,v)=>a+Math.cos(v*Math.PI/180),0);
+  return Math.round(((Math.atan2(s,c)*180/Math.PI)+360)%360);
+}
+
+function bestWindow(good){
+  if(!good.length) return null;
+  const sorted=[...good].sort((a,b)=>a.hour-b.hour);
+  let best=[],cur=[sorted[0]];
+  for(let i=1;i<sorted.length;i++){
+    if(sorted[i].hour===sorted[i-1].hour+1) cur.push(sorted[i]);
+    else{ if(cur.length>best.length)best=cur; cur=[sorted[i]]; }
+  }
+  if(cur.length>best.length)best=cur;
+  if(!best.length)return null;
+  const start=best[0].tStr.slice(11,16);
+  const end=`${String(best[best.length-1].hour+1).padStart(2,'0')}:00`;
+  return `${start}–${end} (${best.length}h)`;
+}
+
+// ══════════════════════════════════
+//  SHORE PICKER
+// ══════════════════════════════════
+function selectShore(btn){
+  const deg=Number(btn.dataset.deg);
+  document.querySelectorAll('.s-btn').forEach(b=>b.classList.remove('active'));
+  if(shoreDeg===deg){
+    shoreDeg=null;
+    $('shoreHint').textContent='Set for wind direction scoring';
+    if(cachedWx) renderGrid();
+    return;
+  }
+  btn.classList.add('active');
+  shoreDeg=deg;
+  $('shoreHint').textContent=`Side-shore ≈ ${compass((deg+90)%360)} or ${compass((deg+270)%360)}`;
+  if(cachedWx) renderGrid();
+}
+function setShoreByDeg(deg){
+  document.querySelectorAll('.s-btn').forEach(b=>{if(Number(b.dataset.deg)===deg)selectShore(b);});
+}
+
+// ══════════════════════════════════
+//  DOM
+// ══════════════════════════════════
+const $=id=>document.getElementById(id);
+function showOnly(id){
+  ['hintState','loadingState','errorState','results'].forEach(s=>{
+    $(s).style.display=s!==id?'none':(s==='results'||s==='hintState')?'block':'flex';
+  });
+}
+
+// ══════════════════════════════════
+//  SEARCH
+// ══════════════════════════════════
+async function doSearch(){
+  const q=$('searchInput').value.trim();
+  if(q) await fetchForecast(q);
+}
+function quickSearch(name,deg){
+  $('searchInput').value=name;
+  setShoreByDeg(deg);
+  fetchForecast(name);
+}
+$('searchInput').addEventListener('keydown',e=>{if(e.key==='Enter')doSearch();});
+
+// ══════════════════════════════════
+//  FETCH
+// ══════════════════════════════════
+async function fetchForecast(query){
+  showOnly('loadingState');
+  try{
+    const geo=await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=1&language=en&format=json`).then(r=>r.json());
+    if(!geo.results?.length){
+      $('errorTitle').textContent='Location not found';
+      $('errorMsg').textContent=`Could not find "${query}". Try a more specific name.`;
+      showOnly('errorState'); return;
+    }
+    const{latitude,longitude,name,country,admin1}=geo.results[0];
+    cachedLoc={name,country,admin1,latitude,longitude};
+
+    const p=new URLSearchParams({
+      latitude,longitude,
+      hourly:['temperature_2m','weathercode','windspeed_10m','winddirection_10m','windgusts_10m','windspeed_80m','winddirection_80m'].join(','),
+      daily:['weathercode','temperature_2m_max','temperature_2m_min','windgusts_10m_max','sunrise','sunset'].join(','),
+      forecast_days:10, timezone:'auto', windspeed_unit:'ms',
+    });
+    cachedWx=await fetch(`https://api.open-meteo.com/v1/forecast?${p}`).then(r=>r.json());
+
+    // build hour map
+    cachedHrMap=new Map();
+    const h=cachedWx.hourly;
+    h.time.forEach((t,i)=>{
+      cachedHrMap.set(t,{
+        temp: Math.round(h.temperature_2m[i]),
+        code: h.weathercode[i]??0,
+        kn:   toKnotsR(h.windspeed_10m[i]),
+        dir:  h.winddirection_10m[i],
+        gustKn: toKnotsR(h.windgusts_10m[i]),
+        kn80:   h.windspeed_80m?.[i]    !=null ? toKnotsR(h.windspeed_80m[i])    : null,
+        dir80:  h.winddirection_80m?.[i] !=null ? h.winddirection_80m[i]          : null,
+      });
+    });
+
+    renderGrid();
+  }catch{
+    $('errorTitle').textContent='Network error';
+    $('errorMsg').textContent='Could not reach forecast service.';
+    showOnly('errorState');
+  }
+}
+
+// ══════════════════════════════════
+//  BUILD DAY DATA
+// ══════════════════════════════════
+function buildDay(dateStr,sunrise,sunset){
+  const hours=[];
+  for(let h=0;h<24;h++){
+    const tStr=`${dateStr}T${String(h).padStart(2,'0')}:00`;
+    const d=cachedHrMap.get(tStr);
+    if(!d)continue;
+    const inDay=tStr>=sunrise&&tStr<=sunset;
+    const cl=classifyHour(d.kn,d.dir);
+    hours.push({...d,...cl,tStr,hour:h,inDay});
+  }
+  const day=hours.filter(h=>h.inDay);
+  const good=day.filter(h=>h.qualifying);
+  const peakKn=good.length?Math.max(...good.map(h=>h.kn)):day.length?Math.max(...day.map(h=>h.kn)):0;
+  const sample=good.length?good:day;
+  const domDir=sample.length?circMean(sample.map(h=>h.dir)):null;
+  const hasBadDir=day.some(h=>h.type==='lightdir');
+  return{hours,day,good,goodHours:good.length,peakKn,domDir,hasBadDir};
+}
+
+// ══════════════════════════════════
+//  RENDER GRID
+// ══════════════════════════════════
+function renderGrid(){
+  const{daily}=cachedWx;
+  const loc=cachedLoc;
+
+  $('locName').textContent=`${loc.name}${loc.admin1?', '+loc.admin1:''}`;
+  $('locSub').textContent=`${loc.country} · ${loc.latitude.toFixed(2)}°, ${loc.longitude.toFixed(2)}°`+(shoreDeg!==null?` · Shore ${compass(shoreDeg)}`:'');
+  $('locHdr').style.display='block';
+  $('shoreBar').classList.add('visible');
+
+  const grid=$('forecastGrid');
+  grid.innerHTML='';
+
+  daily.time.forEach((dateStr,i)=>{
+    const code=daily.weathercode[i];
+    const[icon]=wmoInfo(code);
+    const tMax=Math.round(daily.temperature_2m_max[i]);
+    const tMin=Math.round(daily.temperature_2m_min[i]);
+    const gust=toKnotsR(daily.windgusts_10m_max[i]);
+    const{goodHours,peakKn,hasBadDir,domDir,day}=buildDay(dateStr,daily.sunrise[i],daily.sunset[i]);
+    const{short,num}=fmtDate(dateStr);
+    const rating=rateDay(goodHours,peakKn,code,hasBadDir);
+
+    const barHTML=day.map(h=>{
+      const cls={perfect:'hb-perfect',verygood:'hb-verygood',good:'hb-good',lightdir:'hb-lightdir',light:'hb-light'}[h.type]||'hb-light';
+      return `<div class="hb ${cls}" title="${h.tStr.slice(11,16)} ${h.kn}kn ${compass(h.dir)}"></div>`;
+    }).join('');
+
+    let dirPill='';
+    if(shoreDeg!==null&&domDir!==null){
+      const da=dirAnalysis(domDir,shoreDeg);
+      dirPill=`<div class="dir-pill ${da.cls}">${da.txt} (${compass(domDir)})</div>`;
+    }
+    const hPill=goodHours>0
+      ?`<div class="hours-pill has-wind">${goodHours}h qualifying wind</div>`
+      :`<div class="hours-pill">${day.length}h daylight · no good wind</div>`;
+
+    const card=document.createElement('div');
+    card.className='day-card';
+    card.title='Tap for hourly detail';
+    card.onclick=()=>openModal(dateStr,i);
+    card.innerHTML=`
+      <div class="day-label">${short}<span class="dn">${num}</span></div>
+      <div class="card-top">
+        <div class="wx-icon">${icon}</div>
+        <div class="t-range"><strong>${tMax}°</strong>${tMin}°C</div>
+      </div>
+      <div class="hour-bar">${barHTML||'<div style="color:var(--tdim);font-size:.58rem;width:100%;text-align:center">—</div>'}</div>
+      <div class="wind-peak" style="color:${speedColor(peakKn)}">${peakKn}<span style="font-size:.6rem;font-weight:400;color:var(--tdim)"> kn</span><span class="gust">gusts ${gust} kn</span></div>
+      ${dirPill}
+      ${hPill}
+      <div class="rating-badge ${rating.cls}">${rating.label}</div>`;
+    grid.appendChild(card);
+  });
+
+  showOnly('results');
+}
+
+// ══════════════════════════════════
+//  MODAL
+// ══════════════════════════════════
+function openModal(dateStr,dayIdx){
+  const daily=cachedWx.daily;
+  const sunrise=daily.sunrise[dayIdx];
+  const sunset=daily.sunset[dayIdx];
+  const{hours,day,good,goodHours,peakKn,domDir,hasBadDir}=buildDay(dateStr,sunrise,sunset);
+  const{full}=fmtDate(dateStr);
+  const loc=cachedLoc;
+  const rating=rateDay(goodHours,peakKn,daily.weathercode[dayIdx],hasBadDir);
+
+  $('mTitle').textContent=full;
+  $('mSub').innerHTML=`${loc.name}${loc.admin1?', '+loc.admin1:''} · ${loc.country}`
+    +(shoreDeg!==null?` · Shore <strong style="color:var(--accent)">${compass(shoreDeg)}</strong>`:'');
+
+  // session chips
+  const win=bestWindow(good);
+  const avgTemp=day.length?Math.round(day.reduce((s,h)=>s+h.temp,0)/day.length):'—';
+  const maxGust=day.length?Math.max(...day.map(h=>h.gustKn)):0;
+  const srTime=sunrise.slice(11,16);
+  const ssTime=sunset.slice(11,16);
+  $('mSession').innerHTML=`
+    <span class="rating-badge ${rating.cls}" style="width:auto;padding:5px 14px">${rating.label}</span>
+    ${win?`<span class="m-badge green">🪁 ${win}</span>`:''}
+    ${peakKn>0?`<span class="m-badge accent">Peak ${peakKn} kn</span>`:''}
+    ${maxGust>0?`<span class="m-badge">Gusts ${maxGust} kn</span>`:''}
+    ${domDir!==null?(()=>{const da=dirAnalysis(domDir,shoreDeg??domDir);return`<span class="m-badge">${da.txt} (${compass(domDir)})</span>`;})():''}
+    <span class="m-badge">🌡 avg ${avgTemp}°C</span>
+    <span class="m-badge">🌅 ${srTime} · 🌇 ${ssTime}</span>`;
+
+  // timeline
+  const maxKn=Math.max(30,...hours.map(h=>h.kn));
+  $('mTimeline').innerHTML=hours.map(h=>{
+    const pct=Math.max(4,Math.round(h.kn/maxKn*100));
+    const col=h.qualifying?speedBg(h.kn):h.type==='lightdir'?'rgba(234,179,8,.38)':'rgba(100,116,139,.18)';
+    const isSr=h.tStr.slice(0,16)===sunrise.slice(0,16);
+    const isSs=h.tStr.slice(0,16)===sunset.slice(0,16);
+    const tlCls=isSr?'sr':isSs?'ss':'';
+    const tlTxt=isSr?'☀':isSs?'🌇':(h.hour%6===0?String(h.hour).padStart(2,'0'):'');
+    return `<div class="m-tl-col ${h.inDay?'':'night'}" title="${h.tStr.slice(11,16)} ${h.kn}kn ${compass(h.dir)}${h.qualifying?' ✓':''}">
+      <div class="m-tl-bar" style="height:${pct}%;background:${col}"></div>
+      <div class="m-tl-time ${tlCls}">${tlTxt}</div>
+    </div>`;
+  }).join('');
+  $('mTlLegend').textContent=`${goodHours} qualifying hour${goodHours!==1?'s':''}`;
+
+  // table
+  const ws=shoreDeg!==null;
+  const wsCls=ws?'ws':'';
+  const shoreTH=ws?'<div>Shore</div>':'';
+
+  let html=`<div class="m-thead ${wsCls}">
+    <div>Time</div><div></div><div>Temp</div>
+    <div>Wind</div>
+    <div class="col-gust">Gust</div>
+    <div>Dir</div>
+    <div class="col-80m" style="color:var(--accent)">80m 🪁</div>
+    ${shoreTH}
+  </div>`;
+
+  let srDone=false,ssDone=false;
+  hours.forEach(h=>{
+    if(!srDone&&h.tStr>=sunrise){ html+=`<div class="m-sun-row">🌅 Sunrise ${srTime}</div>`; srDone=true; }
+    if(!ssDone&&h.tStr>sunset)  { html+=`<div class="m-sun-row ss">🌇 Sunset ${ssTime}</div>`;  ssDone=true; }
+
+    const[wxIcon]=wmoInfo(h.code);
+    const barPct=Math.min(Math.round(h.kn/40*100),100);
+    const barCol=h.qualifying?speedBg(h.kn):h.type==='lightdir'?'rgba(234,179,8,.38)':'rgba(100,116,139,.22)';
+    const rowCls=['m-row',wsCls,h.qualifying?'kite-on':'',!h.inDay?'night':''].filter(Boolean).join(' ');
+    const timeCls=h.qualifying?'c-time on':'c-time';
+    const kite=h.qualifying?'🪁 ':'';
+
+    let shoreTD='';
+    if(ws){
+      const da=dirAnalysis(h.dir,shoreDeg);
+      shoreTD=`<div class="c-sp ${da.cls}">${da.txt}</div>`;
+    }
+
+    const kn80html=h.kn80!=null
+      ?`<span style="font-weight:800;color:${speedColor(h.kn80)}">${h.kn80}</span><span style="font-size:.65rem;color:var(--tdim)"> kn</span>`
+        +(h.dir80!=null?` <span style="display:inline-block;transform:rotate(${h.dir80}deg);font-size:.8rem;opacity:.55">↑</span>`:'')
+      :'<span style="color:var(--tdim)">—</span>';
+
+    const tempCol=h.temp<=8?'#7dd3fc':h.temp>=28?'#f97316':'var(--text)';
+
+    html+=`<div class="${rowCls}">
+      <div class="${timeCls}">${kite}${h.tStr.slice(11,16)}</div>
+      <div class="c-wx">${wxIcon}</div>
+      <div class="c-temp" style="color:${tempCol}">${h.temp}°</div>
+      <div class="c-wind">
+        <div class="c-wind-bar" style="width:${barPct}%;background:${barCol}"></div>
+        <span class="c-wind-val" style="color:${speedColor(h.kn)}">${h.kn}</span>
+        <span style="font-size:.65rem;color:var(--tdim)">kn</span>
+      </div>
+      <div class="c-gust col-gust">↑${h.gustKn}<span style="font-size:.65rem"> kn</span></div>
+      <div class="c-dir">
+        <span class="c-da" style="transform:rotate(${h.dir}deg)">↑</span>
+        <span class="c-dl">${compass(h.dir)}</span>
+      </div>
+      <div class="c-80m col-80m">${kn80html}</div>
+      ${shoreTD}
+    </div>`;
+  });
+
+  $('mBody').innerHTML=html;
+  $('modalOverlay').style.display='flex';
+  document.body.style.overflow='hidden';
+  // scroll to first qualifying row
+  requestAnimationFrame(()=>{
+    const first=$('mBody').querySelector('.kite-on');
+    if(first) first.scrollIntoView({block:'center',behavior:'smooth'});
+  });
+}
+
+function closeModal(){
+  $('modalOverlay').style.display='none';
+  document.body.style.overflow='';
+}
+function handleOverlayClick(e){if(e.target===$('modalOverlay'))closeModal();}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
+</script>
+</body>
+</html>
