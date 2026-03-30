@@ -41,6 +41,10 @@
     .btn { padding:12px 20px; border-radius:12px; border:none; background:linear-gradient(135deg,var(--accent),var(--accent2)); color:#000; font-weight:700; font-size:.93rem; cursor:pointer; transition:opacity .15s,transform .1s; white-space:nowrap; }
     .btn:hover  { opacity:.88; transform:translateY(-1px); }
     .btn:active { transform:translateY(0); opacity:.95; }
+    .btn-reset { padding:12px 18px; border-radius:12px; border:1.5px solid var(--border); background:transparent; color:var(--gray); font-weight:600; font-size:.93rem; cursor:pointer; transition:opacity .15s,border-color .2s,color .2s; white-space:nowrap; }
+    .btn-reset:hover { border-color:var(--accent); color:var(--accent); }
+    .map-link { display:inline-flex; align-items:center; gap:4px; color:var(--accent); text-decoration:none; font-size:.82rem; opacity:.85; vertical-align:middle; margin-left:8px; transition:opacity .2s; }
+    .map-link:hover { opacity:1; }
 
     /* ── MAIN ── */
     main { max-width:1140px; margin:0 auto; padding:20px 14px 60px; }
@@ -326,6 +330,7 @@
   <div class="search-wrap">
     <input type="text" id="searchInput" placeholder="Beach, spot or city…" autocomplete="off" />
     <button class="btn" onclick="doSearch()">Search</button>
+    <button class="btn-reset" id="resetBtn" style="display:none" onclick="resetSearch()">✕ Reset</button>
   </div>
 </header>
 
@@ -659,6 +664,18 @@ function showOnly(id){
 // ══════════════════════════════════
 //  SEARCH
 // ══════════════════════════════════
+function resetSearch(){
+  $('searchInput').value='';
+  $('resetBtn').style.display='none';
+  $('locHdr').style.display='none';
+  $('shoreBar').classList.remove('visible');
+  showOnly('emptyState');
+  cachedWx=null; cachedLoc=null; cachedHrMap=new Map();
+  shoreDeg=null; manualShoreSet=false;
+  document.querySelectorAll('.s-btn').forEach(b=>b.classList.remove('active'));
+  $('shoreHint').textContent='Set for wind direction scoring';
+  $('searchInput').focus();
+}
 async function doSearch(){
   const q=$('searchInput').value.trim();
   if(q) await fetchForecast(q);
@@ -782,10 +799,12 @@ function renderGrid(){
   const{daily}=cachedWx;
   const loc=cachedLoc;
 
-  $('locName').textContent=`${loc.name}${loc.admin1?', '+loc.admin1:''}`;
+  const mapsUrl=`https://www.google.com/maps?q=${loc.latitude},${loc.longitude}`;
+  $('locName').innerHTML=`${loc.name}${loc.admin1?', '+loc.admin1:''}<a class="map-link" href="${mapsUrl}" target="_blank" rel="noopener" title="Open in Google Maps"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Maps</a>`;
   $('locSub').textContent=`${loc.country} · ${loc.latitude.toFixed(2)}°, ${loc.longitude.toFixed(2)}°`+(shoreDeg!==null?` · Shore ${compass(shoreDeg)}`:'');
   $('locHdr').style.display='block';
   $('shoreBar').classList.add('visible');
+  $('resetBtn').style.display='inline-flex';
 
   const grid=$('forecastGrid');
   grid.innerHTML='';
