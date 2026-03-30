@@ -254,14 +254,14 @@
     .m-body::-webkit-scrollbar { width:4px; }
     .m-body::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
 
-    /* table header — 7 cols (+ optional shore) */
+    /* table header — 6 cols (+ optional shore) */
     .m-thead, .m-row {
       display:grid;
-      grid-template-columns: 50px 24px 42px 1fr 50px 56px 58px;
+      grid-template-columns: 50px 24px 42px 1fr 50px 56px;
       gap:0 7px; padding:8px 18px;
       align-items:center;
     }
-    .m-thead.ws, .m-row.ws { grid-template-columns: 50px 24px 42px 1fr 50px 56px 58px 82px; }
+    .m-thead.ws, .m-row.ws { grid-template-columns: 50px 24px 42px 1fr 50px 56px 82px; }
     .m-thead {
       font-size:.6rem; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--tdim);
       border-bottom:1px solid var(--border);
@@ -288,14 +288,14 @@
     .c-time.on { color:var(--text); }
     .c-wx   { font-size:1.2rem; line-height:1; }
     .c-temp { font-size:.86rem; font-weight:600; }
-    .c-wind { display:flex; align-items:center; gap:5px; overflow:hidden; }
-    .c-wind-bar { height:6px; border-radius:99px; flex-shrink:0; max-width:55px; min-width:4px; }
-    .c-wind-val { font-size:.88rem; font-weight:800; white-space:nowrap; }
+    .c-wind { position:relative; display:flex; align-items:center; height:26px; border-radius:4px; overflow:hidden; background:rgba(255,255,255,.03); }
+    .c-wind-bar { position:absolute; left:0; top:0; bottom:0; border-radius:4px; opacity:.32; }
+    .c-wind-val { position:relative; z-index:1; font-size:.88rem; font-weight:800; white-space:nowrap; padding-left:7px; }
+    .c-wind-kn  { position:relative; z-index:1; font-size:.62rem; color:rgba(255,255,255,.45); margin-left:2px; }
     .c-gust { font-size:.74rem; color:#94a3b8; font-weight:600; white-space:nowrap; }
     .c-dir  { display:flex; align-items:center; gap:4px; }
     .c-da   { font-size:.95rem; line-height:1; display:inline-block; }
     .c-dl   { font-size:.76rem; font-weight:600; color:var(--gray); }
-    .c-80m  { font-size:.78rem; font-weight:700; }
     .c-sp   { padding:3px 6px; border-radius:5px; font-size:.6rem; font-weight:700; white-space:nowrap; }
 
     /* ── MOBILE: 2-line card layout per hour ── */
@@ -327,15 +327,13 @@
       .c-time { grid-area:time; font-size:.88rem; line-height:1.3; align-self:center; }
       .c-wx   { grid-area:wx;   font-size:1.15rem; line-height:1; align-self:center; }
       .c-temp { grid-area:temp; font-size:.82rem; align-self:end; }
-      .c-wind { grid-area:wind; align-self:center; justify-self:start; gap:4px; }
-      .c-wind-bar { display:none; } /* bar too small on mobile, wind number is enough */
-      .c-wind-val { font-size:1.05rem; }
+      .c-wind { grid-area:wind; align-self:center; justify-self:start; height:22px; min-width:60px; }
+      .c-wind-val { font-size:1.0rem; }
       .c-gust { grid-area:gust; font-size:.72rem; align-self:start; }
       .c-dir  { grid-area:dir;  align-self:center; flex-direction:column; align-items:flex-end; gap:1px; }
       .c-da   { font-size:1.1rem; }
       .c-dl   { font-size:.72rem; text-align:right; }
       .c-sp   { grid-area:shore; align-self:start; font-size:.62rem; padding:2px 6px; }
-      .col-80m { display:none; }
     }
   </style>
 </head>
@@ -540,7 +538,7 @@ function windBarColor(kn){
   if(kn>=10) return '#f97316'; // orange — getting there
   return '#b91c1c';            // dark red — too light
 }
-function windBarPct(kn){ return Math.min(Math.round(kn/50*100),100); }
+function windBarPct(kn){ return Math.min(Math.round(kn/45*100),100); }
 
 function classifyHour(kn,dir,code){
   const sp=speedTier(kn);
@@ -813,7 +811,7 @@ async function fetchForecastFromSpot(spot){
     cachedLoc={name:spot.name,country:spot.loc.split(', ').pop(),admin1:spot.loc.split(', ').slice(0,-1).join(', '),latitude:spot.lat,longitude:spot.lon};
     const p=new URLSearchParams({
       latitude:spot.lat,longitude:spot.lon,
-      hourly:['temperature_2m','weather_code','windspeed_10m','winddirection_10m','windgusts_10m','windspeed_80m','winddirection_80m'].join(','),
+      hourly:['temperature_2m','weather_code','windspeed_10m','winddirection_10m','windgusts_10m'].join(','),
       daily:['weather_code','temperature_2m_max','temperature_2m_min','windgusts_10m_max','sunrise','sunset'].join(','),
       forecast_days:10, timezone:'auto', windspeed_unit:'ms',
     });
@@ -841,8 +839,6 @@ async function fetchForecastFromSpot(spot){
         kn:     toKnotsR(h.windspeed_10m[i]),
         dir:    h.winddirection_10m[i],
         gustKn: toKnotsR(h.windgusts_10m[i]),
-        kn80:   h.windspeed_80m?.[i]!=null ? toKnotsR(h.windspeed_80m[i]) : null,
-        dir80:  h.winddirection_80m?.[i]!=null ? h.winddirection_80m[i] : null,
       });
     });
     renderGrid();
@@ -1036,7 +1032,7 @@ async function fetchForecast(query){
 
     const p=new URLSearchParams({
       latitude,longitude,
-      hourly:['temperature_2m','weather_code','windspeed_10m','winddirection_10m','windgusts_10m','windspeed_80m','winddirection_80m'].join(','),
+      hourly:['temperature_2m','weather_code','windspeed_10m','winddirection_10m','windgusts_10m'].join(','),
       daily:['weather_code','temperature_2m_max','temperature_2m_min','windgusts_10m_max','sunrise','sunset'].join(','),
       forecast_days:10, timezone:'auto', windspeed_unit:'ms',
     });
@@ -1226,7 +1222,6 @@ function openModal(dateStr,dayIdx){
     <div>Wind</div>
     <div class="col-gust">Gust</div>
     <div>Dir</div>
-    <div class="col-80m" style="color:var(--accent)">80m 🪁</div>
     ${shoreTH}
   </div>`;
 
@@ -1248,11 +1243,6 @@ function openModal(dateStr,dayIdx){
       shoreTD=`<div class="c-sp ${ok?'dir-side':'dir-sideoff'}">${ok?'✓ Good':'✗ Bad'}</div>`;
     }
 
-    const kn80html=h.kn80!=null
-      ?`<span style="font-weight:800;color:${speedColor(h.kn80)}">${h.kn80}</span><span style="font-size:.65rem;color:var(--tdim)"> kn</span>`
-        +(h.dir80!=null?` <span style="display:inline-block;transform:rotate(${(h.dir80+180)%360}deg);font-size:.8rem;opacity:.55">↑</span>`:'')
-      :'<span style="color:var(--tdim)">—</span>';
-
     const tempCol=h.temp<=8?'#7dd3fc':h.temp>=28?'#f97316':'var(--text)';
 
     html+=`<div class="${rowCls}">
@@ -1261,15 +1251,14 @@ function openModal(dateStr,dayIdx){
       <div class="c-temp" style="color:${tempCol}">${h.temp}°</div>
       <div class="c-wind">
         <div class="c-wind-bar" style="width:${barPct}%;background:${barCol}"></div>
-        <span class="c-wind-val" style="color:${speedColor(h.kn)}">${h.kn}</span>
-        <span style="font-size:.65rem;color:var(--tdim)">kn</span>
+        <span class="c-wind-val" style="color:${barCol}">${h.kn}</span>
+        <span class="c-wind-kn">kn</span>
       </div>
       <div class="c-gust col-gust">↑<span style="color:${windBarColor(h.gustKn)}">${h.gustKn}</span><span style="font-size:.65rem"> kn</span></div>
       <div class="c-dir">
         <span class="c-da" style="transform:rotate(${(h.dir+180)%360}deg)">↑</span>
         <span class="c-dl">${compass(h.dir)}<span style="font-size:.65rem;color:var(--tdim);font-weight:400"> ${h.dir}°</span></span>
       </div>
-      <div class="c-80m col-80m">${kn80html}</div>
       ${shoreTD}
     </div>`;
   });
