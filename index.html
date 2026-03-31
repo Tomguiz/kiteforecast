@@ -211,6 +211,8 @@
     .fav-chip:hover { border-color:#fbbf24; background:rgba(251,191,36,.13); }
     .fav-chip-label { flex:1; }
     .fav-chip-remove { font-size:.7rem; opacity:.6; line-height:1; padding:1px 2px; border-radius:4px; }
+    .chip-notif-bell { display:inline-flex; align-items:center; margin-left:4px; color:var(--accent); opacity:.9; vertical-align:middle; }
+    .chip-notif-bell svg .bell-fill { fill:var(--accent); }
     .fav-chip-remove:hover { opacity:1; background:rgba(239,68,68,.2); color:#f87171; }
     .hints-section-label {
       display:flex; align-items:center; gap:10px;
@@ -1668,11 +1670,9 @@ function renderHintChips(){
       chip.className='fav-chip';
       const label=document.createElement('span');
       label.className='fav-chip-label'; label.textContent=f.label;
-      const hasAnyNotif=loadNotifs().some(n=>n.spotName===f.name);
-      if(hasAnyNotif){
+      if(loadNotifs().some(n=>n.spotName===f.name)){
         const bi=document.createElement('span');
-        bi.innerHTML=' '+bellSVG(10); bi.style.cssText='font-size:.7rem;opacity:.85;display:inline-flex;align-items:center;vertical-align:middle;color:var(--accent)';
-        bi.querySelector('svg .bell-fill').style.fill='var(--accent)';
+        bi.className='chip-notif-bell active'; bi.innerHTML=bellSVG(10);
         label.appendChild(bi);
       }
       label.addEventListener('click',()=>pickFav(f));
@@ -1703,6 +1703,11 @@ function renderHintChips(){
     const chip=document.createElement('span');
     chip.className='chip';
     chip.appendChild(document.createTextNode(c.label));
+    if(loadNotifs().some(n=>n.spotName===c.name)){
+      const bi=document.createElement('span');
+      bi.className='chip-notif-bell active'; bi.innerHTML=bellSVG(10);
+      chip.appendChild(bi);
+    }
     const badge=document.createElement('span');
     badge.className='chip-days cd-loading'; badge.textContent='·';
     chip.appendChild(badge);
