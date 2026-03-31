@@ -177,7 +177,9 @@
     .legend h3 { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--gray); margin-bottom:14px; }
     .legend-cols { display:grid; grid-template-columns:repeat(3,1fr); gap:14px 24px; }
     @media (max-width:600px) {
-      .legend-cols { grid-template-columns:1fr; gap:10px 0; }
+      .legend-cols { display:flex; flex-direction:column; gap:0; }
+      .legend-cols > div { padding-bottom:14px; margin-bottom:14px; border-bottom:1px solid var(--border); }
+      .legend-cols > div:last-child { padding-bottom:0; margin-bottom:0; border-bottom:none; }
       .legend-item { white-space:nowrap; }
       .legend-desc { white-space:normal; }
     }
