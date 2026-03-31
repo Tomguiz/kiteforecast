@@ -158,6 +158,7 @@
 
     /* ── LEGEND ── */
     .legend { margin-top:20px; background:var(--card); border:1px solid var(--border); border-radius:13px; padding:16px 18px; }
+    #hintLegend { margin-top:32px; }
     .legend h3 { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--gray); margin-bottom:14px; }
     .legend-cols { display:grid; grid-template-columns:repeat(3,1fr); gap:14px 24px; }
     @media (max-width:600px) { .legend-cols { grid-template-columns:1fr 1fr; } }
@@ -401,6 +402,8 @@
     <p>Search any kitesurf spot · tap a day card for the full hourly breakdown</p>
     <div class="examples" id="hintChips"></div>
   </div>
+  <!-- welcome legend -->
+  <div id="hintLegend" class="legend" style="display:none"></div>
 
   <!-- loading -->
   <div class="state-msg" id="loadingState" style="display:none">
@@ -441,37 +444,7 @@
 
     <div class="forecast-grid" id="forecastGrid"></div>
 
-    <div class="legend">
-      <h3>How to read</h3>
-      <div class="legend-cols">
-        <div>
-          <div class="legend-sub">Day rating</div>
-          <div class="legend-item"><div class="legend-dot" style="background:#4ade80"></div><span class="legend-kpi">Perfect</span><span class="legend-desc">25+ kn · 5h+ session</span></div>
-          <div class="legend-item"><div class="legend-dot" style="background:#86efac"></div><span class="legend-kpi">Very Good</span><span class="legend-desc">20+ kn · 4h+ session</span></div>
-          <div class="legend-item"><div class="legend-dot" style="background:#bef264"></div><span class="legend-kpi">Good</span><span class="legend-desc">15+ kn · 2h+ session</span></div>
-          <div class="legend-item"><div class="legend-dot" style="background:#fde047"></div><span class="legend-kpi">Marginal</span><span class="legend-desc">short window (2h)</span></div>
-          <div class="legend-item"><div class="legend-dot" style="background:#fca5a5"></div><span class="legend-kpi">Bad</span><span class="legend-desc">wrong dir · too light</span></div>
-          <div class="legend-item"><div class="legend-dot" style="background:#f87171"></div><span class="legend-kpi">Danger</span><span class="legend-desc">offshore / storm</span></div>
-        </div>
-        <div>
-          <div class="legend-sub">Wind speed (bar color)</div>
-          <div class="legend-item"><div class="legend-sq" style="background:#4ade80"></div><span class="legend-kpi">25+ kn</span><span class="legend-desc">perfect kite wind</span></div>
-          <div class="legend-item"><div class="legend-sq" style="background:#86efac"></div><span class="legend-kpi">20–25 kn</span><span class="legend-desc">very good</span></div>
-          <div class="legend-item"><div class="legend-sq" style="background:#bef264"></div><span class="legend-kpi">15–20 kn</span><span class="legend-desc">good — works for most</span></div>
-          <div class="legend-item"><div class="legend-sq" style="background:#f97316"></div><span class="legend-kpi">10–15 kn</span><span class="legend-desc">light — big kite needed</span></div>
-          <div class="legend-item"><div class="legend-sq" style="background:rgba(185,28,28,.7)"></div><span class="legend-kpi">&lt;10 kn</span><span class="legend-desc">too light</span></div>
-          <div class="legend-item"><div class="legend-sq" style="background:rgba(234,179,8,.5)"></div><span class="legend-kpi">Any speed</span><span class="legend-desc">wrong direction</span></div>
-        </div>
-        <div>
-          <div class="legend-sub">Wind direction</div>
-          <div class="legend-item"><div class="legend-dot" style="background:#4ade80"></div><span class="legend-kpi">↔ Side-shore</span><span class="legend-desc">ideal — power + safety</span></div>
-          <div class="legend-item"><div class="legend-dot" style="background:#86efac"></div><span class="legend-kpi">↗ Side-on</span><span class="legend-desc">safe, some chop</span></div>
-          <div class="legend-item"><div class="legend-dot" style="background:#fdba74"></div><span class="legend-kpi">↙ Side-off</span><span class="legend-desc">risky — rescue harder</span></div>
-          <div class="legend-item"><div class="legend-dot" style="background:#fca5a5"></div><span class="legend-kpi">↓ Onshore</span><span class="legend-desc">choppy · no downwind</span></div>
-          <div class="legend-item"><div class="legend-dot" style="background:#f87171"></div><span class="legend-kpi">↑ Offshore</span><span class="legend-desc">dangerous — avoid</span></div>
-        </div>
-      </div>
-    </div>
+    <div class="legend" id="resultsLegend"></div>
   </div>
 </main>
 
@@ -741,7 +714,45 @@ function showOnly(id){
   ['hintState','loadingState','errorState','results'].forEach(s=>{
     $(s).style.display=s!==id?'none':(s==='results'||s==='hintState')?'block':'flex';
   });
+  $('hintLegend').style.display=id==='hintState'?'block':'none';
 }
+
+function buildLegendHTML(){
+  return `<h3>How to read</h3>
+  <div class="legend-cols">
+    <div>
+      <div class="legend-sub">Day rating</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#4ade80"></div><span class="legend-kpi">Perfect</span><span class="legend-desc">25+ kn · 5h+ session</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#86efac"></div><span class="legend-kpi">Very Good</span><span class="legend-desc">20+ kn · 4h+ session</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#bef264"></div><span class="legend-kpi">Good</span><span class="legend-desc">15+ kn · 2h+ session</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#fde047"></div><span class="legend-kpi">Marginal</span><span class="legend-desc">short window (2h)</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#fca5a5"></div><span class="legend-kpi">Bad</span><span class="legend-desc">wrong dir · too light</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f87171"></div><span class="legend-kpi">Danger</span><span class="legend-desc">offshore / storm</span></div>
+    </div>
+    <div>
+      <div class="legend-sub">Wind speed (bar color)</div>
+      <div class="legend-item"><div class="legend-sq" style="background:#4ade80"></div><span class="legend-kpi">25+ kn</span><span class="legend-desc">perfect kite wind</span></div>
+      <div class="legend-item"><div class="legend-sq" style="background:#86efac"></div><span class="legend-kpi">20–25 kn</span><span class="legend-desc">very good</span></div>
+      <div class="legend-item"><div class="legend-sq" style="background:#bef264"></div><span class="legend-kpi">15–20 kn</span><span class="legend-desc">good — works for most</span></div>
+      <div class="legend-item"><div class="legend-sq" style="background:#f97316"></div><span class="legend-kpi">10–15 kn</span><span class="legend-desc">light — big kite needed</span></div>
+      <div class="legend-item"><div class="legend-sq" style="background:rgba(185,28,28,.7)"></div><span class="legend-kpi">&lt;10 kn</span><span class="legend-desc">too light</span></div>
+      <div class="legend-item"><div class="legend-sq" style="background:rgba(234,179,8,.5)"></div><span class="legend-kpi">Any speed</span><span class="legend-desc">wrong direction</span></div>
+    </div>
+    <div>
+      <div class="legend-sub">Wind direction</div>
+      <div class="legend-item"><div class="legend-dot" style="background:#4ade80"></div><span class="legend-kpi">↔ Side-shore</span><span class="legend-desc">ideal — power + safety</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#86efac"></div><span class="legend-kpi">↗ Side-on</span><span class="legend-desc">safe, some chop</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#fdba74"></div><span class="legend-kpi">↙ Side-off</span><span class="legend-desc">risky — rescue harder</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#fca5a5"></div><span class="legend-kpi">↓ Onshore</span><span class="legend-desc">choppy · no downwind</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#f87171"></div><span class="legend-kpi">↑ Offshore</span><span class="legend-desc">dangerous — avoid</span></div>
+      <div class="legend-item" style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+        <span class="legend-kpi" style="font-size:.72rem;min-width:72px">3/10</span>
+        <span class="legend-desc">days with a qualifying session in the next 10 days</span>
+      </div>
+    </div>
+  </div>`;
+}
+
 
 // ══════════════════════════════════
 //  KITESPOT DATABASE
@@ -1126,6 +1137,8 @@ $('searchInput').addEventListener('keydown',e=>{
 });
 document.addEventListener('click',e=>{if(!e.target.closest('.search-wrap'))closeAC();});
 renderHintChips();
+$('hintLegend').innerHTML=buildLegendHTML();
+$('resultsLegend').innerHTML=buildLegendHTML();
 
 // ══════════════════════════════════
 //  FETCH
@@ -1242,7 +1255,18 @@ function renderGrid(){
 
   const mapsUrl=`https://www.google.com/maps?q=${loc.latitude},${loc.longitude}`;
   const isFav=isFavorite(loc);
-  $('locName').innerHTML=`${loc.name}${loc.admin1?', '+loc.admin1:''}<a class="map-link" href="${mapsUrl}" target="_blank" rel="noopener" title="Open in Google Maps"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Maps</a><button class="fav-btn${isFav?' active':''}" id="favBtn" title="${isFav?'Remove from favourites':'Add to favourites'}" onclick="toggleFavorite()">${isFav?'★':'☆'}</button>`;
+  // compute qualifying-day count for the summary badge
+  const totalDays=daily.time.length;
+  const qualDaysCount=daily.time.reduce((n,dateStr,i)=>{
+    const{goodHours}=buildDay(dateStr,daily.sunrise[i],daily.sunset[i]);
+    return n+(goodHours>=2?1:0);
+  },0);
+  const qdCls=qualDaysCount>=5?'color:#4ade80':qualDaysCount>=2?'color:#fde047':'color:var(--tdim)';
+  const qdLabel=qualDaysCount===0
+    ?`<span style="${qdCls};font-size:.8rem;font-weight:700;margin-left:10px">No sessions in ${totalDays} days</span>`
+    :`<span style="${qdCls};font-size:.8rem;font-weight:700;margin-left:10px">${qualDaysCount} of ${totalDays} days rideable</span>`;
+  $('locName').innerHTML=`${loc.name}${loc.admin1?', '+loc.admin1:''}<a class="map-link" href="${mapsUrl}" target="_blank" rel="noopener" title="Open in Google Maps"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Maps</a><button class="fav-btn${isFav?' active':''}" id="favBtn" title="${isFav?'Remove from favourites':'Add to favourites'}" onclick="toggleFavorite()">${isFav?'★':'☆'}</button>${qdLabel}`;
+
   $('locSub').textContent=`${loc.country} · ${loc.latitude.toFixed(2)}°, ${loc.longitude.toFixed(2)}°`+(windDirs.size>0?` · Winds: ${[...windDirs].sort((a,b)=>a-b).map(d=>compass(d)).join('/')}`:'');
   $('locHdr').style.display='block';
   $('shoreBar').classList.add('visible');
