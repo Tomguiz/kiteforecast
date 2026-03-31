@@ -29,11 +29,11 @@
       position: relative; overflow: visible;
     }
     .hero::before { content:''; position:absolute; inset:0; background:radial-gradient(ellipse at 50% 0%,rgba(0,212,255,.07) 0%,transparent 65%); pointer-events:none; overflow:hidden; border-radius:inherit; }
-    .logo-btn { background:none; border:none; cursor:pointer; padding:0; display:inline-block; line-height:1; }
-    .logo-btn:hover { opacity:.88; }
-    .site-logo { height:clamp(52px,10vw,80px); width:auto; display:block; filter:drop-shadow(0 2px 8px rgba(0,0,0,.35)); }
-    .logo-fallback { font-size: clamp(1.7rem,5vw,2.4rem); font-weight:800; letter-spacing:-1px; background:linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; display:none; }
-    .logo-fallback span { -webkit-text-fill-color:var(--text); }
+    .logo { font-size: clamp(1.7rem,5vw,2.4rem); font-weight:800; letter-spacing:-1px; background:linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
+    .logo span { -webkit-text-fill-color:var(--text); }
+    .home-btn { position:absolute; top:clamp(10px,2.5vw,18px); left:clamp(12px,2.5vw,20px); background:none; border:none; cursor:pointer; padding:0; line-height:1; z-index:10; }
+    .home-btn:hover { opacity:.82; transform:scale(1.04); transition:opacity .15s,transform .15s; }
+    .site-logo { height:clamp(44px,8vw,64px); width:auto; display:block; filter:drop-shadow(0 2px 8px rgba(0,0,0,.4)); }
     /* modal logo */
     .modal-logo-btn { background:none; border:none; cursor:pointer; padding:0; flex-shrink:0; opacity:.85; transition:opacity .15s; }
     .modal-logo-btn:hover { opacity:1; }
@@ -389,10 +389,10 @@
 
 <!-- ══ HEADER ══ -->
 <header class="hero">
-  <button class="logo-btn" onclick="goHome()" title="Home">
-    <img src="logo.png" alt="Tichkes" class="site-logo" onerror="this.style.display='none';this.nextElementSibling.style.display='inline'">
-    <span class="logo-fallback">🪁 Kite<span>Forecast</span></span>
+  <button class="home-btn" onclick="goHome()" title="Home">
+    <img src="logo.png" alt="Tichkes" class="site-logo" onerror="this.style.display='none'">
   </button>
+  <div class="logo">🪁 Kite<span>Forecast</span></div>
   <p class="tagline">10-day kitesurf forecast · tap any day for hourly session detail</p>
   <div class="search-wrap">
     <div class="search-input-wrap">
