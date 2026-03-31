@@ -29,8 +29,15 @@
       position: relative; overflow: visible;
     }
     .hero::before { content:''; position:absolute; inset:0; background:radial-gradient(ellipse at 50% 0%,rgba(0,212,255,.07) 0%,transparent 65%); pointer-events:none; overflow:hidden; border-radius:inherit; }
-    .logo { font-size: clamp(1.7rem,5vw,2.4rem); font-weight:800; letter-spacing:-1px; background:linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; }
-    .logo span { -webkit-text-fill-color:var(--text); }
+    .logo-btn { background:none; border:none; cursor:pointer; padding:0; display:inline-block; line-height:1; }
+    .logo-btn:hover { opacity:.88; }
+    .site-logo { height:clamp(52px,10vw,80px); width:auto; display:block; filter:drop-shadow(0 2px 8px rgba(0,0,0,.35)); }
+    .logo-fallback { font-size: clamp(1.7rem,5vw,2.4rem); font-weight:800; letter-spacing:-1px; background:linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; display:none; }
+    .logo-fallback span { -webkit-text-fill-color:var(--text); }
+    /* modal logo */
+    .modal-logo-btn { background:none; border:none; cursor:pointer; padding:0; flex-shrink:0; opacity:.85; transition:opacity .15s; }
+    .modal-logo-btn:hover { opacity:1; }
+    .modal-logo { height:36px; width:auto; display:block; }
     .tagline { color:var(--gray); margin:4px 0 18px; font-size:clamp(.78rem,.9rem + .2vw,.93rem); }
 
     /* ── SEARCH ── */
@@ -382,7 +389,10 @@
 
 <!-- ══ HEADER ══ -->
 <header class="hero">
-  <div class="logo">🪁 Kite<span>Forecast</span></div>
+  <button class="logo-btn" onclick="goHome()" title="Home">
+    <img src="logo.png" alt="Tichkes" class="site-logo" onerror="this.style.display='none';this.nextElementSibling.style.display='inline'">
+    <span class="logo-fallback">🪁 Kite<span>Forecast</span></span>
+  </button>
   <p class="tagline">10-day kitesurf forecast · tap any day for hourly session detail</p>
   <div class="search-wrap">
     <div class="search-input-wrap">
@@ -453,6 +463,9 @@
   <div class="modal" id="modal">
     <div class="m-handle"></div>
     <div class="m-hdr">
+      <button class="modal-logo-btn" onclick="closeModal();goHome()" title="Home">
+        <img src="logo.png" alt="Tichkes" class="site-logo modal-logo" onerror="this.style.display='none'">
+      </button>
       <div class="m-hdr-info">
         <h2 id="mTitle"></h2>
         <div class="m-sub" id="mSub"></div>
@@ -1099,7 +1112,11 @@ function resetSearch(){
   windDirs=new Set(); manualShoreSet=false;
   document.querySelectorAll('.s-btn').forEach(b=>b.classList.remove('active'));
   $('shoreHint').textContent='Select good wind directions for this spot';
-  $('searchInput').focus();
+  $('searchInput').blur(); // never auto-focus — especially important on mobile
+}
+function goHome(){
+  closeAC();
+  resetSearch();
 }
 async function doSearch(){
   closeAC();
@@ -1455,6 +1472,7 @@ function openModal(dateStr,dayIdx){
 
 function closeModal(){
   $('modalOverlay').style.display='none';
+  $('searchInput').blur();
   // Restore background scroll position
   const scrollY=parseInt(document.body.dataset.scrollY||'0',10);
   document.body.style.position='';
