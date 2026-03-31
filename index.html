@@ -470,21 +470,27 @@
     .card-bell {
       position:absolute; top:6px; right:6px;
       background:none; border:none; cursor:pointer; padding:2px;
-      font-size:.9rem; line-height:1; opacity:.35;
-      transition:opacity .15s, color .15s; z-index:2; color:var(--gray);
+      line-height:1; opacity:.3; transition:opacity .15s,color .15s; z-index:2; color:var(--gray);
     }
-    .card-bell:hover { opacity:.8; }
+    .card-bell:hover { opacity:.75; }
     .card-bell.active { opacity:1; color:var(--accent); }
+    /* SVG bell: filled only when active */
+    .card-bell svg { display:block; transition:fill .15s; }
+    .card-bell svg .bell-fill     { fill:none; }
+    .card-bell.active svg .bell-fill { fill:var(--accent); }
 
     /* notif bell in spot header */
     .notif-btn {
       background:none; border:1.5px solid rgba(255,255,255,.22); border-radius:7px;
-      cursor:pointer; font-size:1rem; padding:3px 7px; line-height:1;
+      cursor:pointer; padding:3px 8px; line-height:1; display:inline-flex; align-items:center;
       color:rgba(255,255,255,.45); transition:border-color .2s,color .2s,background .2s,transform .15s;
       vertical-align:middle; margin-left:6px;
     }
     .notif-btn:hover { border-color:rgba(0,212,255,.6); color:var(--accent); background:rgba(0,212,255,.08); transform:scale(1.08); }
     .notif-btn.active { border-color:rgba(0,212,255,.5); color:var(--accent); background:rgba(0,212,255,.1); }
+    .notif-btn svg { display:block; transition:fill .15s; }
+    .notif-btn svg .bell-fill      { fill:none; }
+    .notif-btn.active svg .bell-fill { fill:var(--accent); }
 
     /* toast */
     .pp-toast {
@@ -1485,6 +1491,13 @@ function buildDay(dateStr,sunrise,sunset){
 // ══════════════════════════════════
 //  RENDER GRID
 // ══════════════════════════════════
+function bellSVG(size){
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path class="bell-fill" d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+    <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+  </svg>`;
+}
+
 function renderGrid(){
   const{daily}=cachedWx;
   const loc=cachedLoc;
@@ -1501,7 +1514,7 @@ function renderGrid(){
   const qdLabel=qualDaysCount===0
     ?`<span style="${qdCls};font-size:.8rem;font-weight:700;margin-left:10px">No sessions in ${totalDays} days</span>`
     :`<span style="${qdCls};font-size:.8rem;font-weight:700;margin-left:10px">${qualDaysCount} of ${totalDays} days rideable</span>`;
-  $('locName').innerHTML=`${loc.name}${loc.admin1?', '+loc.admin1:''}<a class="map-link" href="${mapsUrl}" target="_blank" rel="noopener" title="Open in Google Maps"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Maps</a><button class="notif-btn${hasSpotNotif(loc.name)?' active':''}" id="notifBtn" title="Get notified" onclick="toggleSpotNotif()">🔔</button><button class="fav-btn${isFav?' active':''}" id="favBtn" title="${isFav?'Remove from favourites':'Add to favourites'}" onclick="toggleFavorite()">${isFav?'★':'☆'}</button>${qdLabel}`;
+  $('locName').innerHTML=`${loc.name}${loc.admin1?', '+loc.admin1:''}<a class="map-link" href="${mapsUrl}" target="_blank" rel="noopener" title="Open in Google Maps"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Maps</a><button class="notif-btn${hasSpotNotif(loc.name)?' active':''}" id="notifBtn" title="Get notified" onclick="toggleSpotNotif()">${bellSVG(16)}</button><button class="fav-btn${isFav?' active':''}" id="favBtn" title="${isFav?'Remove from favourites':'Add to favourites'}" onclick="toggleFavorite()">${isFav?'★':'☆'}</button>${qdLabel}`;
 
   $('locSub').textContent=`${loc.country} · ${loc.latitude.toFixed(2)}°, ${loc.longitude.toFixed(2)}°`+(windDirs.size>0?` · Winds: ${[...windDirs].sort((a,b)=>a-b).map(d=>compass(d)).join('/')}`:'');
   $('locHdr').style.display='block';
@@ -1553,7 +1566,7 @@ function renderGrid(){
     card.title='Tap for hourly detail';
     card.onclick=()=>openModal(dateStr,i);
     card.innerHTML=`
-      <button class="card-bell${hasDayNotif(loc.name,dateStr)?' active':''}" onclick="toggleDayNotif(event,'${dateStr}',${i})" title="Notify me for this day">🔔</button>
+      <button class="card-bell${hasDayNotif(loc.name,dateStr)?' active':''}" onclick="toggleDayNotif(event,'${dateStr}',${i})" title="Notify me for this day">${bellSVG(12)}</button>
       <div class="day-label">${short}<span class="dn">${num}</span></div>
       <div class="card-top">
         <div class="wx-icon">${icon}</div>
