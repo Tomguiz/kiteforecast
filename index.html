@@ -104,10 +104,12 @@
       cursor:pointer; transition:transform .18s,border-color .18s,background .18s,box-shadow .18s;
       user-select:none; position:relative; -webkit-user-select:none;
     }
-    .day-card:hover  { transform:translateY(-4px); border-color:var(--accent); background:var(--card-hov); box-shadow:0 8px 28px rgba(0,0,0,.4),0 0 0 1px rgba(0,212,255,.08); }
     .day-card:active { transform:translateY(-1px); }
     .day-card.has-session { border-color:rgba(34,197,94,.55); box-shadow:0 0 0 1px rgba(34,197,94,.18), 0 4px 20px rgba(34,197,94,.12); }
-    .day-card.has-session:hover { border-color:#4ade80; box-shadow:0 8px 28px rgba(0,0,0,.4),0 0 0 1px rgba(34,197,94,.4), 0 4px 24px rgba(34,197,94,.2); }
+    @media (hover:hover) {
+      .day-card:hover  { transform:translateY(-4px); border-color:var(--accent); background:var(--card-hov); box-shadow:0 8px 28px rgba(0,0,0,.4),0 0 0 1px rgba(0,212,255,.08); }
+      .day-card.has-session:hover { border-color:#4ade80; box-shadow:0 8px 28px rgba(0,0,0,.4),0 0 0 1px rgba(34,197,94,.4), 0 4px 24px rgba(34,197,94,.2); }
+    }
     /* tap indicator */
     .day-card::after { content:'tap'; position:absolute; top:7px; right:8px; font-size:.5rem; color:var(--tdim); letter-spacing:.04em; opacity:0; transition:opacity .18s; }
     @media (hover:hover) { .day-card::after { content:'↗'; } .day-card:hover::after { opacity:1; } }
@@ -174,8 +176,9 @@
     .hints .big { font-size:2.8rem; margin-bottom:10px; }
     .hints p { font-size:.88rem; line-height:1.6; }
     .hints .examples { display:flex; flex-wrap:wrap; justify-content:center; gap:7px; margin-top:14px; }
-    .chip { padding:6px 13px; border:1px solid var(--border); border-radius:99px; font-size:.78rem; color:var(--gray); cursor:pointer; transition:border-color .2s,color .2s; }
+    .chip { display:inline-flex; align-items:center; gap:6px; padding:6px 13px; border:1px solid var(--border); border-radius:99px; font-size:.78rem; color:var(--gray); cursor:pointer; transition:border-color .2s,color .2s; }
     .chip:hover { border-color:var(--accent); color:var(--accent); }
+    .chip-dirs { font-size:.65rem; color:var(--tdim); font-weight:600; }
     .fav-chip { display:inline-flex; align-items:center; gap:5px; padding:6px 10px 6px 13px; border:1px solid rgba(251,191,36,.35); border-radius:99px; font-size:.78rem; color:#fbbf24; cursor:pointer; transition:border-color .2s,background .2s; background:rgba(251,191,36,.06); }
     .fav-chip:hover { border-color:#fbbf24; background:rgba(251,191,36,.13); }
     .fav-chip-label { flex:1; }
@@ -710,6 +713,8 @@ function toggleWindDir(btn){
   }
   updateShoreHint();
   if(cachedWx&&cachedHrMap) renderGrid();
+  // persist user override for this spot
+  if(cachedLoc&&windDirs.size>0) saveUserDirsForSpot(cachedLoc.name,[...windDirs]);
 }
 function setWindDirs(degs){
   windDirs=new Set(degs);
@@ -755,22 +760,22 @@ const SPOTS=[
   {name:'Tarifa',loc:'Tarifa, Spain',lat:36.0143,lon:-5.6044,dirs:[90,270]},
   {name:'Valdevaqueros',loc:'Tarifa, Spain',lat:36.0778,lon:-5.6778,dirs:[90,270]},
   {name:'Los Lances',loc:'Tarifa, Spain',lat:36.0400,lon:-5.6200,dirs:[90,270]},
-  {name:'El Medano',loc:'Tenerife, Spain',lat:28.0444,lon:-16.5292,dirs:[225,270]},
-  {name:'Fuerteventura',loc:'Canary Islands, Spain',lat:28.3587,lon:-14.0535,dirs:[225,270]},
-  {name:'Sotavento',loc:'Fuerteventura, Spain',lat:28.1497,lon:-14.2369,dirs:[225,270]},
+  {name:'El Medano',loc:'Tenerife, Spain',lat:28.0444,lon:-16.5292,dirs:[0,22,45]},   // dominant: NNE trade
+  {name:'Fuerteventura',loc:'Canary Islands, Spain',lat:28.3587,lon:-14.0535,dirs:[22,45,90]}, // NE trade
+  {name:'Sotavento',loc:'Fuerteventura, Spain',lat:28.1497,lon:-14.2369,dirs:[22,45,90]}, // NE trade (Alisio)
   // France
-  {name:'Leucate',loc:'Occitanie, France',lat:42.9064,lon:3.0347,dirs:[315,0,270]},
+  {name:'Leucate',loc:'Occitanie, France',lat:42.9064,lon:3.0347,dirs:[315,0]},    // dominant: Tramontane (NW/N)
   {name:'Almanarre',loc:'Hyères, France',lat:43.0694,lon:6.1292,dirs:[270,315]},
   {name:'Saint-Malo',loc:'Brittany, France',lat:48.6500,lon:-2.0300,dirs:[270,315]},
   {name:'Gruissan',loc:'Occitanie, France',lat:43.1094,lon:3.0847,dirs:[270,315]},
   // Morocco
-  {name:'Dakhla',loc:'Dakhla, Morocco',lat:23.7136,lon:-15.9355,dirs:[225,270]},
-  {name:'Essaouira',loc:'Essaouira, Morocco',lat:31.5125,lon:-9.7700,dirs:[270,315]},
+  {name:'Dakhla',loc:'Dakhla, Morocco',lat:23.7136,lon:-15.9355,dirs:[0,22,45]},  // dominant: N/NNE trade
+  {name:'Essaouira',loc:'Essaouira, Morocco',lat:31.5125,lon:-9.7700,dirs:[0,22,45]}, // dominant: N/NNE trade
   // Egypt
   {name:'El Gouna',loc:'Red Sea, Egypt',lat:27.3969,lon:33.6778,dirs:[45,90]},
   {name:'Soma Bay',loc:'Red Sea, Egypt',lat:26.8917,lon:33.9333,dirs:[45,90]},
   // Greece
-  {name:'Vassiliki',loc:'Lefkada, Greece',lat:38.6333,lon:20.5833,dirs:[180,225]},
+  {name:'Vassiliki',loc:'Lefkada, Greece',lat:38.6333,lon:20.5833,dirs:[225,270]}, // afternoon Maistros (SW/W thermal)
   {name:'Prasonisi',loc:'Rhodes, Greece',lat:35.8881,lon:27.7378,dirs:[45,90]},
   // Italy
   {name:'Brindisi',loc:'Puglia, Italy',lat:40.6333,lon:17.9417,dirs:[90,135]},
@@ -783,15 +788,15 @@ const SPOTS=[
   {name:'Kite Beach Maui',loc:'Maui, Hawaii',lat:20.9237,lon:-156.6892,dirs:[45,90]},
   {name:'Kanaha',loc:'Maui, Hawaii',lat:20.9019,lon:-156.4494,dirs:[45,90]},
   // Dominican Republic
-  {name:'Cabarete',loc:'Puerto Plata, Dominican Republic',lat:19.7667,lon:-70.4167,dirs:[0,45]},
+  {name:'Cabarete',loc:'Puerto Plata, Dominican Republic',lat:19.7667,lon:-70.4167,dirs:[45,90]}, // dominant: E/NE trade
   // Brazil
-  {name:'Cumbuco',loc:'Ceará, Brazil',lat:-3.6000,lon:-38.7667,dirs:[90,135]},
-  {name:'Jericoacoara',loc:'Ceará, Brazil',lat:-2.7978,lon:-40.5114,dirs:[90,135]},
+  {name:'Cumbuco',loc:'Ceará, Brazil',lat:-3.6000,lon:-38.7667,dirs:[45,90]},      // dominant: E/NE trade
+  {name:'Jericoacoara',loc:'Ceará, Brazil',lat:-2.7978,lon:-40.5114,dirs:[45,90]}, // dominant: E/NE trade
   // Australia
   {name:'Lancelin',loc:'Western Australia, Australia',lat:-31.0181,lon:115.3281,dirs:[270,315]},
   {name:'Surfers Paradise',loc:'Queensland, Australia',lat:-28.0022,lon:153.4309,dirs:[45,90]},
   // Thailand
-  {name:'Hua Hin',loc:'Prachuap Khiri Khan, Thailand',lat:12.5686,lon:99.9578,dirs:[225,270]},
+  {name:'Hua Hin',loc:'Prachuap Khiri Khan, Thailand',lat:12.5686,lon:99.9578,dirs:[315,0,45]}, // NE monsoon + thermal
 ];
 
 function spotSearch(q){
@@ -862,7 +867,11 @@ async function fetchForecastFromSpot(spot){
     cachedWx=await safeFetch(`https://api.open-meteo.com/v1/forecast?${p}`);
     if(cachedWx.error) throw new Error(cachedWx.reason||'API error');
     if(!manualShoreSet){
-      if(spot.dirs&&spot.dirs.length>0){
+      const userDirs=loadUserDirsForSpot(spot.name);
+      if(userDirs&&userDirs.length>0){
+        setWindDirs(userDirs);
+        $('shoreHint').textContent=`Your saved directions · click to change`;
+      } else if(spot.dirs&&spot.dirs.length>0){
         setWindDirs(spot.dirs);
         $('shoreHint').textContent=`Known good directions · you can override`;
       } else if(spot._osm){
@@ -912,6 +921,23 @@ function loadFavs(){
 }
 function saveFavs(arr){ localStorage.setItem('kf_favs',JSON.stringify(arr)); }
 
+// Per-spot wind direction overrides saved by the user
+function loadAllUserDirs(){
+  try{ return JSON.parse(localStorage.getItem('kf_dirs')||'{}'); }
+  catch{ return {}; }
+}
+function saveUserDirsForSpot(name,dirs){
+  const all=loadAllUserDirs(); all[name]=dirs;
+  localStorage.setItem('kf_dirs',JSON.stringify(all));
+  // also update in favs if this spot is saved there
+  const favs=loadFavs();
+  const fi=favs.findIndex(f=>f.name===name);
+  if(fi>=0){ favs[fi].dirs=dirs; saveFavs(favs); }
+}
+function loadUserDirsForSpot(name){
+  const all=loadAllUserDirs(); return all[name]||null;
+}
+
 function isFavorite(loc){
   return loadFavs().some(f=>f.name===loc.name&&f.lat===loc.latitude);
 }
@@ -951,7 +977,14 @@ function renderHintChips(){
       const chip=document.createElement('span');
       chip.className='fav-chip';
       const label=document.createElement('span');
-      label.className='fav-chip-label'; label.textContent=f.label;
+      label.className='fav-chip-label';
+      label.textContent=f.label;
+      if(f.dirs&&f.dirs.length){
+        const badge=document.createElement('span');
+        badge.className='chip-dirs'; badge.style.marginLeft='4px';
+        badge.textContent=f.dirs.map(d=>compass(d)).join('/');
+        label.appendChild(badge);
+      }
       label.addEventListener('click',()=>pickFav(f));
       const rm=document.createElement('span');
       rm.className='fav-chip-remove'; rm.textContent='✕'; rm.title='Remove';
@@ -965,12 +998,20 @@ function renderHintChips(){
   }
 
   DEFAULT_CHIPS.forEach(c=>{
+    const spot=SPOTS.find(s=>s.name===c.name);
+    const userDirs=loadUserDirsForSpot(c.name);
+    const dirsArr=userDirs||(spot&&spot.dirs)||[];
+    const dirsLabel=dirsArr.length?dirsArr.map(d=>compass(d)).join('/'):'';
     const chip=document.createElement('span');
-    chip.className='chip'; chip.textContent=c.label;
-    chip.addEventListener('click',()=>{
-      const spot=SPOTS.find(s=>s.name===c.name);
-      if(spot) pickSpot(spot);
-    });
+    chip.className='chip';
+    const txt=document.createTextNode(c.label);
+    chip.appendChild(txt);
+    if(dirsLabel){
+      const badge=document.createElement('span');
+      badge.className='chip-dirs'; badge.textContent=dirsLabel;
+      chip.appendChild(badge);
+    }
+    chip.addEventListener('click',()=>{ if(spot) pickSpot(spot); });
     wrap.appendChild(chip);
   });
 }
@@ -1183,7 +1224,7 @@ function renderGrid(){
     let dirPill='';
     if(windDirs.size>0&&domDir!==null){
       const ok=isWindDirOK(domDir);
-      dirPill=`<div class="dir-pill ${ok?'dir-side':'dir-sideoff'}">${ok?'✓ Good wind':'✗ Bad wind'} (${compass(domDir)})</div>`;
+      dirPill=`<div class="dir-pill ${ok?'dir-side':'dir-sideoff'}">${ok?'✓':'✗'} Wind dir (${compass(domDir)})</div>`;
     }
     const hPill=goodHours>0
       ?`<div class="hours-pill has-wind">${goodHours}h qualifying wind</div>`
