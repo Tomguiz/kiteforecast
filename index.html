@@ -1046,7 +1046,7 @@ function toggleFavorite(){
 
 function setChipDayBadge(el,n){
   if(n===null){ el.remove(); return; }
-  el.className='chip-days '+(n>=5?'cd-good':n>=2?'cd-ok':'cd-none');
+  el.className='chip-days '+(n>=5?'cd-good':n>=1?'cd-ok':'cd-none');
   el.textContent=n>0?`${n}/10`:'0/10';
   el.title=`${n} day${n!==1?'s':''} with qualifying wind in the next 10`;
 }
