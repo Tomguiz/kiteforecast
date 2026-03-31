@@ -176,8 +176,11 @@
     #hintLegend { margin-top:32px; }
     .legend h3 { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--gray); margin-bottom:14px; }
     .legend-cols { display:grid; grid-template-columns:repeat(3,1fr); gap:14px 24px; }
-    @media (max-width:600px) { .legend-cols { grid-template-columns:1fr 1fr; } }
-    @media (max-width:380px) { .legend-cols { grid-template-columns:1fr; } }
+    @media (max-width:600px) {
+      .legend-cols { grid-template-columns:1fr; gap:10px 0; }
+      .legend-item { white-space:nowrap; }
+      .legend-desc { white-space:normal; }
+    }
     .legend-sub  { font-size:.6rem; font-weight:800; text-transform:uppercase; letter-spacing:.1em; color:var(--tdim); margin-bottom:8px; padding-bottom:5px; border-bottom:1px solid var(--border); }
     .legend-item { display:flex; align-items:center; gap:8px; font-size:.75rem; margin-bottom:5px; }
     .legend-kpi  { font-weight:700; color:var(--text); min-width:72px; flex-shrink:0; }
@@ -734,7 +737,7 @@ function showOnly(id){
   ['hintState','loadingState','errorState','results'].forEach(s=>{
     $(s).style.display=s!==id?'none':(s==='results'||s==='hintState')?'block':'flex';
   });
-  $('hintLegend').style.display=id==='hintState'?'block':'none';
+  $('hintLegend').style.display='none';
 }
 
 function buildLegendHTML(){
