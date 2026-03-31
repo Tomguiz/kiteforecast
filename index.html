@@ -406,7 +406,7 @@
     <img src="logo.png" alt="Tichkes" class="site-logo" onerror="this.style.display='none'">
   </button>
   <div class="logo">🪁 Kite<span>Forecast</span></div>
-  <p class="tagline">10-day kitesurf forecast · tap any day for hourly session detail</p>
+  <p class="tagline">Never miss a session again &amp; get notified when your spot fires 🔔</p>
   <div class="search-wrap">
     <div class="search-input-wrap">
       <input type="text" id="searchInput" placeholder="Spot name, beach or city…" autocomplete="off" />
@@ -421,11 +421,16 @@
 <main>
   <!-- hint state -->
   <div class="hints" id="hintState">
-    <p>💡 Search any kitesurf spot · tap a day card for the full hourly breakdown</p>
+    <p>1. 🎯 Pick a spot &nbsp;·&nbsp; 2. 👀 Check your ideal session &nbsp;·&nbsp; 3. 🔔 Get notified when it 🚀</p>
     <div class="examples" id="hintChips"></div>
   </div>
   <!-- welcome legend -->
   <div id="hintLegend" class="legend" style="display:none"></div>
+  <!-- welcome footer -->
+  <div id="welcomeFooter" style="display:none;text-align:center;padding:40px 20px 32px;color:var(--tdim);font-size:.8rem;line-height:2;">
+    <div style="font-size:1rem;font-weight:600;color:var(--gray);margin-bottom:4px;">Life starts at 25 knots 💨</div>
+    <div>Tichkes Corporation Inc. — All rights reserved</div>
+  </div>
 
   <!-- loading -->
   <div class="state-msg" id="loadingState" style="display:none">
@@ -740,6 +745,7 @@ function showOnly(id){
     $(s).style.display=s!==id?'none':(s==='results'||s==='hintState')?'block':'flex';
   });
   $('hintLegend').style.display='none';
+  $('welcomeFooter').style.display=id==='hintState'?'block':'none';
 }
 
 function buildLegendHTML(){
@@ -1441,9 +1447,9 @@ function openModal(dateStr,dayIdx){
   </div>`;
 
   let srDone=false,ssDone=false;
-  hours.forEach(h=>{
-    if(!srDone&&h.tStr>=sunrise){ html+=`<div class="m-sun-row">🌅 Sunrise ${srTime}</div>`; srDone=true; }
-    if(!ssDone&&h.tStr>sunset)  { html+=`<div class="m-sun-row ss">🌇 Sunset ${ssTime}</div>`;  ssDone=true; }
+  hours.filter(h=>h.inDay).forEach(h=>{
+    if(!srDone){ html+=`<div class="m-sun-row">🌅 Sunrise ${srTime}</div>`; srDone=true; }
+    if(!ssDone&&h.tStr>sunset){ html+=`<div class="m-sun-row ss">🌇 Sunset ${ssTime}</div>`; ssDone=true; }
 
     const[wxIcon]=wmoInfo(h.code);
     const barPct=windBarPct(h.kn);
