@@ -14,9 +14,9 @@
       --blight:   #1e2d46;
       --accent:   #00d4ff;
       --accent2:  #0ea5e9;
-      --gray:     #7a8fa8;
+      --gray:     #a0b4cb;
       --text:     #e2e8f0;
-      --tdim:     #4e6380;
+      --tdim:     #6e87a2;
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; -webkit-tap-highlight-color: transparent; }
@@ -986,27 +986,69 @@ const SPOTS=[
   {name:'Westende',loc:'Middelkerke, Belgium',lat:51.1662,lon:2.7628,dirs:[270,315]},
   {name:'Oostduinkerke',loc:'Koksijde, Belgium',lat:51.1420,lon:2.6976,dirs:[270,315]},
   {name:'De Panne',loc:'De Panne, Belgium',lat:51.1009,lon:2.5817,dirs:[270,315]},
-  // ── NETHERLANDS ──
-  {name:'Scheveningen',loc:'The Hague, Netherlands',lat:52.1053,lon:4.2676,dirs:[180,225,315,0]},
-  {name:'Kijkduin',loc:'The Hague, Netherlands',lat:52.0667,lon:4.2167,dirs:[180,225,315,0]},
+  // ── NETHERLANDS – ZEELAND ──
   {name:'Brouwersdam',loc:'Zeeland, Netherlands',lat:51.7629,lon:3.8512,dirs:[225,270,315]},
   {name:'Kabbelaarsbank',loc:'Zeeland, Netherlands',lat:51.7567,lon:3.8492,dirs:[225,270,315]},
+  {name:'De Punt',loc:'Zeeland, Netherlands',lat:51.7810,lon:3.8739,dirs:[225,270,315]},
+  {name:'T\'Hekje Ouddorp',loc:'Zeeland, Netherlands',lat:51.8223,lon:3.8896,dirs:[225,270,315]},
+  {name:'Vuurtoren Ouddorp',loc:'Zeeland, Netherlands',lat:51.8112,lon:3.8651,dirs:[225,270,315]},
   {name:'Oesterdam',loc:'Zeeland, Netherlands',lat:51.7333,lon:3.8667,dirs:[180,225,270,315]},
   {name:'Neeltje Jans',loc:'Zeeland, Netherlands',lat:51.6273,lon:3.6857,dirs:[225,270,315]},
+  {name:'Vrouwenpolder',loc:'Zeeland, Netherlands',lat:51.5869,lon:3.6268,dirs:[270,315,0]},
+  {name:'Veersemeer',loc:'Zeeland, Netherlands',lat:51.5697,lon:3.6551,dirs:[225,270,315]},
   {name:'Domburg',loc:'Zeeland, Netherlands',lat:51.5549,lon:3.4709,dirs:[225,270,315]},
+  {name:'Westkapelle',loc:'Zeeland, Netherlands',lat:51.5256,lon:3.4376,dirs:[225,270,315]},
+  {name:'Vlissingen',loc:'Zeeland, Netherlands',lat:51.4511,lon:3.5509,dirs:[225,270,315]},
   {name:'Cadzand Bad',loc:'Zeeland, Netherlands',lat:51.3722,lon:3.3706,dirs:[270,315]},
-  {name:'Workum',loc:'Friesland, Netherlands',lat:52.9673,lon:5.4122,dirs:[225,270,315]},
-  {name:'Makkum',loc:'Friesland, Netherlands',lat:53.0514,lon:5.3790,dirs:[225,270,315]},
-  {name:'Hindeloopen',loc:'Friesland, Netherlands',lat:52.9364,lon:5.4024,dirs:[225,270,315]},
-  {name:'Maasvlakte',loc:'Rotterdam, Netherlands',lat:51.9667,lon:4.0167,dirs:[180,225,315]},
-  {name:'Castricum aan Zee',loc:'Noord-Holland, Netherlands',lat:52.5574,lon:4.6067,dirs:[180,225,315]},
-  {name:'Wijk aan Zee',loc:'Noord-Holland, Netherlands',lat:52.4705,lon:4.5683,dirs:[180,225,315]},
-  {name:'Bergen aan Zee',loc:'Noord-Holland, Netherlands',lat:52.6601,lon:4.6280,dirs:[180,225,315]},
-  {name:'Egmond aan Zee',loc:'Noord-Holland, Netherlands',lat:52.6173,lon:4.6203,dirs:[180,225,315]},
+  {name:'Numansdorp',loc:'Zuid-Holland, Netherlands',lat:51.7226,lon:4.4063,dirs:[225,270,315]},
+  // ── NETHERLANDS – ZUID HOLLAND ──
+  {name:'Haringvlietdam',loc:'Zuid-Holland, Netherlands',lat:51.8411,lon:4.0775,dirs:[225,270,315]},
+  {name:'Maasvlakte',loc:'Rotterdam, Netherlands',lat:51.9170,lon:3.9967,dirs:[180,225,315]},
+  {name:'Maasvlakte Dead Men\'s Point',loc:'Rotterdam, Netherlands',lat:51.9378,lon:3.9721,dirs:[180,225,315]},
+  {name:'Oostvoorne Autostrand',loc:'Zuid-Holland, Netherlands',lat:51.9038,lon:4.0454,dirs:[225,270,315]},
+  {name:'Hook of Holland',loc:'Zuid-Holland, Netherlands',lat:51.9866,lon:4.1025,dirs:[225,270,315]},
+  {name:'Ter Heijde',loc:'Zuid-Holland, Netherlands',lat:52.0346,lon:4.1710,dirs:[180,225,315]},
+  {name:'Kijkduin',loc:'The Hague, Netherlands',lat:52.0613,lon:4.2079,dirs:[180,225,315,0]},
+  {name:'Scheveningen',loc:'The Hague, Netherlands',lat:52.1053,lon:4.2676,dirs:[180,225,315,0]},
+  {name:'Katwijk aan Zee',loc:'Zuid-Holland, Netherlands',lat:52.2009,lon:4.3887,dirs:[180,225,315]},
+  {name:'Noordwijk aan Zee',loc:'Zuid-Holland, Netherlands',lat:52.2369,lon:4.4222,dirs:[180,225,315]},
+  // ── NETHERLANDS – NOORD HOLLAND ──
   {name:'Zandvoort',loc:'Noord-Holland, Netherlands',lat:52.3829,lon:4.5303,dirs:[180,225,315]},
-  {name:'Lauwersoog',loc:'Groningen, Netherlands',lat:53.4073,lon:6.1590,dirs:[225,270,315]},
+  {name:'IJmuiden',loc:'Noord-Holland, Netherlands',lat:52.4581,lon:4.5563,dirs:[180,225,315]},
+  {name:'Wijk aan Zee',loc:'Noord-Holland, Netherlands',lat:52.4705,lon:4.5683,dirs:[180,225,315]},
+  {name:'Castricum aan Zee',loc:'Noord-Holland, Netherlands',lat:52.5574,lon:4.6067,dirs:[180,225,315]},
+  {name:'Egmond aan Zee',loc:'Noord-Holland, Netherlands',lat:52.6173,lon:4.6203,dirs:[180,225,315]},
+  {name:'Bergen aan Zee',loc:'Noord-Holland, Netherlands',lat:52.6601,lon:4.6280,dirs:[180,225,315]},
+  {name:'Camperduin',loc:'Noord-Holland, Netherlands',lat:52.7227,lon:4.6400,dirs:[180,225,315]},
+  {name:'Petten',loc:'Noord-Holland, Netherlands',lat:52.7772,lon:4.6631,dirs:[180,225,315]},
+  {name:'Callantsoog',loc:'Noord-Holland, Netherlands',lat:52.8358,lon:4.6904,dirs:[180,225,315]},
+  {name:'Huisduinen',loc:'Noord-Holland, Netherlands',lat:52.9525,lon:4.7204,dirs:[180,225,315]},
+  {name:'Den Helder',loc:'Noord-Holland, Netherlands',lat:52.9624,lon:4.7309,dirs:[180,225,315]},
+  // ── NETHERLANDS – TEXEL / WADDEN ──
   {name:'Texel',loc:'Noord-Holland, Netherlands',lat:53.0814,lon:4.7361,dirs:[180,225,315,0]},
   {name:'Vlieland',loc:'Friesland, Netherlands',lat:53.3047,lon:5.0509,dirs:[180,225,315]},
+  {name:'Midsland aan Zee',loc:'Terschelling, Netherlands',lat:53.4069,lon:5.2839,dirs:[180,225,315]},
+  {name:'Hollumstrand Ameland',loc:'Ameland, Netherlands',lat:53.4571,lon:5.6220,dirs:[180,225,315]},
+  {name:'Noordzeestrand Ameland',loc:'Ameland, Netherlands',lat:53.4589,lon:5.7518,dirs:[180,225,315]},
+  {name:'Noordzeestrand Schiermonnikoog',loc:'Groningen, Netherlands',lat:53.5002,lon:6.1887,dirs:[180,225,315]},
+  // ── NETHERLANDS – GRONINGEN / FRIESLAND ──
+  {name:'Lauwersoog',loc:'Groningen, Netherlands',lat:53.4073,lon:6.1590,dirs:[225,270,315]},
+  {name:'Delfzijl',loc:'Groningen, Netherlands',lat:53.3345,lon:6.9308,dirs:[225,270,315]},
+  // ── NETHERLANDS – IJSSELMEER ──
+  {name:'Makkum',loc:'Friesland, Netherlands',lat:53.0514,lon:5.3790,dirs:[225,270,315]},
+  {name:'De Houw',loc:'Friesland, Netherlands',lat:53.0914,lon:5.3800,dirs:[225,270,315]},
+  {name:'Workum',loc:'Friesland, Netherlands',lat:52.9673,lon:5.4122,dirs:[225,270,315]},
+  {name:'Hindeloopen',loc:'Friesland, Netherlands',lat:52.9364,lon:5.4024,dirs:[225,270,315]},
+  {name:'Molkwerum',loc:'Friesland, Netherlands',lat:52.9047,lon:5.3948,dirs:[225,270,315]},
+  {name:'Stavoren',loc:'Friesland, Netherlands',lat:52.8723,lon:5.3700,dirs:[225,270,315]},
+  {name:'Enkhuizen',loc:'Noord-Holland, Netherlands',lat:52.7147,lon:5.2876,dirs:[225,270,315]},
+  {name:'Medemblik',loc:'Noord-Holland, Netherlands',lat:52.7659,lon:5.1179,dirs:[225,270,315]},
+  // ── NETHERLANDS – GOOIMEER / VELUWEMEER ──
+  {name:'Strand Horst',loc:'Flevoland, Netherlands',lat:52.3270,lon:5.5768,dirs:[225,270,315]},
+  {name:'Zeewolde Strand',loc:'Flevoland, Netherlands',lat:52.3252,lon:5.5490,dirs:[225,270,315]},
+  {name:'Harderwijk',loc:'Gelderland, Netherlands',lat:52.3514,lon:5.6141,dirs:[225,270,315]},
+  {name:'Flevostrand',loc:'Flevoland, Netherlands',lat:52.3795,lon:5.6239,dirs:[225,270,315]},
+  {name:'Almere Haven',loc:'Flevoland, Netherlands',lat:52.3352,lon:5.2056,dirs:[225,270,315]},
   // ── POLAND ──
   {name:'Dabki',loc:'Pomerania, Poland',lat:54.3761,lon:16.3097,dirs:[270,315,0]},
   {name:'Lazy',loc:'Pomerania, Poland',lat:54.2840,lon:16.2093,dirs:[270,315,0]},
