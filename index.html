@@ -763,8 +763,17 @@ function classifyHour(kn,dir,code){
 }
 function conditionLabel(kn,dir,code,temp){
   const sp=speedTier(kn);
-  if(sp===0||isRainy(code)||!isWindDirOK(dir))
-    return {label:'✕ Bad',cls:'cond-bad'};
+  const light=sp===0;
+  const rain=isRainy(code);
+  const badDir=!isWindDirOK(dir);
+  if(light||rain||badDir){
+    const reasons=[];
+    if(rain)   reasons.push('🌧');
+    if(badDir) reasons.push('🧭');
+    if(light)  reasons.push('💨');
+    const suffix=reasons.length>1?'✕ Bad '+reasons.join(''):'✕ Bad '+reasons[0];
+    return {label:suffix,cls:'cond-bad'};
+  }
   const warm=temp>=13;
   if(sp>=3&&warm) return {label:'⚡ Perfect',  cls:'cond-perfect'};
   if(sp>=2&&warm) return {label:'★ Excellent', cls:'cond-excellent'};
