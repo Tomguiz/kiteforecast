@@ -157,15 +157,17 @@
     .rating-danger   { background:rgba(239,68,68,.16);   color:#f87171; border:1px solid rgba(239,68,68,.32); }
 
     /* ── LEGEND ── */
-    .legend { margin-top:20px; background:var(--card); border:1px solid var(--border); border-radius:13px; padding:14px 16px; }
-    .legend h3 { font-size:.72rem; font-weight:600; text-transform:uppercase; letter-spacing:.08em; color:var(--gray); margin-bottom:10px; }
-    .legend-cols { display:grid; grid-template-columns:repeat(3,1fr); gap:12px 16px; }
+    .legend { margin-top:20px; background:var(--card); border:1px solid var(--border); border-radius:13px; padding:16px 18px; }
+    .legend h3 { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--gray); margin-bottom:14px; }
+    .legend-cols { display:grid; grid-template-columns:repeat(3,1fr); gap:14px 24px; }
     @media (max-width:600px) { .legend-cols { grid-template-columns:1fr 1fr; } }
     @media (max-width:380px) { .legend-cols { grid-template-columns:1fr; } }
-    .legend-sub  { font-size:.66rem; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--tdim); margin-bottom:5px; }
-    .legend-item { display:flex; align-items:center; gap:7px; font-size:.74rem; margin-bottom:3px; }
-    .legend-dot  { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
-    .legend-sq   { width:9px; height:12px; border-radius:3px; flex-shrink:0; }
+    .legend-sub  { font-size:.6rem; font-weight:800; text-transform:uppercase; letter-spacing:.1em; color:var(--tdim); margin-bottom:8px; padding-bottom:5px; border-bottom:1px solid var(--border); }
+    .legend-item { display:flex; align-items:center; gap:8px; font-size:.75rem; margin-bottom:5px; }
+    .legend-kpi  { font-weight:700; color:var(--text); min-width:72px; flex-shrink:0; }
+    .legend-desc { color:var(--tdim); font-size:.72rem; }
+    .legend-dot  { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+    .legend-sq   { width:10px; height:14px; border-radius:3px; flex-shrink:0; }
 
     /* ── STATES ── */
     .state-msg { text-align:center; padding:60px 20px; color:var(--gray); display:none; flex-direction:column; align-items:center; }
@@ -444,28 +446,29 @@
       <div class="legend-cols">
         <div>
           <div class="legend-sub">Day rating</div>
-          <div class="legend-item"><div class="legend-dot" style="background:#4ade80"></div><span><strong>Perfect</strong> — 25+ kn, 5h+</span></div>
-          <div class="legend-item"><div class="legend-dot" style="background:#86efac"></div><span><strong>Very Good</strong> — 20+ kn, 4h+</span></div>
-          <div class="legend-item"><div class="legend-dot" style="background:#bef264"></div><span><strong>Good</strong> — 15+ kn</span></div>
-          <div class="legend-item"><div class="legend-dot" style="background:#fde047"></div><span><strong>Marginal</strong> — short window</span></div>
-          <div class="legend-item"><div class="legend-dot" style="background:#fca5a5"></div><span><strong>Bad</strong> — onshore / none</span></div>
-          <div class="legend-item"><div class="legend-dot" style="background:#f87171"></div><span><strong>Danger</strong> — offshore / storm</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#4ade80"></div><span class="legend-kpi">Perfect</span><span class="legend-desc">25+ kn · 5h+ session</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#86efac"></div><span class="legend-kpi">Very Good</span><span class="legend-desc">20+ kn · 4h+ session</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#bef264"></div><span class="legend-kpi">Good</span><span class="legend-desc">15+ kn · 2h+ session</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#fde047"></div><span class="legend-kpi">Marginal</span><span class="legend-desc">short window (2h)</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#fca5a5"></div><span class="legend-kpi">Bad</span><span class="legend-desc">wrong dir · too light</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#f87171"></div><span class="legend-kpi">Danger</span><span class="legend-desc">offshore / storm</span></div>
         </div>
         <div>
-          <div class="legend-sub">Wind speed</div>
-          <div class="legend-item"><div class="legend-sq" style="background:#4ade80"></div><span><strong>25+ kn</strong> perfect</span></div>
-          <div class="legend-item"><div class="legend-sq" style="background:#86efac"></div><span><strong>20–25 kn</strong> very good</span></div>
-          <div class="legend-item"><div class="legend-sq" style="background:#bef264"></div><span><strong>15–20 kn</strong> good</span></div>
-          <div class="legend-item"><div class="legend-sq" style="background:rgba(234,179,8,.5)"></div><span>15+ kn, wrong dir</span></div>
-          <div class="legend-item"><div class="legend-sq" style="background:rgba(100,116,139,.3)"></div><span>&lt;15 kn — too light</span></div>
+          <div class="legend-sub">Wind speed (bar color)</div>
+          <div class="legend-item"><div class="legend-sq" style="background:#4ade80"></div><span class="legend-kpi">25+ kn</span><span class="legend-desc">perfect kite wind</span></div>
+          <div class="legend-item"><div class="legend-sq" style="background:#86efac"></div><span class="legend-kpi">20–25 kn</span><span class="legend-desc">very good</span></div>
+          <div class="legend-item"><div class="legend-sq" style="background:#bef264"></div><span class="legend-kpi">15–20 kn</span><span class="legend-desc">good — works for most</span></div>
+          <div class="legend-item"><div class="legend-sq" style="background:#f97316"></div><span class="legend-kpi">10–15 kn</span><span class="legend-desc">light — big kite needed</span></div>
+          <div class="legend-item"><div class="legend-sq" style="background:rgba(185,28,28,.7)"></div><span class="legend-kpi">&lt;10 kn</span><span class="legend-desc">too light</span></div>
+          <div class="legend-item"><div class="legend-sq" style="background:rgba(234,179,8,.5)"></div><span class="legend-kpi">Any speed</span><span class="legend-desc">wrong direction</span></div>
         </div>
         <div>
-          <div class="legend-sub">Direction vs shore</div>
-          <div class="legend-item"><div class="legend-dot" style="background:#4ade80"></div><span><strong>↔ Side-shore</strong> ideal</span></div>
-          <div class="legend-item"><div class="legend-dot" style="background:#86efac"></div><span><strong>↗ Side-on</strong> safe</span></div>
-          <div class="legend-item"><div class="legend-dot" style="background:#fdba74"></div><span><strong>↙ Side-off</strong> risky</span></div>
-          <div class="legend-item"><div class="legend-dot" style="background:#fca5a5"></div><span><strong>↓ Onshore</strong> choppy</span></div>
-          <div class="legend-item"><div class="legend-dot" style="background:#f87171"></div><span><strong>↑ Offshore</strong> danger</span></div>
+          <div class="legend-sub">Wind direction</div>
+          <div class="legend-item"><div class="legend-dot" style="background:#4ade80"></div><span class="legend-kpi">↔ Side-shore</span><span class="legend-desc">ideal — power + safety</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#86efac"></div><span class="legend-kpi">↗ Side-on</span><span class="legend-desc">safe, some chop</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#fdba74"></div><span class="legend-kpi">↙ Side-off</span><span class="legend-desc">risky — rescue harder</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#fca5a5"></div><span class="legend-kpi">↓ Onshore</span><span class="legend-desc">choppy · no downwind</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#f87171"></div><span class="legend-kpi">↑ Offshore</span><span class="legend-desc">dangerous — avoid</span></div>
         </div>
       </div>
     </div>
