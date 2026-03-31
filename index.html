@@ -929,6 +929,7 @@ function pickSpot(spot){
   $('searchInput').value=spot.name;
   closeAC();
   manualShoreSet=false;
+  addRecentSpot(spot);
   fetchForecastFromSpot(spot);
 }
 
@@ -993,6 +994,17 @@ const DEFAULT_CHIPS=[
   {name:'Sotavento',           label:'Sotavento'},
   {name:'Cabarete',            label:'Cabarete'},
 ];
+
+function loadRecent(){
+  try{ return JSON.parse(localStorage.getItem('kf_recent')||'[]'); }catch{ return []; }
+}
+function saveRecent(arr){ localStorage.setItem('kf_recent',JSON.stringify(arr)); }
+function addRecentSpot(spot){
+  let recent=loadRecent().filter(r=>r.name!==spot.name);
+  recent.unshift({name:spot.name,label:spot.name,lat:spot.lat,lon:spot.lon,dirs:spot.dirs||[]});
+  if(recent.length>10) recent=recent.slice(0,10);
+  saveRecent(recent);
+}
 
 function loadFavs(){
   try{ return JSON.parse(localStorage.getItem('kf_favs')||'[]'); }
@@ -1081,17 +1093,23 @@ function renderHintChips(){
   }
 
   const favNames=new Set(favs.map(f=>f.name));
-  DEFAULT_CHIPS.filter(c=>!favNames.has(c.name)).forEach(c=>{
-    const spot=SPOTS.find(s=>s.name===c.name);
+  const defaultNames=new Set(DEFAULT_CHIPS.map(c=>c.name));
+  const recent=loadRecent().filter(r=>!favNames.has(r.name)&&!defaultNames.has(r.name));
+  const suggestions=[
+    ...DEFAULT_CHIPS.filter(c=>!favNames.has(c.name)),
+    ...recent
+  ];
+  suggestions.forEach(c=>{
+    const spot=SPOTS.find(s=>s.name===c.name)||{name:c.name,lat:c.lat,lon:c.lon,dirs:c.dirs||[]};
     const chip=document.createElement('span');
     chip.className='chip';
     chip.appendChild(document.createTextNode(c.label));
     const badge=document.createElement('span');
     badge.className='chip-days cd-loading'; badge.textContent='·';
     chip.appendChild(badge);
-    chip.addEventListener('click',()=>{ if(spot) pickSpot(spot); });
+    chip.addEventListener('click',()=>pickSpot(spot));
     wrap.appendChild(chip);
-    if(spot) fetchChipQualDays(spot).then(n=>setChipDayBadge(badge,n));
+    fetchChipQualDays(spot).then(n=>setChipDayBadge(badge,n));
   });
 }
 
