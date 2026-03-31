@@ -426,7 +426,8 @@
       transition:border-color .2s;
     }
     .pp-input:focus { border-color:var(--accent); }
-    .pp-save-btn { width:100%; padding:11px; border-radius:10px; font-size:.9rem; }
+    .pp-save-btn { width:100%; padding:11px; border-radius:10px; font-size:.9rem; transition:background .2s,color .2s,border-color .2s,opacity .2s; }
+    .pp-save-btn.saved { background:transparent; border:1.5px solid var(--accent); color:var(--accent); opacity:.7; cursor:default; }
     .pp-note { font-size:.72rem; color:var(--tdim); line-height:1.5; }
     .pp-warning {
       background:rgba(234,179,8,.1); border:1px solid rgba(234,179,8,.3);
@@ -660,8 +661,8 @@
     <div id="ppPanelProfile" class="pp-body">
       <div id="ppEmailWarning" style="display:none" class="pp-warning">⚠️ Active notifications are paused until you add an email</div>
       <label class="pp-label">Email address</label>
-      <input type="email" id="ppEmailInput" class="pp-input" placeholder="your@email.com" />
-      <button class="btn pp-save-btn" onclick="saveProfileEmail()">Save</button>
+      <input type="email" id="ppEmailInput" class="pp-input" placeholder="your@email.com" oninput="onEmailEdit()" />
+      <button class="btn pp-save-btn" id="ppSaveBtn" onclick="saveProfileEmail()">Save</button>
       <p class="pp-note">Your email is used only to send session alerts — never shared.</p>
     </div>
     <div id="ppPanelNotifs" class="pp-body" style="display:none">
@@ -2214,6 +2215,8 @@ function openProfilePanel(tab){
   switchPpTab(tab);
   const p=loadProfile();
   $('ppEmailInput').value=p.email||'';
+  const sb=$('ppSaveBtn');
+  if(sb){ if(p.email){sb.classList.add('saved');sb.textContent='✓ Saved';}else{sb.classList.remove('saved');sb.textContent='Save';} }
   updateEmailWarning();
   renderNotifList();
   updateProfileDot();
@@ -2233,6 +2236,10 @@ function switchPpTab(tab){
   $('ppPanelNotifs').style.display=tab==='notifs'?'flex':'none';
   if(tab==='notifs')renderNotifList();
 }
+function onEmailEdit(){
+  const btn=$('ppSaveBtn');
+  if(btn){ btn.classList.remove('saved'); btn.textContent='Save'; }
+}
 function saveProfileEmail(){
   const email=$('ppEmailInput').value.trim();
   const p=loadProfile();
@@ -2240,6 +2247,8 @@ function saveProfileEmail(){
   saveProfile(p);
   updateEmailWarning();
   updateProfileDot();
+  const btn=$('ppSaveBtn');
+  if(btn){ btn.classList.add('saved'); btn.textContent='✓ Saved'; }
   showToast('✓ Email saved');
   if(pendingNotif&&email){
     const pn=pendingNotif; pendingNotif=null;
