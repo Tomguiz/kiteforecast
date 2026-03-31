@@ -37,8 +37,7 @@
       display:block; margin:0 auto;
       width:clamp(80px,14vw,110px); height:clamp(80px,14vw,110px);
       border-radius:50%; object-fit:cover;
-      mix-blend-mode:multiply;
-      filter:drop-shadow(0 2px 10px rgba(0,0,0,.5));
+      box-shadow:0 4px 16px rgba(0,0,0,.5);
     }
     @media (max-width:599px) {
       .site-logo { width:90px; height:90px; }
@@ -46,7 +45,7 @@
     /* modal logo */
     .modal-logo-btn { background:none; border:none; cursor:pointer; padding:0; flex-shrink:0; opacity:.85; transition:opacity .15s; }
     .modal-logo-btn:hover { opacity:1; }
-    .modal-logo { height:36px; width:36px; border-radius:50%; object-fit:cover; mix-blend-mode:multiply; }
+    .modal-logo { height:36px; width:36px; border-radius:50%; object-fit:cover; }
     .tagline { color:var(--gray); margin:4px 0 18px; font-size:clamp(.78rem,.9rem + .2vw,.93rem); }
 
     /* ── SEARCH ── */
