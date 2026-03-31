@@ -359,6 +359,141 @@
     .cond-excellent{ background:rgba(0,212,255,.15);  color:#67e8f9; border:1px solid rgba(0,212,255,.35); }
     .cond-perfect  { background:rgba(250,204,21,.15); color:#fde047; border:1px solid rgba(250,204,21,.35); }
 
+    /* ── PROFILE BUTTON ── */
+    .profile-btn {
+      position:absolute; top:clamp(10px,2.5vw,18px); right:clamp(12px,2.5vw,20px);
+      background:var(--card); border:1.5px solid var(--border); border-radius:50%;
+      width:40px; height:40px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+      transition:border-color .2s,background .2s; z-index:10; flex-shrink:0;
+    }
+    .profile-btn:hover { border-color:var(--accent); background:var(--card-hov); }
+    .profile-btn svg { display:block; }
+    .profile-btn-dot {
+      position:absolute; top:-1px; right:-1px;
+      width:10px; height:10px; border-radius:50%;
+      background:var(--accent); border:2px solid var(--bg);
+      display:none;
+    }
+    .profile-btn-dot.visible { display:block; }
+
+    /* ── PROFILE OVERLAY ── */
+    #profileOverlay {
+      position:fixed; inset:0; z-index:400;
+      background:rgba(4,7,16,.7); backdrop-filter:blur(6px);
+      display:flex; justify-content:flex-end; align-items:stretch;
+      animation:mFadeIn .15s ease;
+    }
+    @media (max-width:599px) {
+      #profileOverlay { align-items:flex-end; }
+      #profilePanel { width:100%; border-radius:20px 20px 0 0; max-height:85vh; }
+    }
+    #profilePanel {
+      background:var(--surface); border-left:1px solid var(--border);
+      width:380px; display:flex; flex-direction:column;
+      animation:mSlideUp .22s cubic-bezier(.22,.68,0,1.2);
+      overflow:hidden;
+    }
+    .pp-hdr {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:16px 18px 0; border-bottom:1px solid var(--border); flex-shrink:0;
+    }
+    .pp-tabs { display:flex; gap:0; }
+    .pp-tab {
+      background:none; border:none; cursor:pointer;
+      font-size:.82rem; font-weight:600; color:var(--gray);
+      padding:10px 16px; border-bottom:2px solid transparent;
+      transition:color .15s, border-color .15s; white-space:nowrap;
+    }
+    .pp-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
+    .pp-tab span {
+      display:inline-flex; align-items:center; justify-content:center;
+      background:var(--accent); color:#000; font-size:.6rem; font-weight:800;
+      width:16px; height:16px; border-radius:50%; margin-left:5px;
+    }
+    .pp-close {
+      background:none; border:1.5px solid var(--border); color:var(--gray);
+      border-radius:7px; padding:5px 12px; cursor:pointer; font-size:.78rem; font-weight:600;
+      transition:border-color .15s,color .15s; flex-shrink:0;
+    }
+    .pp-close:hover { border-color:var(--accent); color:var(--accent); }
+    .pp-body { padding:20px 18px; overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:12px; }
+    .pp-label { font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--gray); }
+    .pp-input {
+      width:100%; padding:11px 14px; border-radius:10px;
+      border:1.5px solid var(--border); background:var(--card);
+      color:var(--text); font-size:.95rem; outline:none;
+      transition:border-color .2s;
+    }
+    .pp-input:focus { border-color:var(--accent); }
+    .pp-save-btn { width:100%; padding:11px; border-radius:10px; font-size:.9rem; }
+    .pp-note { font-size:.72rem; color:var(--tdim); line-height:1.5; }
+    .pp-warning {
+      background:rgba(234,179,8,.1); border:1px solid rgba(234,179,8,.3);
+      color:#fde047; border-radius:9px; padding:10px 13px; font-size:.78rem; line-height:1.5;
+    }
+
+    /* master toggle */
+    .pp-toggle-row { display:flex; align-items:center; justify-content:space-between; padding:4px 0; }
+    .pp-toggle-label { font-size:.85rem; color:var(--text); font-weight:600; }
+    .pp-toggle {
+      background:var(--border); border:none; cursor:pointer;
+      width:44px; height:24px; border-radius:99px; padding:0;
+      position:relative; transition:background .2s; flex-shrink:0;
+    }
+    .pp-toggle span {
+      position:absolute; top:3px; left:3px;
+      width:18px; height:18px; border-radius:50%; background:#fff;
+      transition:transform .2s; display:block;
+    }
+    .pp-toggle.on { background:var(--accent); }
+    .pp-toggle.on span { transform:translateX(20px); }
+
+    /* notif list items */
+    .pp-notif-item {
+      display:flex; align-items:center; gap:10px;
+      padding:10px 12px; background:var(--card); border:1px solid var(--border);
+      border-radius:10px;
+    }
+    .pp-notif-info { flex:1; min-width:0; }
+    .pp-notif-spot { font-size:.82rem; font-weight:700; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .pp-notif-day  { font-size:.72rem; color:var(--gray); margin-top:2px; }
+    .pp-notif-del  {
+      background:none; border:1.5px solid var(--border); color:var(--gray);
+      border-radius:7px; padding:4px 9px; cursor:pointer; font-size:.75rem;
+      transition:border-color .15s,color .15s,background .15s; flex-shrink:0;
+    }
+    .pp-notif-del:hover { border-color:rgba(239,68,68,.5); color:#f87171; background:rgba(239,68,68,.08); }
+    .pp-empty { font-size:.82rem; color:var(--tdim); text-align:center; padding:24px 0; }
+
+    /* notif bell on day card */
+    .card-bell {
+      position:absolute; top:6px; right:6px;
+      background:none; border:none; cursor:pointer; padding:2px;
+      font-size:.9rem; line-height:1; opacity:.35;
+      transition:opacity .15s, color .15s; z-index:2; color:var(--gray);
+    }
+    .card-bell:hover { opacity:.8; }
+    .card-bell.active { opacity:1; color:var(--accent); }
+
+    /* notif bell in spot header */
+    .notif-btn {
+      background:none; border:1.5px solid rgba(255,255,255,.22); border-radius:7px;
+      cursor:pointer; font-size:1rem; padding:3px 7px; line-height:1;
+      color:rgba(255,255,255,.45); transition:border-color .2s,color .2s,background .2s,transform .15s;
+      vertical-align:middle; margin-left:6px;
+    }
+    .notif-btn:hover { border-color:rgba(0,212,255,.6); color:var(--accent); background:rgba(0,212,255,.08); transform:scale(1.08); }
+    .notif-btn.active { border-color:rgba(0,212,255,.5); color:var(--accent); background:rgba(0,212,255,.1); }
+
+    /* toast */
+    .pp-toast {
+      position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+      background:var(--card); border:1px solid rgba(34,197,94,.4); color:#4ade80;
+      padding:10px 20px; border-radius:99px; font-size:.82rem; font-weight:600;
+      z-index:500; animation:mFadeIn .2s ease; white-space:nowrap;
+      box-shadow:0 4px 20px rgba(0,0,0,.5);
+    }
+
     /* ── MOBILE: 2-line card layout per hour ── */
     @media (max-width:599px) {
       .m-hdr     { padding:14px 14px 10px; }
@@ -404,6 +539,13 @@
 <header class="hero">
   <button class="home-btn" onclick="goHome()" title="Home">
     <img src="logo.png" alt="Tichkes" class="site-logo" onerror="this.style.display='none'">
+  </button>
+  <button class="profile-btn" onclick="openProfilePanel()" title="Profile &amp; Notifications" id="profileBtn">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="8" r="4"/>
+      <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+    </svg>
+    <span class="profile-btn-dot" id="profileDot"></span>
   </button>
   <div class="logo">🪁 Kite<span>Forecast</span></div>
   <p class="tagline">Never miss a session again &amp; get notified when your spot fires 🔔</p>
@@ -495,6 +637,33 @@
       <div class="m-timeline" id="mTimeline"></div>
     </div>
     <div class="m-body" id="mBody"></div>
+  </div>
+</div>
+
+<!-- ══ PROFILE PANEL ══ -->
+<div id="profileOverlay" style="display:none" onclick="handleProfileOverlayClick(event)">
+  <div id="profilePanel">
+    <div class="pp-hdr">
+      <div class="pp-tabs">
+        <button class="pp-tab active" id="ppTabProfile" onclick="switchPpTab('profile')">Profile</button>
+        <button class="pp-tab" id="ppTabNotifs" onclick="switchPpTab('notifs')">Notifications <span id="ppNotifCount" style="display:none"></span></button>
+      </div>
+      <button class="pp-close" onclick="closeProfilePanel()">✕</button>
+    </div>
+    <div id="ppPanelProfile" class="pp-body">
+      <div id="ppEmailWarning" style="display:none" class="pp-warning">⚠️ Active notifications are paused until you add an email</div>
+      <label class="pp-label">Email address</label>
+      <input type="email" id="ppEmailInput" class="pp-input" placeholder="your@email.com" />
+      <button class="btn pp-save-btn" onclick="saveProfileEmail()">Save</button>
+      <p class="pp-note">Your email is used only to send session alerts — never shared.</p>
+    </div>
+    <div id="ppPanelNotifs" class="pp-body" style="display:none">
+      <div class="pp-toggle-row">
+        <span class="pp-toggle-label">Enable notifications</span>
+        <button class="pp-toggle" id="ppMasterToggle" onclick="toggleMasterNotif()"><span></span></button>
+      </div>
+      <div id="ppNotifList"></div>
+    </div>
   </div>
 </div>
 
@@ -1083,6 +1252,11 @@ function renderHintChips(){
       chip.className='fav-chip';
       const label=document.createElement('span');
       label.className='fav-chip-label'; label.textContent=f.label;
+      if(hasSpotNotif(f.name)){
+        const bi=document.createElement('span');
+        bi.textContent=' 🔔'; bi.style.fontSize='.7rem';
+        label.appendChild(bi);
+      }
       label.addEventListener('click',()=>pickFav(f));
       const fbadge=document.createElement('span');
       fbadge.className='chip-days cd-loading'; fbadge.textContent='·';
@@ -1317,7 +1491,7 @@ function renderGrid(){
   const qdLabel=qualDaysCount===0
     ?`<span style="${qdCls};font-size:.8rem;font-weight:700;margin-left:10px">No sessions in ${totalDays} days</span>`
     :`<span style="${qdCls};font-size:.8rem;font-weight:700;margin-left:10px">${qualDaysCount} of ${totalDays} days rideable</span>`;
-  $('locName').innerHTML=`${loc.name}${loc.admin1?', '+loc.admin1:''}<a class="map-link" href="${mapsUrl}" target="_blank" rel="noopener" title="Open in Google Maps"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Maps</a><button class="fav-btn${isFav?' active':''}" id="favBtn" title="${isFav?'Remove from favourites':'Add to favourites'}" onclick="toggleFavorite()">${isFav?'★':'☆'}</button>${qdLabel}`;
+  $('locName').innerHTML=`${loc.name}${loc.admin1?', '+loc.admin1:''}<a class="map-link" href="${mapsUrl}" target="_blank" rel="noopener" title="Open in Google Maps"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Maps</a><button class="notif-btn${hasSpotNotif(loc.name)?' active':''}" id="notifBtn" title="Get notified" onclick="toggleSpotNotif()">🔔</button><button class="fav-btn${isFav?' active':''}" id="favBtn" title="${isFav?'Remove from favourites':'Add to favourites'}" onclick="toggleFavorite()">${isFav?'★':'☆'}</button>${qdLabel}`;
 
   $('locSub').textContent=`${loc.country} · ${loc.latitude.toFixed(2)}°, ${loc.longitude.toFixed(2)}°`+(windDirs.size>0?` · Winds: ${[...windDirs].sort((a,b)=>a-b).map(d=>compass(d)).join('/')}`:'');
   $('locHdr').style.display='block';
@@ -1369,6 +1543,7 @@ function renderGrid(){
     card.title='Tap for hourly detail';
     card.onclick=()=>openModal(dateStr,i);
     card.innerHTML=`
+      <button class="card-bell${hasDayNotif(loc.name,dateStr)?' active':''}" onclick="toggleDayNotif(event,'${dateStr}',${i})" title="Notify me for this day">🔔</button>
       <div class="day-label">${short}<span class="dn">${num}</span></div>
       <div class="card-top">
         <div class="wx-icon">${icon}</div>
@@ -1516,7 +1691,228 @@ function closeModal(){
   window.scrollTo(0,scrollY);
 }
 function handleOverlayClick(e){if(e.target===$('modalOverlay'))closeModal();}
-document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('modalOverlay').style.display==='flex')closeModal();else if(e.key==='Escape'&&$('profileOverlay').style.display==='flex')closeProfilePanel();});
+
+// ══════════════════════════════════
+//  NOTIFICATIONS — DATA
+// ══════════════════════════════════
+const WEBHOOK_URL = '';
+
+function loadProfile(){ try{ return JSON.parse(localStorage.getItem('kf_profile')||'{}'); }catch{ return {}; } }
+function saveProfile(p){ localStorage.setItem('kf_profile', JSON.stringify(p)); }
+function loadNotifs(){ try{ return JSON.parse(localStorage.getItem('kf_notifs')||'[]'); }catch{ return []; } }
+function saveNotifs(arr){ localStorage.setItem('kf_notifs', JSON.stringify(arr)); }
+function notifMasterEnabled(){ return loadProfile().notifsEnabled !== false; }
+
+function hasSpotNotif(spotName){ return loadNotifs().some(n=>n.type==='spot'&&n.spotName===spotName); }
+function hasDayNotif(spotName,date){ return loadNotifs().some(n=>n.type==='day'&&n.spotName===spotName&&n.date===date); }
+
+function addSpotNotif(spot,sessions){
+  let notifs=loadNotifs().filter(n=>!(n.type==='spot'&&n.spotName===spot.name));
+  notifs.push({id:Date.now()+'_s',type:'spot',spotName:spot.name,spotLat:spot.lat||spot.latitude,spotLon:spot.lon||spot.longitude,spotDirs:[...windDirs],label:'All sessions',createdAt:new Date().toISOString()});
+  saveNotifs(notifs);
+  updateProfileDot();
+  renderHintChips();
+  sessions.forEach(sess=>fireWebhook(spot,sess));
+}
+function removeSpotNotif(spotName){
+  saveNotifs(loadNotifs().filter(n=>!(n.type==='spot'&&n.spotName===spotName)));
+  updateProfileDot();
+  renderHintChips();
+}
+function addDayNotif(spot,dateStr,sessInfo){
+  let notifs=loadNotifs().filter(n=>!(n.type==='day'&&n.spotName===spot.name&&n.date===dateStr));
+  const{full}=fmtDate(dateStr);
+  notifs.push({id:Date.now()+'_d',type:'day',spotName:spot.name,spotLat:spot.lat||spot.latitude,spotLon:spot.lon||spot.longitude,date:dateStr,label:full,createdAt:new Date().toISOString()});
+  saveNotifs(notifs);
+  updateProfileDot();
+  renderHintChips();
+  fireWebhook(spot,sessInfo);
+}
+function removeDayNotif(spotName,date){
+  saveNotifs(loadNotifs().filter(n=>!(n.type==='day'&&n.spotName===spotName&&n.date===date)));
+  updateProfileDot();
+  renderHintChips();
+}
+
+async function fireWebhook(spot,sessInfo){
+  const p=loadProfile();
+  if(!p.email||!WEBHOOK_URL)return;
+  try{
+    await fetch(WEBHOOK_URL,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        email:p.email,spot:spot.name,
+        spot_location:{lat:spot.lat||spot.latitude,lon:spot.lon||spot.longitude},
+        session_start_time:sessInfo.sessionStart,
+        forecast:{wind_speed:sessInfo.peakKn,wind_direction:sessInfo.domDir,gusts:sessInfo.gusts}
+      })
+    });
+  }catch(e){console.warn('Webhook failed',e);}
+}
+
+// ── PENDING NOTIF ──
+let pendingNotif=null;
+
+// ── PROFILE PANEL ──
+let ppCurrentTab='profile';
+
+function openProfilePanel(tab){
+  tab=tab||'profile';
+  $('profileOverlay').style.display='flex';
+  document.body.style.overflow='hidden';
+  switchPpTab(tab);
+  const p=loadProfile();
+  $('ppEmailInput').value=p.email||'';
+  updateEmailWarning();
+  renderNotifList();
+  updateProfileDot();
+}
+function closeProfilePanel(){
+  $('profileOverlay').style.display='none';
+  document.body.style.overflow='';
+}
+function handleProfileOverlayClick(e){
+  if(e.target===$('profileOverlay'))closeProfilePanel();
+}
+function switchPpTab(tab){
+  ppCurrentTab=tab;
+  $('ppTabProfile').classList.toggle('active',tab==='profile');
+  $('ppTabNotifs').classList.toggle('active',tab==='notifs');
+  $('ppPanelProfile').style.display=tab==='profile'?'flex':'none';
+  $('ppPanelNotifs').style.display=tab==='notifs'?'flex':'none';
+  if(tab==='notifs')renderNotifList();
+}
+function saveProfileEmail(){
+  const email=$('ppEmailInput').value.trim();
+  const p=loadProfile();
+  p.email=email;
+  saveProfile(p);
+  updateEmailWarning();
+  updateProfileDot();
+  showToast('✓ Email saved');
+  if(pendingNotif&&email){
+    const pn=pendingNotif; pendingNotif=null;
+    if(pn.type==='spot') addSpotNotif(pn.spot,pn.sessions);
+    else addDayNotif(pn.spot,pn.dateStr,pn.sessInfo);
+    if(cachedLoc) renderGrid();
+  }
+}
+function updateEmailWarning(){
+  const p=loadProfile();
+  const hasNotifs=loadNotifs().length>0;
+  $('ppEmailWarning').style.display=(!p.email&&hasNotifs)?'block':'none';
+}
+function toggleMasterNotif(){
+  const p=loadProfile();
+  p.notifsEnabled=!notifMasterEnabled();
+  saveProfile(p);
+  $('ppMasterToggle').classList.toggle('on',p.notifsEnabled!==false);
+}
+function renderNotifList(){
+  const notifs=loadNotifs();
+  const count=notifs.length;
+  const countEl=$('ppNotifCount');
+  if(count>0){countEl.style.display='inline-flex';countEl.textContent=count;}
+  else{countEl.style.display='none';}
+  $('ppMasterToggle').className='pp-toggle'+(notifMasterEnabled()?' on':'');
+  const list=$('ppNotifList');
+  if(!notifs.length){list.innerHTML='<div class="pp-empty">No active notifications</div>';return;}
+  list.innerHTML=notifs.map(n=>`
+    <div class="pp-notif-item">
+      <div class="pp-notif-info">
+        <div class="pp-notif-spot">🔔 ${n.spotName}</div>
+        <div class="pp-notif-day">${n.type==='spot'?'All sessions':n.label}</div>
+      </div>
+      <button class="pp-notif-del" onclick="deleteNotifById('${n.id}')">🗑 Remove</button>
+    </div>`).join('');
+}
+function deleteNotifById(id){
+  const notifs=loadNotifs();
+  const n=notifs.find(x=>x.id===id);
+  if(!n)return;
+  saveNotifs(notifs.filter(x=>x.id!==id));
+  renderNotifList();
+  updateProfileDot();
+  updateEmailWarning();
+  renderHintChips();
+  if(cachedLoc) renderGrid();
+}
+function updateProfileDot(){
+  const p=loadProfile();
+  const hasNotifs=loadNotifs().length>0;
+  const show=!!(p.email||hasNotifs);
+  document.querySelectorAll('.profile-btn-dot').forEach(d=>d.classList.toggle('visible',show));
+}
+function showToast(msg){
+  const t=document.createElement('div');
+  t.className='pp-toast'; t.textContent=msg;
+  document.body.appendChild(t);
+  setTimeout(()=>t.remove(),2400);
+}
+
+// ── SPOT-LEVEL NOTIF TOGGLE ──
+function toggleSpotNotif(){
+  const loc=cachedLoc;
+  if(!loc)return;
+  const p=loadProfile();
+  if(!p.email){
+    const sessions=getQualSessions();
+    pendingNotif={type:'spot',spot:{name:loc.name,lat:loc.latitude,lon:loc.longitude},sessions};
+    openProfilePanel('profile');
+    return;
+  }
+  if(hasSpotNotif(loc.name)){
+    removeSpotNotif(loc.name);
+  } else {
+    addSpotNotif({name:loc.name,lat:loc.latitude,lon:loc.longitude},getQualSessions());
+  }
+  renderGrid();
+}
+
+function getQualSessions(){
+  if(!cachedWx)return[];
+  const{daily}=cachedWx;
+  return daily.time.reduce((arr,dateStr,i)=>{
+    const{good,peakKn,domDir}=buildDay(dateStr,daily.sunrise[i],daily.sunset[i]);
+    if(good.length>=2){
+      const sessionStart=good[0].tStr;
+      const gusts=good.length?Math.max(...good.map(h=>h.gustKn)):0;
+      arr.push({sessionStart,peakKn,domDir:domDir!==null?compass(domDir):'—',gusts});
+    }
+    return arr;
+  },[]);
+}
+
+// ── DAY-LEVEL NOTIF TOGGLE ──
+function toggleDayNotif(e,dateStr,dayIdx){
+  e.stopPropagation();
+  const loc=cachedLoc;
+  if(!loc)return;
+  const{daily}=cachedWx;
+  const{good,peakKn,domDir}=buildDay(dateStr,daily.sunrise[dayIdx],daily.sunset[dayIdx]);
+  const sessionStart=good.length?good[0].tStr:dateStr+'T10:00';
+  const gusts=good.length?Math.max(...good.map(h=>h.gustKn)):0;
+  const sessInfo={sessionStart,peakKn,domDir:domDir!==null?compass(domDir):'—',gusts};
+  const spot={name:loc.name,lat:loc.latitude,lon:loc.longitude};
+
+  const p=loadProfile();
+  if(!p.email){
+    pendingNotif={type:'day',spot,dateStr,sessInfo};
+    openProfilePanel('profile');
+    return;
+  }
+  if(hasDayNotif(loc.name,dateStr)){
+    removeDayNotif(loc.name,dateStr);
+  } else {
+    addDayNotif(spot,dateStr,sessInfo);
+  }
+  renderGrid();
+}
+
+// ── INIT ──
+updateProfileDot();
+$('ppMasterToggle').classList.toggle('on', notifMasterEnabled());
 </script>
 </body>
 </html>
