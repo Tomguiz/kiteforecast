@@ -179,6 +179,11 @@
     .chip { display:inline-flex; align-items:center; gap:6px; padding:6px 13px; border:1px solid var(--border); border-radius:99px; font-size:.78rem; color:var(--gray); cursor:pointer; transition:border-color .2s,color .2s; }
     .chip:hover { border-color:var(--accent); color:var(--accent); }
     .chip-dirs { font-size:.65rem; color:var(--tdim); font-weight:600; }
+    .chip-days { font-size:.65rem; font-weight:700; padding:1px 5px; border-radius:99px; margin-left:2px; line-height:1.5; }
+    .chip-days.cd-good    { background:rgba(34,197,94,.15);  color:#4ade80; }
+    .chip-days.cd-ok      { background:rgba(234,179,8,.13);  color:#fde047; }
+    .chip-days.cd-none    { background:rgba(148,163,184,.1); color:var(--tdim); }
+    .chip-days.cd-loading { color:var(--tdim); }
     .fav-chip { display:inline-flex; align-items:center; gap:5px; padding:6px 10px 6px 13px; border:1px solid rgba(251,191,36,.35); border-radius:99px; font-size:.78rem; color:#fbbf24; cursor:pointer; transition:border-color .2s,background .2s; background:rgba(251,191,36,.06); }
     .fav-chip:hover { border-color:#fbbf24; background:rgba(251,191,36,.13); }
     .fav-chip-label { flex:1; }
@@ -809,6 +814,44 @@ function spotSearch(q){
 }
 
 let osmSearchCache={};
+
+// ── Chip forecast cache (session-level) ──
+const chipFxCache={};
+async function fetchChipQualDays(spot){
+  const key=`${spot.lat},${spot.lon}`;
+  if(chipFxCache[key]!==undefined) return chipFxCache[key];
+  try{
+    const p=new URLSearchParams({
+      latitude:spot.lat,longitude:spot.lon,
+      hourly:['weather_code','windspeed_10m','winddirection_10m'].join(','),
+      daily:['sunrise','sunset'].join(','),
+      forecast_days:10,timezone:'auto',windspeed_unit:'ms',
+    });
+    const wx=await safeFetch(`https://api.open-meteo.com/v1/forecast?${p}`,10000);
+    if(wx.error) throw new Error(wx.reason);
+    const userDirs=loadUserDirsForSpot(spot.name);
+    const dirs=new Set(userDirs||(spot.dirs&&spot.dirs.length?spot.dirs:[]));
+    const isDirOK=d=>{ if(!dirs.size) return true; for(const sd of dirs) if(angleDiff(d,sd)<=22.5) return true; return false; };
+    let qualDays=0;
+    wx.daily.time.forEach((dateStr,i)=>{
+      const srH=parseInt(wx.daily.sunrise[i].slice(11,13),10);
+      const ssH=parseInt(wx.daily.sunset[i].slice(11,13),10);
+      let qh=0;
+      wx.hourly.time.forEach((t,j)=>{
+        if(t.slice(0,10)!==dateStr) return;
+        const hr=parseInt(t.slice(11,13),10);
+        if(hr<srH||hr>ssH) return;
+        const kn=toKnotsR(wx.hourly.windspeed_10m[j]);
+        const dir=wx.hourly.winddirection_10m[j];
+        const code=wx.hourly.weather_code[j]??0;
+        if(speedTier(kn)>0&&!isRainy(code)&&isDirOK(dir)) qh++;
+      });
+      if(qh>=2) qualDays++;
+    });
+    chipFxCache[key]=qualDays;
+    return qualDays;
+  }catch{ chipFxCache[key]=null; return null; }
+}
 async function searchOsmSpots(q){
   if(q.length<3) return [];
   const key=q.toLowerCase();
@@ -964,6 +1007,13 @@ function toggleFavorite(){
   if(btn){ btn.textContent=isFav?'★':'☆'; btn.classList.toggle('active',isFav); btn.title=isFav?'Remove from favourites':'Add to favourites'; }
 }
 
+function setChipDayBadge(el,n){
+  if(n===null){ el.remove(); return; }
+  el.className='chip-days '+(n>=5?'cd-good':n>=2?'cd-ok':'cd-none');
+  el.textContent=n>0?`${n}/10`:'0/10';
+  el.title=`${n} day${n!==1?'s':''} with qualifying wind in the next 10`;
+}
+
 function renderHintChips(){
   const favs=loadFavs();
   const wrap=$('hintChips');
@@ -977,15 +1027,12 @@ function renderHintChips(){
       const chip=document.createElement('span');
       chip.className='fav-chip';
       const label=document.createElement('span');
-      label.className='fav-chip-label';
-      label.textContent=f.label;
-      if(f.dirs&&f.dirs.length){
-        const badge=document.createElement('span');
-        badge.className='chip-dirs'; badge.style.marginLeft='4px';
-        badge.textContent=f.dirs.map(d=>compass(d)).join('/');
-        label.appendChild(badge);
-      }
+      label.className='fav-chip-label'; label.textContent=f.label;
       label.addEventListener('click',()=>pickFav(f));
+      const fbadge=document.createElement('span');
+      fbadge.className='chip-days cd-loading'; fbadge.textContent='·';
+      label.appendChild(fbadge);
+      fetchChipQualDays({name:f.name,lat:f.lat,lon:f.lon,dirs:f.dirs||[]}).then(n=>setChipDayBadge(fbadge,n));
       const rm=document.createElement('span');
       rm.className='fav-chip-remove'; rm.textContent='✕'; rm.title='Remove';
       rm.addEventListener('click',e=>{e.stopPropagation();removeFav(f);});
@@ -999,20 +1046,15 @@ function renderHintChips(){
 
   DEFAULT_CHIPS.forEach(c=>{
     const spot=SPOTS.find(s=>s.name===c.name);
-    const userDirs=loadUserDirsForSpot(c.name);
-    const dirsArr=userDirs||(spot&&spot.dirs)||[];
-    const dirsLabel=dirsArr.length?dirsArr.map(d=>compass(d)).join('/'):'';
     const chip=document.createElement('span');
     chip.className='chip';
-    const txt=document.createTextNode(c.label);
-    chip.appendChild(txt);
-    if(dirsLabel){
-      const badge=document.createElement('span');
-      badge.className='chip-dirs'; badge.textContent=dirsLabel;
-      chip.appendChild(badge);
-    }
+    chip.appendChild(document.createTextNode(c.label));
+    const badge=document.createElement('span');
+    badge.className='chip-days cd-loading'; badge.textContent='·';
+    chip.appendChild(badge);
     chip.addEventListener('click',()=>{ if(spot) pickSpot(spot); });
     wrap.appendChild(chip);
+    if(spot) fetchChipQualDays(spot).then(n=>setChipDayBadge(badge,n));
   });
 }
 
