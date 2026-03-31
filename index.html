@@ -555,7 +555,7 @@
     <span class="profile-btn-dot" id="profileDot"></span>
   </button>
   <div class="logo">🪁 Kite<span>Forecast</span></div>
-  <p class="tagline">Never miss a session again &amp; get notified when your spot fires 🔔</p>
+  <p class="tagline">Never miss a session again</p>
   <div class="search-wrap">
     <div class="search-input-wrap">
       <input type="text" id="searchInput" placeholder="Spot name, beach or city…" autocomplete="off" />
@@ -1113,12 +1113,21 @@ function renderAC(items){
   dd.classList.add('open');
   acActive=-1;
   dd.querySelectorAll('.ac-item').forEach((el,i)=>{
-    el.addEventListener('mousedown',e=>{e.preventDefault();pickSpot(items[i]);});
+    el.addEventListener('mousedown',e=>{e.preventDefault();fillSpotFromAC(items[i]);});
   });
 }
 function closeAC(){$('acDropdown').innerHTML='';$('acDropdown').classList.remove('open');acActive=-1;}
+// Called from autocomplete dropdown — fills input only, waits for Search
+let acSelectedSpot=null;
+function fillSpotFromAC(spot){
+  $('searchInput').value=spot.name;
+  acSelectedSpot=spot;
+  closeAC();
+}
+// Called from chips, favs, recent — always fetches immediately
 function pickSpot(spot){
   $('searchInput').value=spot.name;
+  acSelectedSpot=null;
   closeAC();
   manualShoreSet=false;
   addRecentSpot(spot);
@@ -1347,6 +1356,8 @@ async function doSearch(){
   closeAC();
   const q=$('searchInput').value.trim();
   if(!q) return;
+  // if user selected from autocomplete, use that spot directly
+  if(acSelectedSpot){ const s=acSelectedSpot; acSelectedSpot=null; pickSpot(s); return; }
   // check curated spots first (exact/partial name match)
   const ql=q.toLowerCase();
   const match=SPOTS.find(s=>s.name.toLowerCase()===ql||s.name.toLowerCase().startsWith(ql));
@@ -1354,6 +1365,7 @@ async function doSearch(){
   await fetchForecast(q);
 }
 $('searchInput').addEventListener('input',e=>{
+  acSelectedSpot=null;
   const q=e.target.value.trim();
   const local=spotSearch(q);
   renderAC(local); // show local results immediately
@@ -1894,10 +1906,8 @@ function deleteNotifById(id){
   if(cachedLoc) renderGrid();
 }
 function updateProfileDot(){
-  const p=loadProfile();
   const hasNotifs=loadNotifs().length>0;
-  const show=!!(p.email||hasNotifs);
-  document.querySelectorAll('.profile-btn-dot').forEach(d=>d.classList.toggle('visible',show));
+  document.querySelectorAll('.profile-btn-dot').forEach(d=>d.classList.toggle('visible',hasNotifs));
 }
 function showToast(msg){
   const t=document.createElement('div');
