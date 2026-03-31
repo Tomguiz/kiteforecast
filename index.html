@@ -971,7 +971,7 @@ function buildLegendHTML(){
 //  KITESPOT DATABASE
 // ══════════════════════════════════
 const SPOTS=[
-  // Belgium
+  // ── BELGIUM ──
   {name:'Riverwoods Beachclub',loc:'Knokke-Heist, Belgium',lat:51.3627,lon:3.3062,dirs:[270,315]},
   {name:'Knokke Beach',loc:'Knokke-Heist, Belgium',lat:51.3590,lon:3.3100,dirs:[270,315]},
   {name:'Icarus Kite School',loc:'Zeebrugge, Belgium',lat:51.3459,lon:3.1989,dirs:[270,315]},
@@ -980,56 +980,160 @@ const SPOTS=[
   {name:'Oostduinkerke',loc:'Koksijde, Belgium',lat:51.1106,lon:2.6878,dirs:[270,315]},
   {name:'Blankenberge',loc:'Blankenberge, Belgium',lat:51.3086,lon:3.1317,dirs:[270,315]},
   {name:'Middelkerke',loc:'Middelkerke, Belgium',lat:51.1892,lon:2.8267,dirs:[270,315]},
-  // Netherlands
+  // ── NETHERLANDS ──
   {name:'Scheveningen',loc:'The Hague, Netherlands',lat:52.1053,lon:4.2676,dirs:[180,225,315,0]},
-  {name:'Brouwersdam',loc:'Zeeland, Netherlands',lat:51.7333,lon:3.8667,dirs:[225,270,315]},
+  {name:'Kijkduin',loc:'The Hague, Netherlands',lat:52.0667,lon:4.2167,dirs:[180,225,315,0]},
+  {name:'Brouwersdam',loc:'Zeeland, Netherlands',lat:51.7629,lon:3.8512,dirs:[225,270,315]},
+  {name:'Kabbelaarsbank',loc:'Zeeland, Netherlands',lat:51.7567,lon:3.8492,dirs:[225,270,315]},
   {name:'Oesterdam',loc:'Zeeland, Netherlands',lat:51.7333,lon:3.8667,dirs:[180,225,270,315]},
-  {name:'Workum',loc:'Friesland, Netherlands',lat:52.9800,lon:5.4400,dirs:[225,270,315]},
+  {name:'Neeltje Jans',loc:'Zeeland, Netherlands',lat:51.6273,lon:3.6857,dirs:[225,270,315]},
+  {name:'Domburg',loc:'Zeeland, Netherlands',lat:51.5549,lon:3.4709,dirs:[225,270,315]},
+  {name:'Cadzand Bad',loc:'Zeeland, Netherlands',lat:51.3722,lon:3.3706,dirs:[270,315]},
+  {name:'Workum',loc:'Friesland, Netherlands',lat:52.9673,lon:5.4122,dirs:[225,270,315]},
+  {name:'Makkum',loc:'Friesland, Netherlands',lat:53.0514,lon:5.3790,dirs:[225,270,315]},
+  {name:'Hindeloopen',loc:'Friesland, Netherlands',lat:52.9364,lon:5.4024,dirs:[225,270,315]},
   {name:'Maasvlakte',loc:'Rotterdam, Netherlands',lat:51.9667,lon:4.0167,dirs:[180,225,315]},
-  {name:'Castricum',loc:'Noord-Holland, Netherlands',lat:52.5667,lon:4.6167,dirs:[180,225,315]},
-  {name:'Wijk aan Zee',loc:'Noord-Holland, Netherlands',lat:52.5000,lon:4.6000,dirs:[180,225,315]},
-  {name:'Hvide Sande',loc:'Jutland, Denmark',lat:56.0000,lon:8.1333,dirs:[180,225,315]},
-  // Spain
-  {name:'Tarifa',loc:'Tarifa, Spain',lat:36.0143,lon:-5.6044,dirs:[90,270]},
-  {name:'Valdevaqueros',loc:'Tarifa, Spain',lat:36.0778,lon:-5.6778,dirs:[90,270]},
-  {name:'Los Lances',loc:'Tarifa, Spain',lat:36.0400,lon:-5.6200,dirs:[90,270]},
-  {name:'El Medano',loc:'Tenerife, Spain',lat:28.0444,lon:-16.5292,dirs:[0,22,45]},   // dominant: NNE trade
-  {name:'Fuerteventura',loc:'Canary Islands, Spain',lat:28.3587,lon:-14.0535,dirs:[22,45,90]}, // NE trade
-  {name:'Sotavento',loc:'Fuerteventura, Spain',lat:28.1497,lon:-14.2369,dirs:[22,45,90]}, // NE trade (Alisio)
-  // France
-  {name:'Leucate',loc:'Occitanie, France',lat:42.9064,lon:3.0347,dirs:[315,0]},    // dominant: Tramontane (NW/N)
+  {name:'Castricum aan Zee',loc:'Noord-Holland, Netherlands',lat:52.5574,lon:4.6067,dirs:[180,225,315]},
+  {name:'Wijk aan Zee',loc:'Noord-Holland, Netherlands',lat:52.4705,lon:4.5683,dirs:[180,225,315]},
+  {name:'Bergen aan Zee',loc:'Noord-Holland, Netherlands',lat:52.6601,lon:4.6280,dirs:[180,225,315]},
+  {name:'Egmond aan Zee',loc:'Noord-Holland, Netherlands',lat:52.6173,lon:4.6203,dirs:[180,225,315]},
+  {name:'Zandvoort',loc:'Noord-Holland, Netherlands',lat:52.3829,lon:4.5303,dirs:[180,225,315]},
+  {name:'Lauwersoog',loc:'Groningen, Netherlands',lat:53.4073,lon:6.1590,dirs:[225,270,315]},
+  {name:'Texel',loc:'Noord-Holland, Netherlands',lat:53.0814,lon:4.7361,dirs:[180,225,315,0]},
+  {name:'Vlieland',loc:'Friesland, Netherlands',lat:53.3047,lon:5.0509,dirs:[180,225,315]},
+  // ── DENMARK ──
+  {name:'Hvide Sande',loc:'Jutland, Denmark',lat:56.0000,lon:8.1333,dirs:[180,225,270,315]},
+  // ── GERMANY ──
+  {name:'Fehmarn',loc:'Schleswig-Holstein, Germany',lat:54.4333,lon:11.1500,dirs:[225,270,315]},
+  {name:'Sylt',loc:'Schleswig-Holstein, Germany',lat:54.9000,lon:8.3167,dirs:[270,315,0]},
+  // ── GREAT BRITAIN ──
+  {name:'Camber Sands',loc:'East Sussex, UK',lat:50.9333,lon:0.7833,dirs:[225,270,315]},
+  {name:'West Wittering',loc:'West Sussex, UK',lat:50.7667,lon:-0.9000,dirs:[225,270,315]},
+  {name:'Rhosneigr',loc:'Anglesey, Wales, UK',lat:53.2333,lon:-4.5000,dirs:[180,225,270]},
+  // ── IRELAND ──
+  {name:'Brandon Bay',loc:'Kerry, Ireland',lat:52.2500,lon:-10.1333,dirs:[225,270,315]},
+  // ── FRANCE ──
+  {name:'Leucate',loc:'Occitanie, France',lat:42.9064,lon:3.0347,dirs:[315,0]},
+  {name:'La Nautique',loc:'Narbonne, France',lat:43.1367,lon:3.0156,dirs:[315,0]},
+  {name:'La Vielle Nouvelle',loc:'Gruissan, France',lat:43.0847,lon:3.0847,dirs:[315,0]},
+  {name:'Gruissan',loc:'Occitanie, France',lat:43.1094,lon:3.0847,dirs:[315,0]},
+  {name:'La Grande-Motte',loc:'Hérault, France',lat:43.5700,lon:4.0850,dirs:[270,315]},
+  {name:'Carnon-Plage',loc:'Hérault, France',lat:43.5417,lon:3.9583,dirs:[270,315]},
+  {name:'Sète',loc:'Hérault, France',lat:43.4067,lon:3.6817,dirs:[270,315]},
   {name:'Almanarre',loc:'Hyères, France',lat:43.0694,lon:6.1292,dirs:[270,315]},
+  {name:'Hourtin-Plage',loc:'Gironde, France',lat:45.2234,lon:-1.1710,dirs:[270,315]},
+  {name:'Lacanau Océan',loc:'Gironde, France',lat:44.9806,lon:-1.1995,dirs:[270,315]},
+  {name:'Biscarosse Plage',loc:'Landes, France',lat:44.4418,lon:-1.2551,dirs:[270,315]},
+  {name:'Mimizan Plage',loc:'Landes, France',lat:44.2055,lon:-1.2992,dirs:[270,315]},
+  {name:'Cap Ferret',loc:'Gironde, France',lat:44.7972,lon:-1.2296,dirs:[270,315]},
   {name:'Saint-Malo',loc:'Brittany, France',lat:48.6500,lon:-2.0300,dirs:[270,315]},
-  {name:'Gruissan',loc:'Occitanie, France',lat:43.1094,lon:3.0847,dirs:[270,315]},
-  // Morocco
-  {name:'Dakhla',loc:'Dakhla, Morocco',lat:23.7136,lon:-15.9355,dirs:[0,22,45]},  // dominant: N/NNE trade
-  {name:'Essaouira',loc:'Essaouira, Morocco',lat:31.5125,lon:-9.7700,dirs:[0,22,45]}, // dominant: N/NNE trade
-  // Egypt
-  {name:'El Gouna',loc:'Red Sea, Egypt',lat:27.3969,lon:33.6778,dirs:[45,90]},
-  {name:'Soma Bay',loc:'Red Sea, Egypt',lat:26.8917,lon:33.9333,dirs:[45,90]},
-  // Greece
-  {name:'Vassiliki',loc:'Lefkada, Greece',lat:38.6333,lon:20.5833,dirs:[225,270]}, // afternoon Maistros (SW/W thermal)
-  {name:'Prasonisi',loc:'Rhodes, Greece',lat:35.8881,lon:27.7378,dirs:[45,90]},
-  // Italy
+  {name:'Pas-de-Calais',loc:'Pas-de-Calais, France',lat:50.8500,lon:1.5500,dirs:[225,270,315]},
+  // ── SPAIN ──
+  {name:'Tarifa',loc:'Tarifa, Spain',lat:36.0143,lon:-5.6044,dirs:[90,270]},
+  {name:'Valdevaqueros',loc:'Tarifa, Spain',lat:36.0650,lon:-5.6821,dirs:[90,270]},
+  {name:'Los Lances',loc:'Tarifa, Spain',lat:36.0448,lon:-5.6393,dirs:[90,270]},
+  {name:'Punta Paloma',loc:'Tarifa, Spain',lat:36.0596,lon:-5.7075,dirs:[90,270]},
+  {name:'Bolonia',loc:'Tarifa, Spain',lat:36.0798,lon:-5.7605,dirs:[90,270]},
+  {name:'El Palmar',loc:'Cádiz, Spain',lat:36.2325,lon:-6.0719,dirs:[225,270,315]},
+  {name:'Sancti Petri',loc:'Cádiz, Spain',lat:36.3885,lon:-6.2076,dirs:[225,270,315]},
+  {name:'Valdelagrana',loc:'Cádiz, Spain',lat:36.5673,lon:-6.2235,dirs:[225,270,315]},
+  {name:'Rota',loc:'Cádiz, Spain',lat:36.6281,lon:-6.3857,dirs:[225,270,315]},
+  // ── CANARY ISLANDS ──
+  {name:'Sotavento',loc:'Fuerteventura, Spain',lat:28.1385,lon:-14.2399,dirs:[22,45,90]},
+  {name:'Flag Beach',loc:'Fuerteventura, Spain',lat:28.7219,lon:-13.8417,dirs:[22,45,90]},
+  {name:'El Cotillo',loc:'Fuerteventura, Spain',lat:28.6748,lon:-14.0094,dirs:[0,22,45]},
+  {name:'Las Dunas Fuerteventura',loc:'Fuerteventura, Spain',lat:28.5437,lon:-13.8350,dirs:[22,45,90]},
+  {name:'Las Cucharas',loc:'Lanzarote, Spain',lat:28.9994,lon:-13.4876,dirs:[22,45,90]},
+  {name:'Famara',loc:'Lanzarote, Spain',lat:29.1209,lon:-13.5427,dirs:[225,270,315]},
+  {name:'Los Pocillos',loc:'Lanzarote, Spain',lat:28.9251,lon:-13.6375,dirs:[22,45,90]},
+  {name:'Pozo Izquierdo',loc:'Gran Canaria, Spain',lat:27.8222,lon:-15.4234,dirs:[22,45,90]},
+  {name:'Bahia Feliz',loc:'Gran Canaria, Spain',lat:27.7815,lon:-15.5172,dirs:[22,45,90]},
+  {name:'El Medano',loc:'Tenerife, Spain',lat:28.0444,lon:-16.5292,dirs:[0,22,45]},
+  // ── PORTUGAL ──
+  {name:'Guincho',loc:'Cascais, Portugal',lat:38.7326,lon:-9.4730,dirs:[315,0]},
+  {name:'Carcavelos',loc:'Lisbon, Portugal',lat:38.6790,lon:-9.3348,dirs:[270,315]},
+  {name:'Meia Praia',loc:'Lagos, Portugal',lat:37.1113,lon:-8.6581,dirs:[315,0]},
+  {name:'Ria de Alvor',loc:'Portimão, Portugal',lat:37.1227,lon:-8.6235,dirs:[315,0]},
+  {name:'Vilamoura',loc:'Algarve, Portugal',lat:37.0709,lon:-8.1138,dirs:[315,0]},
+  {name:'Viana do Castelo',loc:'Norte, Portugal',lat:41.6795,lon:-8.8323,dirs:[315,0]},
+  {name:'Ofir',loc:'Braga, Portugal',lat:41.5233,lon:-8.7902,dirs:[315,0]},
+  {name:'Matosinhos',loc:'Porto, Portugal',lat:41.1768,lon:-8.6918,dirs:[315,0]},
+  // ── FRANCE MEDITERRANEAN ──
+  {name:'Maguelone',loc:'Palavas-les-Flots, France',lat:43.5167,lon:3.8917,dirs:[270,315]},
+  // ── ITALY ──
   {name:'Brindisi',loc:'Puglia, Italy',lat:40.6333,lon:17.9417,dirs:[90,135]},
   {name:'Lake Garda',loc:'Lombardia, Italy',lat:45.6167,lon:10.7167,dirs:[180,225]},
-  // South Africa
+  {name:'Oristano',loc:'Sardinia, Italy',lat:39.9167,lon:8.5667,dirs:[270,315]},
+  {name:'Porto Pollo',loc:'Sardinia, Italy',lat:41.1667,lon:9.2833,dirs:[270,315]},
+  // ── GREECE ──
+  {name:'Vassiliki',loc:'Lefkada, Greece',lat:38.6333,lon:20.5833,dirs:[225,270]},
+  {name:'Prasonisi',loc:'Rhodes, Greece',lat:35.8894,lon:27.7732,dirs:[45,90]},
+  {name:'Ixia',loc:'Rhodes, Greece',lat:36.4291,lon:28.1991,dirs:[270,315]},
+  {name:'Kremasti',loc:'Rhodes, Greece',lat:36.4199,lon:28.1250,dirs:[270,315]},
+  {name:'Chicken Bay',loc:'Karpathos, Greece',lat:35.4250,lon:27.1509,dirs:[45,90]},
+  {name:'Mikri Vigla',loc:'Naxos, Greece',lat:37.0167,lon:25.4333,dirs:[315,0,45]},
+  {name:'Agios Georgios',loc:'Naxos, Greece',lat:37.1000,lon:25.3667,dirs:[315,0]},
+  {name:'Golden Beach',loc:'Paros, Greece',lat:37.0167,lon:25.2167,dirs:[315,0,45]},
+  {name:'Pounda',loc:'Paros, Greece',lat:37.0500,lon:25.1667,dirs:[315,0]},
+  {name:'Ftelia',loc:'Mykonos, Greece',lat:37.5000,lon:25.3167,dirs:[315,0,45]},
+  {name:'Mastihari',loc:'Kos, Greece',lat:36.8464,lon:27.0729,dirs:[315,0,45]},
+  {name:'Theologos Beach',loc:'Kos, Greece',lat:36.7129,lon:26.9220,dirs:[315,0,45]},
+  {name:'Kouremenos Beach',loc:'Crete, Greece',lat:35.2065,lon:26.2700,dirs:[45,90]},
+  {name:'Phalasarna',loc:'Crete, Greece',lat:35.4913,lon:23.5813,dirs:[180,225]},
+  {name:'Golden Beach Euboea',loc:'Euboea, Greece',lat:38.0396,lon:24.3191,dirs:[315,0,45]},
+  {name:'Varkiza',loc:'Attica, Greece',lat:37.8204,lon:23.8093,dirs:[315,0,45]},
+  {name:'Anavyssos',loc:'Attica, Greece',lat:37.7254,lon:23.9350,dirs:[315,0,45]},
+  // ── TURKEY ──
+  {name:'Alaçati',loc:'İzmir, Turkey',lat:38.2489,lon:26.3856,dirs:[270,315]},
+  {name:'Alacati',loc:'İzmir, Turkey',lat:38.2489,lon:26.3856,dirs:[270,315]},
+  // ── MOROCCO ──
+  {name:'Dakhla',loc:'Dakhla, Morocco',lat:23.7136,lon:-15.9355,dirs:[0,22,45]},
+  {name:'Essaouira',loc:'Essaouira, Morocco',lat:31.5125,lon:-9.7700,dirs:[0,22,45]},
+  {name:'Sidi Kaouki',loc:'Essaouira, Morocco',lat:34.0325,lon:-6.8405,dirs:[0,22,45]},
+  {name:'Moulay Bouzerktoun',loc:'Morocco',lat:34.8761,lon:-6.2977,dirs:[0,22,45]},
+  {name:'Dakhla PK25',loc:'Dakhla, Morocco',lat:23.6347,lon:-15.9156,dirs:[0,22,45]},
+  {name:'Aglou Plage',loc:'Tiznit, Morocco',lat:29.8292,lon:-9.7263,dirs:[0,22,45]},
+  {name:'Tanger',loc:'Tangier, Morocco',lat:35.7801,lon:-5.8000,dirs:[90,135,180]},
+  {name:'Oualidia',loc:'El Jadida, Morocco',lat:32.7345,lon:-9.0411,dirs:[0,22,45]},
+  // ── EGYPT ──
+  {name:'El Gouna',loc:'Red Sea, Egypt',lat:27.3969,lon:33.6778,dirs:[45,90]},
+  {name:'Mangroovy Beach',loc:'El Gouna, Egypt',lat:27.4100,lon:33.6775,dirs:[45,90]},
+  {name:'Soma Bay',loc:'Red Sea, Egypt',lat:26.8436,lon:33.9967,dirs:[45,90]},
+  {name:'Safaga',loc:'Red Sea, Egypt',lat:26.7993,lon:33.9442,dirs:[45,90]},
+  {name:'Ras Sudr',loc:'Sinai, Egypt',lat:29.6000,lon:32.7000,dirs:[315,0,45]},
+  {name:'Blue Lagoon Dahab',loc:'Sinai, Egypt',lat:28.4716,lon:34.5062,dirs:[315,0,45]},
+  // ── CAPE VERDE ──
+  {name:'Santa Maria',loc:'Sal, Cape Verde',lat:16.5971,lon:-22.9106,dirs:[315,0,45]},
+  {name:'Ponta Preta',loc:'Sal, Cape Verde',lat:16.6041,lon:-22.9285,dirs:[315,0,45]},
+  {name:'Kite Beach Sal',loc:'Sal, Cape Verde',lat:16.6504,lon:-22.9457,dirs:[315,0,45]},
+  // ── SOUTH AFRICA ──
   {name:'Bloubergstrand',loc:'Cape Town, South Africa',lat:-33.8028,lon:18.4703,dirs:[225,270]},
-  {name:'Cape Town',loc:'Cape Town, South Africa',lat:-33.9050,lon:18.4200,dirs:[225,270]},
-  {name:'Langebaan',loc:'Western Cape, South Africa',lat:-33.1000,lon:18.0333,dirs:[90,135]},
-  // Hawaii
+  {name:'Langebaan',loc:'Western Cape, South Africa',lat:-33.1000,lon:18.0333,dirs:[90,135,180]},
+  {name:'Paternoster',loc:'Western Cape, South Africa',lat:-32.8167,lon:17.8833,dirs:[135,180,225]},
+  // ── KENYA ──
+  {name:'Diani Beach',loc:'Mombasa, Kenya',lat:-4.3167,lon:39.5833,dirs:[135,180,225]},
+  // ── DOMINICAN REPUBLIC ──
+  {name:'Cabarete',loc:'Puerto Plata, Dominican Republic',lat:19.7633,lon:-70.4222,dirs:[45,90]},
+  {name:'Kite Beach Cabarete',loc:'Puerto Plata, Dominican Republic',lat:19.7511,lon:-70.4109,dirs:[45,90]},
+  {name:'Las Terrenas',loc:'Samaná, Dominican Republic',lat:19.3269,lon:-69.5285,dirs:[45,90]},
+  // ── BRAZIL ──
+  {name:'Jericoacoara',loc:'Ceará, Brazil',lat:-2.7978,lon:-40.5114,dirs:[45,90]},
+  {name:'Cumbuco',loc:'Ceará, Brazil',lat:-3.6000,lon:-38.7667,dirs:[45,90]},
+  {name:'Canoa Quebrada',loc:'Ceará, Brazil',lat:-4.3536,lon:-37.6625,dirs:[45,90]},
+  {name:'Parajuru',loc:'Ceará, Brazil',lat:-4.4528,lon:-37.8633,dirs:[45,90]},
+  {name:'São Miguel do Gostoso',loc:'Rio Grande do Norte, Brazil',lat:-5.1167,lon:-35.6300,dirs:[45,90]},
+  {name:'Preà',loc:'Ceará, Brazil',lat:-2.5900,lon:-40.1500,dirs:[45,90]},
+  {name:'Icaraizinho',loc:'Ceará, Brazil',lat:-2.7278,lon:-40.1667,dirs:[45,90]},
+  // ── HAWAII ──
   {name:'Kite Beach Maui',loc:'Maui, Hawaii',lat:20.9237,lon:-156.6892,dirs:[45,90]},
   {name:'Kanaha',loc:'Maui, Hawaii',lat:20.9019,lon:-156.4494,dirs:[45,90]},
-  // Dominican Republic
-  {name:'Cabarete',loc:'Puerto Plata, Dominican Republic',lat:19.7667,lon:-70.4167,dirs:[45,90]}, // dominant: E/NE trade
-  // Brazil
-  {name:'Cumbuco',loc:'Ceará, Brazil',lat:-3.6000,lon:-38.7667,dirs:[45,90]},      // dominant: E/NE trade
-  {name:'Jericoacoara',loc:'Ceará, Brazil',lat:-2.7978,lon:-40.5114,dirs:[45,90]}, // dominant: E/NE trade
-  // Australia
+  // ── AUSTRALIA ──
   {name:'Lancelin',loc:'Western Australia, Australia',lat:-31.0181,lon:115.3281,dirs:[270,315]},
-  {name:'Surfers Paradise',loc:'Queensland, Australia',lat:-28.0022,lon:153.4309,dirs:[45,90]},
-  // Thailand
-  {name:'Hua Hin',loc:'Prachuap Khiri Khan, Thailand',lat:12.5686,lon:99.9578,dirs:[315,0,45]}, // NE monsoon + thermal
+  {name:'Surfers Paradise',loc:'Queensland, Australia',lat:-28.0022,lon:153.4309,dirs:[45,90,135]},
+  // ── ASIA ──
+  {name:'Hua Hin',loc:'Prachuap Khiri Khan, Thailand',lat:12.5686,lon:99.9578,dirs:[315,0,45]},
+  {name:'Mui Ne',loc:'Bình Thuận, Vietnam',lat:10.9333,lon:108.2833,dirs:[315,0,45]},
+  {name:'Boracay',loc:'Aklan, Philippines',lat:11.9667,lon:121.9167,dirs:[315,0]},
 ];
 
 function spotSearch(q){
