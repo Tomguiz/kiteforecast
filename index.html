@@ -1718,29 +1718,54 @@ function hasSpotNotif(spotName){ return loadNotifs().some(n=>n.type==='spot'&&n.
 function hasDayNotif(spotName,date){ return loadNotifs().some(n=>n.type==='day'&&n.spotName===spotName&&n.date===date); }
 
 function addSpotNotif(spot,sessions){
-  let notifs=loadNotifs().filter(n=>!(n.type==='spot'&&n.spotName===spot.name));
-  notifs.push({id:Date.now()+'_s',type:'spot',spotName:spot.name,spotLat:spot.lat||spot.latitude,spotLon:spot.lon||spot.longitude,spotDirs:[...windDirs],label:'All sessions',createdAt:new Date().toISOString()});
+  // remove any existing spot entry + previous fromSpot day entries for this spot
+  let notifs=loadNotifs()
+    .filter(n=>!(n.type==='spot'&&n.spotName===spot.name))
+    .filter(n=>!(n.type==='day'&&n.spotName===spot.name&&n.fromSpot));
+  const spotId=Date.now()+'_s';
+  notifs.push({id:spotId,type:'spot',spotName:spot.name,spotLat:spot.lat||spot.latitude,spotLon:spot.lon||spot.longitude,spotDirs:[...windDirs],label:'All sessions',createdAt:new Date().toISOString()});
+  // add a day entry (hidden in panel) for each qualifying session so card bells light up
+  sessions.forEach((sess,i)=>{
+    const dateStr=sess.dateStr||sess.sessionStart.slice(0,10);
+    const{full}=fmtDate(dateStr);
+    notifs.push({id:spotId+'_d'+i,type:'day',fromSpot:true,spotName:spot.name,spotLat:spot.lat||spot.latitude,spotLon:spot.lon||spot.longitude,date:dateStr,label:full,createdAt:new Date().toISOString()});
+  });
   saveNotifs(notifs);
   updateProfileDot();
   renderHintChips();
   sessions.forEach(sess=>fireWebhook(spot,sess));
 }
 function removeSpotNotif(spotName){
-  saveNotifs(loadNotifs().filter(n=>!(n.type==='spot'&&n.spotName===spotName)));
+  // also remove all fromSpot day entries
+  saveNotifs(loadNotifs().filter(n=>!(n.spotName===spotName&&(n.type==='spot'||(n.type==='day'&&n.fromSpot)))));
   updateProfileDot();
   renderHintChips();
 }
 function addDayNotif(spot,dateStr,sessInfo){
   let notifs=loadNotifs().filter(n=>!(n.type==='day'&&n.spotName===spot.name&&n.date===dateStr));
   const{full}=fmtDate(dateStr);
-  notifs.push({id:Date.now()+'_d',type:'day',spotName:spot.name,spotLat:spot.lat||spot.latitude,spotLon:spot.lon||spot.longitude,date:dateStr,label:full,createdAt:new Date().toISOString()});
+  notifs.push({id:Date.now()+'_d',type:'day',fromSpot:false,spotName:spot.name,spotLat:spot.lat||spot.latitude,spotLon:spot.lon||spot.longitude,date:dateStr,label:full,createdAt:new Date().toISOString()});
   saveNotifs(notifs);
   updateProfileDot();
   renderHintChips();
   fireWebhook(spot,sessInfo);
 }
 function removeDayNotif(spotName,date){
-  saveNotifs(loadNotifs().filter(n=>!(n.type==='day'&&n.spotName===spotName&&n.date===date)));
+  const notifs=loadNotifs();
+  const target=notifs.find(n=>n.type==='day'&&n.spotName===spotName&&n.date===date);
+  if(target&&target.fromSpot){
+    // user is manually removing one day from a spot subscription:
+    // 1. remove the spot-level entry
+    // 2. remove this specific day
+    // 3. promote remaining fromSpot days to standalone
+    const updated=notifs
+      .filter(n=>!(n.type==='spot'&&n.spotName===spotName))
+      .filter(n=>!(n.type==='day'&&n.spotName===spotName&&n.date===date))
+      .map(n=>(n.type==='day'&&n.spotName===spotName&&n.fromSpot)?{...n,fromSpot:false}:n);
+    saveNotifs(updated);
+  } else {
+    saveNotifs(notifs.filter(n=>!(n.type==='day'&&n.spotName===spotName&&n.date===date)));
+  }
   updateProfileDot();
   renderHintChips();
 }
@@ -1820,15 +1845,16 @@ function toggleMasterNotif(){
   $('ppMasterToggle').classList.toggle('on',p.notifsEnabled!==false);
 }
 function renderNotifList(){
-  const notifs=loadNotifs();
-  const count=notifs.length;
+  const allNotifs=loadNotifs();
+  // visible = spot entries + standalone day entries (not fromSpot)
+  const visible=allNotifs.filter(n=>n.type==='spot'||(n.type==='day'&&!n.fromSpot));
   const countEl=$('ppNotifCount');
-  if(count>0){countEl.style.display='inline-flex';countEl.textContent=count;}
+  if(visible.length>0){countEl.style.display='inline-flex';countEl.textContent=visible.length;}
   else{countEl.style.display='none';}
   $('ppMasterToggle').className='pp-toggle'+(notifMasterEnabled()?' on':'');
   const list=$('ppNotifList');
-  if(!notifs.length){list.innerHTML='<div class="pp-empty">No active notifications</div>';return;}
-  list.innerHTML=notifs.map(n=>`
+  if(!visible.length){list.innerHTML='<div class="pp-empty">No active notifications</div>';return;}
+  list.innerHTML=visible.map(n=>`
     <div class="pp-notif-item">
       <div class="pp-notif-info">
         <div class="pp-notif-spot">🔔 ${n.spotName}</div>
@@ -1841,7 +1867,13 @@ function deleteNotifById(id){
   const notifs=loadNotifs();
   const n=notifs.find(x=>x.id===id);
   if(!n)return;
-  saveNotifs(notifs.filter(x=>x.id!==id));
+  if(n.type==='spot'){
+    // also wipe fromSpot day entries
+    saveNotifs(notifs.filter(x=>x.id!==id&&!(x.type==='day'&&x.spotName===n.spotName&&x.fromSpot)));
+  } else {
+    // standalone day removal — reuse removeDayNotif logic for fromSpot promotion
+    removeDayNotif(n.spotName,n.date);
+  }
   renderNotifList();
   updateProfileDot();
   updateEmailWarning();
@@ -1888,7 +1920,7 @@ function getQualSessions(){
     if(good.length>=2){
       const sessionStart=good[0].tStr;
       const gusts=good.length?Math.max(...good.map(h=>h.gustKn)):0;
-      arr.push({sessionStart,peakKn,domDir:domDir!==null?compass(domDir):'—',gusts});
+      arr.push({dateStr,sessionStart,peakKn,domDir:domDir!==null?compass(domDir):'—',gusts});
     }
     return arr;
   },[]);
