@@ -1078,7 +1078,8 @@ function renderHintChips(){
     wrap.appendChild(lbl2);
   }
 
-  DEFAULT_CHIPS.forEach(c=>{
+  const favNames=new Set(favs.map(f=>f.name));
+  DEFAULT_CHIPS.filter(c=>!favNames.has(c.name)).forEach(c=>{
     const spot=SPOTS.find(s=>s.name===c.name);
     const chip=document.createElement('span');
     chip.className='chip';
