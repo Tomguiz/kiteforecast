@@ -2473,10 +2473,10 @@ function initSpotsMap(){
     html:'<div style="width:10px;height:10px;background:#00d4ff;border-radius:50%;border:2px solid rgba(0,212,255,.4);box-shadow:0 0 6px #00d4ff88;"></div>',
     className:'',iconSize:[10,10],iconAnchor:[5,5]
   });
-  SPOTS.forEach(s=>{
+  SPOTS.forEach((s,i)=>{
     if(!s.lat||!s.lon)return;
     L.marker([s.lat,s.lon],{icon}).addTo(map)
-      .bindPopup(`<div style="min-width:140px"><b style="font-size:.95rem">${s.name}</b><br><span style="font-size:.8rem;color:#666">${s.loc||''}</span><br><br><button onclick="closeSpotsMap();setTimeout(()=>pickSpot(SPOTS.find(x=>x.name===${JSON.stringify(s.name)})),80)" style="background:#00d4ff;color:#000;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:.8rem;font-weight:600;">→ Check forecast</button></div>`);
+      .bindPopup(`<div style="min-width:140px"><b style="font-size:.95rem">${s.name}</b><br><span style="font-size:.8rem;color:#666">${s.loc||''}</span><br><br><button onclick="closeSpotsMap();setTimeout(()=>pickSpot(SPOTS[${i}]),80)" style="background:#00d4ff;color:#000;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:.8rem;font-weight:600;">→ Check forecast</button></div>`);
   });
   window._spotsMap=map;
 }
