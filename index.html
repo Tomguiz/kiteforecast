@@ -1706,7 +1706,10 @@ function renderHintChips(){
       const chip=document.createElement('span');
       chip.className='fav-chip';
       const label=document.createElement('span');
-      label.className='fav-chip-label'; label.textContent=f.label;
+      label.className='fav-chip-label';
+      const _ks=SPOTS.find(s=>s.name===f.name);
+      const _city=_ks?.loc?_ks.loc.split(', ').slice(0,-1).join(', '):'';
+      label.textContent=_ks?f.name+(_city&&_city!==f.name?', '+_city:''):f.label;
       if(loadNotifs().some(n=>n.spotName===f.name)){
         const bi=document.createElement('span');
         bi.className='chip-notif-bell active'; bi.innerHTML=bellSVG(10);
@@ -1730,28 +1733,43 @@ function renderHintChips(){
 
   const favNames=new Set(favs.map(f=>f.name));
   const defaultNames=new Set(DEFAULT_CHIPS.map(c=>c.name));
-  const recent=loadRecent().filter(r=>!favNames.has(r.name)&&!defaultNames.has(r.name));
+  const dismissed=new Set(loadDismissedSuggs());
+  const recent=loadRecent().filter(r=>!favNames.has(r.name)&&!defaultNames.has(r.name)&&!dismissed.has(r.name));
   const suggestions=[
-    ...DEFAULT_CHIPS.filter(c=>!favNames.has(c.name)),
+    ...DEFAULT_CHIPS.filter(c=>!favNames.has(c.name)&&!dismissed.has(c.name)),
     ...recent
   ];
   suggestions.forEach(c=>{
     const spot=SPOTS.find(s=>s.name===c.name)||{name:c.name,lat:c.lat,lon:c.lon,dirs:c.dirs||[]};
     const chip=document.createElement('span');
     chip.className='chip';
-    chip.appendChild(document.createTextNode(c.label));
+    chip.style.cssText='padding:6px 8px 6px 13px;';
+    const inner=document.createElement('span');
+    inner.style.cssText='display:inline-flex;align-items:center;gap:6px;cursor:pointer;';
+    inner.appendChild(document.createTextNode(c.label));
     if(loadNotifs().some(n=>n.spotName===c.name)){
       const bi=document.createElement('span');
       bi.className='chip-notif-bell active'; bi.innerHTML=bellSVG(10);
-      chip.appendChild(bi);
+      inner.appendChild(bi);
     }
     const badge=document.createElement('span');
     badge.className='chip-days cd-loading'; badge.textContent='·';
-    chip.appendChild(badge);
-    chip.addEventListener('click',()=>pickSpot(spot));
+    inner.appendChild(badge);
+    inner.addEventListener('click',()=>pickSpot(spot));
+    const rm=document.createElement('span');
+    rm.className='fav-chip-remove'; rm.textContent='✕'; rm.title='Remove suggestion';
+    rm.style.cssText='margin-left:4px;color:var(--tdim);';
+    rm.addEventListener('click',e=>{e.stopPropagation();dismissSugg(c.name);});
+    chip.appendChild(inner); chip.appendChild(rm);
     wrap.appendChild(chip);
     fetchChipQualDays(spot).then(n=>setChipDayBadge(badge,n));
   });
+}
+function loadDismissedSuggs(){ try{ return JSON.parse(localStorage.getItem('kf_dismissed')||'[]'); }catch{ return []; } }
+function dismissSugg(name){
+  const d=loadDismissedSuggs(); if(!d.includes(name)) d.push(name);
+  localStorage.setItem('kf_dismissed',JSON.stringify(d));
+  renderHintChips();
 }
 
 function pickFav(f){
