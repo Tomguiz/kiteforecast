@@ -69,9 +69,10 @@
     .btn-reset { padding:12px 18px; border-radius:12px; border:1.5px solid var(--border); background:transparent; color:var(--gray); font-weight:600; font-size:.93rem; cursor:pointer; transition:opacity .15s,border-color .2s,color .2s; white-space:nowrap; }
     .btn-map { padding:12px 16px; border-radius:12px; border:1.5px solid var(--border); background:transparent; color:var(--gray); font-weight:600; font-size:.93rem; cursor:pointer; transition:border-color .2s,color .2s; display:inline-flex; align-items:center; flex-shrink:0; white-space:nowrap; }
     .btn-map:hover { border-color:var(--accent); color:var(--accent); }
-    .btn-map-mobile { display:none; }
+    #mapBtnMobileWrap { display:none; }
     @media (max-width:599px) {
       .btn-map { display:none !important; }
+      #mapBtnMobileWrap { display:block; }
       .btn-map-mobile { display:inline-flex; align-items:center; gap:7px; padding:11px 22px; border-radius:12px; border:1.5px solid var(--border); background:transparent; color:var(--gray); font-weight:600; font-size:.93rem; cursor:pointer; transition:border-color .2s,color .2s; white-space:nowrap; margin:18px auto 0; }
       .btn-map-mobile:hover { border-color:var(--accent); color:var(--accent); }
     }
@@ -594,7 +595,7 @@
     <div class="examples" id="hintChips"></div>
   </div>
   <!-- mobile map button -->
-  <div id="mapBtnMobileWrap" style="text-align:center;display:block">
+  <div id="mapBtnMobileWrap" style="text-align:center">
     <button class="btn-map-mobile" onclick="openSpotsMap()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>View all spots on map</button>
   </div>
   <!-- welcome legend -->
@@ -957,7 +958,7 @@ function showOnly(id){
   $('hintLegend').style.display='none';
   $('welcomeFooter').style.display=id==='hintState'?'block':'none';
   $('mapBtn').style.display=id==='hintState'?'':'none';
-  $('mapBtnMobileWrap').style.display=id==='hintState'?'block':'none';
+  $('mapBtnMobileWrap').style.display=id==='hintState'?'':'none';
 }
 
 function buildLegendHTML(){
