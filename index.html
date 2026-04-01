@@ -65,6 +65,8 @@
     .btn:hover  { opacity:.88; transform:translateY(-1px); }
     .btn:active { transform:translateY(0); opacity:.95; }
     .btn-reset { padding:12px 18px; border-radius:12px; border:1.5px solid var(--border); background:transparent; color:var(--gray); font-weight:600; font-size:.93rem; cursor:pointer; transition:opacity .15s,border-color .2s,color .2s; white-space:nowrap; }
+    .btn-map { padding:11px 13px; border-radius:12px; border:1.5px solid var(--border); background:transparent; color:var(--gray); cursor:pointer; transition:border-color .2s,color .2s; display:inline-flex; align-items:center; flex-shrink:0; }
+    .btn-map:hover { border-color:var(--accent); color:var(--accent); }
     .btn-reset:hover { border-color:var(--accent); color:var(--accent); }
     .map-link { display:inline-flex; align-items:center; gap:4px; color:var(--accent); text-decoration:none; font-size:.82rem; opacity:.85; vertical-align:middle; margin-left:8px; transition:opacity .2s; }
     .map-link:hover { opacity:1; }
@@ -565,6 +567,7 @@
       <div class="autocomplete" id="acDropdown"></div>
     </div>
     <button class="btn" onclick="doSearch()">Search</button>
+    <button class="btn-map" id="mapBtn" onclick="openSpotsMap()" title="Show all kite spots on map"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></button>
     <button class="btn-reset" id="resetBtn" style="display:none" onclick="resetSearch()">✕ Reset</button>
   </div>
 </header>
@@ -934,6 +937,7 @@ function showOnly(id){
   });
   $('hintLegend').style.display='none';
   $('welcomeFooter').style.display=id==='hintState'?'block':'none';
+  $('mapBtn').style.display=id==='hintState'?'':'none';
 }
 
 function buildLegendHTML(){
@@ -2124,7 +2128,44 @@ function closeModal(){
   window.scrollTo(0,scrollY);
 }
 function handleOverlayClick(e){if(e.target===$('modalOverlay'))closeModal();}
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('modalOverlay').style.display==='flex')closeModal();else if(e.key==='Escape'&&$('profileOverlay').style.display==='flex')closeProfilePanel();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('modalOverlay').style.display==='flex')closeModal();else if(e.key==='Escape'&&$('profileOverlay').style.display==='flex')closeProfilePanel();else if(e.key==='Escape'&&$('spotsMapOverlay').style.display==='flex')closeSpotsMap();});
+
+// ══════════════════════════════════
+//  SPOTS MAP
+// ══════════════════════════════════
+function openSpotsMap(){
+  $('spotsMapOverlay').style.display='flex';
+  document.body.style.overflow='hidden';
+  if(!window._leafletLoaded){
+    const link=document.createElement('link');
+    link.rel='stylesheet'; link.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    document.head.appendChild(link);
+    const script=document.createElement('script');
+    script.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    script.onload=()=>{ window._leafletLoaded=true; initSpotsMap(); };
+    document.head.appendChild(script);
+  } else {
+    initSpotsMap();
+  }
+}
+function closeSpotsMap(){
+  $('spotsMapOverlay').style.display='none';
+  document.body.style.overflow='';
+}
+function initSpotsMap(){
+  if(window._spotsMap){ window._spotsMap.invalidateSize(); return; }
+  const map=L.map('spotsMapContainer',{zoomControl:true}).setView([30,10],2);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    attribution:'© <a href="https://openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom:18
+  }).addTo(map);
+  const icon=L.divIcon({className:'',html:'<div style="width:10px;height:10px;background:#00d4ff;border-radius:50%;border:2px solid rgba(0,212,255,.4);box-shadow:0 0 6px rgba(0,212,255,.6)"></div>',iconSize:[10,10],iconAnchor:[5,5]});
+  SPOTS.forEach(s=>{
+    const m=L.marker([s.lat,s.lon],{icon}).addTo(map);
+    m.bindPopup(`<div style="font-family:system-ui;min-width:140px"><b style="font-size:.9rem">${s.name}</b><br><span style="color:#666;font-size:.78rem">${s.loc}</span><br><br><button onclick="closeSpotsMap();setTimeout(()=>pickSpot(SPOTS.find(x=>x.lat===${s.lat}&&x.lon===${s.lon})),80)" style="background:#00d4ff;color:#000;border:none;border-radius:6px;padding:5px 10px;font-size:.78rem;font-weight:700;cursor:pointer;width:100%">→ Check forecast</button></div>`);
+  });
+  window._spotsMap=map;
+}
 
 // ══════════════════════════════════
 //  NOTIFICATIONS — DATA
@@ -2385,5 +2426,13 @@ function toggleDayNotif(e,dateStr,dayIdx){
 updateProfileDot();
 $('ppMasterToggle').classList.toggle('on', notifMasterEnabled());
 </script>
+<!-- ══ SPOTS MAP OVERLAY ══ -->
+<div id="spotsMapOverlay" style="display:none;position:fixed;inset:0;z-index:3000;background:#0a1020;flex-direction:column;">
+  <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--border);flex-shrink:0;">
+    <span style="font-weight:700;font-size:1rem;">🗺 All Kite Spots</span>
+    <button onclick="closeSpotsMap()" style="background:none;border:1.5px solid var(--border);color:var(--gray);border-radius:7px;padding:5px 12px;cursor:pointer;font-size:.8rem;font-weight:600;">✕ Close</button>
+  </div>
+  <div id="spotsMapContainer" style="flex:1;min-height:0;"></div>
+</div>
 </body>
 </html>
