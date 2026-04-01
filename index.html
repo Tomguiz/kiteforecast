@@ -19,6 +19,8 @@
       --tdim:     #6e87a2;
     }
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    button:focus, button:focus-visible { outline: none; }
+    button:focus:not(:focus-visible) { outline: none; box-shadow: none; }
     body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; -webkit-tap-highlight-color: transparent; }
 
     /* ── HERO ── */
@@ -65,7 +67,7 @@
     .btn:hover  { opacity:.88; transform:translateY(-1px); }
     .btn:active { transform:translateY(0); opacity:.95; }
     .btn-reset { padding:12px 18px; border-radius:12px; border:1.5px solid var(--border); background:transparent; color:var(--gray); font-weight:600; font-size:.93rem; cursor:pointer; transition:opacity .15s,border-color .2s,color .2s; white-space:nowrap; }
-    .btn-map { padding:11px 13px; border-radius:12px; border:1.5px solid var(--border); background:transparent; color:var(--gray); cursor:pointer; transition:border-color .2s,color .2s; display:inline-flex; align-items:center; flex-shrink:0; }
+    .btn-map { padding:12px 16px; border-radius:12px; border:1.5px solid var(--border); background:transparent; color:var(--gray); font-weight:600; font-size:.93rem; cursor:pointer; transition:border-color .2s,color .2s; display:inline-flex; align-items:center; flex-shrink:0; white-space:nowrap; }
     .btn-map:hover { border-color:var(--accent); color:var(--accent); }
     .btn-reset:hover { border-color:var(--accent); color:var(--accent); }
     .map-link { display:inline-flex; align-items:center; gap:4px; color:var(--accent); text-decoration:none; font-size:.82rem; opacity:.85; vertical-align:middle; margin-left:8px; transition:opacity .2s; }
@@ -102,7 +104,9 @@
       line-height:1;
     }
     .s-btn:hover  { border-color:var(--accent); color:var(--accent); }
+    .s-btn:focus  { outline:none; }
     .s-btn.active { border-color:var(--accent); background:rgba(0,212,255,.13); color:var(--accent); }
+    .s-btn:not(.active):focus { border-color:var(--border); }
     .shore-hint { font-size:.72rem; color:var(--tdim); }
 
     /* ── FORECAST GRID ── */
@@ -233,6 +237,8 @@
     .hints-section-label.lbl-sugg::after  { background:var(--border); }
     .fav-btn { background:none; border:1.5px solid rgba(255,255,255,.22); border-radius:7px; cursor:pointer; font-size:1.1rem; padding:3px 7px; line-height:1; color:rgba(255,255,255,.55); transition:border-color .2s,color .2s,background .2s,transform .15s; vertical-align:middle; margin-left:8px; }
     .fav-btn:hover { border-color:rgba(250,204,21,.7); color:#fde047; background:rgba(250,204,21,.08); transform:scale(1.08); }
+    .fav-btn:focus { outline:none; }
+    .fav-btn:not(.active):focus { border-color:rgba(255,255,255,.22); color:rgba(255,255,255,.55); background:none; }
     .fav-btn.active { border-color:#fbbf24; color:#fbbf24; background:rgba(251,191,36,.15); }
 
     /* ════════════════════════════════════════
@@ -492,6 +498,8 @@
       vertical-align:middle; margin-left:6px;
     }
     .notif-btn:hover { border-color:rgba(0,212,255,.6); color:var(--accent); background:rgba(0,212,255,.08); transform:scale(1.08); }
+    .notif-btn:focus { outline:none; }
+    .notif-btn:not(.active):focus { border-color:rgba(255,255,255,.22); color:rgba(255,255,255,.45); background:none; }
     .notif-btn.active { border-color:rgba(0,212,255,.5); color:var(--accent); background:rgba(0,212,255,.1); }
     .notif-btn svg { display:block; transition:fill .15s; }
     .notif-btn svg .bell-fill      { fill:none; }
@@ -567,7 +575,7 @@
       <div class="autocomplete" id="acDropdown"></div>
     </div>
     <button class="btn" onclick="doSearch()">Search</button>
-    <button class="btn-map" id="mapBtn" onclick="openSpotsMap()" title="Show all kite spots on map"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></button>
+    <button class="btn-map" id="mapBtn" onclick="openSpotsMap()" title="Show all kite spots on map"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:5px"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Map</button>
     <button class="btn-reset" id="resetBtn" style="display:none" onclick="resetSearch()">✕ Reset</button>
   </div>
 </header>
@@ -903,6 +911,7 @@ async function autoDetectShore(lat,lon){
 //  SHORE PICKER
 // ══════════════════════════════════
 function toggleWindDir(btn){
+  btn.blur();
   const deg=Number(btn.dataset.deg);
   manualShoreSet=true;
   if(windDirs.has(deg)){
@@ -1632,6 +1641,7 @@ function isFavorite(loc){
 }
 
 function toggleFavorite(){
+  document.activeElement?.blur();
   const loc=cachedLoc; if(!loc) return;
   let favs=loadFavs();
   const idx=favs.findIndex(f=>f.name===loc.name&&f.lat===loc.latitude);
@@ -1640,7 +1650,7 @@ function toggleFavorite(){
   } else {
     favs.push({
       name: loc.name,
-      label:`${loc.name}${loc.admin1?', '+loc.admin1:''}`,
+      label:`${loc.name}${loc.admin1&&loc.admin1!==loc.name?', '+loc.admin1:''}`,
       lat:  loc.latitude,
       lon:  loc.longitude,
       dirs: [...windDirs],
@@ -1824,7 +1834,9 @@ async function fetchForecast(query){
       showOnly('errorState'); return;
     }
     const{latitude,longitude,name,country,admin1}=geo.results[0];
-    cachedLoc={name,country,admin1,latitude,longitude};
+    const _knownSpot=SPOTS.find(s=>s.name.toLowerCase()===name.toLowerCase());
+    const _admin1=_knownSpot?_knownSpot.loc.split(', ').slice(0,-1).join(', '):(admin1||'');
+    cachedLoc={name,country,admin1:_admin1,latitude,longitude};
 
     // fire shore detection in parallel with weather fetch (don't await yet)
     const shorePromise=autoDetectShore(latitude,longitude);
@@ -2365,6 +2377,7 @@ function showToast(msg){
 
 // ── SPOT-LEVEL NOTIF TOGGLE ──
 function toggleSpotNotif(){
+  document.activeElement?.blur();
   const loc=cachedLoc;
   if(!loc)return;
   const p=loadProfile();
@@ -2420,6 +2433,47 @@ function toggleDayNotif(e,dateStr,dayIdx){
     addDayNotif(spot,dateStr,sessInfo);
   }
   renderGrid();
+}
+
+// ── SPOTS MAP ──
+function openSpotsMap(){
+  const overlay=$('spotsMapOverlay');
+  overlay.style.display='flex';
+  document.body.style.overflow='hidden';
+  if(!window._leafletLoaded){
+    const link=document.createElement('link');
+    link.rel='stylesheet';
+    link.href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+    document.head.appendChild(link);
+    const script=document.createElement('script');
+    script.src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+    script.onload=()=>{ window._leafletLoaded=true; initSpotsMap(); };
+    document.head.appendChild(script);
+  } else {
+    initSpotsMap();
+  }
+}
+function closeSpotsMap(){
+  $('spotsMapOverlay').style.display='none';
+  document.body.style.overflow='';
+}
+function initSpotsMap(){
+  if(window._spotsMap){ window._spotsMap.invalidateSize(); return; }
+  const map=L.map('spotsMapContainer').setView([25,10],2);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{
+    attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+    maxZoom:18
+  }).addTo(map);
+  const icon=L.divIcon({
+    html:'<div style="width:10px;height:10px;background:#00d4ff;border-radius:50%;border:2px solid rgba(0,212,255,.4);box-shadow:0 0 6px #00d4ff88;"></div>',
+    className:'',iconSize:[10,10],iconAnchor:[5,5]
+  });
+  SPOTS.forEach(s=>{
+    if(!s.lat||!s.lon)return;
+    L.marker([s.lat,s.lon],{icon}).addTo(map)
+      .bindPopup(`<div style="min-width:140px"><b style="font-size:.95rem">${s.name}</b><br><span style="font-size:.8rem;color:#666">${s.loc||''}</span><br><br><button onclick="closeSpotsMap();setTimeout(()=>pickSpot(SPOTS.find(x=>x.name===${JSON.stringify(s.name)})),80)" style="background:#00d4ff;color:#000;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:.8rem;font-weight:600;">→ Check forecast</button></div>`);
+  });
+  window._spotsMap=map;
 }
 
 // ── INIT ──
