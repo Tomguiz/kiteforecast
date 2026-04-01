@@ -587,6 +587,12 @@
   </div>
 </header>
 
+<!-- ══ API ERROR BANNER ══ -->
+<div id="apiErrorBanner" style="display:none;background:rgba(239,68,68,.1);border-top:1px solid rgba(239,68,68,.3);border-bottom:1px solid rgba(239,68,68,.3);padding:12px 20px;text-align:center;">
+  <span style="color:#f87171;font-size:.88rem;font-weight:500;">⚠️ Could not load forecast data — please check your connection.</span>
+  <button onclick="location.reload()" style="margin-left:12px;padding:5px 14px;border-radius:8px;border:1.5px solid #f87171;background:transparent;color:#f87171;font-size:.82rem;font-weight:700;cursor:pointer;">↺ Reload</button>
+</div>
+
 <!-- ══ MAIN ══ -->
 <main>
   <!-- hint state -->
@@ -1676,7 +1682,12 @@ function toggleFavorite(){
 }
 
 function setChipDayBadge(el,n){
-  if(n===null){ el.remove(); return; }
+  if(n===null){
+    el.remove();
+    $('apiErrorBanner').style.display='block';
+    return;
+  }
+  $('apiErrorBanner').style.display='none';
   el.className='chip-days '+(n>=5?'cd-good':n>=1?'cd-ok':'cd-none');
   el.textContent=n>0?`${n}/10`:'0/10';
   el.title=`${n} day${n!==1?'s':''} with qualifying wind in the next 10`;
@@ -1764,6 +1775,7 @@ function resetSearch(){
   $('resetBtn').style.display='none';
   $('locHdr').style.display='none';
   $('shoreBar').classList.remove('visible');
+  $('apiErrorBanner').style.display='none';
   renderHintChips();
   showOnly('hintState');
   cachedWx=null; cachedLoc=null; cachedHrMap=new Map();
