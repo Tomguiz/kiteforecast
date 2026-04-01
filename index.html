@@ -1835,8 +1835,13 @@ async function fetchForecast(query){
     }
     const{latitude,longitude,name,country,admin1}=geo.results[0];
     const _knownSpot=SPOTS.find(s=>s.name.toLowerCase()===name.toLowerCase());
-    const _admin1=_knownSpot?_knownSpot.loc.split(', ').slice(0,-1).join(', '):(admin1||'');
-    cachedLoc={name,country,admin1:_admin1,latitude,longitude};
+    const _locParts=_knownSpot?_knownSpot.loc.split(', '):null;
+    cachedLoc={
+      name: _knownSpot?_knownSpot.name:name,
+      country: _locParts?_locParts[_locParts.length-1]:country,
+      admin1: _locParts?_locParts.slice(0,-1).join(', '):(admin1||''),
+      latitude, longitude
+    };
 
     // fire shore detection in parallel with weather fetch (don't await yet)
     const shorePromise=autoDetectShore(latitude,longitude);
