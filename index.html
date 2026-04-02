@@ -2331,7 +2331,7 @@ async function fireWebhook(spot,sessInfo){
         spot: spot.name,
         spot_city: spotCity,
         spot_country: spotCountry,
-        spot_location: {lat:spot.lat||spot.latitude, lon:spot.lon||spot.longitude},
+        spot_map_link: `https://www.google.com/maps?q=${spot.lat||spot.latitude},${spot.lon||spot.longitude}`,
         date: dateStr,
         date_label: dateLabel,
         app_link: appUrl,
