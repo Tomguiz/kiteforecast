@@ -2017,9 +2017,18 @@ function renderGrid(){
       const ok=isWindDirOK(domDir);
       dirPill=`<div class="dir-pill ${ok?'dir-side':'dir-sideoff'}">${ok?'✓':'✗'} Wind dir (${compass(domDir)})</div>`;
     }
-    const hPill=goodHours>0
-      ?`<div class="hours-pill has-wind">${goodHours}h qualifying wind</div>`
-      :`<div class="hours-pill">${day.length}h daylight · no good wind</div>`;
+    let hPill;
+    if(goodHours>0){
+      hPill=`<div class="hours-pill has-wind">${goodHours}h qualifying wind</div>`;
+    } else {
+      const hasRain=day.some(h=>h.type==='rain');
+      const hasLight=day.some(h=>h.type==='light');
+      const hasBadDirOnly=!hasRain&&!hasLight&&hasBadDir;
+      const reason=hasRain?'🌧 Rain / snow'
+        :hasBadDirOnly?'🧭 Wrong wind dir'
+        :'💨 Too light';
+      hPill=`<div class="hours-pill">${day.length}h daylight · ${reason}</div>`;
+    }
 
     // wind range bar: sustained up to peakKn, lighter extension to gusts
     const dispKn=peakKn||peakDayKn;
