@@ -2241,6 +2241,7 @@ function initSpotsMap(){
 //  NOTIFICATIONS — DATA
 // ══════════════════════════════════
 const WEBHOOK_URL = 'https://hook.eu1.make.com/6t9fgm6btixri2wf5lnx47requf416vs';
+const REMINDER_HOURS = [72, 48, 24, 6, 1];
 
 function loadProfile(){ try{ return JSON.parse(localStorage.getItem('kf_profile')||'{}'); }catch{ return {}; } }
 function saveProfile(p){ localStorage.setItem('kf_profile', JSON.stringify(p)); }
@@ -2260,14 +2261,128 @@ function notifMasterEnabled(){ return loadProfile().notifsEnabled !== false; }
 function hasSpotNotif(spotName){ return loadNotifs().some(n=>n.type==='spot'&&n.spotName===spotName); }
 function hasDayNotif(spotName,date){ return loadNotifs().some(n=>n.type==='day'&&n.spotName===spotName&&n.date===date); }
 
+// ── SCHEDULED REMINDERS (client-side) ──
+// kf_reminders: [{id, spotName, spotLat, spotLon, spotDirs[], sessionDate, reminderHours, send_at, sent, notifType, email}]
+function loadReminders(){ try{ return JSON.parse(localStorage.getItem('kf_reminders')||'[]'); }catch{ return []; } }
+function saveReminders(arr){ localStorage.setItem('kf_reminders',JSON.stringify(arr)); }
+
+function scheduleReminders(spot,sessInfo,notifType){
+  const p=loadProfile();
+  if(!p.email) return;
+  const sessionMs=new Date(sessInfo.sessionStart).getTime();
+  const now=Date.now();
+  const existing=loadReminders();
+  // remove any existing reminders for this spot+date combo
+  const sessionDate=sessInfo.sessionStart.slice(0,10);
+  const cleaned=existing.filter(r=>!(r.spotName===spot.name&&r.sessionDate===sessionDate));
+  const newReminders=REMINDER_HOURS
+    .map(h=>({
+      id: `${spot.name}_${sessionDate}_${h}h_${Date.now()}`,
+      spotName: spot.name,
+      spotLat: spot.lat||spot.latitude,
+      spotLon: spot.lon||spot.longitude,
+      spotDirs: [...windDirs],
+      sessionDate,
+      reminderHours: h,
+      send_at: new Date(sessionMs - h*3600*1000).toISOString(),
+      sent: false,
+      notifType,
+      email: p.email,
+    }))
+    .filter(r=>new Date(r.send_at).getTime()>now); // skip already-past windows
+  saveReminders([...cleaned,...newReminders]);
+}
+
+function cancelReminders(spotName,sessionDate){
+  // sessionDate=null means cancel all for that spot
+  const updated=loadReminders().filter(r=>
+    sessionDate ? !(r.spotName===spotName&&r.sessionDate===sessionDate)
+                : r.spotName!==spotName
+  );
+  saveReminders(updated);
+}
+
+async function checkDueReminders(){
+  const reminders=loadReminders();
+  const now=Date.now();
+  const due=reminders.filter(r=>!r.sent&&new Date(r.send_at).getTime()<=now);
+  if(!due.length) return;
+  for(const r of due){
+    try{
+      // Re-fetch live forecast for this spot
+      const p=new URLSearchParams({
+        latitude:r.spotLat, longitude:r.spotLon,
+        hourly:['weather_code','windspeed_10m','winddirection_10m','windgusts_10m','temperature_2m'].join(','),
+        daily:['weather_code','temperature_2m_max','temperature_2m_min','windgusts_10m_max','sunrise','sunset'].join(','),
+        forecast_days:10, timezone:'auto', windspeed_unit:'ms',
+      });
+      const wx=await safeFetch(`https://api.open-meteo.com/v1/forecast?${p}`,10000);
+      if(wx.error) throw new Error(wx.reason);
+      // find the target date in the forecast
+      const dayIdx=wx.daily.time.indexOf(r.sessionDate);
+      if(dayIdx===-1){ markReminderSent(r.id); continue; } // date no longer in window
+      // rebuild hourly map for this spot temporarily
+      const tmpMap=new Map();
+      wx.hourly.time.forEach((t,i)=>{
+        const d=t.slice(0,10); if(d!==r.sessionDate) return;
+        const hr=parseInt(t.slice(11,13),10);
+        tmpMap.set(hr,{kn:toKnotsR(wx.hourly.windspeed_10m[i]),dir:wx.hourly.winddirection_10m[i],code:wx.hourly.weather_code[i]??0,temp:Math.round(wx.hourly.temperature_2m[i]),gustKn:toKnotsR(wx.hourly.windgusts_10m[i])});
+      });
+      // temporarily swap windDirs to the stored dirs for this subscription
+      const savedDirs=new Set(windDirs);
+      windDirs=new Set(r.spotDirs);
+      cachedHrMap=new Map([[r.sessionDate,tmpMap]]);
+      const sunrise=wx.daily.sunrise[dayIdx];
+      const sunset=wx.daily.sunset[dayIdx];
+      const{good,peakKn,domDir,day}=buildDay(r.sessionDate,sunrise,sunset);
+      const code=wx.daily.weather_code[dayIdx];
+      const[,weatherDesc]=wmoInfo(code);
+      const rating=rateDay(good.length,peakKn,code,day.some(h=>h.type==='lightdir'),day.length?Math.max(...day.map(h=>h.kn)):0);
+      windDirs=savedDirs; // restore
+      const sessionStart=good.length?good[0].tStr:r.sessionDate+'T10:00';
+      const sessionEnd=good.length?good[good.length-1].tStr:'';
+      const gusts=good.length?Math.max(...good.map(h=>h.gustKn||0)):0;
+      const windMin=good.length?Math.min(...good.map(h=>h.kn)):0;
+      const consistencyPct=day.length?Math.round(good.length/day.length*100):0;
+      const sessInfo={
+        sessionStart, sessionEnd,
+        duration_hours: good.length,
+        peakKn, windMin, gusts,
+        domDir: domDir!==null?compass(domDir):'—',
+        wind_consistency_pct: consistencyPct,
+        weather_description: weatherDesc,
+        temperature_max: Math.round(wx.daily.temperature_2m_max[dayIdx]),
+        temperature_min: Math.round(wx.daily.temperature_2m_min[dayIdx]),
+        sunrise: sunrise.slice(11,16),
+        sunset: sunset.slice(11,16),
+        daylight_hours: day.length,
+        rating_label: rating.label,
+        notifType: r.notifType,
+      };
+      await fireWebhook(
+        {name:r.spotName, lat:r.spotLat, lon:r.spotLon},
+        sessInfo,
+        r.reminderHours,
+        r.email
+      );
+      markReminderSent(r.id);
+    }catch(e){ console.warn('Reminder check failed for',r.spotName,e); }
+  }
+  // purge sent + past reminders older than 2 days
+  const cutoff=now - 2*24*3600*1000;
+  saveReminders(loadReminders().filter(r=>!r.sent||new Date(r.send_at).getTime()>cutoff));
+}
+
+function markReminderSent(id){
+  saveReminders(loadReminders().map(r=>r.id===id?{...r,sent:true}:r));
+}
+
 function addSpotNotif(spot,sessions){
-  // remove any existing spot entry + previous fromSpot day entries for this spot
   let notifs=loadNotifs()
     .filter(n=>!(n.type==='spot'&&n.spotName===spot.name))
     .filter(n=>!(n.type==='day'&&n.spotName===spot.name&&n.fromSpot));
   const spotId=Date.now()+'_s';
   notifs.push({id:spotId,type:'spot',spotName:spot.name,spotLat:spot.lat||spot.latitude,spotLon:spot.lon||spot.longitude,spotDirs:[...windDirs],label:'All sessions',createdAt:new Date().toISOString()});
-  // add a day entry (hidden in panel) for each qualifying session so card bells light up
   sessions.forEach((sess,i)=>{
     const dateStr=sess.dateStr||sess.sessionStart.slice(0,10);
     const{full}=fmtDate(dateStr);
@@ -2276,11 +2391,11 @@ function addSpotNotif(spot,sessions){
   saveNotifs(notifs);
   updateProfileDot();
   renderHintChips();
-  sessions.forEach(sess=>fireWebhook(spot,sess));
+  sessions.forEach(sess=>scheduleReminders(spot,sess,'spot'));
 }
 function removeSpotNotif(spotName){
-  // also remove all fromSpot day entries
   saveNotifs(loadNotifs().filter(n=>!(n.spotName===spotName&&(n.type==='spot'||(n.type==='day'&&n.fromSpot)))));
+  cancelReminders(spotName,null);
   updateProfileDot();
   renderHintChips();
 }
@@ -2291,16 +2406,12 @@ function addDayNotif(spot,dateStr,sessInfo){
   saveNotifs(notifs);
   updateProfileDot();
   renderHintChips();
-  fireWebhook(spot,sessInfo);
+  scheduleReminders(spot,sessInfo,'day');
 }
 function removeDayNotif(spotName,date){
   const notifs=loadNotifs();
   const target=notifs.find(n=>n.type==='day'&&n.spotName===spotName&&n.date===date);
   if(target&&target.fromSpot){
-    // user is manually removing one day from a spot subscription:
-    // 1. remove the spot-level entry
-    // 2. remove this specific day
-    // 3. promote remaining fromSpot days to standalone
     const updated=notifs
       .filter(n=>!(n.type==='spot'&&n.spotName===spotName))
       .filter(n=>!(n.type==='day'&&n.spotName===spotName&&n.date===date))
@@ -2309,74 +2420,60 @@ function removeDayNotif(spotName,date){
   } else {
     saveNotifs(notifs.filter(n=>!(n.type==='day'&&n.spotName===spotName&&n.date===date)));
   }
+  cancelReminders(spotName,date);
   updateProfileDot();
   renderHintChips();
 }
 
-async function fireWebhook(spot,sessInfo){
+async function fireWebhook(spot,sessInfo,reminderHours,emailOverride){
   const p=loadProfile();
-  if(!p.email||!WEBHOOK_URL)return;
+  const email=emailOverride||p.email;
+  if(!email||!WEBHOOK_URL)return;
   const knownSpot=SPOTS.find(s=>s.name===spot.name);
   const spotCity=knownSpot?.loc?knownSpot.loc.split(', ').slice(0,-1).join(', '):'';
   const spotCountry=knownSpot?.loc?knownSpot.loc.split(', ').pop():'';
   const dateStr=sessInfo.sessionStart.slice(0,10);
   const{full:dateLabel}=fmtDate(dateStr);
   const appUrl=`${location.origin}${location.pathname}?spot=${encodeURIComponent(spot.name)}&date=${dateStr}`;
-  const userDirs=[...windDirs].map(d=>compass(d));
-  const sessionMs=new Date(sessInfo.sessionStart).getTime();
-  const now=Date.now();
-  const reminders=[
-    {hours:72, label:'72 hours before'},
-    {hours:48, label:'48 hours before'},
-    {hours:24, label:'24 hours before'},
-    {hours:6,  label:'6 hours before'},
-    {hours:1,  label:'1 hour before'},
-  ];
-  const basePayload={
-    notification_type: sessInfo._notifType||'spot',
-    email: p.email,
-    spot: spot.name,
-    spot_city: spotCity,
-    spot_country: spotCountry,
-    spot_map_link: `https://www.google.com/maps?q=${spot.lat||spot.latitude},${spot.lon||spot.longitude}`,
-    date: dateStr,
-    date_label: dateLabel,
-    app_link: appUrl,
-    session:{
-      start_time: sessInfo.sessionStart,
-      end_time: sessInfo.sessionEnd||'',
-      duration_hours: sessInfo.duration_hours||0,
-      wind_speed_peak_kn: sessInfo.peakKn,
-      wind_speed_min_kn: sessInfo.windMin||0,
-      wind_gusts_kn: sessInfo.gusts,
-      wind_direction: sessInfo.domDir,
-      wind_consistency_pct: sessInfo.wind_consistency_pct||0,
-    },
-    conditions:{
-      weather: sessInfo.weather_description||'',
-      temperature_max_c: sessInfo.temperature_max||null,
-      temperature_min_c: sessInfo.temperature_min||null,
-      sunrise: sessInfo.sunrise||'',
-      sunset: sessInfo.sunset||'',
-      daylight_hours: sessInfo.daylight_hours||0,
-    },
-    user_good_wind_dirs: userDirs,
-  };
-  // Fire one webhook call per reminder window, only if send_at is in the future
-  for(const r of reminders){
-    const sendAt=new Date(sessionMs - r.hours*3600*1000);
-    if(sendAt.getTime()<=now) continue; // already past, skip
-    try{
-      await fetch(WEBHOOK_URL,{
-        method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({
-          ...basePayload,
-          reminder_label: r.label,
-          send_at: sendAt.toISOString(),
-        })
-      });
-    }catch(e){console.warn('Webhook failed',r.label,e);}
-  }
+  const userDirs=(sessInfo._dirs||[...windDirs]).map(d=>typeof d==='number'?compass(d):d);
+  const rh=reminderHours??0;
+  try{
+    await fetch(WEBHOOK_URL,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        notification_type: sessInfo.notifType||'spot',
+        reminder_label: rh===0?'immediate':`${rh} hour${rh>1?'s':''} before`,
+        email,
+        spot: spot.name,
+        spot_city: spotCity,
+        spot_country: spotCountry,
+        spot_map_link: `https://www.google.com/maps?q=${spot.lat||spot.latitude},${spot.lon||spot.longitude}`,
+        date: dateStr,
+        date_label: dateLabel,
+        app_link: appUrl,
+        session:{
+          start_time: sessInfo.sessionStart,
+          end_time: sessInfo.sessionEnd||'',
+          duration_hours: sessInfo.duration_hours||0,
+          wind_speed_peak_kn: sessInfo.peakKn,
+          wind_speed_min_kn: sessInfo.windMin||0,
+          wind_gusts_kn: sessInfo.gusts,
+          wind_direction: sessInfo.domDir,
+          wind_consistency_pct: sessInfo.wind_consistency_pct||0,
+          rating: sessInfo.rating_label||'',
+        },
+        conditions:{
+          weather: sessInfo.weather_description||'',
+          temperature_max_c: sessInfo.temperature_max||null,
+          temperature_min_c: sessInfo.temperature_min||null,
+          sunrise: sessInfo.sunrise||'',
+          sunset: sessInfo.sunset||'',
+          daylight_hours: sessInfo.daylight_hours||0,
+        },
+        user_good_wind_dirs: userDirs,
+      })
+    });
+  }catch(e){console.warn('Webhook failed',e);}
 }
 
 // ── PENDING NOTIF ──
@@ -2525,12 +2622,14 @@ function getQualSessions(){
       const consistencyPct=day.length?Math.round(good.length/day.length*100):0;
       const code=daily.weather_code[i];
       const[,weatherDesc]=wmoInfo(code);
+      const rating=rateDay(good.length,peakKn,code,day.some(h=>h.type==='lightdir'),day.length?Math.max(...day.map(h=>h.kn)):0);
       arr.push({
         dateStr,sessionStart,sessionEnd,
         duration_hours:good.length,
         peakKn,windMin,gusts,
         domDir:domDir!==null?compass(domDir):'—',
         weather_description:weatherDesc,
+        rating_label:rating.label,
         temperature_max:Math.round(daily.temperature_2m_max[i]),
         temperature_min:Math.round(daily.temperature_2m_min[i]),
         sunrise:daily.sunrise[i].slice(11,16),
@@ -2628,6 +2727,7 @@ function initSpotsMap(){
 // ── INIT ──
 updateProfileDot();
 $('ppMasterToggle').classList.toggle('on', notifMasterEnabled());
+checkDueReminders(); // check on every page load if any reminders are due
 </script>
 <!-- ══ SPOTS MAP OVERLAY ══ -->
 <div id="spotsMapOverlay" style="display:none;position:fixed;inset:0;z-index:3000;background:#0a1020;flex-direction:column;">
