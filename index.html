@@ -821,9 +821,10 @@ function conditionLabel(kn,dir,code,temp){
 function rateDay(gh,pk,code,badDir,peakDay){
   if([82,95,96,99].includes(code)) return {cls:'rating-danger',label:'⚡ Storm'};
   if(gh===0){
-    if(badDir&&peakDay>=15) return {cls:'rating-bad',  label:'❌ Wrong direction'};
-    if(peakDay>=10)         return {cls:'rating-none', label:'💨 Too light'};
-    return                         {cls:'rating-none', label:'😴 No wind'};
+    if(isRainy(code)&&peakDay>=10) return {cls:'rating-bad',  label:'🌧 Rain / snow'};
+    if(badDir&&peakDay>=15)        return {cls:'rating-bad',  label:'❌ Wrong direction'};
+    if(peakDay>=10)                return {cls:'rating-none', label:'💨 Too light'};
+    return                                {cls:'rating-none', label:'😴 No wind'};
   }
   if(gh===1) return {cls:'rating-bad',     label:'❌ Too brief (1h)'};
   if(gh===2) return {cls:'rating-marginal',label:`⏱ 2h window · ${pk}kn`};
