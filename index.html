@@ -22,7 +22,10 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     button:focus, button:focus-visible { outline: none; }
     button:focus:not(:focus-visible) { outline: none; box-shadow: none; }
-    body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; -webkit-tap-highlight-color: transparent; }
+    body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; -webkit-tap-highlight-color: transparent; overscroll-behavior-y: contain; }
+    #ptrIndicator { position:fixed; top:0; left:0; right:0; height:3px; background:var(--accent); transform:scaleX(0); transform-origin:left; z-index:9998; opacity:0; transition:opacity .25s; pointer-events:none; }
+    #ptrSpinner { position:fixed; top:14px; left:50%; transform:translateX(-50%) translateY(-60px); width:32px; height:32px; border-radius:50%; border:3px solid rgba(0,212,255,.2); border-top-color:var(--accent); z-index:9998; opacity:0; transition:opacity .2s,transform .2s; pointer-events:none; }
+    @keyframes spin { to { transform: translateX(-50%) rotate(360deg); } }
 
     /* ── HERO ── */
     .hero {
@@ -715,6 +718,18 @@ let manualShoreSet = false;
 let cachedWx    = null;
 let cachedLoc   = null;
 let cachedHrMap = null;
+let lastFetchTime = 0;
+
+function saveLastSpot(spot){
+  try{ localStorage.setItem('kf_lastSpot',JSON.stringify({name:spot.name,loc:spot.loc||spot.name,lat:spot.lat||spot.latitude,lon:spot.lon||spot.longitude,dirs:spot.dirs||[]})); }catch(e){}
+}
+function loadLastSpot(){
+  try{ return JSON.parse(localStorage.getItem('kf_lastSpot')); }catch(e){ return null; }
+}
+function refreshForecast(){
+  const s=loadLastSpot();
+  if(s) pickSpot(s);
+}
 
 // ══════════════════════════════════
 //  WMO
@@ -734,6 +749,8 @@ const WMO = {
 const wmoInfo = c => WMO[c] ?? ['🌡','—'];
 // WMO codes 51+ = precipitation (drizzle, rain, snow, showers, storms)
 const isRainy = c => c!=null && c>=51;
+// WMO snow codes (distinct from rain)
+const isSnowy = c => c!=null && ([71,73,75,77,85,86].includes(c));
 
 // ══════════════════════════════════
 //  HELPERS
@@ -820,21 +837,21 @@ function conditionLabel(kn,dir,code,temp){
 }
 
 function rateDay(gh,pk,code,badDir,peakDay){
-  if([82,95,96,99].includes(code)) return {cls:'rating-danger',label:'⚡ Storm'};
+  if([82,95,96,99].includes(code)) return {cls:'rating-danger',label:'❌ Storm ⚡'};
   if(gh===0){
-    if(isRainy(code)&&peakDay>=10) return {cls:'rating-bad',  label:'🌧 Rain / snow'};
+    if(isRainy(code)&&peakDay>=10) return {cls:'rating-bad',  label:isSnowy(code)?'❌ ❄️ Snow':'❌ 🌧 Rain'};
     if(badDir&&peakDay>=15)        return {cls:'rating-bad',  label:'❌ Wrong direction'};
-    if(peakDay>=10)                return {cls:'rating-none', label:'💨 Too light'};
-    return                                {cls:'rating-none', label:'😴 No wind'};
+    if(peakDay>=10)                return {cls:'rating-none', label:'❌ Too light'};
+    return                                {cls:'rating-none', label:'❌ No wind'};
   }
   if(gh===1) return {cls:'rating-bad',     label:'❌ Too brief (1h)'};
-  if(gh===2) return {cls:'rating-marginal',label:`⏱ 2h window · ${pk}kn`};
+  if(gh===2) return {cls:'rating-marginal',label:`✅ 2h · ${pk}kn`};
   if(gh<=4){
     if(pk>=25) return {cls:'rating-good',label:`✅ ${gh}h · 25+ kn`};
     if(pk>=20) return {cls:'rating-good',label:`✅ ${gh}h · 20+ kn`};
-    return {cls:'rating-marginal',label:`🤔 ${gh}h · 15+ kn`};
+    return {cls:'rating-marginal',label:`✅ ${gh}h · 15+ kn`};
   }
-  if(pk>=25) return {cls:'rating-perfect', label:`🪁 ${gh}h · Perfect!`};
+  if(pk>=25) return {cls:'rating-perfect', label:`✅ ${gh}h · Perfect! 🪁`};
   if(pk>=20) return {cls:'rating-verygood',label:`✅ ${gh}h · Very Good`};
   return {cls:'rating-good',label:`✅ ${gh}h · Good`};
 }
@@ -1557,6 +1574,7 @@ function pickSpot(spot){
   closeAC();
   manualShoreSet=false;
   addRecentSpot(spot);
+  saveLastSpot(spot);
   fetchForecastFromSpot(spot);
 }
 
@@ -1601,6 +1619,7 @@ async function fetchForecastFromSpot(spot){
         gustKn: toKnotsR(h.windgusts_10m[i]),
       });
     });
+    lastFetchTime=Date.now();
     renderGrid();
   }catch(err){
     console.error('fetchForecastFromSpot error:',err);
@@ -1806,7 +1825,11 @@ function resetSearch(){
 }
 function goHome(){
   closeAC();
-  resetSearch();
+  if(cachedLoc){
+    refreshForecast();
+  } else {
+    resetSearch();
+  }
 }
 async function doSearch(){
   closeAC();
@@ -1926,6 +1949,8 @@ async function fetchForecast(query){
       });
     });
 
+    saveLastSpot({name:cachedLoc.name,loc:[cachedLoc.admin1,cachedLoc.country].filter(Boolean).join(', '),lat:cachedLoc.latitude,lon:cachedLoc.longitude,dirs:[...windDirs]});
+    lastFetchTime=Date.now();
     renderGrid();
   }catch(err){
     console.error('fetchForecast error:',err);
@@ -2024,9 +2049,10 @@ function renderGrid(){
       hPill=`<div class="hours-pill has-wind">${goodHours}h qualifying wind</div>`;
     } else {
       const hasRain=day.some(h=>h.type==='rain');
+      const hasSnowHr=day.some(h=>h.type==='rain'&&isSnowy(h.code));
       const hasLight=day.some(h=>h.type==='light');
       const hasBadDirOnly=!hasRain&&!hasLight&&hasBadDir;
-      const reason=hasRain?'🌧 Rain / snow'
+      const reason=hasRain?(hasSnowHr?'❄️ Snow':'🌧 Rain')
         :hasBadDirOnly?'🧭 Wrong wind dir'
         :'💨 Too light';
       hPill=`<div class="hours-pill">${day.length}h daylight · ${reason}</div>`;
@@ -2662,6 +2688,64 @@ function initSpotsMap(){
 // ── INIT ──
 updateProfileDot();
 $('ppMasterToggle').classList.toggle('on', notifMasterEnabled());
+
+// ── AUTO-REFRESH: load last spot on startup ──
+(function(){
+  const s=loadLastSpot();
+  if(s) pickSpot(s);
+})();
+
+// ── AUTO-REFRESH: re-fetch when app comes back to foreground after 30+ min ──
+document.addEventListener('visibilitychange',()=>{
+  if(document.visibilityState==='visible'&&cachedLoc&&lastFetchTime&&Date.now()-lastFetchTime>30*60*1000){
+    refreshForecast();
+  }
+});
+
+// ── PULL TO REFRESH ──
+(function(){
+  const ptr=document.createElement('div'); ptr.id='ptrIndicator'; document.body.appendChild(ptr);
+  const spin=document.createElement('div'); spin.id='ptrSpinner'; document.body.appendChild(spin);
+  let startY=0, pulling=false, triggered=false;
+  const THRESHOLD=72;
+
+  document.addEventListener('touchstart',e=>{
+    if(window.scrollY===0){ startY=e.touches[0].clientY; pulling=false; triggered=false; }
+  },{passive:true});
+
+  document.addEventListener('touchmove',e=>{
+    if(!startY) return;
+    const dy=e.touches[0].clientY-startY;
+    if(dy>8&&window.scrollY===0){
+      pulling=true;
+      const pct=Math.min(dy/THRESHOLD,1);
+      ptr.style.opacity='1';
+      ptr.style.transform=`scaleX(${pct})`;
+      spin.style.opacity=pct>0.4?String((pct-0.4)/0.6):'0';
+      spin.style.transform=`translateX(-50%) translateY(${Math.min(dy-8,46)}px)`;
+    }
+  },{passive:true});
+
+  document.addEventListener('touchend',e=>{
+    if(pulling){
+      const dy=e.changedTouches[0].clientY-startY;
+      if(dy>=THRESHOLD&&!triggered){
+        triggered=true;
+        ptr.style.transform='scaleX(1)';
+        spin.style.animation='spin .7s linear infinite';
+        setTimeout(()=>{
+          ptr.style.opacity='0'; ptr.style.transform='scaleX(0)';
+          spin.style.opacity='0'; spin.style.animation='';
+        },600);
+        const s=loadLastSpot(); if(s) pickSpot(s); else renderHintChips();
+      } else {
+        ptr.style.opacity='0'; ptr.style.transform='scaleX(0)';
+        spin.style.opacity='0';
+      }
+    }
+    startY=0; pulling=false;
+  },{passive:true});
+})();
 </script>
 <!-- ══ SPOTS MAP OVERLAY ══ -->
 <div id="spotsMapOverlay" style="display:none;position:fixed;inset:0;z-index:3000;background:#0a1020;flex-direction:column;">
