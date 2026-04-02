@@ -2315,14 +2315,45 @@ function removeDayNotif(spotName,date){
 async function fireWebhook(spot,sessInfo){
   const p=loadProfile();
   if(!p.email||!WEBHOOK_URL)return;
+  const knownSpot=SPOTS.find(s=>s.name===spot.name);
+  const spotCity=knownSpot?.loc?knownSpot.loc.split(', ').slice(0,-1).join(', '):'';
+  const spotCountry=knownSpot?.loc?knownSpot.loc.split(', ').pop():'';
+  const dateStr=sessInfo.sessionStart.slice(0,10);
+  const{full:dateLabel}=fmtDate(dateStr);
+  const appUrl=`${location.origin}${location.pathname}?spot=${encodeURIComponent(spot.name)}&date=${dateStr}`;
+  const userDirs=[...windDirs].map(d=>compass(d));
   try{
     await fetch(WEBHOOK_URL,{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
-        email:p.email,spot:spot.name,
-        spot_location:{lat:spot.lat||spot.latitude,lon:spot.lon||spot.longitude},
-        session_start_time:sessInfo.sessionStart,
-        forecast:{wind_speed:sessInfo.peakKn,wind_direction:sessInfo.domDir,gusts:sessInfo.gusts}
+        notification_type: sessInfo._notifType||'spot',
+        email: p.email,
+        spot: spot.name,
+        spot_city: spotCity,
+        spot_country: spotCountry,
+        spot_location: {lat:spot.lat||spot.latitude, lon:spot.lon||spot.longitude},
+        date: dateStr,
+        date_label: dateLabel,
+        app_link: appUrl,
+        session:{
+          start_time: sessInfo.sessionStart,
+          end_time: sessInfo.sessionEnd||'',
+          duration_hours: sessInfo.duration_hours||0,
+          wind_speed_peak_kn: sessInfo.peakKn,
+          wind_speed_min_kn: sessInfo.windMin||0,
+          wind_gusts_kn: sessInfo.gusts,
+          wind_direction: sessInfo.domDir,
+          wind_consistency_pct: sessInfo.wind_consistency_pct||0,
+        },
+        conditions:{
+          weather: sessInfo.weather_description||'',
+          temperature_max_c: sessInfo.temperature_max||null,
+          temperature_min_c: sessInfo.temperature_min||null,
+          sunrise: sessInfo.sunrise||'',
+          sunset: sessInfo.sunset||'',
+          daylight_hours: sessInfo.daylight_hours||0,
+        },
+        user_good_wind_dirs: userDirs,
       })
     });
   }catch(e){console.warn('Webhook failed',e);}
@@ -2465,11 +2496,28 @@ function getQualSessions(){
   if(!cachedWx)return[];
   const{daily}=cachedWx;
   return daily.time.reduce((arr,dateStr,i)=>{
-    const{good,peakKn,domDir}=buildDay(dateStr,daily.sunrise[i],daily.sunset[i]);
+    const{good,peakKn,domDir,day}=buildDay(dateStr,daily.sunrise[i],daily.sunset[i]);
     if(good.length>=2){
       const sessionStart=good[0].tStr;
-      const gusts=good.length?Math.max(...good.map(h=>h.gustKn)):0;
-      arr.push({dateStr,sessionStart,peakKn,domDir:domDir!==null?compass(domDir):'—',gusts});
+      const sessionEnd=good[good.length-1].tStr;
+      const gusts=Math.max(...good.map(h=>h.gustKn||0));
+      const windMin=Math.min(...good.map(h=>h.kn));
+      const consistencyPct=day.length?Math.round(good.length/day.length*100):0;
+      const code=daily.weather_code[i];
+      const[,weatherDesc]=wmoInfo(code);
+      arr.push({
+        dateStr,sessionStart,sessionEnd,
+        duration_hours:good.length,
+        peakKn,windMin,gusts,
+        domDir:domDir!==null?compass(domDir):'—',
+        weather_description:weatherDesc,
+        temperature_max:Math.round(daily.temperature_2m_max[i]),
+        temperature_min:Math.round(daily.temperature_2m_min[i]),
+        sunrise:daily.sunrise[i].slice(11,16),
+        sunset:daily.sunset[i].slice(11,16),
+        daylight_hours:day.length,
+        wind_consistency_pct:consistencyPct,
+      });
     }
     return arr;
   },[]);
@@ -2481,10 +2529,25 @@ function toggleDayNotif(e,dateStr,dayIdx){
   const loc=cachedLoc;
   if(!loc)return;
   const{daily}=cachedWx;
-  const{good,peakKn,domDir}=buildDay(dateStr,daily.sunrise[dayIdx],daily.sunset[dayIdx]);
+  const{good,peakKn,domDir,day}=buildDay(dateStr,daily.sunrise[dayIdx],daily.sunset[dayIdx]);
   const sessionStart=good.length?good[0].tStr:dateStr+'T10:00';
-  const gusts=good.length?Math.max(...good.map(h=>h.gustKn)):0;
-  const sessInfo={sessionStart,peakKn,domDir:domDir!==null?compass(domDir):'—',gusts};
+  const sessionEnd=good.length?good[good.length-1].tStr:dateStr+'T11:00';
+  const gusts=good.length?Math.max(...good.map(h=>h.gustKn||0)):0;
+  const windMin=good.length?Math.min(...good.map(h=>h.kn)):0;
+  const consistencyPct=day.length?Math.round(good.length/day.length*100):0;
+  const code=daily.weather_code[dayIdx];
+  const[,weatherDesc]=wmoInfo(code);
+  const sessInfo={
+    sessionStart,sessionEnd,duration_hours:good.length,
+    peakKn,windMin,gusts,domDir:domDir!==null?compass(domDir):'—',
+    weather_description:weatherDesc,
+    temperature_max:Math.round(daily.temperature_2m_max[dayIdx]),
+    temperature_min:Math.round(daily.temperature_2m_min[dayIdx]),
+    sunrise:daily.sunrise[dayIdx].slice(11,16),
+    sunset:daily.sunset[dayIdx].slice(11,16),
+    daylight_hours:day.length,
+    wind_consistency_pct:consistencyPct,
+  };
   const spot={name:loc.name,lat:loc.latitude,lon:loc.longitude};
 
   const p=loadProfile();
