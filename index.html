@@ -2323,41 +2323,60 @@ async function fireWebhook(spot,sessInfo){
   const{full:dateLabel}=fmtDate(dateStr);
   const appUrl=`${location.origin}${location.pathname}?spot=${encodeURIComponent(spot.name)}&date=${dateStr}`;
   const userDirs=[...windDirs].map(d=>compass(d));
-  try{
-    await fetch(WEBHOOK_URL,{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        notification_type: sessInfo._notifType||'spot',
-        email: p.email,
-        spot: spot.name,
-        spot_city: spotCity,
-        spot_country: spotCountry,
-        spot_map_link: `https://www.google.com/maps?q=${spot.lat||spot.latitude},${spot.lon||spot.longitude}`,
-        date: dateStr,
-        date_label: dateLabel,
-        app_link: appUrl,
-        session:{
-          start_time: sessInfo.sessionStart,
-          end_time: sessInfo.sessionEnd||'',
-          duration_hours: sessInfo.duration_hours||0,
-          wind_speed_peak_kn: sessInfo.peakKn,
-          wind_speed_min_kn: sessInfo.windMin||0,
-          wind_gusts_kn: sessInfo.gusts,
-          wind_direction: sessInfo.domDir,
-          wind_consistency_pct: sessInfo.wind_consistency_pct||0,
-        },
-        conditions:{
-          weather: sessInfo.weather_description||'',
-          temperature_max_c: sessInfo.temperature_max||null,
-          temperature_min_c: sessInfo.temperature_min||null,
-          sunrise: sessInfo.sunrise||'',
-          sunset: sessInfo.sunset||'',
-          daylight_hours: sessInfo.daylight_hours||0,
-        },
-        user_good_wind_dirs: userDirs,
-      })
-    });
-  }catch(e){console.warn('Webhook failed',e);}
+  const sessionMs=new Date(sessInfo.sessionStart).getTime();
+  const now=Date.now();
+  const reminders=[
+    {hours:72, label:'72 hours before'},
+    {hours:48, label:'48 hours before'},
+    {hours:24, label:'24 hours before'},
+    {hours:6,  label:'6 hours before'},
+    {hours:1,  label:'1 hour before'},
+  ];
+  const basePayload={
+    notification_type: sessInfo._notifType||'spot',
+    email: p.email,
+    spot: spot.name,
+    spot_city: spotCity,
+    spot_country: spotCountry,
+    spot_map_link: `https://www.google.com/maps?q=${spot.lat||spot.latitude},${spot.lon||spot.longitude}`,
+    date: dateStr,
+    date_label: dateLabel,
+    app_link: appUrl,
+    session:{
+      start_time: sessInfo.sessionStart,
+      end_time: sessInfo.sessionEnd||'',
+      duration_hours: sessInfo.duration_hours||0,
+      wind_speed_peak_kn: sessInfo.peakKn,
+      wind_speed_min_kn: sessInfo.windMin||0,
+      wind_gusts_kn: sessInfo.gusts,
+      wind_direction: sessInfo.domDir,
+      wind_consistency_pct: sessInfo.wind_consistency_pct||0,
+    },
+    conditions:{
+      weather: sessInfo.weather_description||'',
+      temperature_max_c: sessInfo.temperature_max||null,
+      temperature_min_c: sessInfo.temperature_min||null,
+      sunrise: sessInfo.sunrise||'',
+      sunset: sessInfo.sunset||'',
+      daylight_hours: sessInfo.daylight_hours||0,
+    },
+    user_good_wind_dirs: userDirs,
+  };
+  // Fire one webhook call per reminder window, only if send_at is in the future
+  for(const r of reminders){
+    const sendAt=new Date(sessionMs - r.hours*3600*1000);
+    if(sendAt.getTime()<=now) continue; // already past, skip
+    try{
+      await fetch(WEBHOOK_URL,{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          ...basePayload,
+          reminder_label: r.label,
+          send_at: sendAt.toISOString(),
+        })
+      });
+    }catch(e){console.warn('Webhook failed',r.label,e);}
+  }
 }
 
 // ── PENDING NOTIF ──
