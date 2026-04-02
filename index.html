@@ -2242,7 +2242,16 @@ const WEBHOOK_URL = 'https://hook.eu1.make.com/6t9fgm6btixri2wf5lnx47requf416vs'
 
 function loadProfile(){ try{ return JSON.parse(localStorage.getItem('kf_profile')||'{}'); }catch{ return {}; } }
 function saveProfile(p){ localStorage.setItem('kf_profile', JSON.stringify(p)); }
-function loadNotifs(){ try{ return JSON.parse(localStorage.getItem('kf_notifs')||'[]'); }catch{ return []; } }
+function loadNotifs(){
+  try{
+    const all=JSON.parse(localStorage.getItem('kf_notifs')||'[]');
+    const today=new Date().toISOString().slice(0,10);
+    // auto-purge past day-level entries
+    const active=all.filter(n=>n.type==='spot'||!n.date||(n.date>=today));
+    if(active.length!==all.length) localStorage.setItem('kf_notifs',JSON.stringify(active));
+    return active;
+  }catch{ return []; }
+}
 function saveNotifs(arr){ localStorage.setItem('kf_notifs', JSON.stringify(arr)); }
 function notifMasterEnabled(){ return loadProfile().notifsEnabled !== false; }
 
