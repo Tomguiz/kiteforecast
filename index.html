@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>KiteForecast — 10-Day Kitesurf Conditions</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <style>
     :root {
       --bg:       #070c18;
@@ -2240,8 +2241,12 @@ function initSpotsMap(){
 // ══════════════════════════════════
 //  NOTIFICATIONS — DATA
 // ══════════════════════════════════
-const WEBHOOK_URL = 'https://hook.eu1.make.com/6t9fgm6btixri2wf5lnx47requf416vs';
+const WEBHOOK_URL    = 'https://hook.eu1.make.com/6t9fgm6btixri2wf5lnx47requf416vs';
 const REMINDER_HOURS = [72, 48, 24, 6, 1];
+const _sb = window.supabase.createClient(
+  'https://kpwmajtxmcfpakvonimf.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwd21hanR4bWNmcGFrdm9uaW1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTcyMjYsImV4cCI6MjA5MDczMzIyNn0.QfQuIQbnfVUOApPbOdvCRbNsVdb0SBAwMX-hvioGJmg'
+);
 
 function loadProfile(){ try{ return JSON.parse(localStorage.getItem('kf_profile')||'{}'); }catch{ return {}; } }
 function saveProfile(p){ localStorage.setItem('kf_profile', JSON.stringify(p)); }
@@ -2261,120 +2266,50 @@ function notifMasterEnabled(){ return loadProfile().notifsEnabled !== false; }
 function hasSpotNotif(spotName){ return loadNotifs().some(n=>n.type==='spot'&&n.spotName===spotName); }
 function hasDayNotif(spotName,date){ return loadNotifs().some(n=>n.type==='day'&&n.spotName===spotName&&n.date===date); }
 
-// ── SCHEDULED REMINDERS (client-side) ──
-// kf_reminders: [{id, spotName, spotLat, spotLon, spotDirs[], sessionDate, reminderHours, send_at, sent, notifType, email}]
-function loadReminders(){ try{ return JSON.parse(localStorage.getItem('kf_reminders')||'[]'); }catch{ return []; } }
-function saveReminders(arr){ localStorage.setItem('kf_reminders',JSON.stringify(arr)); }
-
-function scheduleReminders(spot,sessInfo,notifType){
+// ── SCHEDULED REMINDERS (Supabase backend) ──
+async function scheduleReminders(spot,sessInfo,notifType){
   const p=loadProfile();
   if(!p.email) return;
+  const sessionDate=sessInfo.sessionStart.slice(0,10);
   const sessionMs=new Date(sessInfo.sessionStart).getTime();
   const now=Date.now();
-  const existing=loadReminders();
-  // remove any existing reminders for this spot+date combo
-  const sessionDate=sessInfo.sessionStart.slice(0,10);
-  const cleaned=existing.filter(r=>!(r.spotName===spot.name&&r.sessionDate===sessionDate));
-  const newReminders=REMINDER_HOURS
+  const knownSpot=SPOTS.find(s=>s.name===spot.name);
+  const spotCity=knownSpot?.loc?knownSpot.loc.split(', ').slice(0,-1).join(', '):'';
+  const spotCountry=knownSpot?.loc?knownSpot.loc.split(', ').pop():'';
+  const spotLat=spot.lat||spot.latitude;
+  const spotLon=spot.lon||spot.longitude;
+  const appUrl=`${location.origin}${location.pathname}?spot=${encodeURIComponent(spot.name)}&date=${sessionDate}`;
+  // Cancel any existing reminders for this spot+date+email
+  await _sb.from('reminders').update({cancelled:true})
+    .eq('email',p.email).eq('spot_name',spot.name).eq('session_date',sessionDate).eq('cancelled',false);
+  // Insert one row per reminder window that is still in the future
+  const rows=REMINDER_HOURS
     .map(h=>({
-      id: `${spot.name}_${sessionDate}_${h}h_${Date.now()}`,
-      spotName: spot.name,
-      spotLat: spot.lat||spot.latitude,
-      spotLon: spot.lon||spot.longitude,
-      spotDirs: [...windDirs],
-      sessionDate,
-      reminderHours: h,
-      send_at: new Date(sessionMs - h*3600*1000).toISOString(),
-      sent: false,
-      notifType,
-      email: p.email,
+      email:       p.email,
+      spot_name:   spot.name,
+      spot_city:   spotCity,
+      spot_country:spotCountry,
+      spot_lat:    spotLat,
+      spot_lon:    spotLon,
+      spot_map_link:`https://www.google.com/maps?q=${spotLat},${spotLon}`,
+      spot_dirs:   [...windDirs],
+      session_date:sessionDate,
+      notif_type:  notifType,
+      reminder_hours:h,
+      send_at:     new Date(sessionMs-h*3600*1000).toISOString(),
+      app_link:    appUrl,
     }))
-    .filter(r=>new Date(r.send_at).getTime()>now); // skip already-past windows
-  saveReminders([...cleaned,...newReminders]);
+    .filter(r=>new Date(r.send_at).getTime()>now);
+  if(rows.length) await _sb.from('reminders').insert(rows);
 }
 
-function cancelReminders(spotName,sessionDate){
-  // sessionDate=null means cancel all for that spot
-  const updated=loadReminders().filter(r=>
-    sessionDate ? !(r.spotName===spotName&&r.sessionDate===sessionDate)
-                : r.spotName!==spotName
-  );
-  saveReminders(updated);
-}
-
-async function checkDueReminders(){
-  const reminders=loadReminders();
-  const now=Date.now();
-  const due=reminders.filter(r=>!r.sent&&new Date(r.send_at).getTime()<=now);
-  if(!due.length) return;
-  for(const r of due){
-    try{
-      // Re-fetch live forecast for this spot
-      const p=new URLSearchParams({
-        latitude:r.spotLat, longitude:r.spotLon,
-        hourly:['weather_code','windspeed_10m','winddirection_10m','windgusts_10m','temperature_2m'].join(','),
-        daily:['weather_code','temperature_2m_max','temperature_2m_min','windgusts_10m_max','sunrise','sunset'].join(','),
-        forecast_days:10, timezone:'auto', windspeed_unit:'ms',
-      });
-      const wx=await safeFetch(`https://api.open-meteo.com/v1/forecast?${p}`,10000);
-      if(wx.error) throw new Error(wx.reason);
-      // find the target date in the forecast
-      const dayIdx=wx.daily.time.indexOf(r.sessionDate);
-      if(dayIdx===-1){ markReminderSent(r.id); continue; } // date no longer in window
-      // rebuild hourly map for this spot temporarily
-      const tmpMap=new Map();
-      wx.hourly.time.forEach((t,i)=>{
-        const d=t.slice(0,10); if(d!==r.sessionDate) return;
-        const hr=parseInt(t.slice(11,13),10);
-        tmpMap.set(hr,{kn:toKnotsR(wx.hourly.windspeed_10m[i]),dir:wx.hourly.winddirection_10m[i],code:wx.hourly.weather_code[i]??0,temp:Math.round(wx.hourly.temperature_2m[i]),gustKn:toKnotsR(wx.hourly.windgusts_10m[i])});
-      });
-      // temporarily swap windDirs to the stored dirs for this subscription
-      const savedDirs=new Set(windDirs);
-      windDirs=new Set(r.spotDirs);
-      cachedHrMap=new Map([[r.sessionDate,tmpMap]]);
-      const sunrise=wx.daily.sunrise[dayIdx];
-      const sunset=wx.daily.sunset[dayIdx];
-      const{good,peakKn,domDir,day}=buildDay(r.sessionDate,sunrise,sunset);
-      const code=wx.daily.weather_code[dayIdx];
-      const[,weatherDesc]=wmoInfo(code);
-      const rating=rateDay(good.length,peakKn,code,day.some(h=>h.type==='lightdir'),day.length?Math.max(...day.map(h=>h.kn)):0);
-      windDirs=savedDirs; // restore
-      const sessionStart=good.length?good[0].tStr:r.sessionDate+'T10:00';
-      const sessionEnd=good.length?good[good.length-1].tStr:'';
-      const gusts=good.length?Math.max(...good.map(h=>h.gustKn||0)):0;
-      const windMin=good.length?Math.min(...good.map(h=>h.kn)):0;
-      const consistencyPct=day.length?Math.round(good.length/day.length*100):0;
-      const sessInfo={
-        sessionStart, sessionEnd,
-        duration_hours: good.length,
-        peakKn, windMin, gusts,
-        domDir: domDir!==null?compass(domDir):'—',
-        wind_consistency_pct: consistencyPct,
-        weather_description: weatherDesc,
-        temperature_max: Math.round(wx.daily.temperature_2m_max[dayIdx]),
-        temperature_min: Math.round(wx.daily.temperature_2m_min[dayIdx]),
-        sunrise: sunrise.slice(11,16),
-        sunset: sunset.slice(11,16),
-        daylight_hours: day.length,
-        rating_label: rating.label,
-        notifType: r.notifType,
-      };
-      await fireWebhook(
-        {name:r.spotName, lat:r.spotLat, lon:r.spotLon},
-        sessInfo,
-        r.reminderHours,
-        r.email
-      );
-      markReminderSent(r.id);
-    }catch(e){ console.warn('Reminder check failed for',r.spotName,e); }
-  }
-  // purge sent + past reminders older than 2 days
-  const cutoff=now - 2*24*3600*1000;
-  saveReminders(loadReminders().filter(r=>!r.sent||new Date(r.send_at).getTime()>cutoff));
-}
-
-function markReminderSent(id){
-  saveReminders(loadReminders().map(r=>r.id===id?{...r,sent:true}:r));
+async function cancelReminders(spotName,sessionDate){
+  const p=loadProfile();
+  if(!p.email) return;
+  let q=_sb.from('reminders').update({cancelled:true})
+    .eq('email',p.email).eq('spot_name',spotName).eq('cancelled',false);
+  if(sessionDate) q=q.eq('session_date',sessionDate);
+  await q;
 }
 
 function addSpotNotif(spot,sessions){
@@ -2727,7 +2662,6 @@ function initSpotsMap(){
 // ── INIT ──
 updateProfileDot();
 $('ppMasterToggle').classList.toggle('on', notifMasterEnabled());
-checkDueReminders(); // check on every page load if any reminders are due
 </script>
 <!-- ══ SPOTS MAP OVERLAY ══ -->
 <div id="spotsMapOverlay" style="display:none;position:fixed;inset:0;z-index:3000;background:#0a1020;flex-direction:column;">
