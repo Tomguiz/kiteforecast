@@ -2384,6 +2384,7 @@ function addSpotNotif(spot,sessions){
   updateProfileDot();
   renderHintChips();
   sessions.forEach(sess=>scheduleReminders(spot,sess,'spot'));
+  fireConfirmationWebhook(spot,sessions);
 }
 function removeSpotNotif(spotName){
   saveNotifs(loadNotifs().filter(n=>!(n.spotName===spotName&&(n.type==='spot'||(n.type==='day'&&n.fromSpot)))));
@@ -2399,6 +2400,7 @@ function addDayNotif(spot,dateStr,sessInfo){
   updateProfileDot();
   renderHintChips();
   scheduleReminders(spot,sessInfo,'day');
+  fireConfirmationWebhook(spot,[{...sessInfo,dateStr:sessInfo.sessionStart.slice(0,10)}]);
 }
 function removeDayNotif(spotName,date){
   const notifs=loadNotifs();
@@ -2466,6 +2468,57 @@ async function fireWebhook(spot,sessInfo,reminderHours,emailOverride){
       })
     });
   }catch(e){console.warn('Webhook failed',e);}
+}
+
+// ── CONFIRMATION WEBHOOK ──
+async function fireConfirmationWebhook(spot, sessions){
+  const p=loadProfile();
+  if(!p.email||!WEBHOOK_URL) return;
+  const knownSpot=SPOTS.find(s=>s.name===spot.name);
+  const spotCity=knownSpot?.loc?knownSpot.loc.split(', ').slice(0,-1).join(', '):'';
+  const spotCountry=knownSpot?.loc?knownSpot.loc.split(', ').pop():'';
+  const spotLat=spot.lat||spot.latitude;
+  const spotLon=spot.lon||spot.longitude;
+  const appUrl=`${location.origin}${location.pathname}?spot=${encodeURIComponent(spot.name)}`;
+  const now=Date.now();
+
+  const days=sessions.map(sess=>{
+    const dateStr=sess.dateStr||sess.sessionStart.slice(0,10);
+    const sessionMs=new Date(sess.sessionStart).getTime();
+    const{full:dateLabel}=fmtDate(dateStr);
+    const dayOfWeek=new Date(dateStr+'T12:00:00').toLocaleDateString('en',{weekday:'long'});
+    const nextReminders=REMINDER_HOURS
+      .filter(h=>sessionMs-h*3600*1000>now)
+      .map(h=>h===1?'1 hour before':`${h} hours before`);
+    return {
+      date:         dateStr,
+      day_of_week:  dayOfWeek,
+      date_label:   dateLabel,
+      rating:       sess.rating_label||'',
+      session_start:sess.sessionStart||'',
+      session_end:  sess.sessionEnd||'',
+      duration_hours:sess.duration_hours||0,
+      wind_peak_kn: sess.peakKn||0,
+      app_link:     `${location.origin}${location.pathname}?spot=${encodeURIComponent(spot.name)}&date=${dateStr}`,
+      next_reminders: nextReminders,
+    };
+  });
+
+  try{
+    await fetch(WEBHOOK_URL,{
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        notification_type: 'confirmation',
+        email:             p.email,
+        spot:              spot.name,
+        spot_city:         spotCity,
+        spot_country:      spotCountry,
+        spot_map_link:     `https://www.google.com/maps?q=${spotLat},${spotLon}`,
+        app_link:          appUrl,
+        days,
+      })
+    });
+  }catch(e){ console.warn('Confirmation webhook failed',e); }
 }
 
 // ── PENDING NOTIF ──
