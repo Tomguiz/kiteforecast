@@ -611,6 +611,8 @@
   <div id="mapBtnMobileWrap" style="text-align:center">
     <button class="btn-map-mobile" onclick="openSpotsMap()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>View all spots on map</button>
   </div>
+  <!-- last fetch timestamp (home screen) -->
+  <div id="fetchTimestamp" class="fetch-ts" style="margin-top:14px"></div>
   <!-- welcome legend -->
   <div id="hintLegend" class="legend" style="display:none"></div>
   <!-- welcome footer -->
@@ -657,8 +659,6 @@
     </div>
 
     <div class="forecast-grid" id="forecastGrid"></div>
-
-    <div id="fetchTimestamp" class="fetch-ts"></div>
 
     <div class="legend" id="resultsLegend"></div>
   </div>
@@ -723,8 +723,16 @@ let manualShoreSet = false;
 let cachedWx    = null;
 let cachedLoc   = null;
 let cachedHrMap = null;
-let lastFetchTime = 0;
+let lastFetchTime = parseInt(localStorage.getItem('kf_lastFetch')||'0',10);
 
+function updateFetchTimestamp(){
+  const el=$('fetchTimestamp'); if(!el) return;
+  if(lastFetchTime){
+    const d=new Date(lastFetchTime);
+    const pad=n=>String(n).padStart(2,'0');
+    el.textContent=`Last forecast update: ${d.getDate()}-${d.getMonth()+1}-${d.getFullYear()} @ ${pad(d.getHours())}h${pad(d.getMinutes())}`;
+  } else { el.textContent=''; }
+}
 function saveLastSpot(spot){
   try{ localStorage.setItem('kf_lastSpot',JSON.stringify({name:spot.name,loc:spot.loc||spot.name,lat:spot.lat||spot.latitude,lon:spot.lon||spot.longitude,dirs:spot.dirs||[]})); }catch(e){}
 }
@@ -1624,7 +1632,7 @@ async function fetchForecastFromSpot(spot){
         gustKn: toKnotsR(h.windgusts_10m[i]),
       });
     });
-    lastFetchTime=Date.now();
+    lastFetchTime=Date.now(); try{localStorage.setItem('kf_lastFetch',lastFetchTime);}catch(e){}
     renderGrid();
   }catch(err){
     console.error('fetchForecastFromSpot error:',err);
@@ -1955,7 +1963,7 @@ async function fetchForecast(query){
     });
 
     saveLastSpot({name:cachedLoc.name,loc:[cachedLoc.admin1,cachedLoc.country].filter(Boolean).join(', '),lat:cachedLoc.latitude,lon:cachedLoc.longitude,dirs:[...windDirs]});
-    lastFetchTime=Date.now();
+    lastFetchTime=Date.now(); try{localStorage.setItem('kf_lastFetch',lastFetchTime);}catch(e){}
     renderGrid();
   }catch(err){
     console.error('fetchForecast error:',err);
@@ -2099,12 +2107,7 @@ function renderGrid(){
   });
 
   // ── last fetch timestamp ──
-  if(lastFetchTime){
-    const d=new Date(lastFetchTime);
-    const pad=n=>String(n).padStart(2,'0');
-    const label=`${d.getDate()}-${d.getMonth()+1}-${d.getFullYear()} @ ${pad(d.getHours())}h${pad(d.getMinutes())}`;
-    $('fetchTimestamp').textContent=`Last forecast update: ${label}`;
-  }
+  updateFetchTimestamp();
 
   showOnly('results');
 
@@ -2717,6 +2720,7 @@ function initSpotsMap(){
 // ── INIT ──
 updateProfileDot();
 $('ppMasterToggle').classList.toggle('on', notifMasterEnabled());
+updateFetchTimestamp();
 
 // ── AUTO-REFRESH: load last spot on startup (or deep-link via ?spot=&date=) ──
 (function(){
