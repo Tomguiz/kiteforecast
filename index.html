@@ -525,7 +525,7 @@
       position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
       background:var(--card); border:1px solid rgba(34,197,94,.4); color:#4ade80;
       padding:10px 20px; border-radius:99px; font-size:.82rem; font-weight:600;
-      z-index:500; animation:mFadeIn .2s ease; white-space:nowrap;
+      z-index:9999; animation:mFadeIn .2s ease; white-space:nowrap;
       box-shadow:0 4px 20px rgba(0,0,0,.5);
     }
 
@@ -2385,7 +2385,6 @@ function addSpotNotif(spot,sessions){
   renderHintChips();
   sessions.forEach(sess=>scheduleReminders(spot,sess,'spot'));
   fireConfirmationWebhook(spot,sessions);
-  showToast('📧 Confirmation email sent');
 }
 function removeSpotNotif(spotName){
   saveNotifs(loadNotifs().filter(n=>!(n.spotName===spotName&&(n.type==='spot'||(n.type==='day'&&n.fromSpot)))));
@@ -2407,7 +2406,6 @@ function addDayNotif(spot,dateStr,sessInfo){
     .map(n=>n.date);
   const allSessions=_buildSessionsForDates(spot.name,allDayDates);
   fireConfirmationWebhook(spot,allSessions);
-  showToast('📧 Confirmation email sent');
 }
 function removeDayNotif(spotName,date){
   const notifs=loadNotifs();
@@ -2706,12 +2704,15 @@ function toggleSpotNotif(){
     const sessions=getQualSessions();
     pendingNotif={type:'spot',spot:{name:loc.name,lat:loc.latitude,lon:loc.longitude},sessions};
     openProfilePanel('profile');
+    showToast('📧 Enter your email to get notified');
     return;
   }
   if(hasSpotNotif(loc.name)){
     removeSpotNotif(loc.name);
+    showToast('🔕 Notifications removed');
   } else {
     addSpotNotif({name:loc.name,lat:loc.latitude,lon:loc.longitude},getQualSessions());
+    showToast('📧 Confirmation email sent!');
   }
   renderGrid();
 }
@@ -2782,12 +2783,15 @@ function toggleDayNotif(e,dateStr,dayIdx){
   if(!p.email){
     pendingNotif={type:'day',spot,dateStr,sessInfo};
     openProfilePanel('profile');
+    showToast('📧 Enter your email to get notified');
     return;
   }
   if(hasDayNotif(loc.name,dateStr)){
     removeDayNotif(loc.name,dateStr);
+    showToast('🔕 Notification removed');
   } else {
     addDayNotif(spot,dateStr,sessInfo);
+    showToast('📧 Confirmation email sent!');
   }
   renderGrid();
 }
