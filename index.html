@@ -2385,6 +2385,7 @@ function addSpotNotif(spot,sessions){
   renderHintChips();
   sessions.forEach(sess=>scheduleReminders(spot,sess,'spot'));
   fireConfirmationWebhook(spot,sessions);
+  showToast('📧 Confirmation email sent');
 }
 function removeSpotNotif(spotName){
   saveNotifs(loadNotifs().filter(n=>!(n.spotName===spotName&&(n.type==='spot'||(n.type==='day'&&n.fromSpot)))));
@@ -2406,6 +2407,7 @@ function addDayNotif(spot,dateStr,sessInfo){
     .map(n=>n.date);
   const allSessions=_buildSessionsForDates(spot.name,allDayDates);
   fireConfirmationWebhook(spot,allSessions);
+  showToast('📧 Confirmation email sent');
 }
 function removeDayNotif(spotName,date){
   const notifs=loadNotifs();
