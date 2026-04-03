@@ -188,6 +188,9 @@
     .rating-bad      { background:rgba(239,68,68,.08);   color:#fca5a5; border:1px solid rgba(239,68,68,.18); }
     .rating-danger   { background:rgba(239,68,68,.16);   color:#f87171; border:1px solid rgba(239,68,68,.32); }
 
+    /* ── FETCH TIMESTAMP ── */
+    .fetch-ts { text-align:center; margin-top:14px; font-size:.75rem; color:rgba(252,165,165,.7); letter-spacing:.02em; min-height:1em; }
+
     /* ── LEGEND ── */
     .legend { margin-top:20px; background:var(--card); border:1px solid var(--border); border-radius:13px; padding:16px 18px; }
     #hintLegend { margin-top:32px; }
@@ -654,6 +657,8 @@
     </div>
 
     <div class="forecast-grid" id="forecastGrid"></div>
+
+    <div id="fetchTimestamp" class="fetch-ts"></div>
 
     <div class="legend" id="resultsLegend"></div>
   </div>
@@ -2092,6 +2097,14 @@ function renderGrid(){
       <div class="rating-badge ${rating.cls}">${rating.label}</div>`;
     grid.appendChild(card);
   });
+
+  // ── last fetch timestamp ──
+  if(lastFetchTime){
+    const d=new Date(lastFetchTime);
+    const pad=n=>String(n).padStart(2,'0');
+    const label=`${d.getDate()}-${d.getMonth()+1}-${d.getFullYear()} @ ${pad(d.getHours())}h${pad(d.getMinutes())}`;
+    $('fetchTimestamp').textContent=`Last forecast update: ${label}`;
+  }
 
   showOnly('results');
 }
