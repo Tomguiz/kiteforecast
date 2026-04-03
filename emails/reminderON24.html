@@ -1,612 +1,180 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>KiteForecast — Session Alert</title>
-  <style>
-
-    @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap');
-
-    :root {
-      --blue-deep: #0a3d6b;
-      --blue-mid: #0d5c9e;
-      --blue-light: #0a7ac4;
-      --cyan: #5dd4f0;
-      --orange: #f0905d;
-      --red: #f05d5d;
-      --green: #5df0a0;
-      --yellow: #f0c45d;
-      --bg: #0d0f14;
-      --card: #161b27;
-      --card2: #1a2035;
-      --border: #1e2535;
-      --border2: #242d42;
-      --text: #e8eaf0;
-      --muted: #4a5568;
-      --muted2: #2a3347;
-    }
-
-    * { margin:0; padding:0; box-sizing:border-box; }
-
-    body {
-      background: #080a0f;
-      font-family: 'DM Sans', sans-serif;
-      color: var(--text);
-      min-height: 100vh;
-    }
-
-    /* ── TOGGLE UI ── */
-    .toggle-ui {
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      background: #080a0f;
-      border-bottom: 1px solid var(--border);
-      padding: 16px 24px;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      align-items: center;
-    }
-
-    .toggle-ui-label {
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-right: 4px;
-    }
-
-    .toggle-group {
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
-    }
-
-    .tab-btn {
-      background: var(--card);
-      border: 1px solid var(--border2);
-      color: var(--muted);
-      font-family: 'DM Sans', sans-serif;
-      font-size: 12px;
-      font-weight: 600;
-      padding: 7px 14px;
-      border-radius: 20px;
-      cursor: pointer;
-      transition: all 0.2s;
-      white-space: nowrap;
-    }
-
-    .tab-btn:hover { border-color: var(--cyan); color: var(--cyan); }
-    .tab-btn.on.active { background: #0a3d6b; border-color: var(--cyan); color: var(--cyan); }
-    .tab-btn.off.active { background: #3d0a0a; border-color: var(--red); color: var(--red); }
-
-    .sep { width: 1px; height: 24px; background: var(--border); margin: 0 4px; }
-
-    /* ── EMAIL WRAPPER ── */
-    .email-variant { display: none; padding: 40px 16px; }
-    .email-variant.active { display: block; }
-
-    .wrapper {
-      max-width: 600px;
-      margin: 0 auto;
-    }
-
-    /* ── SUBJECT LINE ── */
-    .subject-preview {
-      background: var(--card2);
-      border: 1px solid var(--border2);
-      border-radius: 10px;
-      padding: 12px 18px;
-      margin-bottom: 20px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-    }
-
-    .subject-preview-label {
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      color: var(--muted);
-      white-space: nowrap;
-    }
-
-    .subject-preview-text {
-      font-size: 13px;
-      font-weight: 500;
-      color: var(--text);
-    }
-
-    /* ── HEADER ── */
-    .header {
-      border-radius: 16px 16px 0 0;
-      padding: 36px 40px 28px;
-      position: relative;
-      overflow: hidden;
-    }
-
-    .header.on-72  { background: linear-gradient(135deg, #0a3d6b 0%, #0d5c9e 50%, #0a7ac4 100%); }
-    .header.on-48  { background: linear-gradient(135deg, #0a4a6b 0%, #0d7a9e 50%, #0aa0c4 100%); }
-    .header.on-24  { background: linear-gradient(135deg, #0a5a6b 0%, #0da09e 40%, #0dc4b0 100%); }
-    .header.on-6   { background: linear-gradient(135deg, #0a4d3d 0%, #0d8a6e 50%, #0dc495 100%); }
-    .header.on-1   { background: linear-gradient(135deg, #1a3d0a 0%, #2d7a0d 40%, #3dc40a 80%, #7af020 100%); }
-    .header.off    { background: linear-gradient(135deg, #1a0a0a 0%, #3d1515 50%, #5a1a1a 100%); }
-
-    .header::before {
-      content: '';
-      position: absolute;
-      top: -60px; right: -60px;
-      width: 220px; height: 220px;
-      border-radius: 50%;
-      background: rgba(255,255,255,0.05);
-    }
-
-    .header::after {
-      content: '';
-      position: absolute;
-      bottom: -30px; left: 40px;
-      width: 140px; height: 140px;
-      border-radius: 50%;
-      background: rgba(255,255,255,0.04);
-    }
-
-    .brand {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 22px;
-    }
-
-    .brand-name {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 18px;
-      letter-spacing: 3px;
-      color: rgba(255,255,255,0.85);
-    }
-
-    .badge-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-bottom: 16px;
-      flex-wrap: wrap;
-    }
-
-    .badge {
-      display: inline-block;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      padding: 5px 12px;
-      border-radius: 20px;
-      white-space: nowrap;
-    }
-
-    .badge-reminder {
-      background: rgba(255,255,255,0.12);
-      border: 1px solid rgba(255,255,255,0.2);
-      color: rgba(255,255,255,0.85);
-    }
-
-    .badge-on {
-      background: rgba(93,240,160,0.15);
-      border: 1px solid rgba(93,240,160,0.4);
-      color: #5df0a0;
-    }
-
-    .badge-off {
-      background: rgba(240,93,93,0.15);
-      border: 1px solid rgba(240,93,93,0.4);
-      color: #f05d5d;
-    }
-
-    .badge-rating {
-      background: rgba(255,255,255,0.15);
-      border: 1px solid rgba(255,255,255,0.3);
-      color: #fff;
-      font-size: 12px;
-    }
-
-    .headline {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 56px;
-      line-height: 1.0;
-      color: #ffffff;
-      letter-spacing: 1px;
-      margin-bottom: 6px;
-      position: relative;
-      z-index: 1;
-    }
-
-    .headline .accent-on-72  { color: #5dd4f0; }
-    .headline .accent-on-48  { color: #5de8f0; }
-    .headline .accent-on-24  { color: #5df0e0; }
-    .headline .accent-on-6   { color: #5df0a0; }
-    .headline .accent-on-1   { color: #b0f05d; }
-    .headline .accent-off    { color: #f07a5d; }
-
-    .subheadline {
-      font-size: 15px;
-      color: rgba(255,255,255,0.72);
-      margin-bottom: 24px;
-      position: relative;
-      z-index: 1;
-    }
-
-    .session-window {
-      background: rgba(255,255,255,0.1);
-      border: 1px solid rgba(255,255,255,0.18);
-      border-radius: 12px;
-      padding: 16px 20px;
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      position: relative;
-      z-index: 1;
-    }
-
-    .session-window-time {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 30px;
-      color: #fff;
-      letter-spacing: 1px;
-      white-space: nowrap;
-    }
-
-    .session-window-divider {
-      width: 1px;
-      height: 38px;
-      background: rgba(255,255,255,0.22);
-      flex-shrink: 0;
-    }
-
-    .session-window-label {
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      color: rgba(255,255,255,0.55);
-      margin-bottom: 3px;
-    }
-
-    .session-window-date {
-      font-size: 14px;
-      font-weight: 500;
-      color: #fff;
-    }
-
-    .session-window-duration {
-      font-size: 12px;
-      color: rgba(255,255,255,0.55);
-    }
-
-    /* OFF header — no session window, show reason instead */
-    .nogo-reason {
-      background: rgba(240,93,93,0.12);
-      border: 1px solid rgba(240,93,93,0.3);
-      border-radius: 12px;
-      padding: 16px 20px;
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      position: relative;
-      z-index: 1;
-    }
-
-    .nogo-icon { font-size: 28px; }
-
-    .nogo-reason-label {
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      color: rgba(240,93,93,0.7);
-      margin-bottom: 3px;
-    }
-
-    .nogo-reason-text {
-      font-size: 16px;
-      font-weight: 600;
-      color: #f07a7a;
-    }
-
-    /* ── WIND HERO ── */
-    .wind-hero {
-      background: #111827;
-      padding: 24px 40px;
-      display: flex;
-      border-left: 1px solid var(--border);
-      border-right: 1px solid var(--border);
-    }
-
-    .wind-speed-block {
-      flex: 1;
-      text-align: center;
-      padding: 0 12px;
-    }
-
-    .wind-speed-block + .wind-speed-block {
-      border-left: 1px solid var(--border);
-    }
-
-    .wind-unit {
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 4px;
-    }
-
-    .wind-value {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 58px;
-      line-height: 1;
-    }
-
-    .wind-value.peak-72 { color: var(--cyan); }
-    .wind-value.peak-48 { color: #5de8f0; }
-    .wind-value.peak-24 { color: #5df0d8; }
-    .wind-value.peak-6  { color: #5df0a0; }
-    .wind-value.peak-1  { color: #b0f05d; }
-    .wind-value.peak-off { color: var(--muted); }
-    .wind-value.gust    { color: var(--orange); }
-    .wind-value.min     { color: var(--muted); font-size: 42px; }
-
-    .wind-label {
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-top: 4px;
-    }
-
-    /* ── DETAILS ── */
-    .details {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-top: none;
-      padding: 28px 40px;
-    }
-
-    .section-title {
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 2.5px;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 14px;
-    }
-
-    .grid-2 {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      margin-bottom: 22px;
-    }
-
-    .detail-card {
-      background: var(--card2);
-      border: 1px solid var(--border2);
-      border-radius: 10px;
-      padding: 14px 16px;
-    }
-
-    .detail-card-label {
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-bottom: 5px;
-    }
-
-    .detail-card-value {
-      font-size: 18px;
-      font-weight: 600;
-      color: var(--text);
-    }
-
-    .detail-card-value.accent { color: var(--cyan); }
-    .detail-card-value.good   { color: var(--green); }
-    .detail-card-value.warn   { color: var(--orange); }
-    .detail-card-value.bad    { color: #f07a7a; }
-
-    .detail-card-sub {
-      font-size: 11px;
-      color: var(--muted);
-      margin-top: 3px;
-    }
-
-    .divider { height: 1px; background: var(--border); margin: 20px 0; }
-
-    .conditions-row {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 10px;
-    }
-
-    .condition-item { text-align: center; }
-    .condition-icon { font-size: 20px; margin-bottom: 5px; }
-    .condition-value { font-size: 13px; font-weight: 600; color: var(--text); }
-    .condition-label {
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      color: var(--muted);
-      margin-top: 2px;
-    }
-
-    /* ── FORECAST UPDATE NOTE (OFF emails) ── */
-    .update-note {
-      background: rgba(240,196,93,0.07);
-      border: 1px solid rgba(240,196,93,0.2);
-      border-radius: 10px;
-      padding: 14px 18px;
-      margin-top: 20px;
-      display: flex;
-      align-items: flex-start;
-      gap: 12px;
-    }
-
-    .update-note-icon { font-size: 18px; flex-shrink: 0; margin-top: 1px; }
-
-    .update-note-text {
-      font-size: 13px;
-      color: rgba(240,196,93,0.85);
-      line-height: 1.5;
-    }
-
-    .update-note-text strong { color: var(--yellow); }
-
-    /* ── SPOT ── */
-    .spot-section {
-      background: #111827;
-      border: 1px solid var(--border);
-      border-top: none;
-      padding: 18px 40px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .spot-name {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 26px;
-      color: #fff;
-      letter-spacing: 1px;
-    }
-
-    .spot-location { font-size: 12px; color: var(--muted); margin-top: 2px; }
-
-    .spot-map-link {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      background: var(--card2);
-      border: 1px solid var(--border2);
-      border-radius: 8px;
-      padding: 8px 14px;
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--cyan);
-      text-decoration: none;
-    }
-
-    /* ── CTA ── */
-    .cta-section {
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-top: none;
-      padding: 24px 40px;
-      text-align: center;
-    }
-
-    .cta-button {
-      display: inline-block;
-      font-family: 'DM Sans', sans-serif;
-      font-size: 15px;
-      font-weight: 600;
-      padding: 15px 36px;
-      border-radius: 10px;
-      text-decoration: none;
-      color: #fff;
-      margin-bottom: 12px;
-    }
-
-    .cta-on-72 { background: linear-gradient(135deg, #0a7ac4, #5dd4f0); }
-    .cta-on-48 { background: linear-gradient(135deg, #0a8ab4, #5de8f0); }
-    .cta-on-24 { background: linear-gradient(135deg, #0a9e9e, #5df0d8); }
-    .cta-on-6  { background: linear-gradient(135deg, #0a9e6e, #5df0a0); }
-    .cta-on-1  { background: linear-gradient(135deg, #4a9e0a, #b0f05d); color: #0a1a00; }
-    .cta-off   { background: linear-gradient(135deg, #2a1a1a, #3d2020); border: 1px solid #5a3030; }
-
-    .cta-sub { font-size: 12px; color: var(--muted); }
-
-    /* ── FOOTER ── */
-    .footer {
-      background: var(--bg);
-      border: 1px solid var(--border);
-      border-top: none;
-      border-radius: 0 0 16px 16px;
-      padding: 18px 40px;
-      text-align: center;
-    }
-
-    .footer-tagline {
-      font-family: 'Bebas Neue', sans-serif;
-      font-size: 16px;
-      letter-spacing: 2.5px;
-      color: var(--muted2);
-      margin-bottom: 5px;
-    }
-
-    .footer-copy { font-size: 11px; color: var(--muted2); }
-  
-  </style>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>KiteForecast &mdash; Session Alert</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 </head>
-<body><!-- NOTE for Make.com: format session.start_time and session.end_time from ISO datetime to HH:MM before injecting -->
-<div style="background:#080a0f;padding:40px 16px;">
-<div class="wrapper">
-<div class="header on-24">
-<div class="brand"><span>🪁</span><span class="brand-name">KiteForecast</span></div>
-<div class="badge-row">
-<span class="badge badge-reminder">⏱ {{reminder_label}}</span>
-<span class="badge badge-on">✅ Session ON</span>
-<span class="badge badge-rating">{{session.rating}}</span>
-</div>
-<div class="headline">Tomorrow<br/><span class="accent-on-24">is the day.</span></div>
-<div class="subheadline"><strong style="color:#fff">{{spot}}</strong> is on — get ready for an epic session tomorrow morning.</div>
-<div class="session-window">
-<div class="session-window-time">{{session.start_time}} → {{session.end_time}}</div>
-<div class="session-window-divider"></div>
-<div>
-<div class="session-window-label">Session window</div>
-<div class="session-window-date">{{date_label}}</div>
-<div class="session-window-duration">{{session.duration_hours}} hours of good wind</div>
-</div>
-</div>
-</div>
-<div class="wind-hero">
-<div class="wind-speed-block"><div class="wind-unit">Peak</div><div class="wind-value peak-24">{{session.wind_speed_peak_kn}}</div><div class="wind-label">knots</div></div>
-<div class="wind-speed-block"><div class="wind-unit">Gusts</div><div class="wind-value gust">{{session.wind_gusts_kn}}</div><div class="wind-label">knots</div></div>
-<div class="wind-speed-block"><div class="wind-unit">Min</div><div class="wind-value min">{{session.wind_speed_min_kn}}</div><div class="wind-label">knots</div></div>
-</div>
-<div class="details">
-<div class="section-title">Wind details</div>
-<div class="grid-2">
-<div class="detail-card"><div class="detail-card-label">Direction</div><div class="detail-card-value accent">{{session.wind_direction}} →</div><div class="detail-card-sub">Matches your good dirs: {{user_good_wind_dirs}}</div></div>
-<div class="detail-card"><div class="detail-card-label">Consistency</div><div class="detail-card-value good">{{session.wind_consistency_pct}}%</div><div class="detail-card-sub">of the session window</div></div>
-</div>
-<div class="divider"></div>
-<div class="section-title">Conditions</div>
-<div class="conditions-row">
-<div class="condition-item"><div class="condition-icon">⛅</div><div class="condition-value">{{conditions.weather}}</div><div class="condition-label">Weather</div></div>
-<div class="condition-item"><div class="condition-icon">🌡️</div><div class="condition-value">{{conditions.temperature_min_c}}–{{conditions.temperature_max_c}}°C</div><div class="condition-label">Temp</div></div>
-<div class="condition-item"><div class="condition-icon">🌅</div><div class="condition-value">{{conditions.sunrise}}</div><div class="condition-label">Sunrise</div></div>
-<div class="condition-item"><div class="condition-icon">🌇</div><div class="condition-value">{{conditions.sunset}}</div><div class="condition-label">Sunset</div></div>
-</div>
-</div>
-<div class="spot-section">
-<div><div class="spot-name">{{spot}}</div><div class="spot-location">{{spot_city}} · {{spot_country}}</div></div>
-<a class="spot-map-link" href="{{spot_map_link}}">📍 View on map</a>
-</div>
-<div class="cta-section">
-<a class="cta-button cta-on-24" href="{{app_link}}">🪁 Open full forecast</a>
-<div class="cta-sub">See the full hourly breakdown on KiteForecast</div>
-</div>
-<div class="footer">
-<div class="footer-tagline">Life starts at 25 knots</div>
-<div class="footer-copy">Tichkes Corporation Inc. — All rights reserved</div>
-</div>
-</div>
-</div>
+<body style="margin:0;padding:0;background-color:#080a0f;font-family:'DM Sans',Arial,sans-serif;color:#e8eaf0;">
+
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#080a0f;">
+<tr><td align="center" style="padding:32px 16px;">
+
+<!-- WRAPPER -->
+<table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;">
+
+  <!-- HEADER -->
+  <tr><td style="background:#0a5a6b;border-radius:16px 16px 0 0;padding:36px 40px 28px 40px;">
+
+    <!-- Brand -->
+    <table cellpadding="0" cellspacing="0" border="0" style="margin-bottom:22px;">
+      <tr>
+        <td style="font-size:20px;padding-right:8px;">&#127993;</td>
+        <td style="font-family:'Bebas Neue',Arial,sans-serif;font-size:20px;letter-spacing:3px;color:rgba(255,255,255,0.85);">KITEFORECAST</td>
+      </tr>
+    </table>
+
+    <!-- Badges -->
+    <table cellpadding="0" cellspacing="0" border="0" style="margin-bottom:16px;">
+      <tr>
+        <td style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);border-radius:20px;padding:5px 12px;font-size:11px;font-weight:700;letter-spacing:1.5px;color:rgba(255,255,255,0.85);white-space:nowrap;">&#9201; {reminder_label}</td>
+        <td style="width:8px;"></td>
+        <td style="background:rgba(93,240,160,0.15);border:1px solid rgba(93,240,160,0.4);border-radius:20px;padding:5px 12px;font-size:11px;font-weight:700;letter-spacing:1.5px;color:#5df0a0;white-space:nowrap;">&#9989; SESSION ON</td><td style="width:8px;"></td><td style="background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);border-radius:20px;padding:5px 12px;font-size:12px;font-weight:700;color:#ffffff;white-space:nowrap;">{{session.rating}}</td>
+      </tr>
+    </table>
+
+    <!-- Headline -->
+    <div style="font-family:'Bebas Neue',Arial,sans-serif;font-size:52px;line-height:1.0;color:#ffffff;letter-spacing:1px;margin-bottom:8px;">Tomorrow<br/><span style="color:#5df0e0;">is the day.</span></div>
+
+    <!-- Subheadline -->
+    <div style="font-size:15px;color:rgba(255,255,255,0.72);margin-bottom:24px;"><strong style='color:#ffffff'>{{spot}}</strong> is on &mdash; get ready for an epic session tomorrow morning.</div>
+
+    <!-- Session window (ON) or Nogo reason (OFF) -->
+    <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.18);border-radius:12px;padding:0;">
+      <tr>
+        <td style="padding:16px 20px;">
+          <table cellpadding="0" cellspacing="0" border="0" width="100%">
+            <tr>
+              <td style="font-family:'Bebas Neue',Arial,sans-serif;font-size:28px;color:#ffffff;letter-spacing:1px;white-space:nowrap;padding-right:16px;">{{session.start_time_formatted}} &rarr; {{session.end_time_formatted}}</td>
+              <td style="width:1px;background:rgba(255,255,255,0.22);padding:0;">&nbsp;</td>
+              <td style="padding-left:16px;">
+                <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:rgba(255,255,255,0.55);margin-bottom:3px;">Session window</div>
+                <div style="font-size:14px;font-weight:500;color:#ffffff;">{{date_label}}</div>
+                <div style="font-size:12px;color:rgba(255,255,255,0.55);">{{session.duration_hours}} hours of good wind</div>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+
+  </td></tr>
+
+  <!-- WIND HERO -->
+  <tr><td style="background-color:#111827;border-left:1px solid #1e2535;border-right:1px solid #1e2535;padding:24px 0;">
+    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+      <tr>
+        <td width="33%" align="center" style="padding:0 12px;">
+          <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4a5568;margin-bottom:4px;">Peak</div>
+          <div style="font-family:'Bebas Neue',Arial,sans-serif;font-size:56px;line-height:1;color:#5df0e0;">{{session.wind_speed_peak_kn}}</div>
+          <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4a5568;margin-top:4px;">knots</div>
+        </td>
+        <td width="33%" align="center" style="padding:0 12px;border-left:1px solid #1e2535;border-right:1px solid #1e2535;">
+          <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4a5568;margin-bottom:4px;">Gusts</div>
+          <div style="font-family:'Bebas Neue',Arial,sans-serif;font-size:56px;line-height:1;color:#f0905d;">{{session.wind_gusts_kn}}</div>
+          <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4a5568;margin-top:4px;">knots</div>
+        </td>
+        <td width="33%" align="center" style="padding:0 12px;">
+          <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4a5568;margin-bottom:4px;">Min</div>
+          <div style="font-family:'Bebas Neue',Arial,sans-serif;font-size:42px;line-height:1;color:#4a5568;">{{session.wind_speed_min_kn}}</div>
+          <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4a5568;margin-top:4px;">knots</div>
+        </td>
+      </tr>
+    </table>
+  </td></tr>
+
+  <!-- DETAILS -->
+  <tr><td style="background-color:#161b27;border:1px solid #1e2535;border-top:none;padding:28px 40px;">
+
+    <!-- Wind details title -->
+    <div style="font-size:10px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:#4a5568;margin-bottom:14px;">Wind details</div>
+
+    <!-- Direction + Consistency -->
+    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:22px;">
+      <tr>
+        <td width="48%" style="background-color:#1a2035;border:1px solid #242d42;border-radius:10px;padding:14px 16px;">
+          <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4a5568;margin-bottom:5px;">Direction</div>
+          <div style="font-size:18px;font-weight:600;color:#5dd4f0;">{{session.wind_direction}} &rarr;</div>
+          <div style="font-size:11px;color:#4a5568;margin-top:3px;">Matches your good dirs: {{user_good_wind_dirs}}</div>
+        </td>
+        <td width="4%"></td>
+        <td width="48%" style="background-color:#1a2035;border:1px solid #242d42;border-radius:10px;padding:14px 16px;">
+          <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4a5568;margin-bottom:5px;">Consistency</div>
+          <div style="font-size:18px;font-weight:600;color:#5df0a0;">{{session.wind_consistency_pct}}%</div>
+          <div style="font-size:11px;color:#4a5568;margin-top:3px;">of the session window</div>
+        </td>
+      </tr>
+    </table>
+
+    <!-- Divider -->
+    <div style="height:1px;background-color:#1e2535;margin-bottom:20px;"></div>
+
+    <!-- Conditions title -->
+    <div style="font-size:10px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:#4a5568;margin-bottom:14px;">Conditions</div>
+
+    <!-- Conditions grid -->
+    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+      <tr>
+        <td width="25%" align="center">
+          <div style="font-size:22px;margin-bottom:5px;">&#9925;</div>
+          <div style="font-size:13px;font-weight:600;color:#e8eaf0;">{{conditions.weather}}</div>
+          <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#4a5568;margin-top:2px;">Weather</div>
+        </td>
+        <td width="25%" align="center">
+          <div style="font-size:22px;margin-bottom:5px;">&#127777;&#65039;</div>
+          <div style="font-size:13px;font-weight:600;color:#e8eaf0;">{{conditions.temperature_min_c}}&ndash;{{conditions.temperature_max_c}}&deg;C</div>
+          <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#4a5568;margin-top:2px;">Temp</div>
+        </td>
+        <td width="25%" align="center">
+          <div style="font-size:22px;margin-bottom:5px;">&#127749;</div>
+          <div style="font-size:13px;font-weight:600;color:#e8eaf0;">{{conditions.sunrise}}</div>
+          <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#4a5568;margin-top:2px;">Sunrise</div>
+        </td>
+        <td width="25%" align="center">
+          <div style="font-size:22px;margin-bottom:5px;">&#127751;</div>
+          <div style="font-size:13px;font-weight:600;color:#e8eaf0;">{{conditions.sunset}}</div>
+          <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#4a5568;margin-top:2px;">Sunset</div>
+        </td>
+      </tr>
+    </table>
+
+    
+
+  </td></tr>
+
+  <!-- SPOT -->
+  <tr><td style="background-color:#111827;border:1px solid #1e2535;border-top:none;padding:18px 40px;">
+    <table width="100%" cellpadding="0" cellspacing="0" border="0">
+      <tr>
+        <td>
+          <div style="font-family:'Bebas Neue',Arial,sans-serif;font-size:26px;color:#ffffff;letter-spacing:1px;">{{spot}}</div>
+          <div style="font-size:12px;color:#4a5568;margin-top:2px;">{{spot_city}} &middot; {{spot_country}}</div>
+        </td>
+        <td align="right">
+          <a href="{{spot_map_link}}" style="display:inline-block;background-color:#1a2035;border:1px solid #242d42;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:600;color:#5dd4f0;text-decoration:none;">&#128205; View on map</a>
+        </td>
+      </tr>
+    </table>
+  </td></tr>
+
+  <!-- CTA -->
+  <tr><td style="background-color:#161b27;border:1px solid #1e2535;border-top:none;padding:24px 40px;text-align:center;">
+    <a href="{{app_link}}" style="display:inline-block;background-color:#0a9e9e;color:#ffffff;font-family:'DM Sans',Arial,sans-serif;font-size:15px;font-weight:600;padding:15px 36px;border-radius:10px;text-decoration:none;">&#127993; Open full forecast</a>
+    <div style="font-size:12px;color:#4a5568;margin-top:12px;">See the full hourly breakdown on KiteForecast</div>
+  </td></tr>
+
+  <!-- FOOTER -->
+  <tr><td style="background-color:#0d0f14;border:1px solid #1e2535;border-top:none;border-radius:0 0 16px 16px;padding:18px 40px;text-align:center;">
+    <div style="font-family:'Bebas Neue',Arial,sans-serif;font-size:16px;letter-spacing:2.5px;color:#2a3347;margin-bottom:5px;">LIFE STARTS AT 25 KNOTS</div>
+    <div style="font-size:11px;color:#2a3347;">Tichkes Corporation Inc. &mdash; All rights reserved</div>
+  </td></tr>
+
+</table>
+<!-- END WRAPPER -->
+
+</td></tr>
+</table>
+
 </body>
 </html>
