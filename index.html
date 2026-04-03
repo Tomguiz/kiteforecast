@@ -2840,7 +2840,8 @@ function initSpotsMap(){
 // ── INIT ──
 updateProfileDot();
 $('ppMasterToggle').classList.toggle('on', notifMasterEnabled());
-updateFetchTimestamp();
+// fetchTimestamp element is after </script> — defer until DOM is fully parsed
+setTimeout(updateFetchTimestamp, 0);
 
 // ── AUTO-REFRESH: load last spot on startup (or deep-link via ?spot=&date=) ──
 (function(){
