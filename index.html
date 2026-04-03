@@ -2450,16 +2450,19 @@ async function fireWebhook(spot,sessInfo,reminderHours,emailOverride){
         spot_country: spotCountry,
         spot_map_link: `https://www.google.com/maps?q=${spot.lat||spot.latitude},${spot.lon||spot.longitude}`,
         date: dateStr,
+        day_of_week: new Date(dateStr+'T12:00:00').toLocaleDateString('en',{weekday:'long'}),
         date_label: dateLabel,
         app_link: appUrl,
         session:{
           start_time: sessInfo.sessionStart,
           end_time: sessInfo.sessionEnd||'',
+          start_time_formatted: (sessInfo.sessionStart||'').slice(11,16),
+          end_time_formatted: (sessInfo.sessionEnd||'').slice(11,16),
           duration_hours: sessInfo.duration_hours||0,
-          wind_speed_peak_kn: sessInfo.peakKn,
+          wind_speed_peak_kn: sessInfo.peakKn||0,
           wind_speed_min_kn: sessInfo.windMin||0,
-          wind_gusts_kn: sessInfo.gusts,
-          wind_direction: sessInfo.domDir,
+          wind_gusts_kn: sessInfo.gusts||0,
+          wind_direction: sessInfo.domDir||'—',
           wind_consistency_pct: sessInfo.wind_consistency_pct||0,
           rating: sessInfo.rating_label||'',
         },
@@ -2531,17 +2534,35 @@ async function fireConfirmationWebhook(spot, sessions){
     const nextReminders=REMINDER_HOURS
       .filter(h=>sessionMs-h*3600*1000>now)
       .map(h=>h===1?'1 hour before':`${h} hours before`);
+    const userDirs=[...windDirs].map(d=>compass(d));
     return {
-      date:         dateStr,
-      day_of_week:  dayOfWeek,
-      date_label:   dateLabel,
-      rating:       sess.rating_label||'',
-      session_start:sess.sessionStart||'',
-      session_end:  sess.sessionEnd||'',
-      duration_hours:sess.duration_hours||0,
-      wind_peak_kn: sess.peakKn||0,
-      app_link:     `${location.origin}${location.pathname}?spot=${encodeURIComponent(spot.name)}&date=${dateStr}`,
-      next_reminders: nextReminders,
+      date:                  dateStr,
+      day_of_week:           dayOfWeek,
+      date_label:            dateLabel,
+      app_link:              `${location.origin}${location.pathname}?spot=${encodeURIComponent(spot.name)}&date=${dateStr}`,
+      next_reminders:        nextReminders,
+      session: {
+        start_time:           sess.sessionStart||'',
+        end_time:             sess.sessionEnd||'',
+        start_time_formatted: (sess.sessionStart||'').slice(11,16),
+        end_time_formatted:   (sess.sessionEnd||'').slice(11,16),
+        duration_hours:       sess.duration_hours||0,
+        wind_speed_peak_kn:   sess.peakKn||0,
+        wind_speed_min_kn:    sess.windMin||0,
+        wind_gusts_kn:        sess.gusts||0,
+        wind_direction:       sess.domDir||'—',
+        wind_consistency_pct: sess.wind_consistency_pct||0,
+        rating:               sess.rating_label||'',
+      },
+      conditions: {
+        weather:           sess.weather_description||'',
+        temperature_max_c: sess.temperature_max||null,
+        temperature_min_c: sess.temperature_min||null,
+        sunrise:           sess.sunrise||'',
+        sunset:            sess.sunset||'',
+        daylight_hours:    sess.daylight_hours||0,
+      },
+      user_good_wind_dirs: userDirs,
     };
   });
 
@@ -2742,10 +2763,12 @@ function toggleDayNotif(e,dateStr,dayIdx){
   const consistencyPct=day.length?Math.round(good.length/day.length*100):0;
   const code=daily.weather_code[dayIdx];
   const[,weatherDesc]=wmoInfo(code);
+  const rating=rateDay(good.length,peakKn,code,day.some(h=>h.type==='lightdir'),day.length?Math.max(...day.map(h=>h.kn)):0);
   const sessInfo={
     sessionStart,sessionEnd,duration_hours:good.length,
     peakKn,windMin,gusts,domDir:domDir!==null?compass(domDir):'—',
     weather_description:weatherDesc,
+    rating_label:rating.label,
     temperature_max:Math.round(daily.temperature_2m_max[dayIdx]),
     temperature_min:Math.round(daily.temperature_2m_min[dayIdx]),
     sunrise:daily.sunrise[dayIdx].slice(11,16),

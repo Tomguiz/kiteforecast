@@ -1,7 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const SUPABASE_URL            = Deno.env.get('SUPABASE_URL')!
-const SUPABASE_SERVICE_KEY    = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+const SUPABASE_SERVICE_KEY    = Deno.env.get('SB_SERVICE_ROLE_KEY')!
 const MAKE_WEBHOOK_URL        = 'https://hook.eu1.make.com/6t9fgm6btixri2wf5lnx47requf416vs'
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
@@ -71,22 +71,24 @@ function buildDay(dateStr: string, sunrise: string, sunset: string, hourlyMap: M
   return { day, good, goodHours: good.length, peakKn, peakDayKn, domDir, hasBadDir }
 }
 
+const isSnowy = (code: number) => [71,73,75,77,85,86].includes(code)
+
 function rateDay(gh: number, pk: number, code: number, badDir: boolean, peakDay: number): string {
-  if ([82,95,96,99].includes(code))       return '⚡ Storm'
+  if ([82,95,96,99].includes(code))       return '❌ Storm ⚡'
   if (gh === 0) {
-    if (isRainy(code) && peakDay >= 10)   return '🌧 Rain / snow'
+    if (isRainy(code) && peakDay >= 10)   return isSnowy(code) ? '❌ ❄️ Snow' : '❌ 🌧 Rain'
     if (badDir && peakDay >= 15)          return '❌ Wrong direction'
-    if (peakDay >= 10)                    return '💨 Too light'
-    return '😴 No wind'
+    if (peakDay >= 10)                    return '❌ Too light'
+    return '❌ No wind'
   }
   if (gh === 1)  return '❌ Too brief (1h)'
-  if (gh === 2)  return `⏱ 2h window · ${pk}kn`
+  if (gh === 2)  return `✅ 2h · ${pk}kn`
   if (gh <= 4) {
     if (pk >= 25) return `✅ ${gh}h · 25+ kn`
     if (pk >= 20) return `✅ ${gh}h · 20+ kn`
-    return `🤔 ${gh}h · 15+ kn`
+    return `✅ ${gh}h · 15+ kn`
   }
-  if (pk >= 25) return `🪁 ${gh}h · Perfect!`
+  if (pk >= 25) return `✅ ${gh}h · Perfect! 🪁`
   if (pk >= 20) return `✅ ${gh}h · Very Good`
   return `✅ ${gh}h · Good`
 }
@@ -176,11 +178,14 @@ Deno.serve(async () => {
         spot_country:       r.spot_country,
         spot_map_link:      r.spot_map_link,
         date:               r.session_date,
+        day_of_week:        new Date(r.session_date + 'T12:00:00').toLocaleDateString('en', { weekday: 'long' }),
         date_label:         fmtDateLabel(r.session_date),
         app_link:           r.app_link,
         session: {
           start_time:           sessionStart,
           end_time:             sessionEnd,
+          start_time_formatted: sessionStart.slice(11, 16),
+          end_time_formatted:   sessionEnd ? sessionEnd.slice(11, 16) : '',
           duration_hours:       goodHours,
           wind_speed_peak_kn:   peakKn,
           wind_speed_min_kn:    windMin,
