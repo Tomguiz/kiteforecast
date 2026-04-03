@@ -2400,7 +2400,12 @@ function addDayNotif(spot,dateStr,sessInfo){
   updateProfileDot();
   renderHintChips();
   scheduleReminders(spot,sessInfo,'day');
-  fireConfirmationWebhook(spot,[{...sessInfo,dateStr:sessInfo.sessionStart.slice(0,10)}]);
+  // Build sessions for ALL active days for this spot (not just the new one)
+  const allDayDates=loadNotifs()
+    .filter(n=>n.type==='day'&&n.spotName===spot.name)
+    .map(n=>n.date);
+  const allSessions=_buildSessionsForDates(spot.name,allDayDates);
+  fireConfirmationWebhook(spot,allSessions);
 }
 function removeDayNotif(spotName,date){
   const notifs=loadNotifs();
@@ -2468,6 +2473,40 @@ async function fireWebhook(spot,sessInfo,reminderHours,emailOverride){
       })
     });
   }catch(e){console.warn('Webhook failed',e);}
+}
+
+// ── Build session info for a list of dates from cachedWx ──
+function _buildSessionsForDates(spotName, dates){
+  if(!cachedWx) return [];
+  const {daily} = cachedWx;
+  return dates.sort().reduce((arr, dateStr) => {
+    const i = daily.time.indexOf(dateStr);
+    if(i === -1) return arr;
+    const {good, peakKn, domDir, day} = buildDay(dateStr, daily.sunrise[i], daily.sunset[i]);
+    const code = daily.weather_code[i];
+    const [, weatherDesc] = wmoInfo(code);
+    const rating = rateDay(good.length, peakKn, code, day.some(h=>h.type==='lightdir'), day.length?Math.max(...day.map(h=>h.kn)):0);
+    const gusts = good.length ? Math.max(...good.map(h=>h.gustKn||0)) : 0;
+    const windMin = good.length ? Math.min(...good.map(h=>h.kn)) : 0;
+    const consistencyPct = day.length ? Math.round(good.length/day.length*100) : 0;
+    arr.push({
+      dateStr,
+      sessionStart: good.length ? good[0].tStr : dateStr+'T10:00',
+      sessionEnd:   good.length ? good[good.length-1].tStr : '',
+      duration_hours: good.length,
+      peakKn, windMin, gusts,
+      domDir: domDir !== null ? compass(domDir) : '—',
+      weather_description: weatherDesc,
+      rating_label: rating.label,
+      temperature_max: Math.round(daily.temperature_2m_max[i]),
+      temperature_min: Math.round(daily.temperature_2m_min[i]),
+      sunrise: daily.sunrise[i].slice(11,16),
+      sunset:  daily.sunset[i].slice(11,16),
+      daylight_hours: day.length,
+      wind_consistency_pct: consistencyPct,
+    });
+    return arr;
+  }, []);
 }
 
 // ── CONFIRMATION WEBHOOK ──
