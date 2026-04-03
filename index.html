@@ -2107,6 +2107,22 @@ function renderGrid(){
   }
 
   showOnly('results');
+
+  // ── deep-link: scroll to & highlight the target date card ──
+  if(window._deepLinkDate){
+    const target=window._deepLinkDate;
+    window._deepLinkDate=null; // consume once
+    setTimeout(()=>{
+      const cards=[...grid.children];
+      const idx=daily.time.indexOf(target);
+      if(idx>=0&&cards[idx]){
+        cards[idx].scrollIntoView({behavior:'smooth',block:'center'});
+        cards[idx].style.transition='box-shadow .3s';
+        cards[idx].style.boxShadow='0 0 0 2px var(--accent)';
+        setTimeout(()=>{ cards[idx].style.boxShadow=''; },2200);
+      }
+    },200);
+  }
 }
 
 // ══════════════════════════════════
@@ -2702,10 +2718,20 @@ function initSpotsMap(){
 updateProfileDot();
 $('ppMasterToggle').classList.toggle('on', notifMasterEnabled());
 
-// ── AUTO-REFRESH: load last spot on startup ──
+// ── AUTO-REFRESH: load last spot on startup (or deep-link via ?spot=&date=) ──
 (function(){
-  const s=loadLastSpot();
-  if(s) pickSpot(s);
+  const params=new URLSearchParams(location.search);
+  const spotParam=params.get('spot');
+  const dateParam=params.get('date'); // e.g. "2026-04-06"
+  if(spotParam){
+    const found=SPOTS.find(s=>s.name.toLowerCase()===spotParam.toLowerCase())||{name:spotParam,loc:spotParam,lat:null,lon:null,dirs:[]};
+    // store target date so renderGrid can scroll+highlight after load
+    window._deepLinkDate=dateParam||null;
+    pickSpot(found);
+  } else {
+    const s=loadLastSpot();
+    if(s) pickSpot(s);
+  }
 })();
 
 // ── AUTO-REFRESH: re-fetch when app comes back to foreground after 30+ min ──
