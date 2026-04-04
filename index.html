@@ -2747,7 +2747,8 @@ function saveTideKey(){
 async function fetchTideData(lat,lon){
   const key=loadTideKey(); if(!key) return null;
   try{
-    const url=`https://www.worldtides.info/api/v3?extremes&lat=${lat}&lon=${lon}&days=10&key=${key}`;
+    const start=Math.floor(Date.now()/1000);
+    const url=`https://www.worldtides.info/api/v3?extremes&lat=${lat}&lon=${lon}&days=10&start=${start}&key=${key}`;
     const data=await safeFetch(url,10000);
     if(data.status!==200||!data.extremes) return null;
     // Use dt (Unix timestamp seconds) — unambiguous UTC, avoids date-string parsing issues
