@@ -2518,7 +2518,7 @@ function _scheduleDayConfirmWebhook(spot){
       .map(n=>n.date);
     const allSessions=_buildSessionsForDates(spot.name,allDayDates);
     if(allSessions.length) fireConfirmationWebhook(spot,allSessions);
-  },800);
+  },4000);
 }
 function addDayNotif(spot,dateStr,sessInfo){
   let notifs=loadNotifs().filter(n=>!(n.type==='day'&&n.spotName===spot.name&&n.date===dateStr));
