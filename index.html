@@ -335,11 +335,11 @@
     /* table header — 5 cols (+ optional conditions) */
     .m-thead, .m-row {
       display:grid;
-      grid-template-columns: 50px 24px 42px 1fr 56px;
+      grid-template-columns: 50px 24px 42px 1fr 44px 56px;
       gap:0 7px; padding:8px 18px;
       align-items:center;
     }
-    .m-thead.ws, .m-row.ws { grid-template-columns: 50px 24px 42px 1fr 56px 88px; }
+    .m-thead.ws, .m-row.ws { grid-template-columns: 50px 24px 42px 1fr 44px 56px 88px; }
     .m-thead {
       font-size:.6rem; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--tdim);
       border-bottom:1px solid var(--border);
@@ -373,6 +373,7 @@
     .c-wind-kn   { position:relative; z-index:1; font-size:.62rem; color:rgba(255,255,255,.45); margin-left:2px; }
     .c-gust-num  { position:absolute; z-index:2; top:50%; transform:translateY(-50%) translateX(-100%); font-size:.6rem; font-weight:700; color:rgba(255,255,255,.38); padding-right:4px; white-space:nowrap; }
     .c-gust { font-size:.74rem; color:#94a3b8; font-weight:600; white-space:nowrap; }
+    .c-wave { font-size:.76rem; font-weight:600; color:#60a5fa; white-space:nowrap; text-align:right; }
     .c-dir  { display:flex; align-items:center; gap:4px; }
     .c-da   { font-size:.95rem; line-height:1; display:inline-block; }
     .c-dl   { font-size:.76rem; font-weight:600; color:var(--gray); }
@@ -719,9 +720,10 @@
 // ══════════════════════════════════
 let windDirs       = new Set(); // selected qualifying wind directions (degrees)
 let manualShoreSet = false;
-let cachedWx    = null;
-let cachedLoc   = null;
-let cachedHrMap = null;
+let cachedWx          = null;
+let cachedLoc         = null;
+let cachedHrMap       = null;
+let cachedMarineHrMap = null;
 let lastFetchTime = parseInt(localStorage.getItem('kf_lastFetch')||'0',10);
 
 function updateFetchTimestamp(){
@@ -1601,6 +1603,8 @@ async function fetchForecastFromSpot(spot){
       daily:['weather_code','temperature_2m_max','temperature_2m_min','windgusts_10m_max','sunrise','sunset'].join(','),
       forecast_days:10, timezone:'auto', windspeed_unit:'ms',
     });
+    const mP=new URLSearchParams({latitude:spot.lat,longitude:spot.lon,hourly:'wave_height',forecast_days:10,timezone:'auto'});
+    const marineP=safeFetch(`https://marine-api.open-meteo.com/v1/marine?${mP}`,8000).catch(()=>null);
     cachedWx=await safeFetch(`https://api.open-meteo.com/v1/forecast?${p}`);
     if(cachedWx.error) throw new Error(cachedWx.reason||'API error');
     if(!manualShoreSet){
@@ -1631,6 +1635,7 @@ async function fetchForecastFromSpot(spot){
         gustKn: toKnotsR(h.windgusts_10m[i]),
       });
     });
+    buildMarineMap(await marineP);
     lastFetchTime=Date.now(); try{localStorage.setItem('kf_lastFetch',lastFetchTime);}catch(e){}
     renderGrid();
   }catch(err){
@@ -1888,6 +1893,16 @@ $('resultsLegend').innerHTML=buildLegendHTML();
 // ══════════════════════════════════
 //  FETCH
 // ══════════════════════════════════
+function buildMarineMap(m){
+  cachedMarineHrMap=new Map();
+  if(m&&m.hourly&&m.hourly.wave_height){
+    m.hourly.time.forEach((t,i)=>{
+      const v=m.hourly.wave_height[i];
+      if(v!=null) cachedMarineHrMap.set(t.slice(0,13),v);
+    });
+  }
+}
+
 async function safeFetch(url,timeoutMs=20000){
   const ctrl=new AbortController();
   const timer=setTimeout(()=>ctrl.abort(),timeoutMs);
@@ -1931,6 +1946,8 @@ async function fetchForecast(query){
       daily:['weather_code','temperature_2m_max','temperature_2m_min','windgusts_10m_max','sunrise','sunset'].join(','),
       forecast_days:10, timezone:'auto', windspeed_unit:'ms',
     });
+    const mP2=new URLSearchParams({latitude,longitude,hourly:'wave_height',forecast_days:10,timezone:'auto'});
+    const marineP2=safeFetch(`https://marine-api.open-meteo.com/v1/marine?${mP2}`,8000).catch(()=>null);
     cachedWx=await safeFetch(`https://api.open-meteo.com/v1/forecast?${p}`);
     if(cachedWx.error) throw new Error(cachedWx.reason||'API error');
 
@@ -1961,6 +1978,7 @@ async function fetchForecast(query){
       });
     });
 
+    buildMarineMap(await marineP2);
     saveLastSpot({name:cachedLoc.name,loc:[cachedLoc.admin1,cachedLoc.country].filter(Boolean).join(', '),lat:cachedLoc.latitude,lon:cachedLoc.longitude,dirs:[...windDirs]});
     lastFetchTime=Date.now(); try{localStorage.setItem('kf_lastFetch',lastFetchTime);}catch(e){}
     renderGrid();
@@ -2182,6 +2200,7 @@ function openModal(dateStr,dayIdx){
   let html=`<div class="m-thead ${wsCls}">
     <div>Time</div><div></div><div>Temp</div>
     <div>Wind</div>
+    <div>Waves</div>
     <div>Dir</div>
     ${condTH}
   </div>`;
@@ -2208,6 +2227,8 @@ function openModal(dateStr,dayIdx){
     const gustPct=windBarPct(h.gustKn);
     const gustExt=Math.max(0,gustPct-barPct);
     const gustNumLeft=Math.min(gustPct,97);
+    const waveRaw=cachedMarineHrMap?cachedMarineHrMap.get(h.tStr.slice(0,13)):null;
+    const waveTxt=waveRaw!=null?waveRaw.toFixed(1)+'m':'—';
 
     html+=`<div class="${rowCls}">
       <div class="${timeCls}">${kite}${h.tStr.slice(11,16)}</div>
@@ -2220,6 +2241,7 @@ function openModal(dateStr,dayIdx){
         <span class="c-wind-val" style="color:${barCol}">${h.kn}</span>
         <span class="c-wind-kn">kn</span>
       </div>
+      <div class="c-wave">🌊 ${waveTxt}</div>
       <div class="c-dir">
         <span class="c-da" style="transform:rotate(${(h.dir+180)%360}deg)">↑</span>
         <span class="c-dl">${compass(h.dir)}<span style="font-size:.65rem;color:var(--tdim);font-weight:400"> ${h.dir}°</span></span>
