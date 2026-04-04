@@ -2751,7 +2751,7 @@ async function fetchTideData(lat,lon){
     const data=await safeFetch(url,10000);
     if(data.status!==200||!data.extremes) return null;
     // Use dt (Unix timestamp seconds) — unambiguous UTC, avoids date-string parsing issues
-    console.log('[Tides] raw extremes:', data.extremes.slice(0,4));
+    console.log('[Tides raw]', data.extremes.slice(0,4).map(e=>`${e.type} dt=${e.dt} date=${e.date}`).join(' | '));
     return data.extremes.map(e=>({_ms:e.dt*1000, type:e.type, height:e.height}));
   }catch(e){ console.warn('Tide API error:',e); return null; }
 }
@@ -2768,6 +2768,7 @@ function applyTideTimezone(rawTides, tz){
     const dateStr=`${g('year')}-${String(g('month')).padStart(2,'0')}-${String(g('day')).padStart(2,'0')}`;
     // hour12:false can return 24 for midnight on some engines
     const exactHr=(g('hour')%24)+g('minute')/60+g('second')/3600;
+    console.log(`[Tides converted] ${t.type} → ${dateStr} ${String(g('hour')%24).padStart(2,'0')}:${String(g('minute')).padStart(2,'0')} (tz=${safeZone})`);
     return {dateStr, exactHr, type:t.type, height:t.height};
   });
 }
