@@ -1932,10 +1932,12 @@ function fmtTideTime(exactHr){
 function findTideExtremes(dateStr,srHour,ssHour){
   // ── Prefer real tide API data ──
   if(cachedTides){
-    return cachedTides
+    const real=cachedTides
       .filter(t=>t.dateStr===dateStr&&t.exactHr>=srHour&&t.exactHr<=ssHour)
       .map(t=>({type:t.type==='High'?'high':'low',exactHr:t.exactHr,v:t.height}))
       .sort((a,b)=>a.exactHr-b.exactHr);
+    if(real.length) return real;
+    // API has no data for this date (free tier lag) — fall through to centroid
   }
   // ── Fallback: wave-height centroid (no tide key set) ──
   if(!cachedMarineHrMap||!cachedMarineHrMap.size) return [];
