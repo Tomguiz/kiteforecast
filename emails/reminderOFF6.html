@@ -2,186 +2,213 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>KiteForecast &mdash; Session Alert</title>
-<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<meta name="x-apple-disable-message-reformatting"/>
+<title>KiteForecast</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;600&display=swap" rel="stylesheet"/>
+<!--[if mso]>
+<noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript>
+<![endif]-->
 </head>
-<body style="margin:0;padding:0;background-color:#080a0f;font-family:'DM Sans',Arial,sans-serif;color:#e8eaf0;">
+<body style="margin:0;padding:0;background-color:#111318;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
 
-<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#080a0f;">
-<tr><td align="center" style="padding:32px 16px;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#111318;">
+<tr><td align="center" style="padding:24px 12px;">
 
-<!-- WRAPPER -->
-<table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;">
+  <!-- Main container -->
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:580px;width:100%;">
 
-  <!-- HEADER -->
-  <tr><td style="background:#2a0a0a;border-radius:16px 16px 0 0;padding:36px 40px 28px 40px;">
+    <!-- HEADER CARD -->
+    <tr>
+      <td style="background-color:#3a1010;border-radius:14px 14px 0 0;padding:0;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
 
-    <!-- Brand -->
-    <table cellpadding="0" cellspacing="0" border="0" style="margin-bottom:22px;">
-      <tr>
-        <td style="font-size:20px;padding-right:8px;">&#127993;</td>
-        <td style="font-family:'Bebas Neue',Arial,sans-serif;font-size:20px;letter-spacing:3px;color:rgba(255,255,255,0.85);">KITEFORECAST</td>
-      </tr>
-    </table>
+          <!-- Brand row -->
+          <tr>
+            <td style="padding:24px 32px 20px 32px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="font-size:18px;padding-right:8px;vertical-align:middle;">&#127993;</td>
+                  <td style="font-family:'Bebas Neue',Arial,sans-serif;font-size:17px;letter-spacing:3px;color:rgba(255,255,255,0.8);vertical-align:middle;">KITEFORECAST</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
 
-    <!-- Badges -->
-    <table cellpadding="0" cellspacing="0" border="0" style="margin-bottom:16px;">
-      <tr>
-        <td style="background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);border-radius:20px;padding:5px 12px;font-size:11px;font-weight:700;letter-spacing:1.5px;color:rgba(255,255,255,0.85);white-space:nowrap;">&#9201; {reminder_label}</td>
-        <td style="width:8px;"></td>
-        <td style="background:rgba(240,93,93,0.15);border:1px solid rgba(240,93,93,0.4);border-radius:20px;padding:5px 12px;font-size:11px;font-weight:700;letter-spacing:1.5px;color:#f05d5d;white-space:nowrap;">&#10060; SESSION OFF</td>
-      </tr>
-    </table>
+          <!-- Badges row -->
+          <tr>
+            <td style="padding:0 32px 16px 32px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="background-color:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);border-radius:20px;padding:4px 12px;font-size:11px;font-weight:700;letter-spacing:1px;color:rgba(255,255,255,0.8);white-space:nowrap;">&#9201; [[reminder_label]]</td>
+                  <td style='width:8px;'></td><td style='background-color:rgba(240,93,93,0.15);border:1px solid rgba(240,93,93,0.35);border-radius:20px;padding:4px 12px;font-size:11px;font-weight:700;letter-spacing:1px;color:#f05d5d;white-space:nowrap;'>&#10060; SESSION OFF</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
 
-    <!-- Headline -->
-    <div style="font-family:'Bebas Neue',Arial,sans-serif;font-size:52px;line-height:1.0;color:#ffffff;letter-spacing:1px;margin-bottom:8px;">Not<br/><span style="color:#f07a5d;">today.</span></div>
+          <!-- Headline -->
+          <tr>
+            <td style="padding:0 32px 10px 32px;">
+              <h1 style="margin:0;font-family:'Bebas Neue',Arial,sans-serif;font-size:48px;line-height:1.0;font-weight:400;color:#ffffff;letter-spacing:1px;">Not<br/><span style="color:#f07a5d;">today.</span></h1>
+            </td>
+          </tr>
 
-    <!-- Subheadline -->
-    <div style="font-size:15px;color:rgba(255,255,255,0.72);margin-bottom:24px;">Conditions dropped out at <strong style='color:#ffffff'>{{spot}}</strong>. Put the kite back in the bag &mdash; for now.</div>
+          <!-- Subheadline -->
+          <tr>
+            <td style="padding:0 32px 20px 32px;">
+              <p style="margin:0;font-size:15px;line-height:1.5;color:rgba(255,255,255,0.7);">Conditions dropped at <strong style='color:#ffffff'>[[spot]]</strong>. Put the kite back for now.</p>
+            </td>
+          </tr>
 
-    <!-- Session window (ON) or Nogo reason (OFF) -->
-    <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background:rgba(240,93,93,0.12);border:1px solid rgba(240,93,93,0.3);border-radius:12px;">
-      <tr>
-        <td style="padding:16px 20px;">
-          <table cellpadding="0" cellspacing="0" border="0">
-            <tr>
-              <td style="font-size:28px;padding-right:14px;">&#127788;</td>
-              <td>
-                <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:rgba(240,93,93,0.7);margin-bottom:3px;">Reason</div>
-                <div style="font-size:16px;font-weight:600;color:#f07a7a;">{{session.rating}}</div>
-                <div style="font-size:12px;color:rgba(255,255,255,0.55);margin-top:4px;">{{date_label}}</div>
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
+          
+        <!-- No-go block -->
+        <tr>
+          <td style="padding:0 32px 28px 32px;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:rgba(240,93,93,0.1);border-radius:10px;border:1px solid rgba(240,93,93,0.25);">
+              <tr>
+                <td style="padding:16px 20px;">
+                  <p style="margin:0 0 4px 0;font-size:11px;font-weight:600;letter-spacing:1.5px;text-transform:uppercase;color:rgba(240,93,93,0.6);">Reason &bull; [[date_label]]</p>
+                  <p style="margin:0;font-size:18px;font-weight:600;color:#f07a7a;">[[session.rating]]</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
 
-  </td></tr>
+        </table>
+      </td>
+    </tr>
 
-  <!-- WIND HERO -->
-  <tr><td style="background-color:#111827;border-left:1px solid #1e2535;border-right:1px solid #1e2535;padding:24px 0;">
-    <table width="100%" cellpadding="0" cellspacing="0" border="0">
-      <tr>
-        <td width="33%" align="center" style="padding:0 12px;">
-          <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4a5568;margin-bottom:4px;">Peak</div>
-          <div style="font-family:'Bebas Neue',Arial,sans-serif;font-size:56px;line-height:1;color:#4a5568;">{{session.wind_speed_peak_kn}}</div>
-          <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4a5568;margin-top:4px;">knots</div>
-        </td>
-        <td width="33%" align="center" style="padding:0 12px;border-left:1px solid #1e2535;border-right:1px solid #1e2535;">
-          <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4a5568;margin-bottom:4px;">Gusts</div>
-          <div style="font-family:'Bebas Neue',Arial,sans-serif;font-size:56px;line-height:1;color:#f0905d;">{{session.wind_gusts_kn}}</div>
-          <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4a5568;margin-top:4px;">knots</div>
-        </td>
-        <td width="33%" align="center" style="padding:0 12px;">
-          <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4a5568;margin-bottom:4px;">Min</div>
-          <div style="font-family:'Bebas Neue',Arial,sans-serif;font-size:42px;line-height:1;color:#4a5568;">{{session.wind_speed_min_kn}}</div>
-          <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4a5568;margin-top:4px;">knots</div>
-        </td>
-      </tr>
-    </table>
-  </td></tr>
+    <!-- WIND NUMBERS -->
+    <tr>
+      <td style="background-color:#0f1520;border-left:1px solid #1e2535;border-right:1px solid #1e2535;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+          <tr>
+            <td width="33%" align="center" style="padding:20px 8px;">
+              <p style="margin:0 0 4px 0;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4a5568;">Peak</p>
+              <p style="margin:0;font-family:'Bebas Neue',Arial,sans-serif;font-size:52px;line-height:1;color:#6b7a8d;">[[session.wind_speed_peak_kn]]</p>
+              <p style="margin:4px 0 0 0;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4a5568;">knots</p>
+            </td>
+            <td width="33%" align="center" style="padding:20px 8px;border-left:1px solid #1e2535;border-right:1px solid #1e2535;">
+              <p style="margin:0 0 4px 0;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4a5568;">Gusts</p>
+              <p style="margin:0;font-family:'Bebas Neue',Arial,sans-serif;font-size:52px;line-height:1;color:#f0905d;">[[session.wind_gusts_kn]]</p>
+              <p style="margin:4px 0 0 0;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4a5568;">knots</p>
+            </td>
+            <td width="33%" align="center" style="padding:20px 8px;">
+              <p style="margin:0 0 4px 0;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4a5568;">Min</p>
+              <p style="margin:0;font-family:'Bebas Neue',Arial,sans-serif;font-size:40px;line-height:1;color:#4a5568;">[[session.wind_speed_min_kn]]</p>
+              <p style="margin:4px 0 0 0;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4a5568;">knots</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
 
-  <!-- DETAILS -->
-  <tr><td style="background-color:#161b27;border:1px solid #1e2535;border-top:none;padding:28px 40px;">
+    <!-- DETAILS -->
+    <tr>
+      <td style="background-color:#141b27;border:1px solid #1e2535;border-top:none;padding:24px 32px;">
 
-    <!-- Wind details title -->
-    <div style="font-size:10px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:#4a5568;margin-bottom:14px;">Wind details</div>
+        <!-- Wind details -->
+        <p style="margin:0 0 12px 0;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#4a5568;">Wind details</p>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:20px;">
+          <tr>
+            <td width="49%" style="background-color:#1a2235;border:1px solid #242d42;border-radius:8px;padding:12px 14px;vertical-align:top;">
+              <p style="margin:0 0 4px 0;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4a5568;">Direction</p>
+              <p style="margin:0 0 3px 0;font-size:17px;font-weight:600;color:#5dd4f0;">[[session.wind_direction]] &rarr;</p>
+              <p style="margin:0;font-size:11px;color:#4a5568;">Matches your good dirs: [[user_good_wind_dirs]]</p>
+            </td>
+            <td width="2%"></td>
+            <td width="49%" style="background-color:#1a2235;border:1px solid #242d42;border-radius:8px;padding:12px 14px;vertical-align:top;">
+              <p style="margin:0 0 4px 0;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4a5568;">Consistency</p>
+              <p style="margin:0 0 3px 0;font-size:17px;font-weight:600;color:#f0905d;">[[session.wind_consistency_pct]]%</p>
+              <p style="margin:0;font-size:11px;color:#4a5568;">of the session window</p>
+            </td>
+          </tr>
+        </table>
 
-    <!-- Direction + Consistency -->
-    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:22px;">
-      <tr>
-        <td width="48%" style="background-color:#1a2035;border:1px solid #242d42;border-radius:10px;padding:14px 16px;">
-          <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4a5568;margin-bottom:5px;">Direction</div>
-          <div style="font-size:18px;font-weight:600;color:#5dd4f0;">{{session.wind_direction}} &rarr;</div>
-          <div style="font-size:11px;color:#4a5568;margin-top:3px;">Your good dirs: {{user_good_wind_dirs}}</div>
-        </td>
-        <td width="4%"></td>
-        <td width="48%" style="background-color:#1a2035;border:1px solid #242d42;border-radius:10px;padding:14px 16px;">
-          <div style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4a5568;margin-bottom:5px;">Consistency</div>
-          <div style="font-size:18px;font-weight:600;color:#f05d5d;">{{session.wind_consistency_pct}}%</div>
-          <div style="font-size:11px;color:#4a5568;margin-top:3px;">of the session window</div>
-        </td>
-      </tr>
-    </table>
+        <!-- Divider -->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:20px;">
+          <tr><td style="height:1px;background-color:#1e2535;font-size:0;line-height:0;">&nbsp;</td></tr>
+        </table>
 
-    <!-- Divider -->
-    <div style="height:1px;background-color:#1e2535;margin-bottom:20px;"></div>
+        <!-- Conditions -->
+        <p style="margin:0 0 12px 0;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#4a5568;">Conditions</p>
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+          <tr>
+            <td width="25%" align="center" style="padding:0 4px;">
+              <p style="margin:0 0 4px 0;font-size:20px;">&#9925;</p>
+              <p style="margin:0 0 2px 0;font-size:12px;font-weight:600;color:#e8eaf0;">[[conditions.weather]]</p>
+              <p style="margin:0;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#4a5568;">Weather</p>
+            </td>
+            <td width="25%" align="center" style="padding:0 4px;">
+              <p style="margin:0 0 4px 0;font-size:20px;">&#127777;&#65039;</p>
+              <p style="margin:0 0 2px 0;font-size:12px;font-weight:600;color:#e8eaf0;">[[conditions.temperature_min_c]]&ndash;[[conditions.temperature_max_c]]&deg;C</p>
+              <p style="margin:0;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#4a5568;">Temp</p>
+            </td>
+            <td width="25%" align="center" style="padding:0 4px;">
+              <p style="margin:0 0 4px 0;font-size:20px;">&#127749;</p>
+              <p style="margin:0 0 2px 0;font-size:12px;font-weight:600;color:#e8eaf0;">[[conditions.sunrise]]</p>
+              <p style="margin:0;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#4a5568;">Sunrise</p>
+            </td>
+            <td width="25%" align="center" style="padding:0 4px;">
+              <p style="margin:0 0 4px 0;font-size:20px;">&#127751;</p>
+              <p style="margin:0 0 2px 0;font-size:12px;font-weight:600;color:#e8eaf0;">[[conditions.sunset]]</p>
+              <p style="margin:0;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#4a5568;">Sunset</p>
+            </td>
+          </tr>
+        </table>
 
-    <!-- Conditions title -->
-    <div style="font-size:10px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase;color:#4a5568;margin-bottom:14px;">Conditions</div>
+        
+        <tr>
+          <td style="padding:0 32px 24px 32px;">
+            <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#1e2a1a;border-radius:8px;border:1px solid rgba(240,196,93,0.2);">
+              <tr>
+                <td style="padding:14px 18px;font-size:13px;color:rgba(240,196,93,0.85);line-height:1.6;">
+                  &#128260; Wind can still pick up unexpectedly. <strong>Next update in 1 hour.</strong>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
 
-    <!-- Conditions grid -->
-    <table width="100%" cellpadding="0" cellspacing="0" border="0">
-      <tr>
-        <td width="25%" align="center">
-          <div style="font-size:22px;margin-bottom:5px;">&#9925;</div>
-          <div style="font-size:13px;font-weight:600;color:#e8eaf0;">{{conditions.weather}}</div>
-          <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#4a5568;margin-top:2px;">Weather</div>
-        </td>
-        <td width="25%" align="center">
-          <div style="font-size:22px;margin-bottom:5px;">&#127777;&#65039;</div>
-          <div style="font-size:13px;font-weight:600;color:#e8eaf0;">{{conditions.temperature_min_c}}&ndash;{{conditions.temperature_max_c}}&deg;C</div>
-          <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#4a5568;margin-top:2px;">Temp</div>
-        </td>
-        <td width="25%" align="center">
-          <div style="font-size:22px;margin-bottom:5px;">&#127749;</div>
-          <div style="font-size:13px;font-weight:600;color:#e8eaf0;">{{conditions.sunrise}}</div>
-          <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#4a5568;margin-top:2px;">Sunrise</div>
-        </td>
-        <td width="25%" align="center">
-          <div style="font-size:22px;margin-bottom:5px;">&#127751;</div>
-          <div style="font-size:13px;font-weight:600;color:#e8eaf0;">{{conditions.sunset}}</div>
-          <div style="font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#4a5568;margin-top:2px;">Sunset</div>
-        </td>
-      </tr>
-    </table>
+      </td>
+    </tr>
 
-    <table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:20px;">
-      <tr>
-        <td style="background:rgba(240,196,93,0.07);border:1px solid rgba(240,196,93,0.2);border-radius:10px;padding:14px 18px;">
-          <table cellpadding="0" cellspacing="0" border="0">
-            <tr>
-              <td style="font-size:18px;padding-right:12px;vertical-align:top;">&#128260;</td>
-              <td style="font-size:13px;color:rgba(240,196,93,0.85);line-height:1.5;">Wind can still pick up unexpectedly. Keep an eye on it. <strong style='color:#f0c45d'>Next update in 1 hour.</strong></td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
+    <!-- SPOT ROW -->
+    <tr>
+      <td style="background-color:#0f1520;border:1px solid #1e2535;border-top:none;padding:16px 32px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+          <tr>
+            <td style="vertical-align:middle;">
+              <p style="margin:0;font-family:'Bebas Neue',Arial,sans-serif;font-size:22px;color:#ffffff;letter-spacing:1px;">[[spot]]</p>
+              <p style="margin:2px 0 0 0;font-size:12px;color:#4a5568;">[[spot_city]] &middot; [[spot_country]]</p>
+            </td>
+            <td align="right" style="vertical-align:middle;">
+              <a href="[[spot_map_link]]" style="display:inline-block;background-color:#1a2235;border:1px solid #242d42;border-radius:7px;padding:8px 14px;font-size:12px;font-weight:600;color:#5dd4f0;text-decoration:none;">&#128205; View on map</a>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
 
-  </td></tr>
+    <!-- CTA -->
+    <tr>
+      <td style="background-color:#141b27;border:1px solid #1e2535;border-top:none;padding:24px 32px;text-align:center;">
+        <a href="[[app_link]]" style="display:inline-block;background-color:#3a2020;color:#ffffff;font-family:'DM Sans',Arial,sans-serif;font-size:15px;font-weight:600;padding:14px 32px;border-radius:9px;text-decoration:none;">&#127993; Monitor the forecast</a>
+        <p style="margin:12px 0 0 0;font-size:12px;color:#4a5568;">Check the latest hourly data on KiteForecast</p>
+      </td>
+    </tr>
 
-  <!-- SPOT -->
-  <tr><td style="background-color:#111827;border:1px solid #1e2535;border-top:none;padding:18px 40px;">
-    <table width="100%" cellpadding="0" cellspacing="0" border="0">
-      <tr>
-        <td>
-          <div style="font-family:'Bebas Neue',Arial,sans-serif;font-size:26px;color:#ffffff;letter-spacing:1px;">{{spot}}</div>
-          <div style="font-size:12px;color:#4a5568;margin-top:2px;">{{spot_city}} &middot; {{spot_country}}</div>
-        </td>
-        <td align="right">
-          <a href="{{spot_map_link}}" style="display:inline-block;background-color:#1a2035;border:1px solid #242d42;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:600;color:#5dd4f0;text-decoration:none;">&#128205; View on map</a>
-        </td>
-      </tr>
-    </table>
-  </td></tr>
+    <!-- FOOTER -->
+    <tr>
+      <td style="background-color:#0d0f14;border:1px solid #1e2535;border-top:none;border-radius:0 0 14px 14px;padding:16px 32px;text-align:center;">
+        <p style="margin:0 0 4px 0;font-family:'Bebas Neue',Arial,sans-serif;font-size:14px;letter-spacing:2px;color:#2a3347;">LIFE STARTS AT 25 KNOTS</p>
+        <p style="margin:0;font-size:11px;color:#2a3347;">Tichkes Corporation Inc. &mdash; All rights reserved</p>
+      </td>
+    </tr>
 
-  <!-- CTA -->
-  <tr><td style="background-color:#161b27;border:1px solid #1e2535;border-top:none;padding:24px 40px;text-align:center;">
-    <a href="{{app_link}}" style="display:inline-block;background-color:#2a1a1a;color:#e8eaf0;font-family:'DM Sans',Arial,sans-serif;font-size:15px;font-weight:600;padding:15px 36px;border-radius:10px;text-decoration:none;">&#127993; Monitor the forecast</a>
-    <div style="font-size:12px;color:#4a5568;margin-top:12px;">Check the latest hourly data on KiteForecast</div>
-  </td></tr>
-
-  <!-- FOOTER -->
-  <tr><td style="background-color:#0d0f14;border:1px solid #1e2535;border-top:none;border-radius:0 0 16px 16px;padding:18px 40px;text-align:center;">
-    <div style="font-family:'Bebas Neue',Arial,sans-serif;font-size:16px;letter-spacing:2.5px;color:#2a3347;margin-bottom:5px;">LIFE STARTS AT 25 KNOTS</div>
-    <div style="font-size:11px;color:#2a3347;">Tichkes Corporation Inc. &mdash; All rights reserved</div>
-  </td></tr>
-
-</table>
-<!-- END WRAPPER -->
+  </table>
 
 </td></tr>
 </table>
