@@ -312,8 +312,10 @@
       border:1px solid var(--border); color:var(--tdim); background:var(--card);
       white-space:nowrap;
     }
-    .m-badge.accent { color:var(--accent); border-color:rgba(0,212,255,.28); background:rgba(0,212,255,.05); }
-    .m-badge.green  { color:#4ade80; border-color:rgba(34,197,94,.28); background:rgba(34,197,94,.05); }
+    .m-badge.accent    { color:var(--accent); border-color:rgba(0,212,255,.28); background:rgba(0,212,255,.05); }
+    .m-badge.green     { color:#4ade80; border-color:rgba(34,197,94,.28); background:rgba(34,197,94,.05); }
+    .m-badge.tide-high { color:#38bdf8; border-color:rgba(56,189,248,.28); background:rgba(56,189,248,.06); }
+    .m-badge.tide-low  { color:#7dd3fc; border-color:rgba(125,211,252,.2); background:rgba(125,211,252,.04); opacity:.8; }
 
     /* timeline */
     .m-tl-wrap { padding:12px 20px 10px; border-bottom:1px solid var(--blight); flex-shrink:0; }
@@ -1903,6 +1905,25 @@ function buildMarineMap(m){
   }
 }
 
+function findTideExtremes(dateStr,srHour,ssHour){
+  if(!cachedMarineHrMap||!cachedMarineHrMap.size) return [];
+  const pts=[];
+  for(let hr=0;hr<24;hr++){
+    const v=cachedMarineHrMap.get(`${dateStr}T${String(hr).padStart(2,'0')}`);
+    if(v!=null) pts.push({hr,v});
+  }
+  if(pts.length<3) return [];
+  const res=[];
+  for(let i=1;i<pts.length-1;i++){
+    const prev=pts[i-1].v,cur=pts[i].v,next=pts[i+1].v;
+    if(cur>=prev&&cur>=next&&cur-Math.min(prev,next)>=0.05)
+      res.push({type:'high',hr:pts[i].hr,v:cur});
+    else if(cur<=prev&&cur<=next&&Math.max(prev,next)-cur>=0.05)
+      res.push({type:'low',hr:pts[i].hr,v:cur});
+  }
+  return res.filter(e=>e.hr>=srHour&&e.hr<=ssHour);
+}
+
 async function safeFetch(url,timeoutMs=20000){
   const ctrl=new AbortController();
   const timer=setTimeout(()=>ctrl.abort(),timeoutMs);
@@ -2167,6 +2188,10 @@ function openModal(dateStr,dayIdx){
   const maxGust=day.length?Math.max(...day.map(h=>h.gustKn)):0;
   const srTime=sunrise.slice(11,16);
   const ssTime=sunset.slice(11,16);
+  const srHour=parseInt(sunrise.slice(11,13),10);
+  const ssHour=parseInt(sunset.slice(11,13),10);
+  const tides=findTideExtremes(dateStr,srHour,ssHour);
+  const tideBadges=tides.map(t=>`<span class="m-badge tide-${t.type}">${t.type==='high'?'🌊 ↑':'🌊 ↓'} ${String(t.hr).padStart(2,'0')}:00 ${t.type==='high'?'High':'Low'}</span>`).join('');
   $('mSession').innerHTML=`
     <span class="rating-badge ${rating.cls}" style="width:auto;padding:5px 14px">${rating.label}</span>
     ${win?`<span class="m-badge green">🪁 ${win}</span>`:''}
@@ -2174,7 +2199,8 @@ function openModal(dateStr,dayIdx){
     ${maxGust>0?`<span class="m-badge">Gusts ${maxGust} kn</span>`:''}
     ${domDir!==null?`<span class="m-badge">${isWindDirOK(domDir)?'✓':'✗'} ${compass(domDir)}</span>`:''}
     <span class="m-badge">🌡 avg ${avgTemp}°C</span>
-    <span class="m-badge">🌅 ${srTime} · 🌇 ${ssTime}</span>`;
+    <span class="m-badge">🌅 ${srTime} · 🌇 ${ssTime}</span>
+    ${tideBadges}`;
 
   // timeline
   const maxKn=Math.max(30,...hours.map(h=>h.kn));
