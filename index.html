@@ -1654,7 +1654,7 @@ async function fetchForecastFromSpot(spot){
       });
     });
     buildMarineMap(await marineP);
-    cachedTides=await tideP;
+    cachedTides=applyTideTimezone(await tideP, cachedWx.utc_offset_seconds??0);
     lastFetchTime=Date.now(); try{localStorage.setItem('kf_lastFetch',lastFetchTime);}catch(e){}
     renderGrid();
   }catch(err){
@@ -2042,7 +2042,7 @@ async function fetchForecast(query){
     });
 
     buildMarineMap(await marineP2);
-    cachedTides=await tideP2;
+    cachedTides=applyTideTimezone(await tideP2, cachedWx.utc_offset_seconds??0);
     saveLastSpot({name:cachedLoc.name,loc:[cachedLoc.admin1,cachedLoc.country].filter(Boolean).join(', '),lat:cachedLoc.latitude,lon:cachedLoc.longitude,dirs:[...windDirs]});
     lastFetchTime=Date.now(); try{localStorage.setItem('kf_lastFetch',lastFetchTime);}catch(e){}
     renderGrid();
@@ -2750,17 +2750,24 @@ async function fetchTideData(lat,lon){
     const url=`https://www.worldtides.info/api/v3?extremes&lat=${lat}&lon=${lon}&days=10&key=${key}`;
     const data=await safeFetch(url,10000);
     if(data.status!==200||!data.extremes) return null;
-    return data.extremes.map(e=>{
-      // date like "2026-04-05T14:38:00+0000"
-      const d=new Date(e.date);
-      const hr=d.getUTCHours()+(d.getUTCMinutes()/60)+(d.getUTCSeconds()/3600);
-      return {dateStr:e.date.slice(0,10), exactHr:hr, type:e.type, height:e.height};
-    });
+    // Return raw UTC dates — timezone applied separately once cachedWx is ready
+    return data.extremes.map(e=>({_rawDate:e.date, type:e.type, height:e.height}));
   }catch(e){ console.warn('Tide API error:',e); return null; }
 }
+function applyTideTimezone(rawTides, utcOffsetSec){
+  if(!rawTides) return null;
+  return rawTides.map(t=>{
+    const utcMs=new Date(t._rawDate).getTime();
+    const local=new Date(utcMs+(utcOffsetSec*1000));
+    const dateStr=local.toISOString().slice(0,10);
+    const exactHr=local.getUTCHours()+(local.getUTCMinutes()/60)+(local.getUTCSeconds()/3600);
+    return {dateStr, exactHr, type:t.type, height:t.height};
+  });
+}
 async function fetchTideAndRefresh(){
-  if(!cachedLoc) return;
-  cachedTides=await fetchTideData(cachedLoc.latitude,cachedLoc.longitude);
+  if(!cachedLoc||!cachedWx) return;
+  const raw=await fetchTideData(cachedLoc.latitude,cachedLoc.longitude);
+  cachedTides=applyTideTimezone(raw, cachedWx.utc_offset_seconds??0);
   if(cachedTides) renderGrid();
 }
 function saveProfileEmail(){
