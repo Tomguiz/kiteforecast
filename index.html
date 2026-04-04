@@ -2750,22 +2750,24 @@ async function fetchTideData(lat,lon){
     const url=`https://www.worldtides.info/api/v3?extremes&lat=${lat}&lon=${lon}&days=10&key=${key}`;
     const data=await safeFetch(url,10000);
     if(data.status!==200||!data.extremes) return null;
-    // Return raw UTC dates — timezone applied separately once cachedWx is ready
-    return data.extremes.map(e=>({_rawDate:e.date, type:e.type, height:e.height}));
+    // Use dt (Unix timestamp seconds) — unambiguous UTC, avoids date-string parsing issues
+    console.log('[Tides] raw extremes:', data.extremes.slice(0,4));
+    return data.extremes.map(e=>({_ms:e.dt*1000, type:e.type, height:e.height}));
   }catch(e){ console.warn('Tide API error:',e); return null; }
 }
 function applyTideTimezone(rawTides, tz){
   if(!rawTides) return null;
+  const safeZone=(()=>{ try{ Intl.DateTimeFormat(undefined,{timeZone:tz}); return tz; }catch{ return 'UTC'; }})();
   return rawTides.map(t=>{
-    const d=new Date(t._rawDate);
-    // Use Intl to get wall-clock time in the spot's local timezone (handles DST automatically)
+    const d=new Date(t._ms);
     const parts=new Intl.DateTimeFormat('en-CA',{
-      timeZone:tz, year:'numeric', month:'2-digit', day:'2-digit',
+      timeZone:safeZone, year:'numeric', month:'2-digit', day:'2-digit',
       hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false,
     }).formatToParts(d);
     const g=type=>parseInt(parts.find(p=>p.type===type).value,10);
     const dateStr=`${g('year')}-${String(g('month')).padStart(2,'0')}-${String(g('day')).padStart(2,'0')}`;
-    const exactHr=g('hour')+g('minute')/60+g('second')/3600;
+    // hour12:false can return 24 for midnight on some engines
+    const exactHr=(g('hour')%24)+g('minute')/60+g('second')/3600;
     return {dateStr, exactHr, type:t.type, height:t.height};
   });
 }
