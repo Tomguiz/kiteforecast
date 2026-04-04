@@ -713,6 +713,10 @@
       <input type="email" id="ppEmailInput" class="pp-input" placeholder="your@email.com" oninput="onEmailEdit()" />
       <button class="btn pp-save-btn" id="ppSaveBtn" onclick="saveProfileEmail()">Save</button>
       <p class="pp-note">Your email is used only to send session alerts — never shared.</p>
+      <label class="pp-label" style="margin-top:18px">Tide API key <a href="https://www.worldtides.info/developer" target="_blank" rel="noopener" style="color:var(--accent);font-size:.75rem;font-weight:400;margin-left:6px">Get free key ↗</a></label>
+      <input type="text" id="ppTideKeyInput" class="pp-input" placeholder="Paste your WorldTides API key" />
+      <button class="btn pp-save-btn" id="ppTideSaveBtn" onclick="saveTideKey()" style="margin-top:6px">Save</button>
+      <p class="pp-note">Used to show exact high/low tide times. Free at worldtides.info/developer.</p>
     </div>
     <div id="ppPanelNotifs" class="pp-body" style="display:none">
       <div class="pp-toggle-row">
@@ -736,6 +740,7 @@ let _modalDateStr  = null;
 let _modalDayIdx   = null;
 let cachedHrMap       = null;
 let cachedMarineHrMap = null;
+let cachedTides       = null; // [{dateStr,exactHr,type:'High'|'Low',height}]
 let lastFetchTime = parseInt(localStorage.getItem('kf_lastFetch')||'0',10);
 
 function updateFetchTimestamp(){
@@ -1617,6 +1622,7 @@ async function fetchForecastFromSpot(spot){
     });
     const mP=new URLSearchParams({latitude:spot.lat,longitude:spot.lon,hourly:'wave_height',forecast_days:10,timezone:'auto'});
     const marineP=safeFetch(`https://marine-api.open-meteo.com/v1/marine?${mP}`,8000).catch(()=>null);
+    const tideP=fetchTideData(spot.lat,spot.lon);
     cachedWx=await safeFetch(`https://api.open-meteo.com/v1/forecast?${p}`);
     if(cachedWx.error) throw new Error(cachedWx.reason||'API error');
     if(!manualShoreSet){
@@ -1648,6 +1654,7 @@ async function fetchForecastFromSpot(spot){
       });
     });
     buildMarineMap(await marineP);
+    cachedTides=await tideP;
     lastFetchTime=Date.now(); try{localStorage.setItem('kf_lastFetch',lastFetchTime);}catch(e){}
     renderGrid();
   }catch(err){
@@ -1923,8 +1930,15 @@ function fmtTideTime(exactHr){
 }
 
 function findTideExtremes(dateStr,srHour,ssHour){
+  // ── Prefer real tide API data ──
+  if(cachedTides){
+    return cachedTides
+      .filter(t=>t.dateStr===dateStr&&t.exactHr>=srHour&&t.exactHr<=ssHour)
+      .map(t=>({type:t.type==='High'?'high':'low',exactHr:t.exactHr,v:t.height}))
+      .sort((a,b)=>a.exactHr-b.exactHr);
+  }
+  // ── Fallback: wave-height centroid (no tide key set) ──
   if(!cachedMarineHrMap||!cachedMarineHrMap.size) return [];
-  // collect full 24h (needed for centroid window even outside daylight)
   const all=[];
   for(let hr=0;hr<24;hr++){
     const v=cachedMarineHrMap.get(`${dateStr}T${String(hr).padStart(2,'0')}`);
@@ -1935,20 +1949,14 @@ function findTideExtremes(dateStr,srHour,ssHour){
   const maxV=Math.max(...day.map(p=>p.v));
   const minV=Math.min(...day.map(p=>p.v));
   if(maxV===minV) return [];
-
-  // weighted centroid over ±2h window for sub-hour precision
   function centroid(peakHr,type){
     const win=all.filter(p=>Math.abs(p.hr-peakHr)<=2);
     if(win.length<2) return peakHr;
     const base=type==='high'?Math.min(...win.map(p=>p.v)):Math.max(...win.map(p=>p.v));
     let wSum=0,tSum=0;
-    for(const p of win){
-      const w=type==='high'?Math.max(0,p.v-base):Math.max(0,base-p.v);
-      wSum+=w; tSum+=w*p.hr;
-    }
+    for(const p of win){ const w=type==='high'?Math.max(0,p.v-base):Math.max(0,base-p.v); wSum+=w; tSum+=w*p.hr; }
     return wSum>0?tSum/wSum:peakHr;
   }
-
   const hiPt=day.find(p=>p.v===maxV);
   const loPt=day.find(p=>p.v===minV);
   return [
@@ -2002,6 +2010,7 @@ async function fetchForecast(query){
     });
     const mP2=new URLSearchParams({latitude,longitude,hourly:'wave_height',forecast_days:10,timezone:'auto'});
     const marineP2=safeFetch(`https://marine-api.open-meteo.com/v1/marine?${mP2}`,8000).catch(()=>null);
+    const tideP2=fetchTideData(latitude,longitude);
     cachedWx=await safeFetch(`https://api.open-meteo.com/v1/forecast?${p}`);
     if(cachedWx.error) throw new Error(cachedWx.reason||'API error');
 
@@ -2033,6 +2042,7 @@ async function fetchForecast(query){
     });
 
     buildMarineMap(await marineP2);
+    cachedTides=await tideP2;
     saveLastSpot({name:cachedLoc.name,loc:[cachedLoc.admin1,cachedLoc.country].filter(Boolean).join(', '),lat:cachedLoc.latitude,lon:cachedLoc.longitude,dirs:[...windDirs]});
     lastFetchTime=Date.now(); try{localStorage.setItem('kf_lastFetch',lastFetchTime);}catch(e){}
     renderGrid();
@@ -2699,6 +2709,7 @@ function openProfilePanel(tab){
   switchPpTab(tab);
   const p=loadProfile();
   $('ppEmailInput').value=p.email||'';
+  $('ppTideKeyInput').value=p.tideKey||'';
   const sb=$('ppSaveBtn');
   if(sb){ if(p.email){sb.classList.add('saved');sb.textContent='✓ Saved';}else{sb.classList.remove('saved');sb.textContent='Save';} }
   updateEmailWarning();
@@ -2723,6 +2734,34 @@ function switchPpTab(tab){
 function onEmailEdit(){
   const btn=$('ppSaveBtn');
   if(btn){ btn.classList.remove('saved'); btn.textContent='Save'; }
+}
+function loadTideKey(){ return (loadProfile().tideKey||'').trim(); }
+function saveTideKey(){
+  const key=$('ppTideKeyInput').value.trim();
+  const p=loadProfile(); p.tideKey=key; saveProfile(p);
+  const btn=$('ppTideSaveBtn');
+  if(btn){ btn.classList.add('saved'); btn.textContent='✓ Saved'; setTimeout(()=>{ btn.classList.remove('saved'); btn.textContent='Save'; },2000); }
+  showToast(key?'✓ Tide key saved':'Tide key cleared');
+  if(cachedLoc&&key) fetchTideAndRefresh();
+}
+async function fetchTideData(lat,lon){
+  const key=loadTideKey(); if(!key) return null;
+  try{
+    const url=`https://www.worldtides.info/api/v3?extremes&lat=${lat}&lon=${lon}&days=10&key=${key}`;
+    const data=await safeFetch(url,10000);
+    if(data.status!==200||!data.extremes) return null;
+    return data.extremes.map(e=>{
+      // date like "2026-04-05T14:38:00+0000"
+      const d=new Date(e.date);
+      const hr=d.getUTCHours()+(d.getUTCMinutes()/60)+(d.getUTCSeconds()/3600);
+      return {dateStr:e.date.slice(0,10), exactHr:hr, type:e.type, height:e.height};
+    });
+  }catch(e){ console.warn('Tide API error:',e); return null; }
+}
+async function fetchTideAndRefresh(){
+  if(!cachedLoc) return;
+  cachedTides=await fetchTideData(cachedLoc.latitude,cachedLoc.longitude);
+  if(cachedTides) renderGrid();
 }
 function saveProfileEmail(){
   const email=$('ppEmailInput').value.trim();
