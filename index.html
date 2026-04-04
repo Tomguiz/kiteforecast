@@ -1654,7 +1654,7 @@ async function fetchForecastFromSpot(spot){
       });
     });
     buildMarineMap(await marineP);
-    cachedTides=applyTideTimezone(await tideP, cachedWx.utc_offset_seconds??0);
+    cachedTides=applyTideTimezone(await tideP, cachedWx.timezone||'UTC');
     lastFetchTime=Date.now(); try{localStorage.setItem('kf_lastFetch',lastFetchTime);}catch(e){}
     renderGrid();
   }catch(err){
@@ -2042,7 +2042,7 @@ async function fetchForecast(query){
     });
 
     buildMarineMap(await marineP2);
-    cachedTides=applyTideTimezone(await tideP2, cachedWx.utc_offset_seconds??0);
+    cachedTides=applyTideTimezone(await tideP2, cachedWx.timezone||'UTC');
     saveLastSpot({name:cachedLoc.name,loc:[cachedLoc.admin1,cachedLoc.country].filter(Boolean).join(', '),lat:cachedLoc.latitude,lon:cachedLoc.longitude,dirs:[...windDirs]});
     lastFetchTime=Date.now(); try{localStorage.setItem('kf_lastFetch',lastFetchTime);}catch(e){}
     renderGrid();
@@ -2754,20 +2754,25 @@ async function fetchTideData(lat,lon){
     return data.extremes.map(e=>({_rawDate:e.date, type:e.type, height:e.height}));
   }catch(e){ console.warn('Tide API error:',e); return null; }
 }
-function applyTideTimezone(rawTides, utcOffsetSec){
+function applyTideTimezone(rawTides, tz){
   if(!rawTides) return null;
   return rawTides.map(t=>{
-    const utcMs=new Date(t._rawDate).getTime();
-    const local=new Date(utcMs+(utcOffsetSec*1000));
-    const dateStr=local.toISOString().slice(0,10);
-    const exactHr=local.getUTCHours()+(local.getUTCMinutes()/60)+(local.getUTCSeconds()/3600);
+    const d=new Date(t._rawDate);
+    // Use Intl to get wall-clock time in the spot's local timezone (handles DST automatically)
+    const parts=new Intl.DateTimeFormat('en-CA',{
+      timeZone:tz, year:'numeric', month:'2-digit', day:'2-digit',
+      hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false,
+    }).formatToParts(d);
+    const g=type=>parseInt(parts.find(p=>p.type===type).value,10);
+    const dateStr=`${g('year')}-${String(g('month')).padStart(2,'0')}-${String(g('day')).padStart(2,'0')}`;
+    const exactHr=g('hour')+g('minute')/60+g('second')/3600;
     return {dateStr, exactHr, type:t.type, height:t.height};
   });
 }
 async function fetchTideAndRefresh(){
   if(!cachedLoc||!cachedWx) return;
   const raw=await fetchTideData(cachedLoc.latitude,cachedLoc.longitude);
-  cachedTides=applyTideTimezone(raw, cachedWx.utc_offset_seconds??0);
+  cachedTides=applyTideTimezone(raw, cachedWx.timezone||'UTC');
   if(cachedTides) renderGrid();
 }
 function saveProfileEmail(){
