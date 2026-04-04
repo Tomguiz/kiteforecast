@@ -2509,6 +2509,17 @@ function removeSpotNotif(spotName){
   updateProfileDot();
   renderHintChips();
 }
+let _confirmDebounceTimer=null;
+function _scheduleDayConfirmWebhook(spot){
+  clearTimeout(_confirmDebounceTimer);
+  _confirmDebounceTimer=setTimeout(()=>{
+    const allDayDates=loadNotifs()
+      .filter(n=>n.type==='day'&&n.spotName===spot.name)
+      .map(n=>n.date);
+    const allSessions=_buildSessionsForDates(spot.name,allDayDates);
+    if(allSessions.length) fireConfirmationWebhook(spot,allSessions);
+  },800);
+}
 function addDayNotif(spot,dateStr,sessInfo){
   let notifs=loadNotifs().filter(n=>!(n.type==='day'&&n.spotName===spot.name&&n.date===dateStr));
   const{full}=fmtDate(dateStr);
@@ -2517,12 +2528,7 @@ function addDayNotif(spot,dateStr,sessInfo){
   updateProfileDot();
   renderHintChips();
   scheduleReminders(spot,sessInfo,'day');
-  // Build sessions for ALL active days for this spot (not just the new one)
-  const allDayDates=loadNotifs()
-    .filter(n=>n.type==='day'&&n.spotName===spot.name)
-    .map(n=>n.date);
-  const allSessions=_buildSessionsForDates(spot.name,allDayDates);
-  fireConfirmationWebhook(spot,allSessions);
+  _scheduleDayConfirmWebhook(spot);
 }
 function removeDayNotif(spotName,date){
   const notifs=loadNotifs();
