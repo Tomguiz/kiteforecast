@@ -554,8 +554,8 @@
         grid-template-columns: 56px 22px auto 1fr auto;
         grid-template-rows: auto auto;
         grid-template-areas:
-          "time  wx  temp  wind  dir"
-          "time  .   .     wind  cond";
+          "time  wx    temp  wind  dir"
+          "time  wave  .     wind  cond";
         gap: 1px 8px;
         padding: 9px 14px;
         min-height: auto;
@@ -570,7 +570,7 @@
       .c-wind { grid-area:wind; align-self:center; justify-self:stretch; height:22px; }
       .c-wind-val { font-size:1.0rem; }
       .c-gust { display:none; }
-      .c-wave { display:none; }
+      .c-wave { display:block; grid-area:wave; font-size:.65rem; font-weight:700; color:#60a5fa; align-self:end; white-space:nowrap; }
       .c-dir  { grid-area:dir;  align-self:center; flex-direction:column; align-items:flex-end; gap:1px; }
       .c-da   { font-size:1.1rem; }
       .c-dl   { font-size:.72rem; text-align:right; }
@@ -1924,24 +1924,37 @@ function fmtTideTime(exactHr){
 
 function findTideExtremes(dateStr,srHour,ssHour){
   if(!cachedMarineHrMap||!cachedMarineHrMap.size) return [];
-  const pts=[];
+  // collect full 24h (needed for centroid window even outside daylight)
+  const all=[];
   for(let hr=0;hr<24;hr++){
     const v=cachedMarineHrMap.get(`${dateStr}T${String(hr).padStart(2,'0')}`);
-    if(v!=null) pts.push({hr,v});
+    if(v!=null) all.push({hr,v});
   }
-  if(pts.length<3) return [];
-  const res=[];
-  for(let i=1;i<pts.length-1;i++){
-    const a=pts[i-1].v,b=pts[i].v,c=pts[i+1].v;
-    const denom=a-2*b+c;
-    const offset=denom!==0?Math.max(-0.5,Math.min(0.5,0.5*(a-c)/denom)):0;
-    const exactHr=pts[i].hr+offset;
-    if(b>=a&&b>=c&&b-Math.min(a,c)>=0.05)
-      res.push({type:'high',exactHr,v:b});
-    else if(b<=a&&b<=c&&Math.max(a,c)-b>=0.05)
-      res.push({type:'low',exactHr,v:b});
+  const day=all.filter(p=>p.hr>=srHour&&p.hr<=ssHour);
+  if(day.length<2) return [];
+  const maxV=Math.max(...day.map(p=>p.v));
+  const minV=Math.min(...day.map(p=>p.v));
+  if(maxV===minV) return [];
+
+  // weighted centroid over ±2h window for sub-hour precision
+  function centroid(peakHr,type){
+    const win=all.filter(p=>Math.abs(p.hr-peakHr)<=2);
+    if(win.length<2) return peakHr;
+    const base=type==='high'?Math.min(...win.map(p=>p.v)):Math.max(...win.map(p=>p.v));
+    let wSum=0,tSum=0;
+    for(const p of win){
+      const w=type==='high'?Math.max(0,p.v-base):Math.max(0,base-p.v);
+      wSum+=w; tSum+=w*p.hr;
+    }
+    return wSum>0?tSum/wSum:peakHr;
   }
-  return res.filter(e=>e.exactHr>=srHour&&e.exactHr<=ssHour);
+
+  const hiPt=day.find(p=>p.v===maxV);
+  const loPt=day.find(p=>p.v===minV);
+  return [
+    {type:'high',exactHr:centroid(hiPt.hr,'high'),v:maxV},
+    {type:'low', exactHr:centroid(loPt.hr,'low'), v:minV},
+  ].sort((a,b)=>a.exactHr-b.exactHr);
 }
 
 async function safeFetch(url,timeoutMs=20000){
