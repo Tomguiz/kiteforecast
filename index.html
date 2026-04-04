@@ -526,6 +526,8 @@
     .notif-btn svg { display:block; transition:fill .15s; }
     .notif-btn svg .bell-fill      { fill:none; }
     .notif-btn.active svg .bell-fill { fill:var(--accent); }
+    /* modal header bell — sized to match header, visually separated from close */
+    .m-notif-btn { margin:0 20px 0 0; padding:6px 12px; border-radius:9px; flex-shrink:0; }
 
     /* toast */
     .pp-toast {
@@ -683,6 +685,7 @@
         <h2 id="mTitle"></h2>
         <div class="m-sub" id="mSub"></div>
       </div>
+      <button class="notif-btn m-notif-btn" id="mNotifBtn" onclick="toggleModalDayNotif()" title="Get notified for this day"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path class="bell-fill" d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></button>
       <button class="m-close" onclick="closeModal()">✕ Close</button>
     </div>
     <div class="m-session"  id="mSession"></div>
@@ -729,6 +732,8 @@ let windDirs       = new Set(); // selected qualifying wind directions (degrees)
 let manualShoreSet = false;
 let cachedWx          = null;
 let cachedLoc         = null;
+let _modalDateStr  = null;
+let _modalDayIdx   = null;
 let cachedHrMap       = null;
 let cachedMarineHrMap = null;
 let lastFetchTime = parseInt(localStorage.getItem('kf_lastFetch')||'0',10);
@@ -2191,6 +2196,8 @@ function renderGrid(){
 //  MODAL
 // ══════════════════════════════════
 function openModal(dateStr,dayIdx){
+  _modalDateStr=dateStr;
+  _modalDayIdx=dayIdx;
   const daily=cachedWx.daily;
   const sunrise=daily.sunrise[dayIdx];
   const sunset=daily.sunset[dayIdx];
@@ -2200,6 +2207,8 @@ function openModal(dateStr,dayIdx){
   const rating=rateDay(goodHours,peakKn,daily.weather_code[dayIdx],hasBadDir);
 
   $('mTitle').textContent=full;
+  const mBell=$('mNotifBtn');
+  if(mBell) mBell.className='notif-btn m-notif-btn'+(hasDayNotif(loc.name,dateStr)?' active':'');
   $('mSub').innerHTML=`${loc.name}${loc.admin1?', '+loc.admin1:''} · ${loc.country}`
     +(windDirs.size>0?` · Good: <strong style="color:var(--accent)">${[...windDirs].sort((a,b)=>a-b).map(d=>compass(d)).join(' / ')}</strong>`:'');
 
@@ -2323,6 +2332,12 @@ function closeModal(){
   document.body.style.top='';
   document.body.style.width='';
   window.scrollTo(0,scrollY);
+}
+function toggleModalDayNotif(){
+  if(!_modalDateStr||!cachedLoc) return;
+  toggleDayNotif({stopPropagation:()=>{}},_modalDateStr,_modalDayIdx);
+  const mBell=$('mNotifBtn');
+  if(mBell) mBell.className='notif-btn m-notif-btn'+(hasDayNotif(cachedLoc.name,_modalDateStr)?' active':'');
 }
 function handleOverlayClick(e){if(e.target===$('modalOverlay'))closeModal();}
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('modalOverlay').style.display==='flex')closeModal();else if(e.key==='Escape'&&$('profileOverlay').style.display==='flex')closeProfilePanel();else if(e.key==='Escape'&&$('spotsMapOverlay').style.display==='flex')closeSpotsMap();});
