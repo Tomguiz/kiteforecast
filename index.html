@@ -592,7 +592,7 @@
     </svg>
     <span class="profile-btn-dot" id="profileDot"></span>
   </button>
-  <div class="logo">🪁 Kite<span>Forecast</span></div>
+  <div class="logo" id="logoHome" onclick="resetSearch()" style="cursor:pointer">🪁 Kite<span>Forecast</span></div>
   <p class="tagline">Never miss a session again</p>
   <div class="search-wrap">
     <div class="search-input-wrap">
@@ -601,7 +601,7 @@
     </div>
     <button class="btn" onclick="doSearch()">Search</button>
     <button class="btn-map" id="mapBtn" onclick="openSpotsMap()" title="Show all kite spots on map"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:5px"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Map</button>
-    <button class="btn-reset" id="resetBtn" style="display:none" onclick="resetSearch()">✕ Reset</button>
+    <button class="btn-reset" id="resetBtn" style="display:none" onclick="resetSearch()">← Back</button>
   </div>
 </header>
 
