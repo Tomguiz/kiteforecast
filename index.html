@@ -2434,6 +2434,9 @@ function loadNotifs(){
 }
 function saveNotifs(arr){ localStorage.setItem('kf_notifs', JSON.stringify(arr)); }
 
+// Spots explicitly removed this session — sync will not re-add them
+const _syncExcluded = new Set();
+
 // Sync active reminders from Supabase into localStorage so any browser session
 // with the same email can see and cancel existing subscriptions.
 async function syncNotifsFromSupabase(email){
@@ -2459,6 +2462,7 @@ async function syncNotifsFromSupabase(email){
   for(const r of unique){
     const{spot_name:sn,spot_lat:sLat,spot_lon:sLon,spot_dirs:sDirs,notif_type:nType,session_date:dateStr}=r;
     const ts=r.created_at||new Date().toISOString();
+    if(_syncExcluded.has(sn)) continue;
     if(nType==='spot'){
       if(!existing.some(n=>n.type==='spot'&&n.spotName===sn))
         toAdd.push({id:ts+'_s_'+sn,type:'spot',spotName:sn,spotLat:sLat,spotLon:sLon,spotDirs:sDirs,createdAt:ts});
@@ -2536,6 +2540,7 @@ async function cancelReminders(spotName,sessionDate){
 }
 
 function addSpotNotif(spot,sessions){
+  _syncExcluded.delete(spot.name);
   let notifs=loadNotifs()
     .filter(n=>!(n.type==='spot'&&n.spotName===spot.name))
     .filter(n=>!(n.type==='day'&&n.spotName===spot.name&&n.fromSpot));
@@ -2553,6 +2558,7 @@ function addSpotNotif(spot,sessions){
   fireConfirmationWebhook(spot,sessions);
 }
 function removeSpotNotif(spotName){
+  _syncExcluded.add(spotName);
   saveNotifs(loadNotifs().filter(n=>!(n.spotName===spotName&&(n.type==='spot'||(n.type==='day'&&n.fromSpot)))));
   cancelReminders(spotName,null);
   updateProfileDot();
