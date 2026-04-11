@@ -55,7 +55,9 @@ DO $$ BEGIN
   CREATE POLICY "anon_select" ON reminders FOR SELECT TO anon USING (true);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
--- 5. pg_cron job — runs every 5 minutes, calls the edge function
+-- 5. pg_cron jobs
+
+-- Runs every 5 minutes — sends due reminders
 SELECT cron.unschedule('process-reminders') WHERE EXISTS (
   SELECT 1 FROM cron.job WHERE jobname = 'process-reminders'
 );
@@ -65,6 +67,26 @@ SELECT cron.schedule(
   $$
   SELECT net.http_post(
     url     := 'https://kpwmajtxmcfpakvonimf.supabase.co/functions/v1/process-reminders',
+    headers := jsonb_build_object(
+      'Content-Type',  'application/json',
+      'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwd21hanR4bWNmcGFrdm9uaW1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTcyMjYsImV4cCI6MjA5MDczMzIyNn0.QfQuIQbnfVUOApPbOdvCRbNsVdb0SBAwMX-hvioGJmg'
+    ),
+    body    := '{}'::jsonb
+  );
+  $$
+);
+
+-- Runs daily at 11:00 UTC (noon Brussels winter / 13:00 summer) —
+-- checks for new eligible sessions on all subscribed spots
+SELECT cron.unschedule('check-new-sessions') WHERE EXISTS (
+  SELECT 1 FROM cron.job WHERE jobname = 'check-new-sessions'
+);
+SELECT cron.schedule(
+  'check-new-sessions',
+  '0 11 * * *',
+  $$
+  SELECT net.http_post(
+    url     := 'https://kpwmajtxmcfpakvonimf.supabase.co/functions/v1/check-new-sessions',
     headers := jsonb_build_object(
       'Content-Type',  'application/json',
       'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwd21hanR4bWNmcGFrdm9uaW1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTcyMjYsImV4cCI6MjA5MDczMzIyNn0.QfQuIQbnfVUOApPbOdvCRbNsVdb0SBAwMX-hvioGJmg'
