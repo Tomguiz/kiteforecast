@@ -1657,6 +1657,7 @@ async function fetchForecastFromSpot(spot){
     cachedTides=applyTideTimezone(await tideP, cachedWx.timezone||'UTC');
     lastFetchTime=Date.now(); try{localStorage.setItem('kf_lastFetch',lastFetchTime);}catch(e){}
     renderGrid();
+    recheckSpotSubscription();
   }catch(err){
     console.error('fetchForecastFromSpot error:',err);
     $('errorTitle').textContent='Forecast unavailable';
@@ -2488,6 +2489,31 @@ function notifMasterEnabled(){ return loadProfile().notifsEnabled !== false; }
 
 function hasSpotNotif(spotName){ return loadNotifs().some(n=>n.type==='spot'&&n.spotName===spotName); }
 function hasDayNotif(spotName,date){ return loadNotifs().some(n=>n.type==='day'&&n.spotName===spotName&&n.date===date); }
+
+// After a fresh forecast fetch, auto-schedule reminders for any new eligible
+// sessions that appeared for a subscribed spot.
+async function recheckSpotSubscription(){
+  if(!cachedWx||!cachedLoc) return;
+  const p=loadProfile(); if(!p.email) return;
+  const spotName=cachedLoc.name;
+  if(!hasSpotNotif(spotName)) return;
+  const qualSessions=getQualSessions();
+  if(!qualSessions.length) return;
+  const spot=SPOTS.find(s=>s.name===spotName)||{name:spotName,lat:cachedLoc.latitude,lon:cachedLoc.longitude};
+  const existingDays=new Set(loadNotifs().filter(n=>n.spotName===spotName&&n.type==='day').map(n=>n.date));
+  const newSessions=qualSessions.filter(s=>!existingDays.has(s.dateStr));
+  if(!newSessions.length) return;
+  for(const sess of newSessions) await scheduleReminders(spot,sess,'spot');
+  const notifs=loadNotifs();
+  newSessions.forEach(sess=>{
+    const{full}=fmtDate(sess.dateStr);
+    notifs.push({id:Date.now()+'_d_auto_'+sess.dateStr,type:'day',fromSpot:true,spotName,spotLat:cachedLoc.latitude,spotLon:cachedLoc.longitude,date:sess.dateStr,label:full,createdAt:new Date().toISOString()});
+  });
+  saveNotifs(notifs);
+  renderNotifList();
+  renderHintChips();
+  showToast(`✓ ${newSessions.length} new session${newSessions.length>1?'s':''} added to your ${spotName} alerts`);
+}
 
 // ── SCHEDULED REMINDERS (Supabase backend) ──
 async function scheduleReminders(spot,sessInfo,notifType){
