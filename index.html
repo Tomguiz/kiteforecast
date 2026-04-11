@@ -2434,11 +2434,8 @@ function loadNotifs(){
 }
 function saveNotifs(arr){ localStorage.setItem('kf_notifs', JSON.stringify(arr)); }
 
-// Spots explicitly removed this session — sync will not re-add them
-const _syncExcluded = new Set();
-
-// Sync active reminders from Supabase into localStorage so any browser session
-// with the same email can see and cancel existing subscriptions.
+// Sync active reminders from Supabase into localStorage (authoritative).
+// Replaces localStorage with whatever Supabase says is active for this email.
 async function syncNotifsFromSupabase(email){
   if(!email) return;
   const sb=getSb(); if(!sb) return;
@@ -2449,41 +2446,42 @@ async function syncNotifsFromSupabase(email){
     .eq('email',email)
     .eq('cancelled',false)
     .gte('session_date',today);
-  if(error||!data||!data.length) return;
-  // Deduplicate rows (5 reminder_hours rows exist per session)
+  if(error){ console.error('sync error',error); return; }
+  // Deduplicate rows (5 reminder_hours rows per session)
   const seen=new Set();
-  const unique=data.filter(r=>{
+  const unique=(data||[]).filter(r=>{
     const key=r.spot_name+'|'+r.notif_type+'|'+r.session_date;
     if(seen.has(key)) return false;
     seen.add(key); return true;
   });
-  const existing=loadNotifs();
-  const toAdd=[];
+  // Build canonical list from Supabase (source of truth)
+  const synced=[];
   for(const r of unique){
     const{spot_name:sn,spot_lat:sLat,spot_lon:sLon,spot_dirs:sDirs,notif_type:nType,session_date:dateStr}=r;
     const ts=r.created_at||new Date().toISOString();
-    if(_syncExcluded.has(sn)) continue;
     if(nType==='spot'){
-      if(!existing.some(n=>n.type==='spot'&&n.spotName===sn))
-        toAdd.push({id:ts+'_s_'+sn,type:'spot',spotName:sn,spotLat:sLat,spotLon:sLon,spotDirs:sDirs,createdAt:ts});
-      if(!existing.some(n=>n.type==='day'&&n.spotName===sn&&n.date===dateStr&&n.fromSpot)){
+      if(!synced.some(n=>n.type==='spot'&&n.spotName===sn))
+        synced.push({id:ts+'_s_'+sn,type:'spot',spotName:sn,spotLat:sLat,spotLon:sLon,spotDirs:sDirs,createdAt:ts});
+      if(!synced.some(n=>n.type==='day'&&n.spotName===sn&&n.date===dateStr&&n.fromSpot)){
         const{full}=fmtDate(dateStr);
-        toAdd.push({id:ts+'_ds_'+sn+dateStr,type:'day',fromSpot:true,spotName:sn,spotLat:sLat,spotLon:sLon,date:dateStr,label:full,createdAt:ts});
+        synced.push({id:ts+'_ds_'+sn+dateStr,type:'day',fromSpot:true,spotName:sn,spotLat:sLat,spotLon:sLon,date:dateStr,label:full,createdAt:ts});
       }
     } else if(nType==='day'){
-      if(!existing.some(n=>n.type==='day'&&n.spotName===sn&&n.date===dateStr&&!n.fromSpot)){
+      if(!synced.some(n=>n.type==='day'&&n.spotName===sn&&n.date===dateStr&&!n.fromSpot)){
         const{full}=fmtDate(dateStr);
-        toAdd.push({id:ts+'_d_'+sn+dateStr,type:'day',fromSpot:false,spotName:sn,spotLat:sLat,spotLon:sLon,date:dateStr,label:full,createdAt:ts});
+        synced.push({id:ts+'_d_'+sn+dateStr,type:'day',fromSpot:false,spotName:sn,spotLat:sLat,spotLon:sLon,date:dateStr,label:full,createdAt:ts});
       }
     }
   }
-  if(toAdd.length){
-    saveNotifs([...existing,...toAdd]);
-    renderNotifList();
-    renderHintChips();
-    updateProfileDot();
-    showToast(`✓ Synced ${toAdd.length} notification${toAdd.length>1?'s':''}`);
-  }
+  // Preserve locally-added notifs not yet reflected in Supabase (race-condition safety)
+  const local=loadNotifs();
+  const localOnly=local.filter(ln=>!synced.some(sn=>sn.spotName===ln.spotName&&sn.type===ln.type&&(sn.date||null)===(ln.date||null)));
+  const merged=[...synced,...localOnly];
+  saveNotifs(merged);
+  renderNotifList();
+  renderHintChips();
+  updateProfileDot();
+  if(synced.length) showToast(`✓ ${synced.length} notification${synced.length>1?'s':''} synced`);
 }
 
 function notifMasterEnabled(){ return loadProfile().notifsEnabled !== false; }
@@ -2536,11 +2534,11 @@ async function cancelReminders(spotName,sessionDate){
   let q=sb.from('reminders').update({cancelled:true})
     .eq('email',p.email).eq('spot_name',spotName).eq('cancelled',false);
   if(sessionDate) q=q.eq('session_date',sessionDate);
-  await q;
+  const {error}=await q;
+  if(error) console.error('cancelReminders failed',spotName,error);
 }
 
 function addSpotNotif(spot,sessions){
-  _syncExcluded.delete(spot.name);
   let notifs=loadNotifs()
     .filter(n=>!(n.type==='spot'&&n.spotName===spot.name))
     .filter(n=>!(n.type==='day'&&n.spotName===spot.name&&n.fromSpot));
@@ -2558,7 +2556,6 @@ function addSpotNotif(spot,sessions){
   fireConfirmationWebhook(spot,sessions);
 }
 function removeSpotNotif(spotName){
-  _syncExcluded.add(spotName);
   saveNotifs(loadNotifs().filter(n=>!(n.spotName===spotName&&(n.type==='spot'||(n.type==='day'&&n.fromSpot)))));
   cancelReminders(spotName,null);
   updateProfileDot();
