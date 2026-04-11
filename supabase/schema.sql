@@ -32,22 +32,33 @@ CREATE TABLE IF NOT EXISTS reminders (
 CREATE INDEX IF NOT EXISTS reminders_due_idx
   ON reminders (send_at, sent, cancelled);
 
+-- Unique constraint to prevent duplicate reminder rows per subscription window
+ALTER TABLE reminders
+  ADD CONSTRAINT IF NOT EXISTS reminders_unique_reminder
+  UNIQUE (email, spot_name, notif_type, session_date, reminder_hours);
+
 -- 4. Row Level Security
 ALTER TABLE reminders ENABLE ROW LEVEL SECURITY;
 
 -- Allow frontend (anon) to insert new reminders
-CREATE POLICY "anon_insert" ON reminders
-  FOR INSERT TO anon
-  WITH CHECK (true);
+DO $$ BEGIN
+  CREATE POLICY "anon_insert" ON reminders FOR INSERT TO anon WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- Allow frontend (anon) to cancel their own reminders
-CREATE POLICY "anon_cancel" ON reminders
-  FOR UPDATE TO anon
-  USING (true)
-  WITH CHECK (cancelled = true);
+DO $$ BEGIN
+  CREATE POLICY "anon_cancel" ON reminders FOR UPDATE TO anon USING (true) WITH CHECK (cancelled = true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- Allow frontend (anon) to read reminders (for cross-session sync)
+DO $$ BEGIN
+  CREATE POLICY "anon_select" ON reminders FOR SELECT TO anon USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- 5. pg_cron job — runs every 5 minutes, calls the edge function
--- Replace ANON_KEY below with your project anon key
+SELECT cron.unschedule('process-reminders') WHERE EXISTS (
+  SELECT 1 FROM cron.job WHERE jobname = 'process-reminders'
+);
 SELECT cron.schedule(
   'process-reminders',
   '*/5 * * * *',

@@ -2433,6 +2433,55 @@ function loadNotifs(){
   }catch{ return []; }
 }
 function saveNotifs(arr){ localStorage.setItem('kf_notifs', JSON.stringify(arr)); }
+
+// Sync active reminders from Supabase into localStorage so any browser session
+// with the same email can see and cancel existing subscriptions.
+async function syncNotifsFromSupabase(email){
+  if(!email) return;
+  const sb=getSb(); if(!sb) return;
+  const today=new Date().toISOString().slice(0,10);
+  const {data,error}=await sb
+    .from('reminders')
+    .select('spot_name,spot_lat,spot_lon,spot_dirs,notif_type,session_date,created_at')
+    .eq('email',email)
+    .eq('cancelled',false)
+    .gte('session_date',today);
+  if(error||!data||!data.length) return;
+  // Deduplicate rows (5 reminder_hours rows exist per session)
+  const seen=new Set();
+  const unique=data.filter(r=>{
+    const key=r.spot_name+'|'+r.notif_type+'|'+r.session_date;
+    if(seen.has(key)) return false;
+    seen.add(key); return true;
+  });
+  const existing=loadNotifs();
+  const toAdd=[];
+  for(const r of unique){
+    const{spot_name:sn,spot_lat:sLat,spot_lon:sLon,spot_dirs:sDirs,notif_type:nType,session_date:dateStr}=r;
+    const ts=r.created_at||new Date().toISOString();
+    if(nType==='spot'){
+      if(!existing.some(n=>n.type==='spot'&&n.spotName===sn))
+        toAdd.push({id:ts+'_s_'+sn,type:'spot',spotName:sn,spotLat:sLat,spotLon:sLon,spotDirs:sDirs,createdAt:ts});
+      if(!existing.some(n=>n.type==='day'&&n.spotName===sn&&n.date===dateStr&&n.fromSpot)){
+        const{full}=fmtDate(dateStr);
+        toAdd.push({id:ts+'_ds_'+sn+dateStr,type:'day',fromSpot:true,spotName:sn,spotLat:sLat,spotLon:sLon,date:dateStr,label:full,createdAt:ts});
+      }
+    } else if(nType==='day'){
+      if(!existing.some(n=>n.type==='day'&&n.spotName===sn&&n.date===dateStr&&!n.fromSpot)){
+        const{full}=fmtDate(dateStr);
+        toAdd.push({id:ts+'_d_'+sn+dateStr,type:'day',fromSpot:false,spotName:sn,spotLat:sLat,spotLon:sLon,date:dateStr,label:full,createdAt:ts});
+      }
+    }
+  }
+  if(toAdd.length){
+    saveNotifs([...existing,...toAdd]);
+    renderNotifList();
+    renderHintChips();
+    updateProfileDot();
+    showToast(`✓ Synced ${toAdd.length} notification${toAdd.length>1?'s':''}`);
+  }
+}
+
 function notifMasterEnabled(){ return loadProfile().notifsEnabled !== false; }
 
 function hasSpotNotif(spotName){ return loadNotifs().some(n=>n.type==='spot'&&n.spotName===spotName); }
@@ -2473,7 +2522,7 @@ async function scheduleReminders(spot,sessInfo,notifType){
       app_link:    appUrl,
     }))
     .filter(r=>new Date(r.send_at).getTime()>now);
-  if(rows.length) await sb.from('reminders').insert(rows);
+  if(rows.length) await sb.from('reminders').upsert(rows,{onConflict:'email,spot_name,notif_type,session_date,reminder_hours'});
 }
 
 async function cancelReminders(spotName,sessionDate){
@@ -2787,7 +2836,7 @@ async function fetchTideAndRefresh(){
   cachedTides=applyTideTimezone(raw, cachedWx.timezone||'UTC');
   if(cachedTides) renderGrid();
 }
-function saveProfileEmail(){
+async function saveProfileEmail(){
   const email=$('ppEmailInput').value.trim();
   const p=loadProfile();
   p.email=email;
@@ -2797,6 +2846,7 @@ function saveProfileEmail(){
   const btn=$('ppSaveBtn');
   if(btn){ btn.classList.add('saved'); btn.textContent='✓ Saved'; }
   showToast('✓ Email saved');
+  if(email) await syncNotifsFromSupabase(email);
   if(pendingNotif&&email){
     const pn=pendingNotif; pendingNotif=null;
     if(pn.type==='spot') addSpotNotif(pn.spot,pn.sessions);
