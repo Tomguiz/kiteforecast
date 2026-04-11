@@ -2555,9 +2555,9 @@ function addSpotNotif(spot,sessions){
   sessions.forEach(sess=>scheduleReminders(spot,sess,'spot'));
   fireConfirmationWebhook(spot,sessions);
 }
-function removeSpotNotif(spotName){
+async function removeSpotNotif(spotName){
   saveNotifs(loadNotifs().filter(n=>!(n.spotName===spotName&&(n.type==='spot'||(n.type==='day'&&n.fromSpot)))));
-  cancelReminders(spotName,null);
+  await cancelReminders(spotName,null);
   updateProfileDot();
   renderHintChips();
 }
@@ -2582,7 +2582,7 @@ function addDayNotif(spot,dateStr,sessInfo){
   scheduleReminders(spot,sessInfo,'day');
   _scheduleDayConfirmWebhook(spot);
 }
-function removeDayNotif(spotName,date){
+async function removeDayNotif(spotName,date){
   const notifs=loadNotifs();
   const target=notifs.find(n=>n.type==='day'&&n.spotName===spotName&&n.date===date);
   if(target&&target.fromSpot){
@@ -2594,7 +2594,7 @@ function removeDayNotif(spotName,date){
   } else {
     saveNotifs(notifs.filter(n=>!(n.type==='day'&&n.spotName===spotName&&n.date===date)));
   }
-  cancelReminders(spotName,date);
+  await cancelReminders(spotName,date);
   updateProfileDot();
   renderHintChips();
 }
