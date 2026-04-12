@@ -3066,8 +3066,9 @@ function initInstallBanner(){
     : isAndroid
     ? 'Tap the menu (⋮) then "Add to Home Screen"'
     : 'Add this app to your home screen for the best experience';
-  // On Android hide the Add button if no native prompt (will use instructions instead)
-  if(!isIOS && !_deferredInstallPrompt){
+  // Only show Add button on Android when native install prompt is available
+  // iOS has no JS API to trigger the share sheet — instructions are the only option
+  if(!_deferredInstallPrompt){
     $('installBannerBtn').style.display='none';
   }
   $('installBanner').style.display='flex';
