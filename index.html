@@ -1878,7 +1878,7 @@ function renderHintChips(){
       const _ks=SPOTS.find(s=>s.name===f.name);
       const _city=_ks?.loc?_ks.loc.split(', ').slice(0,-1).join(', '):'';
       label.textContent=_ks?f.name+(_city&&_city!==f.name?', '+_city:''):f.label;
-      if(loadNotifs().some(n=>n.spotName===f.name)){
+      if(signedIn&&loadNotifs().some(n=>n.spotName===f.name)){
         const bi=document.createElement('span');
         bi.className='chip-notif-bell active'; bi.innerHTML=bellSVG(10);
         label.appendChild(bi);
@@ -1920,7 +1920,7 @@ function renderHintChips(){
     const inner=document.createElement('span');
     inner.style.cssText='display:inline-flex;align-items:center;gap:6px;cursor:pointer;';
     inner.appendChild(document.createTextNode(c.label));
-    if(loadNotifs().some(n=>n.spotName===c.name)){
+    if(signedIn&&loadNotifs().some(n=>n.spotName===c.name)){
       const bi=document.createElement('span');
       bi.className='chip-notif-bell active'; bi.innerHTML=bellSVG(10);
       inner.appendChild(bi);
