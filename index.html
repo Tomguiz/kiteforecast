@@ -1085,6 +1085,7 @@ function setShoreByDeg(deg){ setWindDirs([deg]); }
 //  DOM
 // ══════════════════════════════════
 const $=id=>document.getElementById(id);
+let _fetchGen=0; // incremented on every new fetch and on resetSearch to cancel in-flight fetches
 function showOnly(id){
   ['hintState','loadingState','errorState','results'].forEach(s=>{
     $(s).style.display=s!==id?'none':(s==='results'||s==='hintState')?'block':'flex';
@@ -1687,7 +1688,6 @@ function pickSpot(spot){
   fetchForecastFromSpot(spot);
 }
 
-let _fetchGen=0;
 async function fetchForecastFromSpot(spot){
   const myGen=++_fetchGen;
   showOnly('loadingState');
@@ -1947,19 +1947,20 @@ function removeFav(f){
 // ══════════════════════════════════
 function resetSearch(){
   _fetchGen++; // cancel any in-flight fetch
-  $('searchInput').value='';
-  $('resetBtn').style.display='none';
+  // Hide spot view immediately — do this first so UI responds even if something below throws
+  showOnly('hintState');
   document.body.classList.remove('spot-loaded');
   $('locHdr').style.display='none';
   $('shoreBar').classList.remove('visible');
   $('apiErrorBanner').style.display='none';
-  renderHintChips();
-  showOnly('hintState');
+  $('resetBtn').style.display='none';
+  $('searchInput').value='';
   cachedWx=null; cachedLoc=null; cachedHrMap=new Map();
   windDirs=new Set(); manualShoreSet=false;
   document.querySelectorAll('.s-btn').forEach(b=>b.classList.remove('active'));
   $('shoreHint').textContent='Select good wind directions for this spot';
-  $('searchInput').blur(); // never auto-focus — especially important on mobile
+  renderHintChips();
+  $('searchInput').blur();
 }
 function goHome(){
   closeAC();
