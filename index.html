@@ -2953,7 +2953,7 @@ async function sendMagicLink(){
   if(!email){ showToast('Enter your email first'); return; }
   const btn=$('ppMagicBtn');
   btn.textContent='Sending…'; btn.disabled=true;
-  const{error}=await getSb().auth.signInWithOtp({email});
+  const{error}=await getSb().auth.signInWithOtp({email,options:{emailRedirectTo:'https://tomguiz.github.io/kiteforecast/'}});
   btn.disabled=false;
   if(error){ btn.textContent='Send magic link'; showToast('Error: '+error.message); }
   else{ btn.textContent='✓ Check your email'; showToast('Magic link sent to '+email); }
