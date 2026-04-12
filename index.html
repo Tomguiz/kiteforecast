@@ -851,6 +851,15 @@
       <div id="ppAuthSection" style="display:flex;flex-direction:column;gap:14px">
         <!-- Context-specific onboarding card (hidden by default, shown by renderSignInOnboarding) -->
         <div id="ppSignInContext" style="display:none"></div>
+        <!-- Value-prop empty state: shown when signed out AND no stored notifs -->
+        <div id="ppEmptyState" style="display:none" class="pp-info-banner">
+          <span class="pp-info-banner-icon">🔔</span>
+          <div class="pp-info-banner-body">
+            <p class="pp-info-banner-title">Get alerted before your best sessions</p>
+            <p class="pp-info-banner-desc">Sign in to receive wind alerts 72h, 24h and 1h before your kite windows. Free, no password needed.</p>
+          </div>
+        </div>
+        <!-- Active-notifs banner: shown when signed out AND has stored notifs -->
         <div id="ppEmailWarning" style="display:none" class="pp-info-banner">
           <span class="pp-info-banner-icon">🔔</span>
           <div class="pp-info-banner-body">
@@ -862,9 +871,9 @@
         <div id="ppSignInDivider" style="display:none" class="pp-divider"><span class="pp-divider-txt">sign in to continue</span></div>
         <!-- Step 1: email -->
         <div id="ppStep1" style="display:flex;flex-direction:column;gap:10px">
-          <label class="pp-label">Email address</label>
+          <label class="pp-label">Your email</label>
           <input type="email" id="ppEmailInput" class="pp-input" placeholder="your@email.com" autocomplete="email" />
-          <button class="btn pp-save-btn" id="ppSendCodeBtn" onclick="sendOtpCode()">Send code</button>
+          <button class="btn pp-save-btn" id="ppSendCodeBtn" onclick="sendOtpCode()">Get notified — it&apos;s free</button>
           <p class="pp-note" style="text-align:center">No password — we&apos;ll email you a one-time code.</p>
         </div>
         <!-- Step 2: code entry (hidden until code sent) -->
@@ -885,13 +894,13 @@
           </div>
         </div>
         <p class="pp-note" style="margin:0">Notifications &amp; favourites stay in sync across all your devices.</p>
-        <button class="btn-reset" id="ppSignOutBtn" onclick="signOut()" style="font-size:.78rem;color:var(--tdim);text-align:left;padding:0;">Sign out</button>
+        <div style="border-top:1px solid var(--border);margin:4px 0"></div>
+        <label class="pp-label">Tide API key <a href="https://www.worldtides.info/developer" target="_blank" rel="noopener" style="color:var(--accent);font-size:.75rem;font-weight:400;margin-left:6px">Get free key ↗</a></label>
+        <input type="text" id="ppTideKeyInput" class="pp-input" placeholder="Paste your WorldTides API key" />
+        <button class="btn pp-save-btn" id="ppTideSaveBtn" onclick="saveTideKey()" style="margin-top:2px">Save</button>
+        <p class="pp-note">Used to show exact high/low tide times. Free at worldtides.info/developer.</p>
+        <button class="btn-reset" id="ppSignOutBtn" onclick="signOut()" style="font-size:.78rem;color:var(--tdim);text-align:left;padding:4px 0 0;">Sign out</button>
       </div>
-      <!-- Tide key always shown -->
-      <label class="pp-label" style="margin-top:6px">Tide API key <a href="https://www.worldtides.info/developer" target="_blank" rel="noopener" style="color:var(--accent);font-size:.75rem;font-weight:400;margin-left:6px">Get free key ↗</a></label>
-      <input type="text" id="ppTideKeyInput" class="pp-input" placeholder="Paste your WorldTides API key" />
-      <button class="btn pp-save-btn" id="ppTideSaveBtn" onclick="saveTideKey()" style="margin-top:6px">Save</button>
-      <p class="pp-note">Used to show exact high/low tide times. Free at worldtides.info/developer.</p>
     </div>
     <div id="ppPanelNotifs" class="pp-body" style="display:none">
       <div class="pp-toggle-row">
@@ -3321,6 +3330,9 @@ function updateAuthUI(){
   $('ppAuthSection').style.display=loggedIn?'none':'flex';
   $('ppLoggedSection').style.display=loggedIn?'flex':'none';
   if(loggedIn) $('ppLoggedEmail').textContent=_authSession.user.email;
+  // Hide tabs for unauthenticated users
+  const tabs=document.querySelector('.pp-tabs');
+  if(tabs) tabs.style.display=loggedIn?'flex':'none';
   // Update profile button
   const btn=$('profileBtn');
   if(loggedIn){
@@ -3337,6 +3349,8 @@ function updateEmailWarning(){
   const loggedIn=!!_authSession?.user;
   const hasNotifs=loadNotifs().length>0;
   $('ppEmailWarning').style.display=(!loggedIn&&hasNotifs)?'block':'none';
+  const emptyState=$('ppEmptyState');
+  if(emptyState) emptyState.style.display=(!loggedIn&&!hasNotifs)?'block':'none';
 }
 function toggleMasterNotif(){
   const p=loadProfile();
