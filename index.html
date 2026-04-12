@@ -1783,6 +1783,13 @@ function isFavorite(loc){
 function toggleFavorite(){
   document.activeElement?.blur();
   const loc=cachedLoc; if(!loc) return;
+  // Require sign-in to save spots
+  if(!_authSession?.user){
+    pendingFav={name:loc.name,label:`${loc.name}${loc.admin1&&loc.admin1!==loc.name?', '+loc.admin1:''}`,lat:loc.latitude,lon:loc.longitude,dirs:[...windDirs]};
+    openProfilePanel('profile');
+    showToast('Sign in to save spots to My Spots');
+    return;
+  }
   let favs=loadFavs();
   const idx=favs.findIndex(f=>f.name===loc.name&&f.lat===loc.latitude);
   if(idx>=0){
@@ -2856,8 +2863,9 @@ async function fireConfirmationWebhook(spot, sessions){
   }catch(e){ console.warn('Confirmation webhook failed',e); }
 }
 
-// ── PENDING NOTIF ──
+// ── PENDING ACTIONS (set before sign-in, executed after) ──
 let pendingNotif=null;
+let pendingFav=null;
 
 // ── PROFILE PANEL ──
 let ppCurrentTab='profile';
@@ -2961,6 +2969,17 @@ async function initAuth(){
         if(pn.type==='spot') addSpotNotif(pn.spot,pn.sessions);
         else addDayNotif(pn.spot,pn.dateStr,pn.sessInfo);
         if(cachedLoc) renderGrid();
+      }
+      if(pendingFav){
+        const pf=pendingFav; pendingFav=null;
+        const favs=loadFavs();
+        if(!favs.some(f=>f.name===pf.name&&f.lat===pf.lat)){
+          favs.push(pf); saveFavs(favs);
+          renderHintChips();
+          const btn=$('favBtn');
+          if(btn){ btn.textContent='★'; btn.classList.add('active'); btn.title='Remove from favourites'; }
+          showToast('★ '+pf.name+' added to My Spots');
+        }
       }
     } else if(event==='SIGNED_OUT'){
       updateAuthUI(); updateProfileDot(); renderHintChips();
