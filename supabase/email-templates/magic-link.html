@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign in to KiteForecast</title>
+</head>
+<body style="margin:0;padding:0;background-color:#0a0f1e;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0a0f1e;padding:40px 16px;">
+    <tr>
+      <td align="center">
+        <table width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;">
+
+          <!-- Header -->
+          <tr>
+            <td align="center" style="padding-bottom:32px;">
+              <p style="margin:0;font-size:1.6rem;font-weight:700;color:#ffffff;letter-spacing:-0.5px;">
+                🪁 KiteForecast
+              </p>
+              <p style="margin:6px 0 0;font-size:0.85rem;color:#64748b;letter-spacing:0.05em;text-transform:uppercase;">
+                by Tichkes
+              </p>
+            </td>
+          </tr>
+
+          <!-- Card -->
+          <tr>
+            <td style="background-color:#111827;border-radius:16px;padding:36px 32px;">
+
+              <p style="margin:0 0 8px;font-size:1.1rem;font-weight:600;color:#f1f5f9;">
+                Your sign-in code
+              </p>
+              <p style="margin:0 0 28px;font-size:0.9rem;color:#94a3b8;line-height:1.5;">
+                Enter this code in the KiteForecast app to sign in. It expires in 10 minutes.
+              </p>
+
+              <!-- Code box -->
+              <div style="background-color:#0a0f1e;border:2px solid #38bdf8;border-radius:12px;padding:24px;text-align:center;margin-bottom:28px;">
+                <p style="margin:0 0 4px;font-size:0.75rem;color:#64748b;letter-spacing:0.1em;text-transform:uppercase;">Sign-in code</p>
+                <p style="margin:0;font-size:2.4rem;font-weight:700;color:#38bdf8;letter-spacing:0.3em;">{{ .Token }}</p>
+              </div>
+
+              <p style="margin:0;font-size:0.82rem;color:#475569;line-height:1.6;">
+                If you didn't request this code, you can safely ignore this email. Someone may have entered your address by mistake.
+              </p>
+
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td align="center" style="padding-top:28px;">
+              <p style="margin:0;font-size:0.78rem;color:#334155;">
+                KiteForecast &mdash; 10-day kitesurf session forecasts &amp; alerts
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
