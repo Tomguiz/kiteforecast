@@ -489,6 +489,20 @@
       background:rgba(234,179,8,.1); border:1px solid rgba(234,179,8,.3);
       color:#fde047; border-radius:9px; padding:10px 13px; font-size:.78rem; line-height:1.5;
     }
+    /* sign-in onboarding card */
+    .pp-ob-card {
+      background:linear-gradient(135deg,rgba(0,212,255,.09),rgba(14,165,233,.05));
+      border:1px solid rgba(0,212,255,.22); border-radius:13px; padding:16px 15px;
+      display:flex; gap:13px; align-items:flex-start;
+    }
+    .pp-ob-icon { font-size:1.6rem; line-height:1; flex-shrink:0; margin-top:1px; }
+    .pp-ob-title { font-size:.92rem; font-weight:700; color:var(--text); margin:0 0 5px; }
+    .pp-ob-desc  { font-size:.78rem; color:var(--gray); margin:0 0 9px; line-height:1.45; }
+    .pp-ob-perks { display:flex; flex-direction:column; gap:3px; }
+    .pp-ob-perks span { font-size:.73rem; color:var(--accent); font-weight:500; }
+    .pp-divider { display:flex; align-items:center; gap:8px; }
+    .pp-divider::before,.pp-divider::after { content:''; flex:1; height:1px; background:var(--border); }
+    .pp-divider-txt { font-size:.72rem; color:var(--tdim); white-space:nowrap; }
 
     /* master toggle */
     .pp-toggle-row { display:flex; align-items:center; justify-content:space-between; padding:4px 0; }
@@ -625,7 +639,7 @@
   <button class="home-btn" onclick="goHome()" title="Home">
     <img src="logo.png" alt="Tichkes" class="site-logo" onerror="this.style.display='none'">
   </button>
-  <button class="profile-btn" onclick="openProfilePanel()" title="Profile &amp; Notifications" id="profileBtn">
+  <button class="profile-btn" onclick="_signinContext='generic';openProfilePanel()" title="Profile &amp; Notifications" id="profileBtn">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <circle cx="12" cy="8" r="4"/>
       <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
@@ -760,35 +774,38 @@
     </div>
     <div id="ppPanelProfile" class="pp-body">
       <!-- Not signed in -->
-      <div id="ppAuthSection" style="display:flex;flex-direction:column;gap:12px">
-        <div id="ppEmailWarning" style="display:none" class="pp-warning">⚠️ Active notifications are paused until you sign in</div>
-        <p class="pp-note" style="margin:0">Sign in to sync your notifications across all devices.</p>
+      <div id="ppAuthSection" style="display:flex;flex-direction:column;gap:14px">
+        <!-- Context-specific onboarding card (hidden by default, shown by renderSignInOnboarding) -->
+        <div id="ppSignInContext" style="display:none"></div>
+        <div id="ppEmailWarning" style="display:none" class="pp-warning">⚠️ Notifications are paused — sign in to reactivate them</div>
+        <!-- Divider shown only when context card is visible -->
+        <div id="ppSignInDivider" style="display:none" class="pp-divider"><span class="pp-divider-txt">sign in to continue</span></div>
         <!-- Step 1: email -->
-        <div id="ppStep1" style="display:flex;flex-direction:column;gap:12px">
+        <div id="ppStep1" style="display:flex;flex-direction:column;gap:10px">
           <label class="pp-label">Email address</label>
-          <input type="email" id="ppEmailInput" class="pp-input" placeholder="your@email.com" />
+          <input type="email" id="ppEmailInput" class="pp-input" placeholder="your@email.com" autocomplete="email" />
           <button class="btn pp-save-btn" id="ppSendCodeBtn" onclick="sendOtpCode()">Send code</button>
-          <p class="pp-note">You'll receive a sign-in code — no password needed.</p>
+          <p class="pp-note" style="text-align:center">No password — we&apos;ll email you a one-time code.</p>
         </div>
         <!-- Step 2: code entry (hidden until code sent) -->
-        <div id="ppStep2" style="display:none;flex-direction:column;gap:12px">
-          <p class="pp-note" style="margin:0">Enter the code sent to <strong id="ppCodeEmail"></strong></p>
-          <input type="text" id="ppCodeInput" class="pp-input" placeholder="••••••••" maxlength="12" inputmode="numeric" pattern="[0-9]*" style="letter-spacing:.2em;font-size:1.2rem;text-align:center" />
-          <button class="btn pp-save-btn" id="ppVerifyBtn" onclick="verifyOtpCode()">Verify</button>
-          <button class="btn-reset" style="font-size:.8rem;color:var(--accent);text-align:center" onclick="resetOtpFlow()">← Use a different email</button>
+        <div id="ppStep2" style="display:none;flex-direction:column;gap:10px">
+          <p class="pp-note" style="margin:0">Code sent to <strong id="ppCodeEmail"></strong></p>
+          <input type="text" id="ppCodeInput" class="pp-input" placeholder="••••••••" maxlength="12" inputmode="numeric" pattern="[0-9]*" style="letter-spacing:.2em;font-size:1.2rem;text-align:center" autocomplete="one-time-code" />
+          <button class="btn pp-save-btn" id="ppVerifyBtn" onclick="verifyOtpCode()">Verify &amp; sign in</button>
+          <button class="btn-reset" style="font-size:.78rem;color:var(--tdim);text-align:center;padding:2px 0" onclick="resetOtpFlow()">← Use a different email</button>
         </div>
       </div>
       <!-- Signed in -->
       <div id="ppLoggedSection" style="display:none;flex-direction:column;gap:12px">
-        <div style="background:rgba(56,189,248,.08);border:1px solid rgba(56,189,248,.25);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:6px">
-          <div style="display:flex;align-items:center;gap:8px">
-            <span style="font-size:1rem;line-height:1">✅</span>
-            <span style="font-size:.85rem;font-weight:600;color:#f1f5f9;">Signed in &amp; notifications synced</span>
+        <div style="background:rgba(74,222,128,.07);border:1px solid rgba(74,222,128,.22);border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:12px">
+          <span style="font-size:1.3rem;line-height:1;flex-shrink:0">✅</span>
+          <div style="flex:1;min-width:0">
+            <p style="margin:0 0 2px;font-size:.85rem;font-weight:700;color:#f1f5f9;">Signed in</p>
+            <p id="ppLoggedEmail" style="margin:0;font-size:.78rem;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></p>
           </div>
-          <p id="ppLoggedEmail" style="margin:0;font-size:.82rem;color:#64748b;padding-left:26px;"></p>
         </div>
-        <p class="pp-note" style="margin:0">Your notifications are active and will stay in sync across all your devices.</p>
-        <button class="btn-reset" id="ppSignOutBtn" onclick="signOut()" style="font-size:.8rem;color:#64748b;text-align:left;padding:0;">Sign out →</button>
+        <p class="pp-note" style="margin:0">Notifications &amp; favourites stay in sync across all your devices.</p>
+        <button class="btn-reset" id="ppSignOutBtn" onclick="signOut()" style="font-size:.78rem;color:var(--tdim);text-align:left;padding:0;">Sign out</button>
       </div>
       <!-- Tide key always shown -->
       <label class="pp-label" style="margin-top:6px">Tide API key <a href="https://www.worldtides.info/developer" target="_blank" rel="noopener" style="color:var(--accent);font-size:.75rem;font-weight:400;margin-left:6px">Get free key ↗</a></label>
@@ -1087,6 +1104,7 @@ function setShoreByDeg(deg){ setWindDirs([deg]); }
 const $=id=>document.getElementById(id);
 let _fetchGen=0; // incremented on every new fetch and on resetSearch to cancel in-flight fetches
 let _authSession=null; // set by initAuth; kept in sync via onAuthStateChange
+let _signinContext='generic'; // 'notif' | 'fav' | 'generic' — drives onboarding copy in the sign-in panel
 function showOnly(id){
   ['hintState','loadingState','errorState','results'].forEach(s=>{
     $(s).style.display=s!==id?'none':(s==='results'||s==='hintState')?'block':'flex';
@@ -1805,8 +1823,8 @@ function toggleFavorite(){
   // Require sign-in to save spots
   if(!_authSession?.user){
     pendingFav={name:loc.name,label:`${loc.name}${loc.admin1&&loc.admin1!==loc.name?', '+loc.admin1:''}`,lat:loc.latitude,lon:loc.longitude,dirs:[...windDirs]};
+    _signinContext='fav';
     openProfilePanel('profile');
-    showToast('Sign in to save spots to My Spots');
     return;
   }
   let favs=loadFavs();
@@ -2899,6 +2917,46 @@ let pendingFav=null;
 // ── PROFILE PANEL ──
 let ppCurrentTab='profile';
 
+function renderSignInOnboarding(){
+  const ctx=$('ppSignInContext');
+  const div=$('ppSignInDivider');
+  if(!ctx) return;
+  if(_authSession?.user){ ctx.style.display='none'; if(div) div.style.display='none'; return; }
+  if(_signinContext==='notif'){
+    ctx.innerHTML=`<div class="pp-ob-card">
+      <div class="pp-ob-icon">🔔</div>
+      <div>
+        <p class="pp-ob-title">Never miss a session</p>
+        <p class="pp-ob-desc">Get email alerts before your best kite windows — 72h, 24h and 1h out.</p>
+        <div class="pp-ob-perks">
+          <span>✓ Free &amp; no password needed</span>
+          <span>✓ Works on any device</span>
+          <span>✓ Cancel at any time</span>
+        </div>
+      </div>
+    </div>`;
+    ctx.style.display='block';
+    if(div) div.style.display='flex';
+  } else if(_signinContext==='fav'){
+    ctx.innerHTML=`<div class="pp-ob-card">
+      <div class="pp-ob-icon">⭐</div>
+      <div>
+        <p class="pp-ob-title">Save your go-to spots</p>
+        <p class="pp-ob-desc">Pin spots to your home screen for one-tap forecast access.</p>
+        <div class="pp-ob-perks">
+          <span>✓ Instant access from home screen</span>
+          <span>✓ Syncs across all your devices</span>
+          <span>✓ Free &amp; no password needed</span>
+        </div>
+      </div>
+    </div>`;
+    ctx.style.display='block';
+    if(div) div.style.display='flex';
+  } else {
+    ctx.style.display='none';
+    if(div) div.style.display='none';
+  }
+}
 function openProfilePanel(tab){
   try{
     tab=tab||'profile';
@@ -2906,11 +2964,12 @@ function openProfilePanel(tab){
     document.body.style.overflow='hidden';
     switchPpTab(tab);
     $('ppTideKeyInput').value=loadProfile().tideKey||'';
+    renderSignInOnboarding();
     updateAuthUI();
     renderNotifList();
     updateProfileDot();
     // Sync in background on every open so cross-device changes appear immediately
-    const email=loadProfile().email;
+    const email=_authSession?.user?.email||loadProfile().email;
     if(email) syncNotifsFromSupabase(email).then(()=>{ renderNotifList(); updateProfileDot(); });
   }catch(err){
     console.error('openProfilePanel error:',err);
@@ -2980,14 +3039,25 @@ async function fetchTideAndRefresh(){
 // ── AUTH ──
 async function initAuth(){
   const sb=getSb();
+  // Restore session from storage — this is the authoritative check on every page load
   const { data:{ session } }=await sb.auth.getSession();
   _authSession=session;
   if(session?.user?.email){
     const p=loadProfile(); p.email=session.user.email; saveProfile(p);
   }
-  updateAuthUI();
+  updateAuthUI(); updateProfileDot(); renderHintChips();
+
   sb.auth.onAuthStateChange(async(event,session)=>{
-    _authSession=session;
+    // ── Positive events: always trust the new session ──
+    if(event==='SIGNED_IN'||event==='TOKEN_REFRESHED'||event==='INITIAL_SESSION'){
+      if(session) _authSession=session;
+    }
+    // ── SIGNED_OUT: only act on explicit sign-out (user clicked the button).
+    //    Ignore transient SIGNED_OUT that Supabase can fire on token-refresh
+    //    failure, PWA relaunch, or background tab restoration — those would
+    //    unexpectedly log the user out. The signOut() function handles cleanup. ──
+    // (no else-if for SIGNED_OUT — handled entirely by signOut() below)
+
     if(event==='SIGNED_IN'&&session?.user?.email){
       const email=session.user.email;
       const p=loadProfile();
@@ -3013,7 +3083,9 @@ async function initAuth(){
           showToast('★ '+pf.name+' added to My Spots');
         }
       }
-    } else if(event==='SIGNED_OUT'){
+    } else if((event==='TOKEN_REFRESHED'||event==='INITIAL_SESSION')&&session?.user){
+      // Silent restore / refresh — update UI without toast
+      const p=loadProfile(); p.email=session.user.email; saveProfile(p);
       updateAuthUI(); updateProfileDot(); renderHintChips();
     }
   });
@@ -3046,20 +3118,22 @@ async function verifyOtpCode(){
   btn.textContent='Verifying…'; btn.disabled=true;
   const{data,error}=await getSb().auth.verifyOtp({email,token,type:'email'});
   btn.disabled=false;
-  if(error){ btn.textContent='Verify'; showToast('❌ Invalid code — please try again'); return; }
+  if(error){ btn.textContent='Verify & sign in'; showToast('❌ Invalid code — please try again'); return; }
   // Update session immediately so UI switches without waiting for onAuthStateChange
   _authSession=data.session;
+  _signinContext='generic';
   resetOtpFlow();
-  updateAuthUI(); updateProfileDot();
-  showToast('✅ Signed in — notifications synced');
+  updateAuthUI(); updateProfileDot(); renderHintChips();
+  showToast('✅ Signed in successfully');
 }
 
 async function signOut(){
-  await getSb().auth.signOut();
+  // Clear state first so onAuthStateChange SIGNED_OUT (which fires after signOut()) has nothing to do
+  _authSession=null;
   const p=loadProfile(); delete p.email; saveProfile(p);
   localStorage.removeItem('kf_notifs');
-  _authSession=null;
   updateAuthUI(); updateProfileDot(); renderNotifList(); renderHintChips();
+  try{ await getSb().auth.signOut(); }catch(e){ /* ignore network errors on sign-out */ }
   showToast('Signed out');
 }
 
@@ -3200,8 +3274,8 @@ function toggleSpotNotif(){
     if(!_authSession?.user){
       const sessions=getQualSessions();
       pendingNotif={type:'spot',spot:{name:loc.name,lat:loc.latitude,lon:loc.longitude},sessions};
+      _signinContext='notif';
       openProfilePanel('profile');
-      showToast('Sign in to get notified');
       return;
     }
     if(hasSpotNotif(loc.name)){
@@ -3277,11 +3351,10 @@ function toggleDayNotif(e,dateStr,dayIdx){
   };
   const spot={name:loc.name,lat:loc.latitude,lon:loc.longitude};
 
-  const p=loadProfile();
-  if(!p.email){
+  if(!_authSession?.user){
     pendingNotif={type:'day',spot,dateStr,sessInfo};
+    _signinContext='notif';
     openProfilePanel('profile');
-    showToast('📧 Enter your email to get notified');
     return;
   }
   if(hasDayNotif(loc.name,dateStr)){
