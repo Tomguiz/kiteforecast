@@ -1,0 +1,17 @@
+{
+  "name": "KiteForecast",
+  "short_name": "KiteForecast",
+  "description": "10-day kitesurf session forecast & alerts",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#0a0f1e",
+  "theme_color": "#0a0f1e",
+  "icons": [
+    {
+      "src": "logo.png",
+      "sizes": "any",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
