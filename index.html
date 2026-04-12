@@ -1813,6 +1813,7 @@ function loadUserDirsForSpot(name){
 }
 
 function isFavorite(loc){
+  if(!_authSession?.user) return false;
   return loadFavs().some(f=>f.name===loc.name&&f.lat===loc.latitude);
 }
 
@@ -2614,8 +2615,8 @@ async function syncNotifsFromSupabase(email){
 
 function notifMasterEnabled(){ return loadProfile().notifsEnabled !== false; }
 
-function hasSpotNotif(spotName){ return loadNotifs().some(n=>n.type==='spot'&&n.spotName===spotName); }
-function hasDayNotif(spotName,date){ return loadNotifs().some(n=>n.type==='day'&&n.spotName===spotName&&n.date===date); }
+function hasSpotNotif(spotName){ return !!_authSession?.user&&loadNotifs().some(n=>n.type==='spot'&&n.spotName===spotName); }
+function hasDayNotif(spotName,date){ return !!_authSession?.user&&loadNotifs().some(n=>n.type==='day'&&n.spotName===spotName&&n.date===date); }
 
 // After a fresh forecast fetch, auto-schedule reminders for any new eligible
 // sessions that appeared for a subscribed spot.
