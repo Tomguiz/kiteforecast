@@ -749,10 +749,20 @@
       <div id="ppAuthSection" style="display:flex;flex-direction:column;gap:12px">
         <div id="ppEmailWarning" style="display:none" class="pp-warning">⚠️ Active notifications are paused until you sign in</div>
         <p class="pp-note" style="margin:0">Sign in to sync your notifications across all devices.</p>
-        <label class="pp-label">Email address</label>
-        <input type="email" id="ppEmailInput" class="pp-input" placeholder="your@email.com" />
-        <button class="btn pp-save-btn" id="ppMagicBtn" onclick="sendMagicLink()">Send magic link</button>
-        <p class="pp-note">You'll receive a sign-in link — no password needed.</p>
+        <!-- Step 1: email -->
+        <div id="ppStep1" style="display:flex;flex-direction:column;gap:12px">
+          <label class="pp-label">Email address</label>
+          <input type="email" id="ppEmailInput" class="pp-input" placeholder="your@email.com" />
+          <button class="btn pp-save-btn" id="ppSendCodeBtn" onclick="sendOtpCode()">Send code</button>
+          <p class="pp-note">You'll receive a 6-digit code — no password needed.</p>
+        </div>
+        <!-- Step 2: code entry (hidden until code sent) -->
+        <div id="ppStep2" style="display:none;flex-direction:column;gap:12px">
+          <p class="pp-note" style="margin:0">Enter the 6-digit code sent to <strong id="ppCodeEmail"></strong></p>
+          <input type="text" id="ppCodeInput" class="pp-input" placeholder="123456" maxlength="6" inputmode="numeric" pattern="[0-9]*" style="letter-spacing:.2em;font-size:1.2rem;text-align:center" />
+          <button class="btn pp-save-btn" id="ppVerifyBtn" onclick="verifyOtpCode()">Verify</button>
+          <button class="btn-reset" style="font-size:.8rem;color:var(--accent);text-align:center" onclick="resetOtpFlow()">← Use a different email</button>
+        </div>
       </div>
       <!-- Signed in -->
       <div id="ppLoggedSection" style="display:none;flex-direction:column;gap:12px">
@@ -2948,15 +2958,35 @@ async function initAuth(){
   });
 }
 
-async function sendMagicLink(){
+async function sendOtpCode(){
   const email=($('ppEmailInput').value||'').trim();
   if(!email){ showToast('Enter your email first'); return; }
-  const btn=$('ppMagicBtn');
+  const btn=$('ppSendCodeBtn');
   btn.textContent='Sending…'; btn.disabled=true;
-  const{error}=await getSb().auth.signInWithOtp({email,options:{emailRedirectTo:'https://tomguiz.github.io/kiteforecast/'}});
+  const{error}=await getSb().auth.signInWithOtp({email,options:{shouldCreateUser:true}});
   btn.disabled=false;
-  if(error){ btn.textContent='Send magic link'; showToast('Error: '+error.message); }
-  else{ btn.textContent='✓ Check your email'; showToast('Magic link sent to '+email); }
+  if(error){ btn.textContent='Send code'; showToast('Error: '+error.message); return; }
+  $('ppCodeEmail').textContent=email;
+  $('ppStep1').style.display='none';
+  $('ppStep2').style.display='flex';
+  setTimeout(()=>$('ppCodeInput').focus(),100);
+}
+function resetOtpFlow(){
+  $('ppStep2').style.display='none';
+  $('ppStep1').style.display='flex';
+  $('ppCodeInput').value='';
+  $('ppSendCodeBtn').textContent='Send code';
+}
+async function verifyOtpCode(){
+  const email=($('ppEmailInput').value||'').trim();
+  const token=($('ppCodeInput').value||'').trim();
+  if(token.length<6){ showToast('Enter the 6-digit code'); return; }
+  const btn=$('ppVerifyBtn');
+  btn.textContent='Verifying…'; btn.disabled=true;
+  const{error}=await getSb().auth.verifyOtp({email,token,type:'email'});
+  btn.disabled=false;
+  if(error){ btn.textContent='Verify'; showToast('Invalid code: '+error.message); }
+  else{ showToast('Signed in!'); resetOtpFlow(); }
 }
 
 async function signOut(){
