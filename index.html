@@ -1687,7 +1687,9 @@ function pickSpot(spot){
   fetchForecastFromSpot(spot);
 }
 
+let _fetchGen=0;
 async function fetchForecastFromSpot(spot){
+  const myGen=++_fetchGen;
   showOnly('loadingState');
   manualShoreSet=false;
   try{
@@ -1733,6 +1735,7 @@ async function fetchForecastFromSpot(spot){
     });
     buildMarineMap(await marineP);
     cachedTides=applyTideTimezone(await tideP, cachedWx.timezone||'UTC');
+    if(myGen!==_fetchGen) return; // user navigated away — discard results
     lastFetchTime=Date.now(); try{localStorage.setItem('kf_lastFetch',lastFetchTime);}catch(e){}
     renderGrid();
     recheckSpotSubscription();
@@ -1943,6 +1946,7 @@ function removeFav(f){
 //  SEARCH
 // ══════════════════════════════════
 function resetSearch(){
+  _fetchGen++; // cancel any in-flight fetch
   $('searchInput').value='';
   $('resetBtn').style.display='none';
   document.body.classList.remove('spot-loaded');
@@ -1959,11 +1963,7 @@ function resetSearch(){
 }
 function goHome(){
   closeAC();
-  if(cachedLoc){
-    refreshForecast();
-  } else {
-    resetSearch();
-  }
+  resetSearch();
 }
 async function doSearch(){
   closeAC();
