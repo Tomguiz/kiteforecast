@@ -489,6 +489,14 @@
       background:rgba(234,179,8,.1); border:1px solid rgba(234,179,8,.3);
       color:#fde047; border-radius:9px; padding:10px 13px; font-size:.78rem; line-height:1.5;
     }
+    .pp-info-banner {
+      background:rgba(56,189,248,.08); border:1px solid rgba(56,189,248,.25);
+      border-radius:12px; padding:14px 16px; display:flex; gap:12px; align-items:flex-start;
+    }
+    .pp-info-banner-icon { font-size:1.3rem; line-height:1; flex-shrink:0; margin-top:1px; }
+    .pp-info-banner-body { flex:1; }
+    .pp-info-banner-title { font-size:.82rem; font-weight:600; color:#e0f2fe; margin:0 0 3px; }
+    .pp-info-banner-desc { font-size:.75rem; color:#94a3b8; line-height:1.5; margin:0; }
     /* sign-in onboarding card */
     .pp-ob-card {
       background:linear-gradient(135deg,rgba(0,212,255,.09),rgba(14,165,233,.05));
@@ -777,7 +785,13 @@
       <div id="ppAuthSection" style="display:flex;flex-direction:column;gap:14px">
         <!-- Context-specific onboarding card (hidden by default, shown by renderSignInOnboarding) -->
         <div id="ppSignInContext" style="display:none"></div>
-        <div id="ppEmailWarning" style="display:none" class="pp-warning">⚠️ Notifications are paused — sign in to reactivate them</div>
+        <div id="ppEmailWarning" style="display:none" class="pp-info-banner">
+          <span class="pp-info-banner-icon">🔔</span>
+          <div class="pp-info-banner-body">
+            <p class="pp-info-banner-title">Your alerts are active</p>
+            <p class="pp-info-banner-desc">Sign in to see, edit, or cancel your scheduled notifications.</p>
+          </div>
+        </div>
         <!-- Divider shown only when context card is visible -->
         <div id="ppSignInDivider" style="display:none" class="pp-divider"><span class="pp-divider-txt">sign in to continue</span></div>
         <!-- Step 1: email -->
