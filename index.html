@@ -1816,7 +1816,8 @@ function setChipDayBadge(el,n){
 }
 
 function renderHintChips(){
-  const favs=loadFavs();
+  const signedIn=!!_authSession?.user;
+  const favs=signedIn?loadFavs():[];
   const wrap=$('hintChips');
   wrap.innerHTML='';
 
@@ -1848,8 +1849,13 @@ function renderHintChips(){
       chip.appendChild(label); chip.appendChild(rm);
       wrap.appendChild(chip);
     });
+  }
+
+  // Always show Suggestions label
+  {
     const lbl2=document.createElement('div');
-    lbl2.className='hints-section-label lbl-sugg'; lbl2.textContent='Suggestions';
+    lbl2.className='hints-section-label lbl-sugg';
+    lbl2.textContent=favs.length?'Suggestions':'Discover spots';
     wrap.appendChild(lbl2);
   }
 
@@ -2947,7 +2953,7 @@ async function initAuth(){
       const p=loadProfile();
       const isNew=email!==p.email;
       p.email=email; saveProfile(p);
-      updateAuthUI(); updateProfileDot();
+      updateAuthUI(); updateProfileDot(); renderHintChips();
       if(isNew) await syncNotifsFromSupabase(email);
       showToast('✓ Signed in as '+email);
       if(pendingNotif){
@@ -2957,7 +2963,7 @@ async function initAuth(){
         if(cachedLoc) renderGrid();
       }
     } else if(event==='SIGNED_OUT'){
-      updateAuthUI(); updateProfileDot();
+      updateAuthUI(); updateProfileDot(); renderHintChips();
     }
   });
 }
@@ -3002,7 +3008,7 @@ async function signOut(){
   const p=loadProfile(); delete p.email; saveProfile(p);
   localStorage.removeItem('kf_notifs');
   _authSession=null;
-  updateAuthUI(); updateProfileDot(); renderNotifList();
+  updateAuthUI(); updateProfileDot(); renderNotifList(); renderHintChips();
   showToast('Signed out');
 }
 
