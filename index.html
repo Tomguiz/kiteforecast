@@ -3172,7 +3172,9 @@ function toggleMasterNotif(){
   $('ppMasterToggle').classList.toggle('on',p.notifsEnabled!==false);
 }
 function renderNotifList(){
-  const allNotifs=loadNotifs();
+  const signedIn=!!_authSession?.user;
+  // Never show stored notifications to a signed-out user
+  const allNotifs=signedIn?loadNotifs():[];
   // visible = spot entries + standalone day entries (not fromSpot)
   const visible=allNotifs.filter(n=>n.type==='spot'||(n.type==='day'&&!n.fromSpot));
   const countEl=$('ppNotifCount');
@@ -3180,6 +3182,10 @@ function renderNotifList(){
   else{countEl.style.display='none';}
   $('ppMasterToggle').className='pp-toggle'+(notifMasterEnabled()?' on':'');
   const list=$('ppNotifList');
+  if(!signedIn){
+    list.innerHTML='<div class="pp-empty">Sign in to manage your notifications</div>';
+    return;
+  }
   if(!visible.length){list.innerHTML='<div class="pp-empty">No active notifications</div>';return;}
   list.innerHTML=visible.map(n=>`
     <div class="pp-notif-item">
@@ -3208,7 +3214,8 @@ function deleteNotifById(id){
   if(cachedLoc) renderGrid();
 }
 function updateProfileDot(){
-  const hasNotifs=loadNotifs().length>0;
+  const signedIn=!!_authSession?.user;
+  const hasNotifs=signedIn&&loadNotifs().length>0;
   document.querySelectorAll('.profile-btn-dot').forEach(d=>d.classList.toggle('visible',hasNotifs));
 }
 // ── INSTALL BANNER ──
