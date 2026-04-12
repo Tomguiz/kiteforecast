@@ -1086,6 +1086,7 @@ function setShoreByDeg(deg){ setWindDirs([deg]); }
 // ══════════════════════════════════
 const $=id=>document.getElementById(id);
 let _fetchGen=0; // incremented on every new fetch and on resetSearch to cancel in-flight fetches
+let _authSession=null; // set by initAuth; kept in sync via onAuthStateChange
 function showOnly(id){
   ['hintState','loadingState','errorState','results'].forEach(s=>{
     $(s).style.display=s!==id?'none':(s==='results'||s==='hintState')?'block':'flex';
@@ -2977,8 +2978,6 @@ async function fetchTideAndRefresh(){
   if(cachedTides) renderGrid();
 }
 // ── AUTH ──
-let _authSession = null;
-
 async function initAuth(){
   const sb=getSb();
   const { data:{ session } }=await sb.auth.getSession();
