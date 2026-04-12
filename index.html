@@ -3244,8 +3244,10 @@ async function verifyOtpCode(){
   // Update session immediately so UI switches without waiting for onAuthStateChange
   _authSession=data.session;
   _signinContext='generic';
+  const p=loadProfile(); const isNew=email!==p.email; p.email=email; saveProfile(p);
   resetOtpFlow();
   updateAuthUI(); updateProfileDot(); renderHintChips();
+  if(isNew) await syncNotifsFromSupabase(email);
   showToast('✅ Signed in successfully');
 }
 
@@ -3312,10 +3314,30 @@ async function nsmVerifyCode(){
   const{data,error}=await getSb().auth.verifyOtp({email,token,type:'email'});
   btn.disabled=false;
   if(error){ btn.textContent='Confirm & get notified'; showToast('❌ Invalid code — please try again'); return; }
-  // Close modal — onAuthStateChange SIGNED_IN fires next and handles pendingNotif + toast
+
+  // Set session immediately — don't wait for onAuthStateChange which may be unreliable
+  _authSession=data.session;
   _signinContext='generic';
+  const p=loadProfile(); const isNew=email!==p.email; p.email=email; saveProfile(p);
+
+  // Close modal and refresh all auth-gated UI
   closeNotifSignupModal();
-  // Also mirror into profile panel fields so ppVerifyBtn flow stays consistent if user opens panel later
+  updateAuthUI(); updateProfileDot(); renderHintChips();
+
+  // Execute pending notif now — before the toast so the action feels instant
+  if(pendingNotif){
+    const pn=pendingNotif; pendingNotif=null;
+    if(isNew) await syncNotifsFromSupabase(email);
+    if(pn.type==='spot') addSpotNotif(pn.spot,pn.sessions);
+    else addDayNotif(pn.spot,pn.dateStr,pn.sessInfo);
+    if(cachedLoc) renderGrid();
+  } else if(isNew){
+    await syncNotifsFromSupabase(email);
+  }
+
+  showToast('📧 Notification set! Confirmation email sent.');
+
+  // Mirror email into profile panel input for consistency
   $('ppEmailInput').value=email;
 }
 
