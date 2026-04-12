@@ -3109,48 +3109,47 @@ function updateProfileDot(){
 let _deferredInstallPrompt = null;
 window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault();
-  _deferredInstallPrompt = e; // Android: native install prompt available
+  _deferredInstallPrompt = e;
 });
 
 function initInstallBanner(){
-  // Don't show if already running as installed PWA
+  // Already installed as PWA — never show
   const isStandalone = window.navigator.standalone === true ||
     window.matchMedia('(display-mode: standalone)').matches;
   if(isStandalone) return;
-  // Don't show on desktop
+
+  // Desktop — skip
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
   if(!isMobile) return;
-  // Don't show if already dismissed this session
-  if(sessionStorage.getItem('kf_install_dismissed')) return;
+
+  // Dismissed within the last 3 days — skip
+  const dismissedAt = parseInt(localStorage.getItem('kf_install_dismissed_at')||'0',10);
+  if(Date.now() - dismissedAt < 3*24*60*60*1000) return;
+
   const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-  const isAndroid = /Android/i.test(navigator.userAgent);
   $('installBannerSub').textContent = isIOS
     ? 'Tap the Share button (□↑) then "Add to Home Screen"'
-    : isAndroid
-    ? 'Tap the menu (⋮) then "Add to Home Screen"'
-    : 'Add this app to your home screen for the best experience';
-  // Only show Add button on Android when native install prompt is available
-  // iOS has no JS API to trigger the share sheet — instructions are the only option
-  if(!_deferredInstallPrompt){
-    $('installBannerBtn').style.display='none';
-  }
-  $('installBanner').style.display='flex';
+    : 'Tap the menu (⋮) then "Add to Home Screen"';
+
+  // Hide the Add button on iOS (no JS API to trigger share sheet)
+  $('installBannerBtn').style.display = (!isIOS && _deferredInstallPrompt) ? '' : 'none';
+
+  // Small delay so the banner doesn't flash during page paint
+  setTimeout(() => { $('installBanner').style.display='flex'; }, 1500);
 }
 
 async function handleInstallClick(){
   if(_deferredInstallPrompt){
-    // Android: trigger native install prompt
     _deferredInstallPrompt.prompt();
     const{ outcome } = await _deferredInstallPrompt.userChoice;
     if(outcome==='accepted') dismissInstallBanner();
     _deferredInstallPrompt = null;
   }
-  // iOS: no programmatic install — the sub text already explains what to do
 }
 
 function dismissInstallBanner(){
   $('installBanner').style.display='none';
-  sessionStorage.setItem('kf_install_dismissed', '1');
+  localStorage.setItem('kf_install_dismissed_at', String(Date.now()));
 }
 
 function showToast(msg){
