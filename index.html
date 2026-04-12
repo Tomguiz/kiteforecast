@@ -3057,8 +3057,9 @@ function initInstallBanner(){
   // Don't show on desktop
   const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
   if(!isMobile) return;
-  // Don't show if user already dismissed
-  if(localStorage.getItem('kf_install_dismissed')) return;
+  // Don't show if dismissed in the last 7 days
+  const dismissed=localStorage.getItem('kf_install_dismissed');
+  if(dismissed && Date.now()-parseInt(dismissed)<7*24*3600*1000) return;
   const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
   const isAndroid = /Android/i.test(navigator.userAgent);
   $('installBannerSub').textContent = isIOS
@@ -3087,7 +3088,7 @@ async function handleInstallClick(){
 
 function dismissInstallBanner(){
   $('installBanner').style.display='none';
-  localStorage.setItem('kf_install_dismissed','1');
+  localStorage.setItem('kf_install_dismissed', String(Date.now()));
 }
 
 function showToast(msg){
