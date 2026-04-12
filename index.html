@@ -3263,7 +3263,7 @@ async function signOut(){
 
 // ── NOTIF SIGNUP MICRO-MODAL ──
 function openNotifSignupModal(preview){
-  // preview: { spotName, dateLabel, peakKn, domDir }
+  // preview: { spotName, subtitle?, dateLabel?, peakKn?, domDir? }
   const headline=$('nsmHeadline');
   if(headline){
     const parts=['🔔'];
@@ -3273,6 +3273,8 @@ function openNotifSignupModal(preview){
     if(preview.domDir)    parts.push(preview.domDir);
     headline.textContent=parts.join(' · ');
   }
+  const sub=$('nsmSub');
+  if(sub) sub.textContent=preview.subtitle||'No password. Cancel anytime.';
   nsmResetFlow();
   $('notifSignupOverlay').style.display='flex';
   document.body.style.overflow='hidden';
@@ -3493,10 +3495,8 @@ function toggleSpotNotif(){
       // Pick the best session for the headline preview
       const best=sessions[0];
       openNotifSignupModal({
-        spotName:  loc.name,
-        dateLabel: best?fmtDate(best.dateStr).short:null,
-        peakKn:    best?best.peakKn:null,
-        domDir:    best?(best.domDir||null):null,
+        spotName: loc.name,
+        subtitle: 'All upcoming sessions',
       });
       return;
     }
@@ -3713,7 +3713,7 @@ document.addEventListener('visibilitychange',()=>{
     <div id="nsmStep1" style="display:flex;flex-direction:column;gap:16px">
       <div>
         <p id="nsmHeadline" class="nsm-headline"></p>
-        <p class="nsm-sub">No password. Cancel anytime.</p>
+        <p class="nsm-sub" id="nsmSub">No password. Cancel anytime.</p>
       </div>
       <input type="email" id="nsmEmailInput" class="nsm-email-input" placeholder="your@email.com" autocomplete="email" onkeydown="if(event.key==='Enter')nsmSendCode()" />
       <button class="nsm-cta" id="nsmSendBtn" onclick="nsmSendCode()">Get notified — it's free</button>
