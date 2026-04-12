@@ -766,11 +766,15 @@
       </div>
       <!-- Signed in -->
       <div id="ppLoggedSection" style="display:none;flex-direction:column;gap:12px">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-          <span class="pp-label" style="margin:0">Signed in as</span>
-          <button class="btn-reset" id="ppSignOutBtn" onclick="signOut()" style="font-size:.8rem;padding:6px 14px">Sign out</button>
+        <div style="background:rgba(56,189,248,.08);border:1px solid rgba(56,189,248,.25);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;align-items:center;gap:8px">
+            <span style="font-size:1rem;line-height:1">✅</span>
+            <span style="font-size:.85rem;font-weight:600;color:#f1f5f9;">Signed in &amp; notifications synced</span>
+          </div>
+          <p id="ppLoggedEmail" style="margin:0;font-size:.82rem;color:#64748b;padding-left:26px;"></p>
         </div>
-        <p id="ppLoggedEmail" style="color:var(--accent);font-weight:600;font-size:.95rem;margin:0"></p>
+        <p class="pp-note" style="margin:0">Your notifications are active and will stay in sync across all your devices.</p>
+        <button class="btn-reset" id="ppSignOutBtn" onclick="signOut()" style="font-size:.8rem;color:#64748b;text-align:left;padding:0;">Sign out →</button>
       </div>
       <!-- Tide key always shown -->
       <label class="pp-label" style="margin-top:6px">Tide API key <a href="https://www.worldtides.info/developer" target="_blank" rel="noopener" style="color:var(--accent);font-size:.75rem;font-weight:400;margin-left:6px">Get free key ↗</a></label>
@@ -2983,10 +2987,14 @@ async function verifyOtpCode(){
   if(token.length<4){ showToast('Enter the code from your email'); return; }
   const btn=$('ppVerifyBtn');
   btn.textContent='Verifying…'; btn.disabled=true;
-  const{error}=await getSb().auth.verifyOtp({email,token,type:'email'});
+  const{data,error}=await getSb().auth.verifyOtp({email,token,type:'email'});
   btn.disabled=false;
-  if(error){ btn.textContent='Verify'; showToast('Invalid code: '+error.message); }
-  else{ showToast('Signed in!'); resetOtpFlow(); }
+  if(error){ btn.textContent='Verify'; showToast('❌ Invalid code — please try again'); return; }
+  // Update session immediately so UI switches without waiting for onAuthStateChange
+  _authSession=data.session;
+  resetOtpFlow();
+  updateAuthUI(); updateProfileDot();
+  showToast('✅ Signed in — notifications synced');
 }
 
 async function signOut(){
