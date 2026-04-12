@@ -1798,6 +1798,7 @@ function isFavorite(loc){
 }
 
 function toggleFavorite(){
+  try{
   document.activeElement?.blur();
   const loc=cachedLoc; if(!loc) return;
   // Require sign-in to save spots
@@ -1825,6 +1826,7 @@ function toggleFavorite(){
   const isFav=idx<0;
   const btn=$('favBtn');
   if(btn){ btn.textContent=isFav?'★':'☆'; btn.classList.toggle('active',isFav); btn.title=isFav?'Remove from favourites':'Add to favourites'; }
+  }catch(err){ console.error('toggleFavorite error:',err); showToast('Error: '+err.message); }
 }
 
 function setChipDayBadge(el,n){
@@ -2004,6 +2006,11 @@ $('searchInput').addEventListener('keydown',e=>{
   if(e.key==='Enter'){doSearch();}
 });
 document.addEventListener('click',e=>{if(!e.target.closest('.search-wrap'))closeAC();});
+// Persistent event delegation for dynamically rendered spot-header buttons
+document.addEventListener('click',function(e){
+  if(e.target.closest('#notifBtn')){e.stopPropagation();toggleSpotNotif();return;}
+  if(e.target.closest('#favBtn')){e.stopPropagation();toggleFavorite();return;}
+});
 renderHintChips();
 $('hintLegend').innerHTML=buildLegendHTML();
 $('resultsLegend').innerHTML=buildLegendHTML();
@@ -2212,9 +2219,6 @@ function renderGrid(){
     ?`<span style="${qdCls};font-size:.8rem;font-weight:700;margin-left:10px">No sessions in ${totalDays} days</span>`
     :`<span style="${qdCls};font-size:.8rem;font-weight:700;margin-left:10px">${qualDaysCount} of ${totalDays} days rideable</span>`;
   $('locName').innerHTML=`${loc.name}${loc.admin1&&loc.admin1!==loc.name?', '+loc.admin1:''}<a class="map-link" href="${mapsUrl}" target="_blank" rel="noopener" title="Open in Google Maps"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Maps</a><button class="notif-btn${hasSpotNotif(loc.name)?' active':''}" id="notifBtn" title="Get notified">${bellSVG(16)}</button><button class="fav-btn${isFav?' active':''}" id="favBtn" title="${isFav?'Remove from favourites':'Add to favourites'}">${isFav?'★':'☆'}</button>${qdLabel}`;
-  // Wire up via addEventListener (more reliable than inline onclick across all browsers)
-  $('notifBtn').addEventListener('click', toggleSpotNotif);
-  $('favBtn').addEventListener('click', toggleFavorite);
 
   $('locSub').textContent=`${loc.country} · ${loc.latitude.toFixed(2)}°, ${loc.longitude.toFixed(2)}°`+(windDirs.size>0?` · Winds: ${[...windDirs].sort((a,b)=>a-b).map(d=>compass(d)).join('/')}`:'');
   $('locHdr').style.display='block';
@@ -2895,17 +2899,22 @@ let pendingFav=null;
 let ppCurrentTab='profile';
 
 function openProfilePanel(tab){
-  tab=tab||'profile';
-  $('profileOverlay').style.display='flex';
-  document.body.style.overflow='hidden';
-  switchPpTab(tab);
-  $('ppTideKeyInput').value=loadProfile().tideKey||'';
-  updateAuthUI();
-  renderNotifList();
-  updateProfileDot();
-  // Sync in background on every open so cross-device changes appear immediately
-  const email=loadProfile().email;
-  if(email) syncNotifsFromSupabase(email).then(()=>{ renderNotifList(); updateProfileDot(); });
+  try{
+    tab=tab||'profile';
+    $('profileOverlay').style.display='flex';
+    document.body.style.overflow='hidden';
+    switchPpTab(tab);
+    $('ppTideKeyInput').value=loadProfile().tideKey||'';
+    updateAuthUI();
+    renderNotifList();
+    updateProfileDot();
+    // Sync in background on every open so cross-device changes appear immediately
+    const email=loadProfile().email;
+    if(email) syncNotifsFromSupabase(email).then(()=>{ renderNotifList(); updateProfileDot(); });
+  }catch(err){
+    console.error('openProfilePanel error:',err);
+    showToast('Error opening panel: '+err.message);
+  }
 }
 function closeProfilePanel(){
   $('profileOverlay').style.display='none';
@@ -3185,24 +3194,26 @@ function showToast(msg){
 
 // ── SPOT-LEVEL NOTIF TOGGLE ──
 function toggleSpotNotif(){
-  document.activeElement?.blur();
-  const loc=cachedLoc;
-  if(!loc)return;
-  if(!_authSession?.user){
-    const sessions=getQualSessions();
-    pendingNotif={type:'spot',spot:{name:loc.name,lat:loc.latitude,lon:loc.longitude},sessions};
-    openProfilePanel('profile');
-    showToast('Sign in to get notified');
-    return;
-  }
-  if(hasSpotNotif(loc.name)){
-    removeSpotNotif(loc.name);
-    showToast('🔕 Notifications removed');
-  } else {
-    addSpotNotif({name:loc.name,lat:loc.latitude,lon:loc.longitude},getQualSessions());
-    showToast('📧 Confirmation email sent!');
-  }
-  renderGrid();
+  try{
+    document.activeElement?.blur();
+    const loc=cachedLoc;
+    if(!loc)return;
+    if(!_authSession?.user){
+      const sessions=getQualSessions();
+      pendingNotif={type:'spot',spot:{name:loc.name,lat:loc.latitude,lon:loc.longitude},sessions};
+      openProfilePanel('profile');
+      showToast('Sign in to get notified');
+      return;
+    }
+    if(hasSpotNotif(loc.name)){
+      removeSpotNotif(loc.name);
+      showToast('🔕 Notifications removed');
+    } else {
+      addSpotNotif({name:loc.name,lat:loc.latitude,lon:loc.longitude},getQualSessions());
+      showToast('📧 Confirmation email sent!');
+    }
+    renderGrid();
+  }catch(err){ console.error('toggleSpotNotif error:',err); showToast('Error: '+err.message); }
 }
 
 function getQualSessions(){
