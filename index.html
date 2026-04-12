@@ -1918,6 +1918,11 @@ function removeFav(f){
   const favs=loadFavs().filter(x=>!(x.name===f.name&&x.lat===f.lat));
   saveFavs(favs);
   renderHintChips();
+  // Reset star button if the removed spot is currently open
+  if(cachedLoc&&cachedLoc.name===f.name){
+    const btn=$('favBtn');
+    if(btn){ btn.textContent='☆'; btn.classList.remove('active'); btn.title='Add to favourites'; }
+  }
 }
 
 // ══════════════════════════════════
@@ -2575,7 +2580,7 @@ function hasDayNotif(spotName,date){ return loadNotifs().some(n=>n.type==='day'&
 // sessions that appeared for a subscribed spot.
 async function recheckSpotSubscription(){
   if(!cachedWx||!cachedLoc) return;
-  const p=loadProfile(); if(!p.email) return;
+  if(!_authSession?.user) return;
   const spotName=cachedLoc.name;
   if(!hasSpotNotif(spotName)) return;
   const qualSessions=getQualSessions();
@@ -2667,6 +2672,7 @@ async function removeSpotNotif(spotName){
   await cancelReminders(spotName,null);
   updateProfileDot();
   renderHintChips();
+  if(cachedLoc) renderGrid();
 }
 let _confirmDebounceTimer=null;
 function _scheduleDayConfirmWebhook(spot){
@@ -3164,12 +3170,11 @@ function toggleSpotNotif(){
   document.activeElement?.blur();
   const loc=cachedLoc;
   if(!loc)return;
-  const p=loadProfile();
-  if(!p.email){
+  if(!_authSession?.user){
     const sessions=getQualSessions();
     pendingNotif={type:'spot',spot:{name:loc.name,lat:loc.latitude,lon:loc.longitude},sessions};
     openProfilePanel('profile');
-    showToast('📧 Enter your email to get notified');
+    showToast('Sign in to get notified');
     return;
   }
   if(hasSpotNotif(loc.name)){
