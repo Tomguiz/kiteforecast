@@ -593,7 +593,7 @@
     </svg>
     <span class="profile-btn-dot" id="profileDot"></span>
   </button>
-  <div class="logo" id="logoHome" onclick="resetSearch()" style="cursor:pointer">🪁 Kite<span>Forecast</span></div>
+  <div class="logo" id="logoHome" onclick="resetSearch()" style="cursor:pointer">🪁<span>Forecast</span></div>
   <p class="tagline">Never miss a session again</p>
   <div class="search-wrap">
     <div class="search-input-wrap">
@@ -709,12 +709,25 @@
       <button class="pp-close" onclick="closeProfilePanel()">✕</button>
     </div>
     <div id="ppPanelProfile" class="pp-body">
-      <div id="ppEmailWarning" style="display:none" class="pp-warning">⚠️ Active notifications are paused until you add an email</div>
-      <label class="pp-label">Email address</label>
-      <input type="email" id="ppEmailInput" class="pp-input" placeholder="your@email.com" oninput="onEmailEdit()" />
-      <button class="btn pp-save-btn" id="ppSaveBtn" onclick="saveProfileEmail()">Save</button>
-      <p class="pp-note">Your email is used only to send session alerts — never shared.</p>
-      <label class="pp-label" style="margin-top:18px">Tide API key <a href="https://www.worldtides.info/developer" target="_blank" rel="noopener" style="color:var(--accent);font-size:.75rem;font-weight:400;margin-left:6px">Get free key ↗</a></label>
+      <!-- Not signed in -->
+      <div id="ppAuthSection" style="display:flex;flex-direction:column;gap:12px">
+        <div id="ppEmailWarning" style="display:none" class="pp-warning">⚠️ Active notifications are paused until you sign in</div>
+        <p class="pp-note" style="margin:0">Sign in to sync your notifications across all devices.</p>
+        <label class="pp-label">Email address</label>
+        <input type="email" id="ppEmailInput" class="pp-input" placeholder="your@email.com" />
+        <button class="btn pp-save-btn" id="ppMagicBtn" onclick="sendMagicLink()">Send magic link</button>
+        <p class="pp-note">You'll receive a sign-in link — no password needed.</p>
+      </div>
+      <!-- Signed in -->
+      <div id="ppLoggedSection" style="display:none;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+          <span class="pp-label" style="margin:0">Signed in as</span>
+          <button class="btn-reset" id="ppSignOutBtn" onclick="signOut()" style="font-size:.8rem;padding:6px 14px">Sign out</button>
+        </div>
+        <p id="ppLoggedEmail" style="color:var(--accent);font-weight:600;font-size:.95rem;margin:0"></p>
+      </div>
+      <!-- Tide key always shown -->
+      <label class="pp-label" style="margin-top:6px">Tide API key <a href="https://www.worldtides.info/developer" target="_blank" rel="noopener" style="color:var(--accent);font-size:.75rem;font-weight:400;margin-left:6px">Get free key ↗</a></label>
       <input type="text" id="ppTideKeyInput" class="pp-input" placeholder="Paste your WorldTides API key" />
       <button class="btn pp-save-btn" id="ppTideSaveBtn" onclick="saveTideKey()" style="margin-top:6px">Save</button>
       <p class="pp-note">Used to show exact high/low tide times. Free at worldtides.info/developer.</p>
@@ -1911,6 +1924,7 @@ document.addEventListener('click',e=>{if(!e.target.closest('.search-wrap'))close
 renderHintChips();
 $('hintLegend').innerHTML=buildLegendHTML();
 $('resultsLegend').innerHTML=buildLegendHTML();
+initAuth();
 
 // ══════════════════════════════════
 //  FETCH
@@ -2796,14 +2810,13 @@ function openProfilePanel(tab){
   $('profileOverlay').style.display='flex';
   document.body.style.overflow='hidden';
   switchPpTab(tab);
-  const p=loadProfile();
-  $('ppEmailInput').value=p.email||'';
-  $('ppTideKeyInput').value=p.tideKey||'';
-  const sb=$('ppSaveBtn');
-  if(sb){ if(p.email){sb.classList.add('saved');sb.textContent='✓ Saved';}else{sb.classList.remove('saved');sb.textContent='Save';} }
-  updateEmailWarning();
+  $('ppTideKeyInput').value=loadProfile().tideKey||'';
+  updateAuthUI();
   renderNotifList();
   updateProfileDot();
+  // Sync in background on every open so cross-device changes appear immediately
+  const email=loadProfile().email;
+  if(email) syncNotifsFromSupabase(email).then(()=>{ renderNotifList(); updateProfileDot(); });
 }
 function closeProfilePanel(){
   $('profileOverlay').style.display='none';
@@ -2820,10 +2833,7 @@ function switchPpTab(tab){
   $('ppPanelNotifs').style.display=tab==='notifs'?'flex':'none';
   if(tab==='notifs')renderNotifList();
 }
-function onEmailEdit(){
-  const btn=$('ppSaveBtn');
-  if(btn){ btn.classList.remove('saved'); btn.textContent='Save'; }
-}
+function onEmailEdit(){}
 function loadTideKey(){ return (loadProfile().tideKey||'').trim(); }
 function saveTideKey(){
   const key=$('ppTideKeyInput').value.trim();
@@ -2868,29 +2878,70 @@ async function fetchTideAndRefresh(){
   cachedTides=applyTideTimezone(raw, cachedWx.timezone||'UTC');
   if(cachedTides) renderGrid();
 }
-async function saveProfileEmail(){
-  const email=$('ppEmailInput').value.trim();
-  const p=loadProfile();
-  const isNewEmail=email && email!==p.email;
-  p.email=email;
-  saveProfile(p);
-  updateEmailWarning();
-  updateProfileDot();
-  const btn=$('ppSaveBtn');
-  if(btn){ btn.classList.add('saved'); btn.textContent='✓ Saved'; }
-  showToast('✓ Email saved');
-  if(isNewEmail) await syncNotifsFromSupabase(email);
-  if(pendingNotif&&email){
-    const pn=pendingNotif; pendingNotif=null;
-    if(pn.type==='spot') addSpotNotif(pn.spot,pn.sessions);
-    else addDayNotif(pn.spot,pn.dateStr,pn.sessInfo);
-    if(cachedLoc) renderGrid();
+// ── AUTH ──
+let _authSession = null;
+
+async function initAuth(){
+  const sb=getSb();
+  const { data:{ session } }=await sb.auth.getSession();
+  _authSession=session;
+  if(session?.user?.email){
+    const p=loadProfile(); p.email=session.user.email; saveProfile(p);
   }
+  updateAuthUI();
+  sb.auth.onAuthStateChange(async(event,session)=>{
+    _authSession=session;
+    if(event==='SIGNED_IN'&&session?.user?.email){
+      const email=session.user.email;
+      const p=loadProfile();
+      const isNew=email!==p.email;
+      p.email=email; saveProfile(p);
+      updateAuthUI(); updateProfileDot();
+      if(isNew) await syncNotifsFromSupabase(email);
+      showToast('✓ Signed in as '+email);
+      if(pendingNotif){
+        const pn=pendingNotif; pendingNotif=null;
+        if(pn.type==='spot') addSpotNotif(pn.spot,pn.sessions);
+        else addDayNotif(pn.spot,pn.dateStr,pn.sessInfo);
+        if(cachedLoc) renderGrid();
+      }
+    } else if(event==='SIGNED_OUT'){
+      updateAuthUI(); updateProfileDot();
+    }
+  });
+}
+
+async function sendMagicLink(){
+  const email=($('ppEmailInput').value||'').trim();
+  if(!email){ showToast('Enter your email first'); return; }
+  const btn=$('ppMagicBtn');
+  btn.textContent='Sending…'; btn.disabled=true;
+  const{error}=await getSb().auth.signInWithOtp({email});
+  btn.disabled=false;
+  if(error){ btn.textContent='Send magic link'; showToast('Error: '+error.message); }
+  else{ btn.textContent='✓ Check your email'; showToast('Magic link sent to '+email); }
+}
+
+async function signOut(){
+  await getSb().auth.signOut();
+  const p=loadProfile(); delete p.email; saveProfile(p);
+  localStorage.removeItem('kf_notifs');
+  _authSession=null;
+  updateAuthUI(); updateProfileDot(); renderNotifList();
+  showToast('Signed out');
+}
+
+function updateAuthUI(){
+  const loggedIn=!!_authSession?.user;
+  $('ppAuthSection').style.display=loggedIn?'none':'flex';
+  $('ppLoggedSection').style.display=loggedIn?'flex':'none';
+  if(loggedIn) $('ppLoggedEmail').textContent=_authSession.user.email;
+  updateEmailWarning();
 }
 function updateEmailWarning(){
-  const p=loadProfile();
+  const loggedIn=!!_authSession?.user;
   const hasNotifs=loadNotifs().length>0;
-  $('ppEmailWarning').style.display=(!p.email&&hasNotifs)?'block':'none';
+  $('ppEmailWarning').style.display=(!loggedIn&&hasNotifs)?'block':'none';
 }
 function toggleMasterNotif(){
   const p=loadProfile();
