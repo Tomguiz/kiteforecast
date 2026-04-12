@@ -512,6 +512,72 @@
     .pp-divider::before,.pp-divider::after { content:''; flex:1; height:1px; background:var(--border); }
     .pp-divider-txt { font-size:.72rem; color:var(--tdim); white-space:nowrap; }
 
+    /* ── NOTIF SIGNUP MICRO-MODAL ── */
+    #notifSignupOverlay {
+      position:fixed; inset:0; z-index:500;
+      background:rgba(4,7,16,.85); backdrop-filter:blur(8px);
+      display:flex; align-items:flex-end; justify-content:center;
+      animation:mFadeIn .15s ease;
+    }
+    @media (min-width:600px) { #notifSignupOverlay { align-items:center; padding:12px; } }
+    #notifSignupModal {
+      background:var(--surface); border:1px solid var(--border);
+      width:100%; max-width:400px;
+      border-radius:20px 20px 0 0;
+      padding:28px 24px 32px;
+      animation:mSlideUp .22s cubic-bezier(.22,.68,0,1.2);
+      display:flex; flex-direction:column; gap:18px;
+    }
+    @media (min-width:600px) {
+      #notifSignupModal { border-radius:20px; border-bottom:1px solid var(--border); padding:32px 28px; }
+    }
+    .nsm-close {
+      position:absolute; top:14px; right:16px;
+      background:none; border:none; cursor:pointer;
+      color:var(--tdim); font-size:1.2rem; line-height:1; padding:4px;
+    }
+    .nsm-close:hover { color:var(--gray); }
+    #notifSignupModal { position:relative; }
+    .nsm-headline {
+      font-size:.95rem; font-weight:700; color:var(--text);
+      line-height:1.3; padding-right:24px;
+    }
+    .nsm-sub {
+      font-size:.78rem; color:var(--gray); margin:2px 0 0; font-weight:400;
+    }
+    .nsm-email-input {
+      width:100%; box-sizing:border-box;
+      background:var(--bg); border:1.5px solid var(--border); color:var(--text);
+      border-radius:11px; padding:13px 14px; font-size:.92rem;
+      outline:none; transition:border-color .15s;
+    }
+    .nsm-email-input:focus { border-color:var(--accent); }
+    .nsm-email-input::placeholder { color:var(--tdim); }
+    .nsm-code-row { display:flex; flex-direction:column; gap:10px; }
+    .nsm-code-sent { font-size:.78rem; color:var(--gray); }
+    .nsm-code-sent strong { color:var(--text); }
+    .nsm-code-input {
+      width:100%; box-sizing:border-box;
+      background:var(--bg); border:1.5px solid var(--border); color:var(--text);
+      border-radius:11px; padding:13px 14px; font-size:1.3rem;
+      letter-spacing:.25em; text-align:center; outline:none; transition:border-color .15s;
+    }
+    .nsm-code-input:focus { border-color:var(--accent); }
+    .nsm-cta {
+      width:100%; padding:14px; border-radius:12px;
+      background:linear-gradient(135deg,var(--accent),var(--accent2));
+      color:#0a0f1e; font-size:.95rem; font-weight:800;
+      border:none; cursor:pointer; transition:opacity .15s;
+    }
+    .nsm-cta:hover { opacity:.9; }
+    .nsm-cta:disabled { opacity:.5; cursor:default; }
+    .nsm-back {
+      background:none; border:none; cursor:pointer;
+      font-size:.78rem; color:var(--tdim); text-align:center; padding:2px 0;
+    }
+    .nsm-back:hover { color:var(--gray); }
+    .nsm-note { font-size:.72rem; color:var(--tdim); text-align:center; line-height:1.4; }
+
     /* master toggle */
     .pp-toggle-row { display:flex; align-items:center; justify-content:space-between; padding:4px 0; }
     .pp-toggle-label { font-size:.85rem; color:var(--text); font-weight:600; }
@@ -2508,7 +2574,7 @@ function toggleModalDayNotif(){
   if(mBell) mBell.className='notif-btn m-notif-btn'+(hasDayNotif(cachedLoc.name,_modalDateStr)?' active':'');
 }
 function handleOverlayClick(e){if(e.target===$('modalOverlay'))closeModal();}
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('modalOverlay').style.display==='flex')closeModal();else if(e.key==='Escape'&&$('profileOverlay').style.display==='flex')closeProfilePanel();else if(e.key==='Escape'&&$('spotsMapOverlay').style.display==='flex')closeSpotsMap();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('modalOverlay').style.display==='flex')closeModal();else if(e.key==='Escape'&&$('notifSignupOverlay').style.display==='flex')closeNotifSignupModal();else if(e.key==='Escape'&&$('profileOverlay').style.display==='flex')closeProfilePanel();else if(e.key==='Escape'&&$('spotsMapOverlay').style.display==='flex')closeSpotsMap();});
 
 // ══════════════════════════════════
 //  SPOTS MAP
@@ -3184,6 +3250,66 @@ async function signOut(){
   showToast('Signed out');
 }
 
+// ── NOTIF SIGNUP MICRO-MODAL ──
+function openNotifSignupModal(preview){
+  // preview: { spotName, dateLabel, peakKn, domDir }
+  const headline=$('nsmHeadline');
+  if(headline){
+    const parts=['🔔'];
+    if(preview.dateLabel) parts.push(preview.dateLabel);
+    if(preview.peakKn)    parts.push(preview.peakKn+'kn');
+    if(preview.domDir)    parts.push(preview.domDir);
+    if(preview.spotName)  parts.push(preview.spotName);
+    headline.textContent=parts.join(' · ');
+  }
+  nsmResetFlow();
+  $('notifSignupOverlay').style.display='flex';
+  document.body.style.overflow='hidden';
+  setTimeout(()=>$('nsmEmailInput').focus(),120);
+}
+function closeNotifSignupModal(){
+  $('notifSignupOverlay').style.display='none';
+  document.body.style.overflow='';
+  nsmResetFlow();
+}
+function nsmResetFlow(){
+  $('nsmStep2').style.display='none';
+  $('nsmStep1').style.display='flex';
+  $('nsmCodeInput').value='';
+  $('nsmSendBtn').textContent="Get notified — it's free";
+  $('nsmSendBtn').disabled=false;
+}
+async function nsmSendCode(){
+  const email=($('nsmEmailInput').value||'').trim();
+  if(!email){ showToast('Enter your email first'); return; }
+  const btn=$('nsmSendBtn');
+  btn.textContent='Sending…'; btn.disabled=true;
+  const{error}=await getSb().auth.signInWithOtp({email,options:{shouldCreateUser:true}});
+  btn.disabled=false;
+  if(error){ btn.textContent="Get notified — it's free"; showToast('Error: '+error.message); return; }
+  // Mirror email into profile panel so verifyOtpCode() picks it up
+  $('ppEmailInput').value=email;
+  $('nsmCodeEmail').textContent=email;
+  $('nsmStep1').style.display='none';
+  $('nsmStep2').style.display='flex';
+  setTimeout(()=>$('nsmCodeInput').focus(),100);
+}
+async function nsmVerifyCode(){
+  const email=($('nsmEmailInput').value||'').trim();
+  const token=($('nsmCodeInput').value||'').trim();
+  if(token.length<4){ showToast('Enter the code from your email'); return; }
+  const btn=$('nsmVerifyBtn');
+  btn.textContent='Verifying…'; btn.disabled=true;
+  const{data,error}=await getSb().auth.verifyOtp({email,token,type:'email'});
+  btn.disabled=false;
+  if(error){ btn.textContent='Confirm & get notified'; showToast('❌ Invalid code — please try again'); return; }
+  // Close modal — onAuthStateChange SIGNED_IN fires next and handles pendingNotif + toast
+  _signinContext='generic';
+  closeNotifSignupModal();
+  // Also mirror into profile panel fields so ppVerifyBtn flow stays consistent if user opens panel later
+  $('ppEmailInput').value=email;
+}
+
 function getInitials(email){
   const name=email.split('@')[0];
   const parts=name.split(/[.\-_]/);
@@ -3328,8 +3454,14 @@ function toggleSpotNotif(){
     if(!_authSession?.user){
       const sessions=getQualSessions();
       pendingNotif={type:'spot',spot:{name:loc.name,lat:loc.latitude,lon:loc.longitude},sessions};
-      _signinContext='notif';
-      openProfilePanel('profile');
+      // Pick the best session for the headline preview
+      const best=sessions[0];
+      openNotifSignupModal({
+        spotName:  loc.name,
+        dateLabel: best?fmtDate(best.dateStr).short:null,
+        peakKn:    best?best.peakKn:null,
+        domDir:    best?(best.domDir||null):null,
+      });
       return;
     }
     if(hasSpotNotif(loc.name)){
@@ -3407,8 +3539,12 @@ function toggleDayNotif(e,dateStr,dayIdx){
 
   if(!_authSession?.user){
     pendingNotif={type:'day',spot,dateStr,sessInfo};
-    _signinContext='notif';
-    openProfilePanel('profile');
+    openNotifSignupModal({
+      spotName:  loc.name,
+      dateLabel: fmtDate(dateStr).short,
+      peakKn:    peakKn||null,
+      domDir:    domDir!==null?compass(domDir):null,
+    });
     return;
   }
   if(hasDayNotif(loc.name,dateStr)){
@@ -3533,6 +3669,35 @@ document.addEventListener('visibilitychange',()=>{
   },{passive:true});
 })();
 </script>
+<!-- ══ NOTIF SIGNUP MICRO-MODAL ══ -->
+<div id="notifSignupOverlay" style="display:none" onclick="if(event.target===this)closeNotifSignupModal()">
+  <div id="notifSignupModal">
+    <button class="nsm-close" onclick="closeNotifSignupModal()" aria-label="Close">✕</button>
+    <!-- Step 1: email -->
+    <div id="nsmStep1" style="display:flex;flex-direction:column;gap:16px">
+      <div>
+        <p id="nsmHeadline" class="nsm-headline"></p>
+        <p class="nsm-sub">No password. Cancel anytime.</p>
+      </div>
+      <input type="email" id="nsmEmailInput" class="nsm-email-input" placeholder="your@email.com" autocomplete="email" onkeydown="if(event.key==='Enter')nsmSendCode()" />
+      <button class="nsm-cta" id="nsmSendBtn" onclick="nsmSendCode()">Get notified — it's free</button>
+      <p class="nsm-note">We'll email you a one-time code to confirm.</p>
+    </div>
+    <!-- Step 2: code verification -->
+    <div id="nsmStep2" style="display:none;flex-direction:column;gap:16px">
+      <div>
+        <p class="nsm-headline">Check your inbox</p>
+        <p class="nsm-sub">Code sent to <strong id="nsmCodeEmail"></strong></p>
+      </div>
+      <div class="nsm-code-row">
+        <input type="text" id="nsmCodeInput" class="nsm-code-input" placeholder="••••••" maxlength="12" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" onkeydown="if(event.key==='Enter')nsmVerifyCode()" />
+      </div>
+      <button class="nsm-cta" id="nsmVerifyBtn" onclick="nsmVerifyCode()">Confirm &amp; get notified</button>
+      <button class="nsm-back" onclick="nsmResetFlow()">← Use a different email</button>
+    </div>
+  </div>
+</div>
+
 <!-- ══ SPOTS MAP OVERLAY ══ -->
 <div id="spotsMapOverlay" style="display:none;position:fixed;inset:0;z-index:3000;background:#0a1020;flex-direction:column;">
   <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px;border-bottom:1px solid var(--border);flex-shrink:0;">
