@@ -539,6 +539,22 @@
     /* modal header bell — sized to match header, visually separated from close */
     .m-notif-btn { margin:0 20px 0 0; padding:6px 12px; border-radius:9px; flex-shrink:0; }
 
+    /* install banner */
+    #installBanner {
+      position:fixed; bottom:0; left:0; right:0; z-index:8000;
+      background:#0e1729; border-top:1px solid rgba(0,212,255,.2);
+      padding:14px 16px; display:flex; align-items:center; gap:12px;
+      box-shadow:0 -4px 24px rgba(0,0,0,.5);
+      animation:slideUp .3s cubic-bezier(.22,.68,0,1.2);
+    }
+    @keyframes slideUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
+    #installBanner img { width:40px; height:40px; border-radius:10px; flex-shrink:0; }
+    #installBanner .ib-text { flex:1; min-width:0; }
+    #installBanner .ib-title { font-size:.85rem; font-weight:700; color:var(--text); margin-bottom:2px; }
+    #installBanner .ib-sub { font-size:.72rem; color:var(--gray); line-height:1.4; }
+    #installBanner .ib-add { background:var(--accent); color:#000; border:none; border-radius:9px; padding:8px 14px; font-size:.8rem; font-weight:700; cursor:pointer; white-space:nowrap; flex-shrink:0; }
+    #installBanner .ib-dismiss { background:none; border:none; color:var(--gray); font-size:1.1rem; cursor:pointer; padding:4px 6px; flex-shrink:0; line-height:1; }
+
     /* toast */
     .pp-toast {
       position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
@@ -705,6 +721,17 @@
     </div>
     <div class="m-body" id="mBody"></div>
   </div>
+</div>
+
+<!-- ══ INSTALL BANNER ══ -->
+<div id="installBanner" style="display:none">
+  <img src="logo.png" alt="KiteForecast" onerror="this.style.display='none'">
+  <div class="ib-text">
+    <div class="ib-title">Add to your home screen</div>
+    <div class="ib-sub" id="installBannerSub"></div>
+  </div>
+  <button class="ib-add" id="installBannerBtn" onclick="handleInstallClick()">Add</button>
+  <button class="ib-dismiss" onclick="dismissInstallBanner()" title="Dismiss">✕</button>
 </div>
 
 <!-- ══ PROFILE PANEL ══ -->
@@ -1934,6 +1961,7 @@ renderHintChips();
 $('hintLegend').innerHTML=buildLegendHTML();
 $('resultsLegend').innerHTML=buildLegendHTML();
 initAuth();
+initInstallBanner();
 
 // ══════════════════════════════════
 //  FETCH
@@ -3014,6 +3042,53 @@ function updateProfileDot(){
   const hasNotifs=loadNotifs().length>0;
   document.querySelectorAll('.profile-btn-dot').forEach(d=>d.classList.toggle('visible',hasNotifs));
 }
+// ── INSTALL BANNER ──
+let _deferredInstallPrompt = null;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault();
+  _deferredInstallPrompt = e; // Android: native install prompt available
+});
+
+function initInstallBanner(){
+  // Don't show if already running as installed PWA
+  const isStandalone = window.navigator.standalone === true ||
+    window.matchMedia('(display-mode: standalone)').matches;
+  if(isStandalone) return;
+  // Don't show on desktop
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  if(!isMobile) return;
+  // Don't show if user already dismissed
+  if(localStorage.getItem('kf_install_dismissed')) return;
+  const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const isAndroid = /Android/i.test(navigator.userAgent);
+  $('installBannerSub').textContent = isIOS
+    ? 'Tap the Share button (□↑) then "Add to Home Screen"'
+    : isAndroid
+    ? 'Tap the menu (⋮) then "Add to Home Screen"'
+    : 'Add this app to your home screen for the best experience';
+  // On Android hide the Add button if no native prompt (will use instructions instead)
+  if(!isIOS && !_deferredInstallPrompt){
+    $('installBannerBtn').style.display='none';
+  }
+  $('installBanner').style.display='flex';
+}
+
+async function handleInstallClick(){
+  if(_deferredInstallPrompt){
+    // Android: trigger native install prompt
+    _deferredInstallPrompt.prompt();
+    const{ outcome } = await _deferredInstallPrompt.userChoice;
+    if(outcome==='accepted') dismissInstallBanner();
+    _deferredInstallPrompt = null;
+  }
+  // iOS: no programmatic install — the sub text already explains what to do
+}
+
+function dismissInstallBanner(){
+  $('installBanner').style.display='none';
+  localStorage.setItem('kf_install_dismissed','1');
+}
+
 function showToast(msg){
   const t=document.createElement('div');
   t.className='pp-toast'; t.textContent=msg;
