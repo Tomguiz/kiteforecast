@@ -3267,10 +3267,10 @@ function openNotifSignupModal(preview){
   const headline=$('nsmHeadline');
   if(headline){
     const parts=['🔔'];
+    if(preview.spotName)  parts.push(preview.spotName);
     if(preview.dateLabel) parts.push(preview.dateLabel);
     if(preview.peakKn)    parts.push(preview.peakKn+'kn');
     if(preview.domDir)    parts.push(preview.domDir);
-    if(preview.spotName)  parts.push(preview.spotName);
     headline.textContent=parts.join(' · ');
   }
   nsmResetFlow();
@@ -3717,7 +3717,7 @@ document.addEventListener('visibilitychange',()=>{
       </div>
       <input type="email" id="nsmEmailInput" class="nsm-email-input" placeholder="your@email.com" autocomplete="email" onkeydown="if(event.key==='Enter')nsmSendCode()" />
       <button class="nsm-cta" id="nsmSendBtn" onclick="nsmSendCode()">Get notified — it's free</button>
-      <p class="nsm-note">We'll email you a one-time code to confirm.</p>
+      <p class="nsm-note">We'll email you a one-time code to verify your address.</p>
     </div>
     <!-- Step 2: code verification -->
     <div id="nsmStep2" style="display:none;flex-direction:column;gap:16px">
