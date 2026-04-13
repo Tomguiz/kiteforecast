@@ -3068,8 +3068,9 @@ async function scheduleReminders(spot,sessInfo,notifType){
   const spotLon=spot.lon||spot.longitude;
   const appUrl=`${location.origin}${location.pathname}?spot=${encodeURIComponent(spot.name)}&date=${sessionDate}`;
   // Cancel any existing reminders for this spot+date+email
-  await sb.from('reminders').update({cancelled:true})
+  const{error:cancelErr}=await sb.from('reminders').update({cancelled:true})
     .eq('email',p.email).eq('spot_name',spot.name).eq('session_date',sessionDate).eq('cancelled',false);
+  if(cancelErr) console.error('[reminders] cancel error',cancelErr);
   // Insert one row per reminder window that is still in the future
   const rows=REMINDER_HOURS
     .map(h=>({
@@ -3088,7 +3089,10 @@ async function scheduleReminders(spot,sessInfo,notifType){
       app_link:    appUrl,
     }))
     .filter(r=>new Date(r.send_at).getTime()>now);
-  if(rows.length) await sb.from('reminders').upsert(rows,{onConflict:'email,spot_name,notif_type,session_date,reminder_hours'});
+  if(rows.length){
+    const{error:insErr}=await sb.from('reminders').insert(rows);
+    if(insErr) console.error('[reminders] insert error',insErr);
+  }
 }
 
 async function cancelReminders(spotName,sessionDate){
