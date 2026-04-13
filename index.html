@@ -2930,34 +2930,36 @@ async function syncAllFromSupabase(email){
   await Promise.all([syncNotifsFromSupabase(email), syncFavsFromSupabase(email)]);
 }
 
+let _syncFavsInFlight=false;
 async function syncFavsFromSupabase(email){
-  if(!email) return;
-  const sb=getSb(); if(!sb) return;
-  console.log('[favs] syncFavsFromSupabase start, email='+email+', localFavs='+loadFavs().length);
-  const {data,error}=await sb
-    .from('favourites')
-    .select('spot_name,spot_label,spot_lat,spot_lon,spot_dirs')
-    .eq('email',email);
-  console.log('[favs] supabase response: error='+JSON.stringify(error)+', rows='+JSON.stringify(data?.map(r=>r.spot_name)));
-  if(error){ console.error('favs sync error',error); return; }
-  const local=loadFavs();
-  const remote=(data||[]).map(r=>({
-    name:  r.spot_name,
-    label: r.spot_label||r.spot_name,
-    lat:   r.spot_lat,
-    lon:   r.spot_lon,
-    dirs:  r.spot_dirs||[],
-  }));
-  // Local favs not yet in Supabase — push them up (handles pre-sync desktop favs)
-  const localOnly=local.filter(lf=>!remote.some(rf=>rf.name===lf.name&&rf.lat===lf.lat));
-  console.log('[favs] remote='+remote.length+', localOnly='+localOnly.length);
-  for(const fav of localOnly) pushFavToSupabase(email,fav,false);
-  // Merge: union of remote + local-only
-  const merged=[...remote,...localOnly];
-  if(merged.length===0){ console.log('[favs] merged empty, skipping save'); return; }
-  saveFavs(merged);
-  console.log('[favs] saved merged favs: '+merged.map(f=>f.name).join(', '));
-  renderHintChips();
+  if(!email||_syncFavsInFlight) return;
+  _syncFavsInFlight=true;
+  try{
+    const sb=getSb(); if(!sb) return;
+    const {data,error}=await sb
+      .from('favourites')
+      .select('spot_name,spot_label,spot_lat,spot_lon,spot_dirs')
+      .eq('email',email);
+    if(error){ console.error('favs sync error',error); return; }
+    const local=loadFavs();
+    const remote=(data||[]).map(r=>({
+      name:  r.spot_name,
+      label: r.spot_label||r.spot_name,
+      lat:   r.spot_lat,
+      lon:   r.spot_lon,
+      dirs:  r.spot_dirs||[],
+    }));
+    // Push any local-only favs up to Supabase (e.g. pre-sync or offline adds)
+    const localOnly=local.filter(lf=>!remote.some(rf=>rf.name===lf.name&&rf.lat===lf.lat));
+    for(const fav of localOnly) pushFavToSupabase(email,fav,false);
+    // Merge: Supabase remote + local-only additions
+    const merged=[...remote,...localOnly];
+    if(merged.length===0) return;
+    saveFavs(merged);
+    renderHintChips();
+  } finally {
+    _syncFavsInFlight=false;
+  }
 }
 
 async function pushFavToSupabase(email,fav,remove=false){
@@ -2988,8 +2990,6 @@ async function pushFavToSupabase(email,fav,remove=false){
       } else {
         console.error('[favs] insert error',insErr);
       }
-    } else {
-      console.log('[favs] pushed to Supabase: '+fav.name);
     }
   }
 }
