@@ -2963,17 +2963,33 @@ async function pushFavToSupabase(email,fav,remove=false){
   if(!email) return;
   const sb=getSb(); if(!sb) return;
   if(remove){
-    await sb.from('favourites').delete()
+    const{error}=await sb.from('favourites').delete()
       .eq('email',email).eq('spot_name',fav.name);
+    if(error) console.error('[favs] delete error',error);
   } else {
-    await sb.from('favourites').upsert({
+    // Try insert first; if conflict (already exists) do an update
+    const row={
       email:      email,
       spot_name:  fav.name,
       spot_label: fav.label,
       spot_lat:   fav.lat,
       spot_lon:   fav.lon,
       spot_dirs:  fav.dirs||[],
-    },{onConflict:'email,spot_name'});
+    };
+    const{error:insErr}=await sb.from('favourites').insert(row);
+    if(insErr){
+      if(insErr.code==='23505'){
+        // Duplicate — update instead
+        const{error:updErr}=await sb.from('favourites')
+          .update({spot_label:row.spot_label,spot_lat:row.spot_lat,spot_lon:row.spot_lon,spot_dirs:row.spot_dirs})
+          .eq('email',email).eq('spot_name',fav.name);
+        if(updErr) console.error('[favs] update error',updErr);
+      } else {
+        console.error('[favs] insert error',insErr);
+      }
+    } else {
+      console.log('[favs] pushed to Supabase: '+fav.name);
+    }
   }
 }
 
@@ -3423,8 +3439,8 @@ async function initAuth(){
         _authSession=session;
         const p=loadProfile(); p.email=session.user.email; saveProfile(p);
         updateAuthUI(); updateProfileDot(); renderHintChips();
-        // Pull favs from Supabase if local is empty (new device / cleared storage)
-        if(event!=='SIGNED_IN'&&loadFavs().length===0)
+        // Sync favs on session restore (pull remote, push local-only)
+        if(event!=='SIGNED_IN')
           syncFavsFromSupabase(session.user.email).then(()=>renderHintChips());
       } else if(event==='INITIAL_SESSION'&&!cachedEmail){
         // No session, never had one — genuinely signed out
@@ -3474,9 +3490,8 @@ async function initAuth(){
       _authSession=session;
       const p=loadProfile(); p.email=session.user.email; saveProfile(p);
       updateAuthUI(); updateProfileDot(); renderHintChips();
-      // If local favs are empty but user is signed in, pull from Supabase.
-      // This covers a returning user on a new device where localStorage is empty.
-      if(loadFavs().length===0) syncFavsFromSupabase(session.user.email).then(()=>renderHintChips());
+      // Sync favs: pull from Supabase (covers new device), push local-only ones up
+      syncFavsFromSupabase(session.user.email).then(()=>renderHintChips());
     }
     // null → keep whatever state we have; don't sign the user out
   }catch(e){ console.warn('getSession error:',e); }
