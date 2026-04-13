@@ -3118,27 +3118,36 @@ async function persistSpotSubscription(spot,spotLat,spotLon){
   const spotCity=knownSpot?.loc?knownSpot.loc.split(', ').slice(0,-1).join(', '):'';
   const spotCountry=knownSpot?.loc?knownSpot.loc.split(', ').pop():'';
   const sentinelDate='2099-12-31';
-  const{error:cErr}=await sb.from('reminders').update({cancelled:true})
-    .eq('email',p.email).eq('spot_name',spot.name).eq('session_date',sentinelDate);
-  if(cErr) console.error('[sub] cancel error',cErr);
-  const{error}=await sb.from('reminders').insert({
-    email:        p.email,
-    spot_name:    spot.name,
-    spot_city:    spotCity,
-    spot_country: spotCountry,
-    spot_lat:     spotLat,
-    spot_lon:     spotLon,
-    spot_map_link:`https://www.google.com/maps?q=${spotLat},${spotLon}`,
-    spot_dirs:    [...windDirs],
-    session_date: sentinelDate,
-    notif_type:   'spot',
-    reminder_hours:0,
-    send_at:      '2099-12-31T00:00:00Z',
-    sent:         false,
-    cancelled:    false,
-  });
-  if(error) console.error('[sub] insert error',error);
-  else console.log('[sub] sentinel inserted OK');
+  // Try to reactivate an existing sentinel first
+  const{data:existing}=await sb.from('reminders').select('id')
+    .eq('email',p.email).eq('spot_name',spot.name).eq('session_date',sentinelDate)
+    .eq('notif_type','spot').eq('reminder_hours',0).limit(1);
+  if(existing&&existing.length){
+    const{error}=await sb.from('reminders').update({cancelled:false})
+      .eq('email',p.email).eq('spot_name',spot.name).eq('session_date',sentinelDate)
+      .eq('notif_type','spot').eq('reminder_hours',0);
+    if(error) console.error('[sub] reactivate error',error);
+    else console.log('[sub] sentinel reactivated OK');
+  } else {
+    const{error}=await sb.from('reminders').insert({
+      email:        p.email,
+      spot_name:    spot.name,
+      spot_city:    spotCity,
+      spot_country: spotCountry,
+      spot_lat:     spotLat,
+      spot_lon:     spotLon,
+      spot_map_link:`https://www.google.com/maps?q=${spotLat},${spotLon}`,
+      spot_dirs:    [...windDirs],
+      session_date: sentinelDate,
+      notif_type:   'spot',
+      reminder_hours:0,
+      send_at:      '2099-12-31T00:00:00Z',
+      sent:         false,
+      cancelled:    false,
+    });
+    if(error) console.error('[sub] insert error',error);
+    else console.log('[sub] sentinel inserted OK');
+  }
 }
 
 function addSpotNotif(spot,sessions){
