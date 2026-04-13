@@ -1253,6 +1253,7 @@ let _sb=null; // Supabase client singleton
 let ppCurrentTab='profile'; // active tab in profile panel
 let pendingNotif=null; // action to execute after sign-in
 let pendingFav=null; // fav to execute after sign-in
+let _deferredInstallPrompt=null; // PWA install prompt event
 
 // ── Constants (must be top-level to avoid TDZ when initAuth() runs) ──────────
 const WEBHOOK_URL    = 'https://hook.eu1.make.com/6t9fgm6btixri2wf5lnx47requf416vs';
@@ -3713,7 +3714,6 @@ function updateProfileDot(){
   document.querySelectorAll('.profile-btn-dot').forEach(d=>d.classList.toggle('visible',hasNotifs));
 }
 // ── INSTALL BANNER ──
-let _deferredInstallPrompt = null;
 window.addEventListener('beforeinstallprompt', e => {
   e.preventDefault();
   _deferredInstallPrompt = e;

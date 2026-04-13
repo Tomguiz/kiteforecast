@@ -23,19 +23,19 @@ CREATE TABLE IF NOT EXISTS favourites (
 ALTER TABLE favourites ENABLE ROW LEVEL SECURITY;
 
 DO $$ BEGIN
-  CREATE POLICY "anon_insert_favs" ON favourites FOR INSERT TO anon WITH CHECK (true);
+  CREATE POLICY "all_insert_favs" ON favourites FOR INSERT TO anon, authenticated WITH CHECK (true);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  CREATE POLICY "anon_select_favs" ON favourites FOR SELECT TO anon USING (true);
+  CREATE POLICY "all_select_favs" ON favourites FOR SELECT TO anon, authenticated USING (true);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  CREATE POLICY "anon_delete_favs" ON favourites FOR DELETE TO anon USING (true);
+  CREATE POLICY "all_delete_favs" ON favourites FOR DELETE TO anon, authenticated USING (true);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
-  CREATE POLICY "anon_update_favs" ON favourites FOR UPDATE TO anon USING (true) WITH CHECK (true);
+  CREATE POLICY "all_update_favs" ON favourites FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- 3. Reminders table
