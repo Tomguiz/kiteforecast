@@ -3458,10 +3458,9 @@ function updateAuthUI(){
 }
 function updateEmailWarning(){
   const loggedIn=!!_authSession?.user;
-  const hasNotifs=loadNotifs().length>0;
-  $('ppEmailWarning').style.display=(!loggedIn&&hasNotifs)?'block':'none';
+  $('ppEmailWarning').style.display='none';
   const emptyState=$('ppEmptyState');
-  if(emptyState) emptyState.style.display=(!loggedIn&&!hasNotifs)?'block':'none';
+  if(emptyState) emptyState.style.display=loggedIn?'none':'block';
 }
 function toggleMasterNotif(){
   const p=loadProfile();
