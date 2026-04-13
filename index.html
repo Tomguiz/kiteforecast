@@ -3461,9 +3461,11 @@ async function initAuth(){
         _authSession=session;
         const p=loadProfile(); p.email=session.user.email; saveProfile(p);
         updateAuthUI(); updateProfileDot(); renderHintChips();
-        // Sync favs on session restore (pull remote, push local-only)
-        if(event!=='SIGNED_IN')
+        // Sync favs + notifs on session restore
+        if(event!=='SIGNED_IN'){
           syncFavsFromSupabase(session.user.email).then(()=>renderHintChips());
+          syncNotifsFromSupabase(session.user.email).then(()=>{ renderNotifList(); renderHintChips(); });
+        }
       } else if(event==='INITIAL_SESSION'&&!cachedEmail){
         // No session, never had one — genuinely signed out
         _authSession=null;
@@ -3512,8 +3514,9 @@ async function initAuth(){
       _authSession=session;
       const p=loadProfile(); p.email=session.user.email; saveProfile(p);
       updateAuthUI(); updateProfileDot(); renderHintChips();
-      // Sync favs: pull from Supabase (covers new device), push local-only ones up
+      // Sync favs + notifs: pull from Supabase on every session restore
       syncFavsFromSupabase(session.user.email).then(()=>renderHintChips());
+      syncNotifsFromSupabase(session.user.email).then(()=>{ renderNotifList(); renderHintChips(); });
     }
     // null → keep whatever state we have; don't sign the user out
   }catch(e){ console.warn('getSession error:',e); }
