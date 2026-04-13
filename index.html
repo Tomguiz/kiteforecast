@@ -3283,6 +3283,12 @@ async function fetchTideAndRefresh(){
 }
 // ── AUTH ──
 async function initAuth(){
+  // ── DIAGNOSTIC (remove after confirming fix) ──
+  console.log('[KF auth] kf_profile=',localStorage.getItem('kf_profile'));
+  console.log('[KF auth] kf-auth(ls)=',localStorage.getItem('kf-auth'));
+  console.log('[KF auth] cookies=',document.cookie);
+  console.log('[KF auth] kfStorage.getItem=',kfStorage.getItem('kf-auth'));
+
   const sb=getSb();
 
   // ── 1. Optimistic UI ──────────────────────────────────────────────────────
@@ -3303,6 +3309,7 @@ async function initAuth(){
   //   SIGNED_OUT → IGNORED. Supabase fires this transiently on PWA cold-start,
   //     background-tab restore, token-refresh failure. Only signOut() may log out.
   sb.auth.onAuthStateChange(async(event,session)=>{
+    console.log('[KF auth] event='+event+' session='+!!session+' email='+(session?.user?.email||'none'));
     if(event==='SIGNED_IN'||event==='TOKEN_REFRESHED'||event==='INITIAL_SESSION'){
       if(session){
         _authSession=session;
@@ -3350,14 +3357,15 @@ async function initAuth(){
   //   not destroy the optimistic session on a transient refresh failure.
   //   Only signOut() is allowed to clear the email from kf_profile.
   try{
-    const{data:{session}}=await sb.auth.getSession();
+    const{data:{session},error}=await sb.auth.getSession();
+    console.log('[KF auth] getSession session='+!!session+' error='+JSON.stringify(error));
     if(session){
       _authSession=session;
       const p=loadProfile(); p.email=session.user.email; saveProfile(p);
       updateAuthUI(); updateProfileDot(); renderHintChips();
     }
     // null → keep whatever state we have; don't sign the user out
-  }catch(e){ console.warn('getSession error:',e); }
+  }catch(e){ console.warn('[KF auth] getSession exception:',e); }
 }
 
 async function sendOtpCode(){
