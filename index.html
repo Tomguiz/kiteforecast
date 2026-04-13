@@ -3110,15 +3110,17 @@ async function cancelReminders(spotName,sessionDate){
 // Uses a far-future session_date so it survives the "session_date >= today" filter.
 // check-new-sessions picks this up and schedules real reminders when sessions appear.
 async function persistSpotSubscription(spot,spotLat,spotLon){
-  const p=loadProfile(); if(!p.email) return;
-  const sb=getSb(); if(!sb) return;
+  const p=loadProfile();
+  console.log('[sub] email='+p.email+' spot='+spot.name+' lat='+spotLat+' lon='+spotLon);
+  if(!p.email){ console.warn('[sub] no email, aborting'); return; }
+  const sb=getSb(); if(!sb){ console.warn('[sub] no sb'); return; }
   const knownSpot=SPOTS.find(s=>s.name===spot.name);
   const spotCity=knownSpot?.loc?knownSpot.loc.split(', ').slice(0,-1).join(', '):'';
   const spotCountry=knownSpot?.loc?knownSpot.loc.split(', ').pop():'';
   const sentinelDate='2099-12-31';
-  // Cancel any previous sentinel for this spot
-  await sb.from('reminders').update({cancelled:true})
+  const{error:cErr}=await sb.from('reminders').update({cancelled:true})
     .eq('email',p.email).eq('spot_name',spot.name).eq('session_date',sentinelDate);
+  if(cErr) console.error('[sub] cancel error',cErr);
   const{error}=await sb.from('reminders').insert({
     email:        p.email,
     spot_name:    spot.name,
@@ -3135,7 +3137,8 @@ async function persistSpotSubscription(spot,spotLat,spotLon){
     sent:         false,
     cancelled:    false,
   });
-  if(error) console.error('[reminders] sentinel insert error',error);
+  if(error) console.error('[sub] insert error',error);
+  else console.log('[sub] sentinel inserted OK');
 }
 
 function addSpotNotif(spot,sessions){
