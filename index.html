@@ -2726,15 +2726,58 @@ const REMINDER_HOURS = [72, 48, 24, 6, 1];
 const SB_URL  = 'https://kpwmajtxmcfpakvonimf.supabase.co';
 const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwd21hanR4bWNmcGFrdm9uaW1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTcyMjYsImV4cCI6MjA5MDczMzIyNn0.QfQuIQbnfVUOApPbOdvCRbNsVdb0SBAwMX-hvioGJmg';
 let _sb = null;
+
+// ── Cookie-backed storage adapter ────────────────────────────────────────────
+// iOS Safari clears localStorage for PWAs/web apps after ~7 days of inactivity.
+// Cookies with an explicit max-age survive this purge. We keep both in sync so
+// the session survives PWA cold-starts and Safari storage eviction.
+const COOKIE_KEY = 'kf_auth';
+const COOKIE_DAYS = 30;
+const kfStorage = {
+  getItem(key){
+    // Prefer localStorage (fast); fall back to cookie if localStorage was cleared
+    try{
+      const ls = localStorage.getItem(key);
+      if(ls) return ls;
+    }catch(e){}
+    // Read from cookie
+    try{
+      const match = document.cookie.match('(?:^|; )'+COOKIE_KEY+'=([^;]*)');
+      if(match){
+        const val = decodeURIComponent(match[1]);
+        // Restore into localStorage for next time
+        try{ localStorage.setItem(key, val); }catch(e){}
+        return val;
+      }
+    }catch(e){}
+    return null;
+  },
+  setItem(key, value){
+    try{ localStorage.setItem(key, value); }catch(e){}
+    try{
+      const maxAge = COOKIE_DAYS * 24 * 60 * 60;
+      // SameSite=Lax works for PWA; Secure is set automatically on https
+      document.cookie = COOKIE_KEY+'='+encodeURIComponent(value)
+        +'; max-age='+maxAge+'; path=/; SameSite=Lax';
+    }catch(e){}
+  },
+  removeItem(key){
+    try{ localStorage.removeItem(key); }catch(e){}
+    try{
+      document.cookie = COOKIE_KEY+'=; max-age=0; path=/; SameSite=Lax';
+    }catch(e){}
+  }
+};
+
 function getSb(){
   if(!_sb){
     if(!window.supabase){ console.error('Supabase SDK not loaded'); return null; }
-    // One-time migration: copy old default Supabase key → new explicit key
+    // One-time migration: pull old default Supabase localStorage key into kfStorage
     try{
-      const OLD='sb-kpwmajtxmcfpakvonimf-auth-token';
-      const NEW='kf-auth';
-      if(!localStorage.getItem(NEW)&&localStorage.getItem(OLD)){
-        localStorage.setItem(NEW,localStorage.getItem(OLD));
+      const OLD = 'sb-kpwmajtxmcfpakvonimf-auth-token';
+      if(!kfStorage.getItem('kf-auth')){
+        const legacy = localStorage.getItem(OLD) || localStorage.getItem('kf-auth');
+        if(legacy) kfStorage.setItem('kf-auth', legacy);
       }
     }catch(e){}
     _sb = window.supabase.createClient(SB_URL, SB_ANON, {
@@ -2743,7 +2786,7 @@ function getSb(){
         autoRefreshToken:  true,
         detectSessionInUrl:false,
         storageKey:        'kf-auth',
-        storage:           window.localStorage,
+        storage:           kfStorage,
       }
     });
   }
