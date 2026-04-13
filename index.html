@@ -2729,7 +2729,23 @@ let _sb = null;
 function getSb(){
   if(!_sb){
     if(!window.supabase){ console.error('Supabase SDK not loaded'); return null; }
-    _sb = window.supabase.createClient(SB_URL, SB_ANON);
+    // One-time migration: copy old default Supabase key → new explicit key
+    try{
+      const OLD='sb-kpwmajtxmcfpakvonimf-auth-token';
+      const NEW='kf-auth';
+      if(!localStorage.getItem(NEW)&&localStorage.getItem(OLD)){
+        localStorage.setItem(NEW,localStorage.getItem(OLD));
+      }
+    }catch(e){}
+    _sb = window.supabase.createClient(SB_URL, SB_ANON, {
+      auth: {
+        persistSession:    true,
+        autoRefreshToken:  true,
+        detectSessionInUrl:false,
+        storageKey:        'kf-auth',
+        storage:           window.localStorage,
+      }
+    });
   }
   return _sb;
 }
@@ -3262,7 +3278,8 @@ async function initAuth(){
       const p=loadProfile();
       const isNew=email!==p.email;
       if(isNew) await syncNotifsFromSupabase(email);
-      showToast('✓ Signed in as '+email);
+      // Only toast on a genuine new sign-in, not on session restore at page load
+      if(isNew) showToast('✓ Signed in as '+email);
       if(pendingNotif){
         const pn=pendingNotif; pendingNotif=null;
         if(pn.type==='spot') addSpotNotif(pn.spot,pn.sessions);
