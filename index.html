@@ -2783,8 +2783,32 @@ function getSb(){
   return _sb;
 }
 
-function loadProfile(){ try{ return JSON.parse(localStorage.getItem('kf_profile')||'{}'); }catch{ return {}; } }
-function saveProfile(p){ localStorage.setItem('kf_profile', JSON.stringify(p)); }
+// Profile stored in both localStorage and a cookie so iOS PWA relaunches
+// don't lose the cached email when localStorage is cleared.
+const PROFILE_COOKIE='kf_profile';
+function loadProfile(){
+  try{
+    const ls=localStorage.getItem('kf_profile');
+    if(ls) return JSON.parse(ls);
+  }catch(e){}
+  try{
+    const m=document.cookie.match('(?:^|; )'+PROFILE_COOKIE+'=([^;]*)');
+    if(m){
+      const v=JSON.parse(decodeURIComponent(m[1]));
+      try{ localStorage.setItem('kf_profile',JSON.stringify(v)); }catch(e){}
+      return v;
+    }
+  }catch(e){}
+  return {};
+}
+function saveProfile(p){
+  const s=JSON.stringify(p);
+  try{ localStorage.setItem('kf_profile',s); }catch(e){}
+  try{
+    document.cookie=PROFILE_COOKIE+'='+encodeURIComponent(s)
+      +'; max-age='+(COOKIE_DAYS*86400)+'; path=/; SameSite=Lax';
+  }catch(e){}
+}
 function loadNotifs(){
   try{
     const all=JSON.parse(localStorage.getItem('kf_notifs')||'[]');
