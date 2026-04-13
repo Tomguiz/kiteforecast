@@ -3106,20 +3106,57 @@ async function cancelReminders(spotName,sessionDate){
   if(error) console.error('cancelReminders failed',spotName,error);
 }
 
+// Write a sentinel reminder row to Supabase marking the spot subscription.
+// Uses a far-future session_date so it survives the "session_date >= today" filter.
+// check-new-sessions picks this up and schedules real reminders when sessions appear.
+async function persistSpotSubscription(spot,spotLat,spotLon){
+  const p=loadProfile(); if(!p.email) return;
+  const sb=getSb(); if(!sb) return;
+  const knownSpot=SPOTS.find(s=>s.name===spot.name);
+  const spotCity=knownSpot?.loc?knownSpot.loc.split(', ').slice(0,-1).join(', '):'';
+  const spotCountry=knownSpot?.loc?knownSpot.loc.split(', ').pop():'';
+  const sentinelDate='2099-12-31';
+  // Cancel any previous sentinel for this spot
+  await sb.from('reminders').update({cancelled:true})
+    .eq('email',p.email).eq('spot_name',spot.name).eq('session_date',sentinelDate);
+  const{error}=await sb.from('reminders').insert({
+    email:        p.email,
+    spot_name:    spot.name,
+    spot_city:    spotCity,
+    spot_country: spotCountry,
+    spot_lat:     spotLat,
+    spot_lon:     spotLon,
+    spot_map_link:`https://www.google.com/maps?q=${spotLat},${spotLon}`,
+    spot_dirs:    [...windDirs],
+    session_date: sentinelDate,
+    notif_type:   'spot',
+    reminder_hours:0,
+    send_at:      '2099-12-31T00:00:00Z',
+    sent:         false,
+    cancelled:    false,
+  });
+  if(error) console.error('[reminders] sentinel insert error',error);
+}
+
 function addSpotNotif(spot,sessions){
   let notifs=loadNotifs()
     .filter(n=>!(n.type==='spot'&&n.spotName===spot.name))
     .filter(n=>!(n.type==='day'&&n.spotName===spot.name&&n.fromSpot));
   const spotId=Date.now()+'_s';
-  notifs.push({id:spotId,type:'spot',spotName:spot.name,spotLat:spot.lat||spot.latitude,spotLon:spot.lon||spot.longitude,spotDirs:[...windDirs],label:'All sessions',createdAt:new Date().toISOString()});
+  const spotLat=spot.lat||spot.latitude;
+  const spotLon=spot.lon||spot.longitude;
+  notifs.push({id:spotId,type:'spot',spotName:spot.name,spotLat,spotLon,spotDirs:[...windDirs],label:'All sessions',createdAt:new Date().toISOString()});
   sessions.forEach((sess,i)=>{
     const dateStr=sess.dateStr||sess.sessionStart.slice(0,10);
     const{full}=fmtDate(dateStr);
-    notifs.push({id:spotId+'_d'+i,type:'day',fromSpot:true,spotName:spot.name,spotLat:spot.lat||spot.latitude,spotLon:spot.lon||spot.longitude,date:dateStr,label:full,createdAt:new Date().toISOString()});
+    notifs.push({id:spotId+'_d'+i,type:'day',fromSpot:true,spotName:spot.name,spotLat,spotLon,date:dateStr,label:full,createdAt:new Date().toISOString()});
   });
   saveNotifs(notifs);
   updateProfileDot();
   renderHintChips();
+  // Write a sentinel row to Supabase so the subscription is visible across devices
+  // even when there are no qualifying sessions yet (e.g. 429 rate limit on forecast)
+  persistSpotSubscription(spot,spotLat,spotLon);
   sessions.forEach(sess=>scheduleReminders(spot,sess,'spot'));
   fireConfirmationWebhook(spot,sessions);
 }
