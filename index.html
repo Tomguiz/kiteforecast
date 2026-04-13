@@ -945,7 +945,7 @@
         <input type="text" id="ppTideKeyInput" class="pp-input" placeholder="Paste your WorldTides API key" />
         <button class="btn pp-save-btn" id="ppTideSaveBtn" onclick="saveTideKey()" style="margin-top:2px">Save</button>
         <p class="pp-note">Used to show exact high/low tide times. Free at worldtides.info/developer.</p>
-        <button class="btn-reset" id="ppSignOutBtn" onclick="signOut()" style="font-size:.78rem;color:var(--tdim);text-align:left;padding:4px 0 0;">Sign out</button>
+        <button class="btn-reset" id="ppSignOutBtn" onclick="signOut()" style="font-size:.78rem;color:#f87171;text-align:left;padding:4px 0 0;">Sign out</button>
       </div>
     </div>
     <div id="ppPanelNotifs" class="pp-body" style="display:none">
@@ -2937,8 +2937,6 @@ async function syncFavsFromSupabase(email){
     .select('spot_name,spot_label,spot_lat,spot_lon,spot_dirs')
     .eq('email',email);
   if(error){ console.error('favs sync error',error); return; }
-  if(!data||!data.length) return;
-  // Merge: Supabase is source of truth, keep local-only entries too
   const local=loadFavs();
   const remote=(data||[]).map(r=>({
     name:  r.spot_name,
@@ -2947,8 +2945,12 @@ async function syncFavsFromSupabase(email){
     lon:   r.spot_lon,
     dirs:  r.spot_dirs||[],
   }));
+  // Local favs not yet in Supabase — push them up (handles pre-sync desktop favs)
   const localOnly=local.filter(lf=>!remote.some(rf=>rf.name===lf.name&&rf.lat===lf.lat));
+  for(const fav of localOnly) pushFavToSupabase(email,fav,false);
+  // Merge: union of remote + local-only
   const merged=[...remote,...localOnly];
+  if(merged.length===0) return;
   saveFavs(merged);
   renderHintChips();
 }
