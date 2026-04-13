@@ -93,6 +93,8 @@
         z-index: 300;
         padding: 8px 16px;
       }
+      /* Keep Back button clear of the absolutely-positioned profile bubble */
+      body.spot-loaded .search-wrap { padding-right: 52px; }
       body.spot-loaded #logoHome,
       body.spot-loaded .tagline {
         display: none;
@@ -3234,37 +3236,31 @@ async function initAuth(){
     updateAuthUI(); updateProfileDot(); renderHintChips();
   }
 
-  // ── 2. Auth-state listener (register BEFORE getSession so INITIAL_SESSION
-  //       fires as early as possible and is never missed) ──────────────────
+  // ── 2. Auth-state listener ────────────────────────────────────────────────
+  // Rules:
+  //   SIGNED_IN / TOKEN_REFRESHED → always update _authSession & persist email
+  //   INITIAL_SESSION with session → same
+  //   INITIAL_SESSION without session + no cachedEmail → genuinely signed out
+  //   SIGNED_OUT → IGNORED. Supabase fires this transiently on PWA cold-start,
+  //     background-tab restore, token-refresh failure. Only signOut() may log out.
   sb.auth.onAuthStateChange(async(event,session)=>{
-    // Only update _authSession for positive events — never on SIGNED_OUT.
-    // Supabase fires SIGNED_OUT transiently on token-refresh failure, PWA
-    // cold start, background-tab restoration, etc. Ignoring it means only the
-    // explicit signOut() button can log the user out.
     if(event==='SIGNED_IN'||event==='TOKEN_REFRESHED'||event==='INITIAL_SESSION'){
-      if(session) _authSession=session;
-    }
-
-    if(event==='INITIAL_SESSION'){
-      if(session?.user?.email){
+      if(session){
+        _authSession=session;
         const p=loadProfile(); p.email=session.user.email; saveProfile(p);
         updateAuthUI(); updateProfileDot(); renderHintChips();
-      } else if(!session&&!cachedEmail){
-        // Genuinely no session and no cached email → signed-out state is correct
+      } else if(event==='INITIAL_SESSION'&&!cachedEmail){
+        // No session, never had one — genuinely signed out
         _authSession=null;
         updateAuthUI(); updateProfileDot(); renderHintChips();
       }
-      // If no session but cachedEmail exists: keep optimistic state; getSession()
-      // below will do a refresh attempt and correct things if truly expired.
-    } else if(event==='TOKEN_REFRESHED'&&session?.user){
-      const p=loadProfile(); p.email=session.user.email; saveProfile(p);
-      updateAuthUI(); updateProfileDot(); renderHintChips();
-    } else if(event==='SIGNED_IN'&&session?.user?.email){
+      // INITIAL_SESSION null + cachedEmail → keep optimistic; getSession() below retries
+    }
+
+    if(event==='SIGNED_IN'&&session?.user?.email){
       const email=session.user.email;
       const p=loadProfile();
       const isNew=email!==p.email;
-      p.email=email; saveProfile(p);
-      updateAuthUI(); updateProfileDot(); renderHintChips();
       if(isNew) await syncNotifsFromSupabase(email);
       showToast('✓ Signed in as '+email);
       if(pendingNotif){
@@ -3287,23 +3283,20 @@ async function initAuth(){
     }
   });
 
-  // ── 3. getSession() — triggers a token refresh if the access token expired.
-  //       If it returns a real session, replace the optimistic placeholder.
-  //       If it returns null and we have no real session yet, keep optimistic
-  //       state: the listener may still fire TOKEN_REFRESHED asynchronously. ──
+  // ── 3. getSession() — attempt a token refresh. ────────────────────────────
+  // If it succeeds → upgrade optimistic placeholder to real session.
+  // If it fails / returns null → do NOT touch _authSession or kf_profile.email.
+  //   The listener may still fire TOKEN_REFRESHED asynchronously, and we must
+  //   not destroy the optimistic session on a transient refresh failure.
+  //   Only signOut() is allowed to clear the email from kf_profile.
   try{
     const{data:{session}}=await sb.auth.getSession();
     if(session){
       _authSession=session;
       const p=loadProfile(); p.email=session.user.email; saveProfile(p);
       updateAuthUI(); updateProfileDot(); renderHintChips();
-    } else if(!_authSession?.user?.email){
-      // getSession returned null AND no email anywhere — truly signed out
-      _authSession=null;
-      const p=loadProfile(); delete p.email; saveProfile(p);
-      updateAuthUI(); updateProfileDot(); renderHintChips();
     }
-    // else: getSession null but optimistic/listener session is in place — keep it
+    // null → keep whatever state we have; don't sign the user out
   }catch(e){ console.warn('getSession error:',e); }
 }
 
