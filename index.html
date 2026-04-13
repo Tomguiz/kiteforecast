@@ -1993,11 +1993,31 @@ function addRecentSpot(spot){
   saveRecent(recent);
 }
 
+// Favs stored in localStorage + cookie (iOS PWA eviction) + Supabase (cross-device)
+const FAVS_COOKIE='kf_favs';
 function loadFavs(){
-  try{ return JSON.parse(localStorage.getItem('kf_favs')||'[]'); }
-  catch{ return []; }
+  try{
+    const ls=localStorage.getItem('kf_favs');
+    if(ls) return JSON.parse(ls);
+  }catch(e){}
+  try{
+    const m=document.cookie.match('(?:^|; )'+FAVS_COOKIE+'=([^;]*)');
+    if(m){
+      const v=JSON.parse(decodeURIComponent(m[1]));
+      try{ localStorage.setItem('kf_favs',JSON.stringify(v)); }catch(e){}
+      return v;
+    }
+  }catch(e){}
+  return [];
 }
-function saveFavs(arr){ localStorage.setItem('kf_favs',JSON.stringify(arr)); }
+function saveFavs(arr){
+  const s=JSON.stringify(arr);
+  try{ localStorage.setItem('kf_favs',s); }catch(e){}
+  try{
+    document.cookie=FAVS_COOKIE+'='+encodeURIComponent(s)
+      +'; max-age='+(COOKIE_DAYS*86400)+'; path=/; SameSite=Lax';
+  }catch(e){}
+}
 
 // Per-spot wind direction overrides saved by the user
 function loadAllUserDirs(){
@@ -2034,18 +2054,21 @@ function toggleFavorite(){
   }
   let favs=loadFavs();
   const idx=favs.findIndex(f=>f.name===loc.name&&f.lat===loc.latitude);
+  const favEntry={
+    name:  loc.name,
+    label: `${loc.name}${loc.admin1&&loc.admin1!==loc.name?', '+loc.admin1:''}`,
+    lat:   loc.latitude,
+    lon:   loc.longitude,
+    dirs:  [...windDirs],
+  };
   if(idx>=0){
     favs.splice(idx,1);
   } else {
-    favs.push({
-      name: loc.name,
-      label:`${loc.name}${loc.admin1&&loc.admin1!==loc.name?', '+loc.admin1:''}`,
-      lat:  loc.latitude,
-      lon:  loc.longitude,
-      dirs: [...windDirs],
-    });
+    favs.push(favEntry);
   }
   saveFavs(favs);
+  const email=_authSession?.user?.email;
+  if(email) pushFavToSupabase(email, favEntry, idx>=0);
   // update star button
   const isFav=idx<0;
   const btn=$('favBtn');
@@ -2146,9 +2169,13 @@ function renderHintChips(){
         _signinContext='fav'; openProfilePanel('profile');
       } else {
         const favs2=loadFavs();
+        const newFav={name:spot.name,label:c.label,lat:spot.lat,lon:spot.lon,dirs:spot.dirs||[]};
         if(!favs2.some(f=>f.name===spot.name)){
-          favs2.push({name:spot.name,label:c.label,lat:spot.lat,lon:spot.lon,dirs:spot.dirs||[]});
-          saveFavs(favs2); renderHintChips(); showToast('★ '+spot.name+' added to Your Spots');
+          favs2.push(newFav);
+          saveFavs(favs2);
+          const em=_authSession?.user?.email;
+          if(em) pushFavToSupabase(em,newFav,false);
+          renderHintChips(); showToast('★ '+spot.name+' added to Your Spots');
         }
       }
     });
@@ -2178,6 +2205,8 @@ function pickFav(f){
 function removeFav(f){
   const favs=loadFavs().filter(x=>!(x.name===f.name&&x.lat===f.lat));
   saveFavs(favs);
+  const email=_authSession?.user?.email;
+  if(email) pushFavToSupabase(email,f,true);
   renderHintChips();
   // Reset star button if the removed spot is currently open
   if(cachedLoc&&cachedLoc.name===f.name){
@@ -2871,6 +2900,52 @@ async function syncNotifsFromSupabase(email){
   if(synced.length) showToast(`✓ ${synced.length} notification${synced.length>1?'s':''} synced`);
 }
 
+async function syncAllFromSupabase(email){
+  await Promise.all([syncNotifsFromSupabase(email), syncFavsFromSupabase(email)]);
+}
+
+async function syncFavsFromSupabase(email){
+  if(!email) return;
+  const sb=getSb(); if(!sb) return;
+  const {data,error}=await sb
+    .from('favourites')
+    .select('spot_name,spot_label,spot_lat,spot_lon,spot_dirs')
+    .eq('email',email);
+  if(error){ console.error('favs sync error',error); return; }
+  if(!data||!data.length) return;
+  // Merge: Supabase is source of truth, keep local-only entries too
+  const local=loadFavs();
+  const remote=(data||[]).map(r=>({
+    name:  r.spot_name,
+    label: r.spot_label||r.spot_name,
+    lat:   r.spot_lat,
+    lon:   r.spot_lon,
+    dirs:  r.spot_dirs||[],
+  }));
+  const localOnly=local.filter(lf=>!remote.some(rf=>rf.name===lf.name&&rf.lat===lf.lat));
+  const merged=[...remote,...localOnly];
+  saveFavs(merged);
+  renderHintChips();
+}
+
+async function pushFavToSupabase(email,fav,remove=false){
+  if(!email) return;
+  const sb=getSb(); if(!sb) return;
+  if(remove){
+    await sb.from('favourites').delete()
+      .eq('email',email).eq('spot_name',fav.name);
+  } else {
+    await sb.from('favourites').upsert({
+      email:      email,
+      spot_name:  fav.name,
+      spot_label: fav.label,
+      spot_lat:   fav.lat,
+      spot_lon:   fav.lon,
+      spot_dirs:  fav.dirs||[],
+    },{onConflict:'email,spot_name'});
+  }
+}
+
 function notifMasterEnabled(){ return loadProfile().notifsEnabled !== false; }
 
 function hasSpotNotif(spotName){ return !!_authSession?.user&&loadNotifs().some(n=>n.type==='spot'&&n.spotName===spotName); }
@@ -3224,7 +3299,7 @@ function openProfilePanel(tab){
     updateProfileDot();
     // Sync in background on every open so cross-device changes appear immediately
     const email=_authSession?.user?.email||loadProfile().email;
-    if(email) syncNotifsFromSupabase(email).then(()=>{ renderNotifList(); updateProfileDot(); });
+    if(email) syncAllFromSupabase(email).then(()=>{ renderNotifList(); updateProfileDot(); });
   }catch(err){
     console.error('openProfilePanel error:',err);
     showToast('Error opening panel: '+err.message);
@@ -3329,7 +3404,7 @@ async function initAuth(){
       const email=session.user.email;
       const p=loadProfile();
       const isNew=email!==p.email;
-      if(isNew) await syncNotifsFromSupabase(email);
+      if(isNew) await syncAllFromSupabase(email);
       // Only toast on a genuine new sign-in, not on session restore at page load
       if(isNew) showToast('✓ Signed in as '+email);
       if(pendingNotif){
@@ -3343,6 +3418,7 @@ async function initAuth(){
         const favs=loadFavs();
         if(!favs.some(f=>f.name===pf.name&&f.lat===pf.lat)){
           favs.push(pf); saveFavs(favs);
+          pushFavToSupabase(email,pf);
           renderHintChips();
           const btn=$('favBtn');
           if(btn){ btn.textContent='★'; btn.classList.add('active'); btn.title='Remove from favourites'; }
@@ -3403,7 +3479,7 @@ async function verifyOtpCode(){
   const p=loadProfile(); const isNew=email!==p.email; p.email=email; saveProfile(p);
   resetOtpFlow();
   updateAuthUI(); updateProfileDot(); renderHintChips();
-  if(isNew) await syncNotifsFromSupabase(email);
+  if(isNew) await syncAllFromSupabase(email);
   showToast('✅ Signed in successfully');
 }
 
@@ -3485,12 +3561,12 @@ async function nsmVerifyCode(){
   // Execute pending notif now — before the toast so the action feels instant
   if(pendingNotif){
     const pn=pendingNotif; pendingNotif=null;
-    if(isNew) await syncNotifsFromSupabase(email);
+    if(isNew) await syncAllFromSupabase(email);
     if(pn.type==='spot') addSpotNotif(pn.spot,pn.sessions);
     else addDayNotif(pn.spot,pn.dateStr,pn.sessInfo);
     if(cachedLoc) renderGrid();
   } else if(isNew){
-    await syncNotifsFromSupabase(email);
+    await syncAllFromSupabase(email);
   }
 
   showToast('📧 Notification set! Confirmation email sent.');

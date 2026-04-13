@@ -7,7 +7,38 @@
 CREATE EXTENSION IF NOT EXISTS pg_cron;
 CREATE EXTENSION IF NOT EXISTS pg_net;
 
--- 2. Reminders table
+-- 2. Favourites table
+CREATE TABLE IF NOT EXISTS favourites (
+  id          uuid             PRIMARY KEY DEFAULT gen_random_uuid(),
+  email       text             NOT NULL,
+  spot_name   text             NOT NULL,
+  spot_label  text,
+  spot_lat    double precision NOT NULL,
+  spot_lon    double precision NOT NULL,
+  spot_dirs   integer[],
+  created_at  timestamptz      NOT NULL DEFAULT now(),
+  UNIQUE (email, spot_name)
+);
+
+ALTER TABLE favourites ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  CREATE POLICY "anon_insert_favs" ON favourites FOR INSERT TO anon WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "anon_select_favs" ON favourites FOR SELECT TO anon USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "anon_delete_favs" ON favourites FOR DELETE TO anon USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "anon_update_favs" ON favourites FOR UPDATE TO anon USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- 3. Reminders table
 CREATE TABLE IF NOT EXISTS reminders (
   id              uuid          PRIMARY KEY DEFAULT gen_random_uuid(),
   email           text          NOT NULL,
