@@ -2864,22 +2864,42 @@ function saveProfile(p){
       +'; max-age='+(COOKIE_DAYS*86400)+'; path=/; SameSite=Lax';
   }catch(e){}
 }
+const NOTIFS_COOKIE='kf_notifs';
 function loadNotifs(){
   try{
-    const all=JSON.parse(localStorage.getItem('kf_notifs')||'[]');
+    let all=null;
+    const ls=localStorage.getItem('kf_notifs');
+    if(ls) all=JSON.parse(ls);
+    if(!all){
+      const m=document.cookie.match('(?:^|; )'+NOTIFS_COOKIE+'=([^;]*)');
+      if(m){
+        all=JSON.parse(decodeURIComponent(m[1]));
+        try{ localStorage.setItem('kf_notifs',JSON.stringify(all)); }catch(e){}
+      }
+    }
+    if(!all) return [];
     const today=new Date().toISOString().slice(0,10);
-    // auto-purge past day-level entries
     const active=all.filter(n=>n.type==='spot'||!n.date||(n.date>=today));
-    if(active.length!==all.length) localStorage.setItem('kf_notifs',JSON.stringify(active));
+    if(active.length!==all.length) saveNotifs(active);
     return active;
   }catch{ return []; }
 }
-function saveNotifs(arr){ localStorage.setItem('kf_notifs', JSON.stringify(arr)); }
+function saveNotifs(arr){
+  const s=JSON.stringify(arr);
+  try{ localStorage.setItem('kf_notifs',s); }catch(e){}
+  try{
+    document.cookie=NOTIFS_COOKIE+'='+encodeURIComponent(s)
+      +'; max-age='+(COOKIE_DAYS*86400)+'; path=/; SameSite=Lax';
+  }catch(e){}
+}
 
 // Sync active reminders from Supabase into localStorage (authoritative).
 // Replaces localStorage with whatever Supabase says is active for this email.
+let _syncNotifsInFlight=false;
 async function syncNotifsFromSupabase(email){
-  if(!email) return;
+  if(!email||_syncNotifsInFlight) return;
+  _syncNotifsInFlight=true;
+  try{
   const sb=getSb(); if(!sb) return;
   const today=new Date().toISOString().slice(0,10);
   const {data,error}=await sb
@@ -2924,6 +2944,7 @@ async function syncNotifsFromSupabase(email){
   renderHintChips();
   updateProfileDot();
   if(synced.length) showToast(`✓ ${synced.length} notification${synced.length>1?'s':''} synced`);
+  } finally { _syncNotifsInFlight=false; }
 }
 
 async function syncAllFromSupabase(email){
