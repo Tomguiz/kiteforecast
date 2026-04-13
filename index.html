@@ -2935,9 +2935,17 @@ async function syncNotifsFromSupabase(email){
       }
     }
   }
-  // Preserve locally-added notifs not yet reflected in Supabase (race-condition safety)
+  // Supabase is source of truth. Keep local-only entries created in the last 60s
+  // (race-condition safety: user just set a notif that hasn't reached Supabase yet).
   const local=loadNotifs();
-  const localOnly=local.filter(ln=>!synced.some(sn=>sn.spotName===ln.spotName&&sn.type===ln.type&&(sn.date||null)===(ln.date||null)));
+  const cutoff=Date.now()-60000;
+  const localOnly=local.filter(ln=>{
+    const alreadySynced=synced.some(sn=>sn.spotName===ln.spotName&&sn.type===ln.type&&(sn.date||null)===(ln.date||null));
+    if(alreadySynced) return false;
+    // Keep if created within the last 60s (not yet in Supabase)
+    const age=new Date(ln.createdAt||0).getTime();
+    return age>cutoff;
+  });
   const merged=[...synced,...localOnly];
   saveNotifs(merged);
   renderNotifList();
