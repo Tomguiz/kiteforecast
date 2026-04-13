@@ -772,7 +772,7 @@
 <main>
   <!-- hint state -->
   <div class="hints" id="hintState">
-    <div class="hint-steps">
+    <div class="hint-steps" id="hintSteps">
       <div class="hint-step">
         <span class="hint-step-icon">📍</span>
         <strong>Find your spot</strong>
@@ -1843,17 +1843,44 @@ async function fetchChipQualDays(spot){
 function updateBestWindowBar(){
   const bar=$('bestWindowBar');
   if(!bar) return;
-  // Find the entry with the highest peakKn across all cached spots
+  const favs=loadFavs();
+  const hasFavs=!!_authSession?.user&&favs.length>0;
+
+  // Hide steps, show bar when user has favs
+  const steps=$('hintSteps');
+  if(steps) steps.style.display=hasFavs?'none':'';
+
+  if(!hasFavs){ bar.style.display='none'; return; }
+
+  // Identify which fav keys have loaded vs still pending
+  const favKeys=favs.map(f=>`${f.lat},${f.lon}`);
+  const loadedKeys=favKeys.filter(k=>k in chipBestCache);
+  const allLoaded=loadedKeys.length===favKeys.length;
+
+  // Find best session among loaded fav keys
   let best=null;
-  for(const key of Object.keys(chipBestCache)){
+  for(const key of loadedKeys){
     const entry=chipBestCache[key];
     if(!entry) continue;
     if(!best||entry.peakKn>best.peakKn) best=entry;
   }
-  if(!best){ bar.style.display='none'; return; }
-  const{short:dayLabel}=fmtDate(best.dateStr);
+
   bar.style.display='block';
-  bar.innerHTML=`<div class="best-window-bar"><span>🏆 Best window this week:</span><span class="bw-spot">${best.spotName}</span><span>·</span><span>${dayLabel}</span><span>·</span><span>${best.peakKn}kn</span></div>`;
+
+  if(!allLoaded){
+    // Still loading — show placeholder
+    bar.innerHTML=`<div class="best-window-bar" style="color:var(--tdim);cursor:default">⏳ Checking your spots…</div>`;
+    return;
+  }
+
+  if(!best){
+    // All loaded, no sessions on any fav
+    bar.innerHTML=`<div class="best-window-bar" style="background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.25);color:#f87171;cursor:default">😶‍🌫️ No good sessions forecast on your spots this week</div>`;
+    return;
+  }
+
+  const{short:dayLabel}=fmtDate(best.dateStr);
+  bar.innerHTML=`<div class="best-window-bar"><span>🏆 Best window:</span><span class="bw-spot">${best.spotName}</span><span>·</span><span>${dayLabel}</span><span>·</span><span>${best.peakKn}kn</span></div>`;
   bar.querySelector('.best-window-bar').addEventListener('click',()=>pickSpot(best.spot));
 }
 async function searchOsmSpots(q){
@@ -2116,7 +2143,7 @@ function renderHintChips(){
       const fbadge=document.createElement('span');
       fbadge.className='chip-days cd-loading'; fbadge.textContent='·';
       label.appendChild(fbadge);
-      fetchChipQualDays({name:f.name,lat:f.lat,lon:f.lon,dirs:f.dirs||[]}).then(n=>setChipDayBadge(fbadge,n));
+      fetchChipQualDays({name:f.name,lat:f.lat,lon:f.lon,dirs:f.dirs||[]}).then(n=>{setChipDayBadge(fbadge,n);updateBestWindowBar();});
       const rm=document.createElement('span');
       rm.className='fav-chip-remove'; rm.textContent='✕'; rm.title='Remove from your spots';
       rm.addEventListener('click',e=>{e.stopPropagation();removeFav(f);});
@@ -2183,10 +2210,8 @@ function renderHintChips(){
     wrap.appendChild(chip);
     fetchChipQualDays(spot).then(n=>{ setChipDayBadge(badge,n); updateBestWindowBar(); });
   });
-  // Also trigger after fav chips load
-  favs.forEach(f=>{
-    fetchChipQualDays({name:f.name,lat:f.lat,lon:f.lon,dirs:f.dirs||[]}).then(()=>updateBestWindowBar());
-  });
+  // Sync step visibility and bar state immediately (before async fetches complete)
+  updateBestWindowBar();
 }
 function loadDismissedSuggs(){ try{ return JSON.parse(localStorage.getItem('kf_dismissed')||'[]'); }catch{ return []; } }
 function dismissSugg(name){
