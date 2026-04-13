@@ -3419,6 +3419,9 @@ async function initAuth(){
         _authSession=session;
         const p=loadProfile(); p.email=session.user.email; saveProfile(p);
         updateAuthUI(); updateProfileDot(); renderHintChips();
+        // Pull favs from Supabase if local is empty (new device / cleared storage)
+        if(event!=='SIGNED_IN'&&loadFavs().length===0)
+          syncFavsFromSupabase(session.user.email).then(()=>renderHintChips());
       } else if(event==='INITIAL_SESSION'&&!cachedEmail){
         // No session, never had one — genuinely signed out
         _authSession=null;
@@ -3467,6 +3470,9 @@ async function initAuth(){
       _authSession=session;
       const p=loadProfile(); p.email=session.user.email; saveProfile(p);
       updateAuthUI(); updateProfileDot(); renderHintChips();
+      // If local favs are empty but user is signed in, pull from Supabase.
+      // This covers a returning user on a new device where localStorage is empty.
+      if(loadFavs().length===0) syncFavsFromSupabase(session.user.email).then(()=>renderHintChips());
     }
     // null → keep whatever state we have; don't sign the user out
   }catch(e){ console.warn('getSession error:',e); }
