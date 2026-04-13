@@ -64,9 +64,10 @@ CREATE INDEX IF NOT EXISTS reminders_due_idx
   ON reminders (send_at, sent, cancelled);
 
 -- Unique constraint to prevent duplicate reminder rows per subscription window
-ALTER TABLE reminders
-  ADD CONSTRAINT IF NOT EXISTS reminders_unique_reminder
-  UNIQUE (email, spot_name, notif_type, session_date, reminder_hours);
+DO $$ BEGIN
+  ALTER TABLE reminders ADD CONSTRAINT reminders_unique_reminder
+    UNIQUE (email, spot_name, notif_type, session_date, reminder_hours);
+EXCEPTION WHEN duplicate_table THEN NULL; END $$;
 
 -- 4. Row Level Security
 ALTER TABLE reminders ENABLE ROW LEVEL SECURITY;
