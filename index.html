@@ -1249,6 +1249,33 @@ const $=id=>document.getElementById(id);
 let _fetchGen=0; // incremented on every new fetch and on resetSearch to cancel in-flight fetches
 let _authSession=null; // set by initAuth; kept in sync via onAuthStateChange
 let _signinContext='generic'; // 'notif' | 'fav' | 'generic' — drives onboarding copy in the sign-in panel
+
+// ── Cookie-backed storage adapter (must be top-level to avoid TDZ) ───────────
+// iOS Safari clears localStorage for PWAs after ~7 days. Cookies with an
+// explicit max-age survive this. We write to both and read cookie as fallback.
+const COOKIE_KEY='kf_auth';
+const COOKIE_DAYS=30;
+const kfStorage={
+  getItem(key){
+    try{ const ls=localStorage.getItem(key); if(ls) return ls; }catch(e){}
+    try{
+      const m=document.cookie.match('(?:^|; )'+COOKIE_KEY+'=([^;]*)');
+      if(m){ const v=decodeURIComponent(m[1]); try{ localStorage.setItem(key,v); }catch(e){} return v; }
+    }catch(e){}
+    return null;
+  },
+  setItem(key,value){
+    try{ localStorage.setItem(key,value); }catch(e){}
+    try{
+      document.cookie=COOKIE_KEY+'='+encodeURIComponent(value)
+        +'; max-age='+(COOKIE_DAYS*86400)+'; path=/; SameSite=Lax';
+    }catch(e){}
+  },
+  removeItem(key){
+    try{ localStorage.removeItem(key); }catch(e){}
+    try{ document.cookie=COOKIE_KEY+'=; max-age=0; path=/; SameSite=Lax'; }catch(e){}
+  }
+};
 function showOnly(id){
   ['hintState','loadingState','errorState','results'].forEach(s=>{
     $(s).style.display=s!==id?'none':(s==='results'||s==='hintState')?'block':'flex';
@@ -2727,48 +2754,6 @@ const SB_URL  = 'https://kpwmajtxmcfpakvonimf.supabase.co';
 const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwd21hanR4bWNmcGFrdm9uaW1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTcyMjYsImV4cCI6MjA5MDczMzIyNn0.QfQuIQbnfVUOApPbOdvCRbNsVdb0SBAwMX-hvioGJmg';
 let _sb = null;
 
-// ── Cookie-backed storage adapter ────────────────────────────────────────────
-// iOS Safari clears localStorage for PWAs/web apps after ~7 days of inactivity.
-// Cookies with an explicit max-age survive this purge. We keep both in sync so
-// the session survives PWA cold-starts and Safari storage eviction.
-const COOKIE_KEY = 'kf_auth';
-const COOKIE_DAYS = 30;
-const kfStorage = {
-  getItem(key){
-    // Prefer localStorage (fast); fall back to cookie if localStorage was cleared
-    try{
-      const ls = localStorage.getItem(key);
-      if(ls) return ls;
-    }catch(e){}
-    // Read from cookie
-    try{
-      const match = document.cookie.match('(?:^|; )'+COOKIE_KEY+'=([^;]*)');
-      if(match){
-        const val = decodeURIComponent(match[1]);
-        // Restore into localStorage for next time
-        try{ localStorage.setItem(key, val); }catch(e){}
-        return val;
-      }
-    }catch(e){}
-    return null;
-  },
-  setItem(key, value){
-    try{ localStorage.setItem(key, value); }catch(e){}
-    try{
-      const maxAge = COOKIE_DAYS * 24 * 60 * 60;
-      // SameSite=Lax works for PWA; Secure is set automatically on https
-      document.cookie = COOKIE_KEY+'='+encodeURIComponent(value)
-        +'; max-age='+maxAge+'; path=/; SameSite=Lax';
-    }catch(e){}
-  },
-  removeItem(key){
-    try{ localStorage.removeItem(key); }catch(e){}
-    try{
-      document.cookie = COOKIE_KEY+'=; max-age=0; path=/; SameSite=Lax';
-    }catch(e){}
-  }
-};
-
 function getSb(){
   if(!_sb){
     if(!window.supabase){ console.error('Supabase SDK not loaded'); return null; }
@@ -3283,12 +3268,6 @@ async function fetchTideAndRefresh(){
 }
 // ── AUTH ──
 async function initAuth(){
-  // ── DIAGNOSTIC (remove after confirming fix) ──
-  console.log('[KF auth] kf_profile=',localStorage.getItem('kf_profile'));
-  console.log('[KF auth] kf-auth(ls)=',localStorage.getItem('kf-auth'));
-  console.log('[KF auth] cookies=',document.cookie);
-  console.log('[KF auth] kfStorage.getItem=',kfStorage.getItem('kf-auth'));
-
   const sb=getSb();
 
   // ── 1. Optimistic UI ──────────────────────────────────────────────────────
@@ -3309,7 +3288,6 @@ async function initAuth(){
   //   SIGNED_OUT → IGNORED. Supabase fires this transiently on PWA cold-start,
   //     background-tab restore, token-refresh failure. Only signOut() may log out.
   sb.auth.onAuthStateChange(async(event,session)=>{
-    console.log('[KF auth] event='+event+' session='+!!session+' email='+(session?.user?.email||'none'));
     if(event==='SIGNED_IN'||event==='TOKEN_REFRESHED'||event==='INITIAL_SESSION'){
       if(session){
         _authSession=session;
@@ -3357,15 +3335,14 @@ async function initAuth(){
   //   not destroy the optimistic session on a transient refresh failure.
   //   Only signOut() is allowed to clear the email from kf_profile.
   try{
-    const{data:{session},error}=await sb.auth.getSession();
-    console.log('[KF auth] getSession session='+!!session+' error='+JSON.stringify(error));
+    const{data:{session}}=await sb.auth.getSession();
     if(session){
       _authSession=session;
       const p=loadProfile(); p.email=session.user.email; saveProfile(p);
       updateAuthUI(); updateProfileDot(); renderHintChips();
     }
     // null → keep whatever state we have; don't sign the user out
-  }catch(e){ console.warn('[KF auth] getSession exception:',e); }
+  }catch(e){ console.warn('getSession error:',e); }
 }
 
 async function sendOtpCode(){
