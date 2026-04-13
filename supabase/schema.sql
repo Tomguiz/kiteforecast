@@ -72,19 +72,17 @@ EXCEPTION WHEN duplicate_table THEN NULL; END $$;
 -- 4. Row Level Security
 ALTER TABLE reminders ENABLE ROW LEVEL SECURITY;
 
--- Allow frontend (anon) to insert new reminders
+-- Allow frontend (anon + authenticated) to insert, update, read reminders
 DO $$ BEGIN
-  CREATE POLICY "anon_insert" ON reminders FOR INSERT TO anon WITH CHECK (true);
+  CREATE POLICY "all_insert" ON reminders FOR INSERT TO anon, authenticated WITH CHECK (true);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
--- Allow frontend (anon) to cancel their own reminders
 DO $$ BEGIN
-  CREATE POLICY "anon_cancel" ON reminders FOR UPDATE TO anon USING (true) WITH CHECK (cancelled = true);
+  CREATE POLICY "all_update" ON reminders FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
--- Allow frontend (anon) to read reminders (for cross-session sync)
 DO $$ BEGIN
-  CREATE POLICY "anon_select" ON reminders FOR SELECT TO anon USING (true);
+  CREATE POLICY "all_select" ON reminders FOR SELECT TO anon, authenticated USING (true);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- 5. pg_cron jobs
