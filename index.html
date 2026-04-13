@@ -2902,16 +2902,20 @@ async function syncNotifsFromSupabase(email){
   try{
   const sb=getSb(); if(!sb) return;
   const today=new Date().toISOString().slice(0,10);
-  const {data,error}=await sb
-    .from('reminders')
-    .select('spot_name,spot_lat,spot_lon,spot_dirs,notif_type,session_date,created_at')
-    .eq('email',email)
-    .eq('cancelled',false)
-    .gte('session_date',today);
-  if(error){ console.error('sync error',error); return; }
+  // Fetch spot subscriptions (no date filter — they're persistent)
+  // and future day-level reminders separately
+  const [{data:spotData,error:spotErr},{data:dayData,error:dayErr}]=await Promise.all([
+    sb.from('reminders').select('spot_name,spot_lat,spot_lon,spot_dirs,notif_type,session_date,created_at')
+      .eq('email',email).eq('cancelled',false).eq('notif_type','spot'),
+    sb.from('reminders').select('spot_name,spot_lat,spot_lon,spot_dirs,notif_type,session_date,created_at')
+      .eq('email',email).eq('cancelled',false).eq('notif_type','day').gte('session_date',today),
+  ]);
+  if(spotErr){ console.error('sync error',spotErr); return; }
+  if(dayErr){ console.error('sync error',dayErr); return; }
+  const data=[...(spotData||[]),...(dayData||[])];
   // Deduplicate rows (5 reminder_hours rows per session)
   const seen=new Set();
-  const unique=(data||[]).filter(r=>{
+  const unique=data.filter(r=>{
     const key=r.spot_name+'|'+r.notif_type+'|'+r.session_date;
     if(seen.has(key)) return false;
     seen.add(key); return true;
@@ -2924,10 +2928,6 @@ async function syncNotifsFromSupabase(email){
     if(nType==='spot'){
       if(!synced.some(n=>n.type==='spot'&&n.spotName===sn))
         synced.push({id:ts+'_s_'+sn,type:'spot',spotName:sn,spotLat:sLat,spotLon:sLon,spotDirs:sDirs,createdAt:ts});
-      if(!synced.some(n=>n.type==='day'&&n.spotName===sn&&n.date===dateStr&&n.fromSpot)){
-        const{full}=fmtDate(dateStr);
-        synced.push({id:ts+'_ds_'+sn+dateStr,type:'day',fromSpot:true,spotName:sn,spotLat:sLat,spotLon:sLon,date:dateStr,label:full,createdAt:ts});
-      }
     } else if(nType==='day'){
       if(!synced.some(n=>n.type==='day'&&n.spotName===sn&&n.date===dateStr&&!n.fromSpot)){
         const{full}=fmtDate(dateStr);
