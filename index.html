@@ -1249,6 +1249,16 @@ const $=id=>document.getElementById(id);
 let _fetchGen=0; // incremented on every new fetch and on resetSearch to cancel in-flight fetches
 let _authSession=null; // set by initAuth; kept in sync via onAuthStateChange
 let _signinContext='generic'; // 'notif' | 'fav' | 'generic' — drives onboarding copy in the sign-in panel
+let _sb=null; // Supabase client singleton
+let ppCurrentTab='profile'; // active tab in profile panel
+let pendingNotif=null; // action to execute after sign-in
+let pendingFav=null; // fav to execute after sign-in
+
+// ── Constants (must be top-level to avoid TDZ when initAuth() runs) ──────────
+const WEBHOOK_URL    = 'https://hook.eu1.make.com/6t9fgm6btixri2wf5lnx47requf416vs';
+const REMINDER_HOURS = [72, 48, 24, 6, 1];
+const SB_URL  = 'https://kpwmajtxmcfpakvonimf.supabase.co';
+const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwd21hanR4bWNmcGFrdm9uaW1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTcyMjYsImV4cCI6MjA5MDczMzIyNn0.QfQuIQbnfVUOApPbOdvCRbNsVdb0SBAwMX-hvioGJmg';
 
 // ── Cookie-backed storage adapter (must be top-level to avoid TDZ) ───────────
 // iOS Safari clears localStorage for PWAs after ~7 days. Cookies with an
@@ -2748,11 +2758,6 @@ function initSpotsMap(){
 // ══════════════════════════════════
 //  NOTIFICATIONS — DATA
 // ══════════════════════════════════
-const WEBHOOK_URL    = 'https://hook.eu1.make.com/6t9fgm6btixri2wf5lnx47requf416vs';
-const REMINDER_HOURS = [72, 48, 24, 6, 1];
-const SB_URL  = 'https://kpwmajtxmcfpakvonimf.supabase.co';
-const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwd21hanR4bWNmcGFrdm9uaW1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTcyMjYsImV4cCI6MjA5MDczMzIyNn0.QfQuIQbnfVUOApPbOdvCRbNsVdb0SBAwMX-hvioGJmg';
-let _sb = null;
 
 function getSb(){
   if(!_sb){
@@ -3140,12 +3145,7 @@ async function fireConfirmationWebhook(spot, sessions){
   }catch(e){ console.warn('Confirmation webhook failed',e); }
 }
 
-// ── PENDING ACTIONS (set before sign-in, executed after) ──
-let pendingNotif=null;
-let pendingFav=null;
-
 // ── PROFILE PANEL ──
-let ppCurrentTab='profile';
 
 function renderSignInOnboarding(){
   const ctx=$('ppSignInContext');
