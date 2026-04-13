@@ -214,7 +214,8 @@
     .rating-danger   { background:rgba(239,68,68,.16);   color:#f87171; border:1px solid rgba(239,68,68,.32); }
 
     /* ── FETCH TIMESTAMP ── */
-    .fetch-ts { position:fixed; bottom:0; left:0; right:0; z-index:1000; text-align:center; padding:5px 12px; font-size:.72rem; color:rgba(252,165,165,.75); letter-spacing:.02em; background:rgba(7,12,24,.82); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); pointer-events:none; }
+    .fetch-ts { position:fixed; bottom:0; left:0; right:0; z-index:1000; text-align:center; padding:5px 12px; font-size:.72rem; color:var(--tdim); letter-spacing:.02em; background:rgba(7,12,24,.82); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); pointer-events:none; }
+    .fetch-ts.stale { color:rgba(251,146,60,.85); pointer-events:auto; cursor:pointer; }
     .fetch-ts:empty { display:none; }
 
     /* ── LEGEND ── */
@@ -245,6 +246,32 @@
     .hints .big { font-size:2.8rem; margin-bottom:10px; }
     .hints p { font-size:.88rem; line-height:1.6; }
     .hints .examples { display:flex; flex-wrap:wrap; justify-content:center; gap:7px; margin-top:14px; }
+    /* 3-step instruction cards */
+    .hint-steps { display:flex; gap:10px; justify-content:center; margin-bottom:18px; flex-wrap:wrap; }
+    .hint-step {
+      background:var(--card); border:1px solid var(--border); border-radius:12px;
+      padding:12px 16px; display:flex; flex-direction:column; align-items:center; gap:4px;
+      flex:1; min-width:130px; max-width:200px; text-align:center;
+    }
+    .hint-step-icon { font-size:1.5rem; line-height:1; margin-bottom:2px; }
+    .hint-step strong { font-size:.8rem; color:var(--text); display:block; }
+    .hint-step span { font-size:.71rem; color:var(--tdim); line-height:1.4; }
+    @media (max-width:480px){
+      .hint-steps { flex-direction:column; align-items:stretch; }
+      .hint-step { flex-direction:row; text-align:left; min-width:0; max-width:none; gap:10px; align-items:flex-start; }
+      .hint-step-icon { font-size:1.3rem; flex-shrink:0; margin-top:2px; margin-bottom:0; }
+      .hint-step > div { flex:1; }
+    }
+    /* best window bar */
+    .best-window-bar {
+      display:flex; align-items:center; gap:8px; justify-content:center;
+      background:rgba(0,212,255,.07); border:1px solid rgba(0,212,255,.18);
+      border-radius:12px; padding:10px 16px; margin-bottom:16px;
+      cursor:pointer; transition:background .2s;
+      font-size:.8rem; color:var(--gray);
+    }
+    .best-window-bar:hover { background:rgba(0,212,255,.13); }
+    .best-window-bar .bw-spot { color:var(--accent); font-weight:700; }
     .chip { display:inline-flex; align-items:center; gap:6px; padding:6px 13px; border:1px solid var(--border); border-radius:99px; font-size:.78rem; color:var(--gray); cursor:pointer; transition:border-color .2s,color .2s; }
     .chip:hover { border-color:var(--accent); color:var(--accent); }
     .chip-dirs { font-size:.65rem; color:var(--tdim); font-weight:600; }
@@ -721,7 +748,7 @@
     <span class="profile-btn-dot" id="profileDot"></span>
   </button>
   <div class="logo" id="logoHome" onclick="resetSearch()" style="cursor:pointer">🪁<span>Forecast</span></div>
-  <p class="tagline">Never miss a session again</p>
+  <p class="tagline">Life starts at 25 knots 💨</p>
   <div class="search-wrap">
     <div class="search-input-wrap">
       <input type="text" id="searchInput" placeholder="Spot name, beach or city…" autocomplete="off" />
@@ -743,7 +770,24 @@
 <main>
   <!-- hint state -->
   <div class="hints" id="hintState">
-    <p>1. 🎯 Pick a spot &nbsp;·&nbsp; 2. 👀 Check your ideal session &nbsp;·&nbsp; 3. 🔔 Get notified and grab your kite</p>
+    <div class="hint-steps">
+      <div class="hint-step">
+        <span class="hint-step-icon">📍</span>
+        <strong>Find your spot</strong>
+        <span>Search any beach or city</span>
+      </div>
+      <div class="hint-step">
+        <span class="hint-step-icon">📊</span>
+        <strong>Check the wind</strong>
+        <span>10-day forecast with session ratings</span>
+      </div>
+      <div class="hint-step">
+        <span class="hint-step-icon">🔔</span>
+        <strong>Get the alert</strong>
+        <span>Notified 72h, 24h and 1h before</span>
+      </div>
+    </div>
+    <div id="bestWindowBar" style="display:none"></div>
     <div class="examples" id="hintChips"></div>
   </div>
   <!-- mobile map button -->
@@ -754,7 +798,7 @@
   <div id="hintLegend" class="legend" style="display:none"></div>
   <!-- welcome footer -->
   <div id="welcomeFooter" style="display:block;text-align:center;padding:40px 20px 32px;color:var(--tdim);font-size:.8rem;line-height:2;">
-    <div style="font-size:1rem;font-weight:600;color:var(--gray);margin-bottom:4px;">Life starts at 25 knots 💨</div>
+    <div style="font-size:.85rem;font-weight:500;color:var(--gray);margin-bottom:4px;">Never miss a session again</div>
     <div>Tichkes Corporation Inc. — All rights reserved</div>
   </div>
 
@@ -929,11 +973,20 @@ let lastFetchTime = parseInt(localStorage.getItem('kf_lastFetch')||'0',10);
 
 function updateFetchTimestamp(){
   const el=$('fetchTimestamp'); if(!el) return;
-  if(lastFetchTime){
+  if(!lastFetchTime){ el.textContent=''; el.className='fetch-ts'; el.onclick=null; return; }
+  const ageMs=Date.now()-lastFetchTime;
+  const stale=ageMs>3*60*60*1000;
+  if(stale){
+    el.textContent='⚠️ Forecast may be outdated — tap to refresh';
+    el.className='fetch-ts stale';
+    el.onclick=refreshForecast;
+  } else {
     const d=new Date(lastFetchTime);
     const pad=n=>String(n).padStart(2,'0');
     el.textContent=`Last forecast update: ${d.getDate()}-${d.getMonth()+1}-${d.getFullYear()} @ ${pad(d.getHours())}h${pad(d.getMinutes())}`;
-  } else { el.textContent=''; }
+    el.className='fetch-ts';
+    el.onclick=null;
+  }
 }
 function saveLastSpot(spot){
   try{ localStorage.setItem('kf_lastSpot',JSON.stringify({name:spot.name,loc:spot.loc||spot.name,lat:spot.lat||spot.latitude,lon:spot.lon||spot.longitude,dirs:spot.dirs||[]})); }catch(e){}
@@ -1706,6 +1759,7 @@ let osmSearchCache={};
 
 // ── Chip forecast cache (session-level) ──
 const chipFxCache={};
+const chipBestCache={}; // key -> {dateStr,peakKn,spotName,spot} | null
 async function fetchChipQualDays(spot){
   const key=`${spot.lat},${spot.lon}`;
   if(chipFxCache[key]!==undefined) return chipFxCache[key];
@@ -1722,10 +1776,11 @@ async function fetchChipQualDays(spot){
     const dirs=new Set(userDirs||(spot.dirs&&spot.dirs.length?spot.dirs:[]));
     const isDirOK=d=>{ if(!dirs.size) return true; for(const sd of dirs) if(angleDiff(d,sd)<=22.5) return true; return false; };
     let qualDays=0;
+    let bestDateStr=null, bestPeakKn=0;
     wx.daily.time.forEach((dateStr,i)=>{
       const srH=parseInt(wx.daily.sunrise[i].slice(11,13),10);
       const ssH=parseInt(wx.daily.sunset[i].slice(11,13),10);
-      let qh=0;
+      let qh=0, dayPeak=0;
       wx.hourly.time.forEach((t,j)=>{
         if(t.slice(0,10)!==dateStr) return;
         const hr=parseInt(t.slice(11,13),10);
@@ -1733,13 +1788,34 @@ async function fetchChipQualDays(spot){
         const kn=toKnotsR(wx.hourly.windspeed_10m[j]);
         const dir=wx.hourly.winddirection_10m[j];
         const code=wx.hourly.weather_code[j]??0;
-        if(speedTier(kn)>0&&!isRainy(code)&&isDirOK(dir)) qh++;
+        if(speedTier(kn)>0&&!isRainy(code)&&isDirOK(dir)){ qh++; if(kn>dayPeak) dayPeak=kn; }
       });
-      if(qh>=2) qualDays++;
+      if(qh>=2){
+        qualDays++;
+        if(dayPeak>bestPeakKn){ bestPeakKn=dayPeak; bestDateStr=dateStr; }
+      }
     });
     chipFxCache[key]=qualDays;
+    chipBestCache[key]=bestDateStr?{dateStr:bestDateStr,peakKn:bestPeakKn,spotName:spot.name,spot}:null;
     return qualDays;
-  }catch{ chipFxCache[key]=null; return null; }
+  }catch{ chipFxCache[key]=null; chipBestCache[key]=null; return null; }
+}
+
+function updateBestWindowBar(){
+  const bar=$('bestWindowBar');
+  if(!bar) return;
+  // Find the entry with the highest peakKn across all cached spots
+  let best=null;
+  for(const key of Object.keys(chipBestCache)){
+    const entry=chipBestCache[key];
+    if(!entry) continue;
+    if(!best||entry.peakKn>best.peakKn) best=entry;
+  }
+  if(!best){ bar.style.display='none'; return; }
+  const{short:dayLabel}=fmtDate(best.dateStr);
+  bar.style.display='block';
+  bar.innerHTML=`<div class="best-window-bar"><span>🏆 Best window this week:</span><span class="bw-spot">${best.spotName}</span><span>·</span><span>${dayLabel}</span><span>·</span><span>${best.peakKn}kn</span></div>`;
+  bar.querySelector('.best-window-bar').addEventListener('click',()=>pickSpot(best.spot));
 }
 async function searchOsmSpots(q){
   if(q.length<3) return [];
@@ -1946,7 +2022,7 @@ function setChipDayBadge(el,n){
   }
   $('apiErrorBanner').style.display='none';
   el.className='chip-days '+(n>=5?'cd-good':n>=1?'cd-ok':'cd-none');
-  el.textContent=n>0?`${n}/10`:'0/10';
+  el.textContent=n>0?`${n} good days 💨`:'no wind this week';
   el.title=`${n} day${n!==1?'s':''} with qualifying wind in the next 10`;
 }
 
@@ -1958,7 +2034,7 @@ function renderHintChips(){
 
   if(favs.length){
     const lbl=document.createElement('div');
-    lbl.className='hints-section-label lbl-favs'; lbl.textContent='★ My Spots';
+    lbl.className='hints-section-label lbl-favs'; lbl.textContent='Your spots';
     wrap.appendChild(lbl);
     favs.forEach(f=>{
       const chip=document.createElement('span');
@@ -1967,7 +2043,8 @@ function renderHintChips(){
       label.className='fav-chip-label';
       const _ks=SPOTS.find(s=>s.name===f.name);
       const _city=_ks?.loc?_ks.loc.split(', ').slice(0,-1).join(', '):'';
-      label.textContent=_ks?f.name+(_city&&_city!==f.name?', '+_city:''):f.label;
+      const nameText='★ '+(_ks?f.name+(_city&&_city!==f.name?', '+_city:''):f.label);
+      label.appendChild(document.createTextNode(nameText));
       if(signedIn&&loadNotifs().some(n=>n.spotName===f.name)){
         const bi=document.createElement('span');
         bi.className='chip-notif-bell active'; bi.innerHTML=bellSVG(10);
@@ -1979,18 +2056,18 @@ function renderHintChips(){
       label.appendChild(fbadge);
       fetchChipQualDays({name:f.name,lat:f.lat,lon:f.lon,dirs:f.dirs||[]}).then(n=>setChipDayBadge(fbadge,n));
       const rm=document.createElement('span');
-      rm.className='fav-chip-remove'; rm.textContent='✕'; rm.title='Remove';
+      rm.className='fav-chip-remove'; rm.textContent='✕'; rm.title='Remove from your spots';
       rm.addEventListener('click',e=>{e.stopPropagation();removeFav(f);});
       chip.appendChild(label); chip.appendChild(rm);
       wrap.appendChild(chip);
     });
   }
 
-  // Always show Suggestions label
+  // Popular spots section
   {
     const lbl2=document.createElement('div');
     lbl2.className='hints-section-label lbl-sugg';
-    lbl2.textContent=favs.length?'Suggestions':'Discover spots';
+    lbl2.textContent='Popular spots';
     wrap.appendChild(lbl2);
   }
 
@@ -2019,13 +2096,30 @@ function renderHintChips(){
     badge.className='chip-days cd-loading'; badge.textContent='·';
     inner.appendChild(badge);
     inner.addEventListener('click',()=>pickSpot(spot));
-    const rm=document.createElement('span');
-    rm.className='fav-chip-remove'; rm.textContent='✕'; rm.title='Remove suggestion';
-    rm.style.cssText='margin-left:4px;color:var(--tdim);';
-    rm.addEventListener('click',e=>{e.stopPropagation();dismissSugg(c.name);});
-    chip.appendChild(inner); chip.appendChild(rm);
+    // "+" to add to favourites instead of dismiss X
+    const add=document.createElement('span');
+    add.className='fav-chip-remove'; add.textContent='+'; add.title='Add to your spots';
+    add.style.cssText='margin-left:4px;color:var(--tdim);font-size:.85rem;font-weight:700;';
+    add.addEventListener('click',e=>{
+      e.stopPropagation();
+      if(!_authSession?.user){
+        pendingFav={name:spot.name,label:c.label,lat:spot.lat,lon:spot.lon,dirs:spot.dirs||[]};
+        _signinContext='fav'; openProfilePanel('profile');
+      } else {
+        const favs2=loadFavs();
+        if(!favs2.some(f=>f.name===spot.name)){
+          favs2.push({name:spot.name,label:c.label,lat:spot.lat,lon:spot.lon,dirs:spot.dirs||[]});
+          saveFavs(favs2); renderHintChips(); showToast('★ '+spot.name+' added to Your Spots');
+        }
+      }
+    });
+    chip.appendChild(inner); chip.appendChild(add);
     wrap.appendChild(chip);
-    fetchChipQualDays(spot).then(n=>setChipDayBadge(badge,n));
+    fetchChipQualDays(spot).then(n=>{ setChipDayBadge(badge,n); updateBestWindowBar(); });
+  });
+  // Also trigger after fav chips load
+  favs.forEach(f=>{
+    fetchChipQualDays({name:f.name,lat:f.lat,lon:f.lon,dirs:f.dirs||[]}).then(()=>updateBestWindowBar());
   });
 }
 function loadDismissedSuggs(){ try{ return JSON.parse(localStorage.getItem('kf_dismissed')||'[]'); }catch{ return []; } }
