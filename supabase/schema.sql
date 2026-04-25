@@ -38,7 +38,27 @@ DO $$ BEGIN
   CREATE POLICY "all_update_favs" ON favourites FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
--- 3. Reminders table
+-- 3. Profiles table (last_seen_at tracking)
+CREATE TABLE IF NOT EXISTS profiles (
+  email        text        PRIMARY KEY,
+  last_seen_at timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  CREATE POLICY "all_insert_profiles" ON profiles FOR INSERT TO anon, authenticated WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "all_select_profiles" ON profiles FOR SELECT TO anon, authenticated USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "all_update_profiles" ON profiles FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- 4. Reminders table
 CREATE TABLE IF NOT EXISTS reminders (
   id              uuid          PRIMARY KEY DEFAULT gen_random_uuid(),
   email           text          NOT NULL,

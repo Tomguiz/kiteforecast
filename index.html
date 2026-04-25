@@ -1944,7 +1944,8 @@ async function fetchForecastFromSpot(spot){
   showOnly('loadingState');
   manualShoreSet=false;
   try{
-    cachedLoc={name:spot.name,country:spot.loc.split(', ').pop(),admin1:spot.loc.split(', ').slice(0,-1).join(', '),latitude:spot.lat,longitude:spot.lon};
+    const locParts=(spot.loc||'').split(', ');
+    cachedLoc={name:spot.name,country:locParts.pop()||'',admin1:locParts.join(', '),latitude:spot.lat,longitude:spot.lon};
     const p=new URLSearchParams({
       latitude:spot.lat,longitude:spot.lon,
       hourly:['temperature_2m','weather_code','windspeed_10m','winddirection_10m','windgusts_10m'].join(','),
@@ -2144,7 +2145,7 @@ function renderHintChips(){
       const fbadge=document.createElement('span');
       fbadge.className='chip-days cd-loading'; fbadge.textContent='·';
       label.appendChild(fbadge);
-      fetchChipQualDays({name:f.name,lat:f.lat,lon:f.lon,dirs:f.dirs||[]}).then(n=>{setChipDayBadge(fbadge,n);updateBestWindowBar();});
+      fetchChipQualDays({name:f.name,loc:f.label||'',lat:f.lat,lon:f.lon,dirs:f.dirs||[]}).then(n=>{setChipDayBadge(fbadge,n);updateBestWindowBar();});
       const rm=document.createElement('span');
       rm.className='fav-chip-remove'; rm.textContent='✕'; rm.title='Remove from your spots';
       rm.addEventListener('click',e=>{e.stopPropagation();removeFav(f);});
@@ -2955,8 +2956,15 @@ async function syncNotifsFromSupabase(email){
   } finally { _syncNotifsInFlight=false; }
 }
 
+async function updateLastSeen(email){
+  const sb=getSb(); if(!sb||!email) return;
+  const{error}=await sb.from('profiles').upsert({email,last_seen_at:new Date().toISOString()},{onConflict:'email'});
+  if(error) console.error('[updateLastSeen] error',error);
+  else console.log('[updateLastSeen] ok for',email);
+}
+
 async function syncAllFromSupabase(email){
-  await Promise.all([syncNotifsFromSupabase(email), syncFavsFromSupabase(email)]);
+  await Promise.all([syncNotifsFromSupabase(email), syncFavsFromSupabase(email), updateLastSeen(email)]);
 }
 
 let _syncFavsInFlight=false;
