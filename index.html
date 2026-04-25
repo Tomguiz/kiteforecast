@@ -2972,6 +2972,7 @@ function touchLastSeen(){
 }
 document.addEventListener('click',touchLastSeen);
 document.addEventListener('keydown',touchLastSeen);
+document.addEventListener('touchstart',touchLastSeen,{passive:true});
 
 async function syncAllFromSupabase(email){
   await Promise.all([syncNotifsFromSupabase(email), syncFavsFromSupabase(email), updateLastSeen(email)]);
