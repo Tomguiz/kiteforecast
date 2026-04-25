@@ -3531,6 +3531,7 @@ async function initAuth(){
         if(event!=='SIGNED_IN'){
           syncFavsFromSupabase(session.user.email).then(()=>renderHintChips());
           syncNotifsFromSupabase(session.user.email).then(()=>{ renderNotifList(); renderHintChips(); });
+          updateLastSeen(session.user.email);
         }
       } else if(event==='INITIAL_SESSION'&&!cachedEmail){
         // No session, never had one — genuinely signed out
@@ -3583,6 +3584,7 @@ async function initAuth(){
       // Sync favs + notifs: pull from Supabase on every session restore
       syncFavsFromSupabase(session.user.email).then(()=>renderHintChips());
       syncNotifsFromSupabase(session.user.email).then(()=>{ renderNotifList(); renderHintChips(); });
+      updateLastSeen(session.user.email);
     }
     // null → keep whatever state we have; don't sign the user out
   }catch(e){ console.warn('getSession error:',e); }
