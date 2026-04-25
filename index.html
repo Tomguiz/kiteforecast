@@ -2960,8 +2960,18 @@ async function updateLastSeen(email){
   const sb=getSb(); if(!sb||!email) return;
   const{error}=await sb.from('profiles').upsert({email,last_seen_at:new Date().toISOString()},{onConflict:'email'});
   if(error) console.error('[updateLastSeen] error',error);
-  else console.log('[updateLastSeen] ok for',email);
 }
+
+// Debounced activity tracker — fires at most once every 5 minutes
+let _lastSeenTimer=null;
+function touchLastSeen(){
+  const email=_authSession?.user?.email; if(!email) return;
+  if(_lastSeenTimer) return;
+  updateLastSeen(email);
+  _lastSeenTimer=setTimeout(()=>{ _lastSeenTimer=null; },5*60*1000);
+}
+document.addEventListener('click',touchLastSeen);
+document.addEventListener('keydown',touchLastSeen);
 
 async function syncAllFromSupabase(email){
   await Promise.all([syncNotifsFromSupabase(email), syncFavsFromSupabase(email), updateLastSeen(email)]);
