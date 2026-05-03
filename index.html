@@ -3865,7 +3865,7 @@ async function renderNotifList(){
         scheduleHTML+=`<div class="pp-notif-session" style="color:var(--tdim);padding-left:10px;"><span class="pp-notif-session-date" style="color:var(--tdim)">${dayLabel}</span></div>`;
       }
     }
-    if(!confirmedDates.length&&!monitoringCount){
+    if(!confirmedDates.length&&!monitoringDates.length){
       scheduleHTML+=`<div class="pp-notif-session" style="color:var(--tdim);font-style:italic">No sessions forecast yet</div>`;
     }
     scheduleHTML+='</div>';
