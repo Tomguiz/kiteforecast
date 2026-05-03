@@ -1230,8 +1230,13 @@ function toggleWindDir(btn){
   }
   updateShoreHint();
   if(cachedWx&&cachedHrMap) renderGrid();
-  // persist user override for this spot
-  if(cachedLoc&&windDirs.size>0) saveUserDirsForSpot(cachedLoc.name,[...windDirs]);
+  // persist user override and invalidate chip cache so home screen updates
+  if(cachedLoc){
+    if(windDirs.size>0) saveUserDirsForSpot(cachedLoc.name,[...windDirs]);
+    const key=`${cachedLoc.latitude},${cachedLoc.longitude}`;
+    delete chipFxCache[key]; delete chipBestCache[key];
+    renderHintChips();
+  }
 }
 function setWindDirs(degs){
   windDirs=new Set(degs);
