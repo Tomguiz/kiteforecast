@@ -3861,8 +3861,13 @@ async function renderNotifList(){
     if(monitoringDates.length){
       scheduleHTML+=`<div class="pp-notif-session" style="color:var(--tdim);font-size:.68rem;margin-top:2px;">🔍 Monitoring — alert sent if forecast is good:</div>`;
       for(const d of monitoringDates){
+        const hrs=byDate[d].sort((a,b)=>b.reminder_hours-a.reminder_hours);
         const dayLabel=new Date(d+'T12:00:00').toLocaleDateString('en',{weekday:'short',month:'short',day:'numeric'});
-        scheduleHTML+=`<div class="pp-notif-session" style="color:var(--tdim);padding-left:10px;"><span class="pp-notif-session-date" style="color:var(--tdim)">${dayLabel}</span></div>`;
+        const pills=hrs.map(r=>{
+          const t=r.send_at?new Date(r.send_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'';
+          return `<span class="pp-notif-pill" style="opacity:.5">${r.reminder_hours}h${t?` <span style="font-weight:400">${t}</span>`:''}</span>`;
+        }).join('');
+        scheduleHTML+=`<div class="pp-notif-session" style="padding-left:10px;"><span class="pp-notif-session-date" style="color:var(--tdim)">${dayLabel}</span>${pills}</div>`;
       }
     }
     if(!confirmedDates.length&&!monitoringDates.length){
