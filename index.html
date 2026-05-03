@@ -954,6 +954,13 @@
         <button class="pp-toggle" id="ppMasterToggle" onclick="toggleMasterNotif()"><span></span></button>
       </div>
       <div id="ppNotifList"></div>
+      <div style="margin-top:16px;padding:12px 14px;background:rgba(56,189,248,.06);border:1px solid rgba(56,189,248,.15);border-radius:10px;font-size:.75rem;color:var(--gray);line-height:1.6;">
+        <div style="font-weight:700;color:var(--text);margin-bottom:6px;">📬 How notifications work</div>
+        <div style="margin-bottom:4px;">⏰ You get up to <strong style="color:var(--text);">4 alerts</strong> per session: <strong style="color:var(--text);">72h · 48h · 24h · 6h</strong> before.</div>
+        <div style="margin-bottom:4px;">✅ The <strong style="color:var(--text);">72h alert</strong> is only sent if the forecast looks good.</div>
+        <div style="margin-bottom:4px;">🔄 If the 72h was sent, you'll keep receiving updates — even if the forecast worsens — so you always know the latest.</div>
+        <div>⚡ If a session looks good at the last minute, you'll still get notified.</div>
+      </div>
     </div>
   </div>
 </div>
@@ -2754,6 +2761,14 @@ function openModal(dateStr,dayIdx){
     </div>`;
   });
   if(!ssDone) html+=`<div class="m-sun-row ss">🌇 Sunset ${ssTime}</div>`;
+
+  // Notification rules note
+  html+=`<div style="margin:18px 0 4px;padding:11px 13px;background:rgba(56,189,248,.06);border:1px solid rgba(56,189,248,.13);border-radius:9px;font-size:.72rem;color:var(--gray);line-height:1.6;">
+    <div style="font-weight:700;color:var(--text);margin-bottom:4px;">📬 Notification rules for this day</div>
+    <div>• <strong style="color:var(--text)">72h alert</strong> sent only if forecast looks good at that time.</div>
+    <div>• <strong style="color:var(--text)">48h · 24h · 6h</strong> sent if 72h was sent — even if forecast worsens.</div>
+    <div>• Last-minute good session? You'll still be notified.</div>
+  </div>`;
 
   $('mBody').innerHTML=html;
   $('modalOverlay').style.display='flex';
