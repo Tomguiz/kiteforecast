@@ -3223,6 +3223,8 @@ function addSpotNotif(spot,sessions){
   persistSpotSubscription(spot,spotLat,spotLon);
   sessions.forEach(sess=>scheduleReminders(spot,sess,'spot'));
   fireConfirmationWebhook(spot,sessions);
+  // Trigger check-new-sessions immediately so reminder rows appear without waiting for daily cron
+  fetch(`${SB_URL}/functions/v1/check-new-sessions`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_ANON},body:'{}'}).catch(()=>{});
 }
 async function removeSpotNotif(spotName){
   saveNotifs(loadNotifs().filter(n=>!(n.spotName===spotName&&(n.type==='spot'||(n.type==='day'&&n.fromSpot)))));
