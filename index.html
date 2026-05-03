@@ -3845,7 +3845,6 @@ async function renderNotifList(){
     // Filter: only show a date if 72h was already sent (confirmed good session)
     // For dates where 72h hasn't fired yet, they're "monitoring" — not shown individually
     const confirmedDates=dates.filter(d=>byDate[d].some(r=>r.reminder_hours===72&&r.sent));
-    const monitoringCount=dates.length-confirmedDates.length;
 
     let scheduleHTML='<div class="pp-notif-schedule">';
     if(confirmedDates.length){
@@ -3856,8 +3855,13 @@ async function renderNotifList(){
         scheduleHTML+=`<div class="pp-notif-session"><span class="pp-notif-session-date">${dayLabel}</span>${pills}</div>`;
       }
     }
-    if(monitoringCount>0){
-      scheduleHTML+=`<div class="pp-notif-session" style="color:var(--tdim);font-style:italic">🔍 Monitoring ${monitoringCount} potential session${monitoringCount>1?'s':''} — alert sent if forecast is good</div>`;
+    const monitoringDates=dates.filter(d=>!byDate[d].some(r=>r.reminder_hours===72&&r.sent));
+    if(monitoringDates.length){
+      scheduleHTML+=`<div class="pp-notif-session" style="color:var(--tdim);font-size:.68rem;margin-top:2px;">🔍 Monitoring — alert sent if forecast is good:</div>`;
+      for(const d of monitoringDates){
+        const dayLabel=new Date(d+'T12:00:00').toLocaleDateString('en',{weekday:'short',month:'short',day:'numeric'});
+        scheduleHTML+=`<div class="pp-notif-session" style="color:var(--tdim);padding-left:10px;"><span class="pp-notif-session-date" style="color:var(--tdim)">${dayLabel}</span></div>`;
+      }
     }
     if(!confirmedDates.length&&!monitoringCount){
       scheduleHTML+=`<div class="pp-notif-session" style="color:var(--tdim);font-style:italic">No sessions forecast yet</div>`;
