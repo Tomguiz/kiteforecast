@@ -3097,6 +3097,8 @@ async function recheckSpotSubscription(){
   const newSessions=qualSessions.filter(s=>!existingDays.has(s.dateStr));
   if(!newSessions.length) return;
   for(const sess of newSessions) await scheduleReminders(spot,sess,'spot');
+  // Trigger check-new-sessions so all subscribers (not just current device) get updated
+  fetch(`${SB_URL}/functions/v1/check-new-sessions`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_ANON},body:'{}'}).catch(()=>{});
   const notifs=loadNotifs();
   newSessions.forEach(sess=>{
     const{full}=fmtDate(sess.dateStr);
