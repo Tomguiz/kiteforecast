@@ -3097,8 +3097,6 @@ async function recheckSpotSubscription(){
   const newSessions=qualSessions.filter(s=>!existingDays.has(s.dateStr));
   if(!newSessions.length) return;
   for(const sess of newSessions) await scheduleReminders(spot,sess,'spot');
-  // Trigger check-new-sessions so all subscribers (not just current device) get updated
-  fetch(`${SB_URL}/functions/v1/check-new-sessions`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_ANON},body:'{}'}).catch(()=>{});
   const notifs=loadNotifs();
   newSessions.forEach(sess=>{
     const{full}=fmtDate(sess.dateStr);
@@ -3124,11 +3122,7 @@ async function scheduleReminders(spot,sessInfo,notifType){
   const spotLat=spot.lat||spot.latitude;
   const spotLon=spot.lon||spot.longitude;
   const appUrl=`${location.origin}${location.pathname}?spot=${encodeURIComponent(spot.name)}&date=${sessionDate}`;
-  // Cancel any existing reminders for this spot+date+email
-  const{error:cancelErr}=await sb.from('reminders').update({cancelled:true})
-    .eq('email',p.email).eq('spot_name',spot.name).eq('session_date',sessionDate).eq('cancelled',false);
-  if(cancelErr) console.error('[reminders] cancel error',cancelErr);
-  // Insert one row per reminder window that is still in the future
+  // Upsert rows — handles both new inserts and re-scheduling after cancellation
   const rows=REMINDER_HOURS
     .map(h=>({
       email:       p.email,
@@ -3143,12 +3137,15 @@ async function scheduleReminders(spot,sessInfo,notifType){
       notif_type:  notifType,
       reminder_hours:h,
       send_at:     new Date(sessionMs-h*3600*1000).toISOString(),
+      sent:        false,
+      cancelled:   false,
       app_link:    appUrl,
     }))
     .filter(r=>new Date(r.send_at).getTime()>now);
   if(rows.length){
-    const{error:insErr}=await sb.from('reminders').insert(rows);
-    if(insErr) console.error('[reminders] insert error',insErr);
+    const{error:insErr}=await sb.from('reminders')
+      .upsert(rows,{onConflict:'email,spot_name,notif_type,session_date,reminder_hours'});
+    if(insErr) console.error('[reminders] upsert error',insErr);
   }
 }
 
@@ -3225,8 +3222,6 @@ function addSpotNotif(spot,sessions){
   persistSpotSubscription(spot,spotLat,spotLon);
   sessions.forEach(sess=>scheduleReminders(spot,sess,'spot'));
   fireConfirmationWebhook(spot,sessions);
-  // Trigger check-new-sessions immediately so reminder rows appear without waiting for daily cron
-  fetch(`${SB_URL}/functions/v1/check-new-sessions`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+SB_ANON},body:'{}'}).catch(()=>{});
 }
 async function removeSpotNotif(spotName){
   saveNotifs(loadNotifs().filter(n=>!(n.spotName===spotName&&(n.type==='spot'||(n.type==='day'&&n.fromSpot)))));
