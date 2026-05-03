@@ -274,14 +274,12 @@
       font-size:.8rem; color:var(--gray);
     }
     .best-window-bar:hover { background:rgba(0,212,255,.13); }
-    .best-window-bar .bw-spot { color:var(--accent); font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:120px; }
+    .best-window-bar .bw-spot { color:var(--accent); font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .bw-next { display:flex; align-items:center; gap:6px; flex-shrink:0; min-width:0; }
-    .bw-next .bw-spot { max-width:90px; }
     .bw-pill { flex:1; min-width:0; margin-bottom:0; cursor:pointer; }
-    @media(max-width:500px){
+    @media(max-width:600px){
       .best-window-bar { font-size:.72rem; gap:4px; padding:8px 10px; }
-      .best-window-bar .bw-spot { max-width:80px; }
-      .bw-next .bw-spot { max-width:70px; }
+      .best-window-bar .bw-spot { max-width:90px; }
     }
     .chip { display:inline-flex; align-items:center; gap:6px; padding:6px 13px; border:1px solid var(--border); border-radius:99px; font-size:.78rem; color:var(--gray); cursor:pointer; transition:border-color .2s,color .2s; }
     .chip:hover { border-color:var(--accent); color:var(--accent); }
