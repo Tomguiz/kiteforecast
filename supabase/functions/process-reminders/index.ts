@@ -198,10 +198,12 @@ Deno.serve(async () => {
       // ─────────────────────────────────────────────────────────────────────
 
       const rating          = rateDay(goodHours, peakKn, code, hasBadDir, peakDayKn)
+      // When forecast degraded (no qualifying hours), fall back to all daylight hours for wind stats
+      const sample          = good.length ? good : day
       const sessionStart    = good.length ? `${r.session_date}T${String(good[0].hour).padStart(2,'0')}:00` : `${r.session_date}T10:00`
       const sessionEnd      = good.length ? `${r.session_date}T${String(good[good.length-1].hour).padStart(2,'0')}:00` : ''
-      const gusts           = good.length ? Math.max(...good.map(h => h.gustKn)) : 0
-      const windMin         = good.length ? Math.min(...good.map(h => h.kn))     : 0
+      const gusts           = sample.length ? Math.max(...sample.map(h => h.gustKn)) : 0
+      const windMin         = sample.length ? Math.min(...sample.map(h => h.kn))     : 0
       const consistencyPct  = day.length  ? Math.round(good.length / day.length * 100) : 0
 
       const payload = {
@@ -222,7 +224,7 @@ Deno.serve(async () => {
           start_time_formatted: sessionStart.slice(11, 16),
           end_time_formatted:   sessionEnd ? sessionEnd.slice(11, 16) : '',
           duration_hours:       goodHours,
-          wind_speed_peak_kn:   peakKn,
+          wind_speed_peak_kn:   good.length ? peakKn : peakDayKn,
           wind_speed_min_kn:    windMin,
           wind_gusts_kn:        gusts,
           wind_direction:       domDir !== null ? compass(domDir) : '—',
