@@ -3851,7 +3851,8 @@ async function renderNotifList(){
         const hrs=byDate[d].sort((a,b)=>b.reminder_hours-a.reminder_hours);
         const dayLabel=new Date(d+'T12:00:00').toLocaleDateString('en',{weekday:'short',month:'short',day:'numeric'});
         const pills=hrs.map(r=>{
-          const t=r.send_at?new Date(r.send_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'';
+          const _sd=r.send_at?new Date(r.send_at):null;
+          const t=_sd?_sd.toLocaleDateString([],{weekday:'short'})+' '+_sd.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'';
           return `<span class="pp-notif-pill${r.sent?' sent':''}" title="Sends at ${t}">${r.reminder_hours}h${t?` <span style="font-weight:400;opacity:.7">${t}</span>`:''}${r.sent?' ✓':''}</span>`;
         }).join('');
         scheduleHTML+=`<div class="pp-notif-session"><span class="pp-notif-session-date">${dayLabel}</span>${pills}</div>`;
@@ -3864,7 +3865,8 @@ async function renderNotifList(){
         const hrs=byDate[d].sort((a,b)=>b.reminder_hours-a.reminder_hours);
         const dayLabel=new Date(d+'T12:00:00').toLocaleDateString('en',{weekday:'short',month:'short',day:'numeric'});
         const pills=hrs.map(r=>{
-          const t=r.send_at?new Date(r.send_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'';
+          const _sd=r.send_at?new Date(r.send_at):null;
+          const t=_sd?_sd.toLocaleDateString([],{weekday:'short'})+' '+_sd.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'';
           return `<span class="pp-notif-pill" style="opacity:.5">${r.reminder_hours}h${t?` <span style="font-weight:400">${t}</span>`:''}</span>`;
         }).join('');
         scheduleHTML+=`<div class="pp-notif-session" style="padding-left:10px;"><span class="pp-notif-session-date" style="color:var(--tdim)">${dayLabel}</span>${pills}</div>`;
