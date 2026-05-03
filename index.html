@@ -2715,6 +2715,7 @@ function openModal(dateStr,dayIdx){
     const gustPct=windBarPct(h.gustKn);
     const gustExt=Math.max(0,gustPct-barPct);
     const gustNumLeft=Math.min(gustPct,97);
+    const showGust=h.gustKn>h.kn&&gustExt>4;
     const waveRaw=cachedMarineHrMap?cachedMarineHrMap.get(h.tStr.slice(0,13)):null;
     const waveTxt=waveRaw!=null?waveRaw.toFixed(1)+'m':'—';
 
@@ -2725,7 +2726,7 @@ function openModal(dateStr,dayIdx){
       <div class="c-wind">
         <div class="c-wind-bar" style="width:${barPct}%;background:${barCol}"></div>
         <div class="c-gust-bar" style="left:${barPct}%;width:${gustExt}%;background:${barCol}"></div>
-        <span class="c-gust-num" style="left:${gustNumLeft}%">${h.gustKn}</span>
+        ${showGust?`<span class="c-gust-num" style="left:${gustNumLeft}%">↑${h.gustKn}</span>`:''}
         <span class="c-wind-val" style="color:${barCol}">${h.kn}</span>
         <span class="c-wind-kn">kn</span>
       </div>
