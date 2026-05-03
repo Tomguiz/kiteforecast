@@ -2065,6 +2065,16 @@ function saveUserDirsForSpot(name,dirs){
   const favs=loadFavs();
   const fi=favs.findIndex(f=>f.name===name);
   if(fi>=0){ favs[fi].dirs=dirs; saveFavs(favs); }
+  // update spot_dirs on all future unsent reminders for this spot
+  const sb=getSb(); const p=loadProfile();
+  if(sb&&p.email){
+    const today=new Date().toISOString().slice(0,10);
+    sb.from('reminders').update({spot_dirs:dirs})
+      .eq('email',p.email).eq('spot_name',name)
+      .eq('sent',false).eq('cancelled',false)
+      .gte('session_date',today)
+      .then(({error})=>{ if(error) console.error('[dirs] reminder update error',error); });
+  }
 }
 function loadUserDirsForSpot(name){
   const all=loadAllUserDirs(); return all[name]||null;
