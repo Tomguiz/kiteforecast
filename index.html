@@ -1833,7 +1833,7 @@ async function fetchChipQualDays(spot){
     const dirs=new Set(userDirs||(spot.dirs&&spot.dirs.length?spot.dirs:[]));
     const isDirOK=d=>{ if(!dirs.size) return true; for(const sd of dirs) if(angleDiff(d,sd)<=22.5) return true; return false; };
     let qualDays=0;
-    let bestDateStr=null, bestPeakKn=0;
+    let bestDateStr=null, bestPeakKn=0, nextDateStr=null;
     wx.daily.time.forEach((dateStr,i)=>{
       const srH=parseInt(wx.daily.sunrise[i].slice(11,13),10);
       const ssH=parseInt(wx.daily.sunset[i].slice(11,13),10);
@@ -1849,11 +1849,12 @@ async function fetchChipQualDays(spot){
       });
       if(qh>=2){
         qualDays++;
+        if(!nextDateStr) nextDateStr=dateStr;
         if(dayPeak>bestPeakKn){ bestPeakKn=dayPeak; bestDateStr=dateStr; }
       }
     });
     chipFxCache[key]=qualDays;
-    chipBestCache[key]=bestDateStr?{dateStr:bestDateStr,peakKn:bestPeakKn,spotName:spot.name,spot}:null;
+    chipBestCache[key]=bestDateStr?{dateStr:bestDateStr,peakKn:bestPeakKn,nextDateStr,spotName:spot.name,spot}:null;
     return qualDays;
   }catch{ chipFxCache[key]=null; chipBestCache[key]=null; return null; }
 }
@@ -1875,12 +1876,13 @@ function updateBestWindowBar(){
   const loadedKeys=favKeys.filter(k=>k in chipBestCache);
   const allLoaded=loadedKeys.length===favKeys.length;
 
-  // Find best session among loaded fav keys
-  let best=null;
+  // Find best (peak kn) and next (earliest date) across all fav spots
+  let best=null, next=null;
   for(const key of loadedKeys){
     const entry=chipBestCache[key];
     if(!entry) continue;
     if(!best||entry.peakKn>best.peakKn) best=entry;
+    if(!next||entry.nextDateStr<next.nextDateStr) next=entry;
   }
 
   bar.style.display='block';
@@ -1897,8 +1899,10 @@ function updateBestWindowBar(){
     return;
   }
 
-  const{short:dayLabel}=fmtDate(best.dateStr);
-  bar.innerHTML=`<div class="best-window-bar"><span>🏆 Best window:</span><span class="bw-spot">${best.spotName}</span><span>·</span><span>${dayLabel}</span><span>·</span><span>${best.peakKn}kn</span></div>`;
+  const{short:bestLabel}=fmtDate(best.dateStr);
+  const nextLabel=next&&next.nextDateStr!==best.dateStr?fmtDate(next.nextDateStr).short:null;
+  const nextPart=nextLabel?`<span style="color:var(--tdim)">|</span><span>⏭ Next:</span><span class="bw-spot">${next.spotName}</span><span>·</span><span>${nextLabel}</span>`:'';
+  bar.innerHTML=`<div class="best-window-bar"><span>🏆 Best:</span><span class="bw-spot">${best.spotName}</span><span>·</span><span>${bestLabel}</span><span>·</span><span>${best.peakKn}kn</span>${nextPart}</div>`;
   bar.querySelector('.best-window-bar').addEventListener('click',()=>pickSpot(best.spot));
 }
 async function searchOsmSpots(q){
