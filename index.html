@@ -266,7 +266,8 @@
     }
     /* best window bar */
     .best-window-bar {
-      display:flex; align-items:center; gap:8px; justify-content:center;
+      display:flex; align-items:center; gap:6px; justify-content:center;
+      flex-wrap:wrap;
       background:rgba(0,212,255,.07); border:1px solid rgba(0,212,255,.18);
       border-radius:12px; padding:10px 16px; margin-bottom:16px;
       cursor:pointer; transition:background .2s;
@@ -274,6 +275,12 @@
     }
     .best-window-bar:hover { background:rgba(0,212,255,.13); }
     .best-window-bar .bw-spot { color:var(--accent); font-weight:700; }
+    .bw-next { display:flex; align-items:center; gap:6px; }
+    @media(max-width:500px){
+      .best-window-bar { flex-direction:column; gap:4px; align-items:center; padding:10px 12px; }
+      .bw-divider { display:none; }
+      .bw-next { font-size:.75rem; }
+    }
     .chip { display:inline-flex; align-items:center; gap:6px; padding:6px 13px; border:1px solid var(--border); border-radius:99px; font-size:.78rem; color:var(--gray); cursor:pointer; transition:border-color .2s,color .2s; }
     .chip:hover { border-color:var(--accent); color:var(--accent); }
     .chip-dirs { font-size:.65rem; color:var(--tdim); font-weight:600; }
@@ -1911,7 +1918,7 @@ function updateBestWindowBar(){
 
   const{short:bestLabel}=fmtDate(best.dateStr);
   const nextLabel=next&&next.nextDateStr!==best.dateStr?fmtDate(next.nextDateStr).short:null;
-  const nextPart=nextLabel?`<span style="color:var(--tdim)">|</span><span>⏭ Next:</span><span class="bw-spot">${next.spotName}</span><span>·</span><span>${nextLabel}</span>`:'';
+  const nextPart=nextLabel?`<span class="bw-divider" style="color:var(--tdim)">|</span><span class="bw-next"><span>⏭ Next:</span><span class="bw-spot">${next.spotName}</span><span>·</span><span>${nextLabel}</span></span>`:'';
   bar.innerHTML=`<div class="best-window-bar"><span>🏆 Best:</span><span class="bw-spot">${best.spotName}</span><span>·</span><span>${bestLabel}</span><span>·</span><span>${best.peakKn}kn</span>${nextPart}</div>`;
   bar.querySelector('.best-window-bar').addEventListener('click',()=>pickSpot(best.spot));
 }
