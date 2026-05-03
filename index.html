@@ -3822,7 +3822,7 @@ async function renderNotifList(){
   let scheduleMap={}; // spotName -> [{session_date, reminder_hours, sent}]
   if(sb){
     const today=new Date().toISOString().slice(0,10);
-    const{data}=await sb.from('reminders').select('spot_name,session_date,reminder_hours,sent,notif_type')
+    const{data}=await sb.from('reminders').select('spot_name,session_date,reminder_hours,sent,notif_type,send_at')
       .eq('email',email).eq('cancelled',false).eq('notif_type','spot')
       .neq('session_date','2099-12-31').gte('session_date',today)
       .order('session_date',{ascending:true}).order('reminder_hours',{ascending:false});
@@ -3850,7 +3850,10 @@ async function renderNotifList(){
       for(const d of confirmedDates){
         const hrs=byDate[d].sort((a,b)=>b.reminder_hours-a.reminder_hours);
         const dayLabel=new Date(d+'T12:00:00').toLocaleDateString('en',{weekday:'short',month:'short',day:'numeric'});
-        const pills=hrs.map(r=>`<span class="pp-notif-pill${r.sent?' sent':''}">${r.reminder_hours}h</span>`).join('');
+        const pills=hrs.map(r=>{
+          const t=r.send_at?new Date(r.send_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'';
+          return `<span class="pp-notif-pill${r.sent?' sent':''}" title="Sends at ${t}">${r.reminder_hours}h${t?` <span style="font-weight:400;opacity:.7">${t}</span>`:''}${r.sent?' ✓':''}</span>`;
+        }).join('');
         scheduleHTML+=`<div class="pp-notif-session"><span class="pp-notif-session-date">${dayLabel}</span>${pills}</div>`;
       }
     }
