@@ -161,13 +161,48 @@ Deno.serve(async () => {
       const { day, good, goodHours, peakKn, domDir, hasBadDir, peakDayKn } =
         buildDay(r.session_date, sunrise, sunset, hourlyMap, spotDirs)
 
+      const isGoodNow = goodHours >= 2
+
+      // ── Decide whether to send ────────────────────────────────────────────
+      // Rule 1: 72h reminder — only send if forecast is currently good
+      // Rule 2: shorter reminders — send if 72h was already sent (keep user
+      //         informed even if forecast degraded), OR if forecast is good now
+      //         (last-minute good session that had no 72h)
+      const rh = r.reminder_hours as number
+      if (rh === 72 && !isGoodNow) {
+        // Bad forecast at 72h — skip silently
+        await supabase.from('reminders').update({ sent: true }).eq('id', r.id)
+        continue
+      }
+
+      if (rh !== 72 && !isGoodNow) {
+        // Check if 72h was already sent for this (email, spot, date)
+        const { data: sent72 } = await supabase
+          .from('reminders')
+          .select('id')
+          .eq('email', r.email)
+          .eq('spot_name', r.spot_name)
+          .eq('session_date', r.session_date)
+          .eq('notif_type', r.notif_type)
+          .eq('reminder_hours', 72)
+          .eq('sent', true)
+          .limit(1)
+
+        if (!sent72 || sent72.length === 0) {
+          // 72h was never sent (or was skipped) and forecast is bad — skip this one too
+          await supabase.from('reminders').update({ sent: true }).eq('id', r.id)
+          continue
+        }
+        // 72h was sent → fall through and send this reminder (forecast update)
+      }
+      // ─────────────────────────────────────────────────────────────────────
+
       const rating          = rateDay(goodHours, peakKn, code, hasBadDir, peakDayKn)
       const sessionStart    = good.length ? `${r.session_date}T${String(good[0].hour).padStart(2,'0')}:00` : `${r.session_date}T10:00`
       const sessionEnd      = good.length ? `${r.session_date}T${String(good[good.length-1].hour).padStart(2,'0')}:00` : ''
       const gusts           = good.length ? Math.max(...good.map(h => h.gustKn)) : 0
       const windMin         = good.length ? Math.min(...good.map(h => h.kn))     : 0
       const consistencyPct  = day.length  ? Math.round(good.length / day.length * 100) : 0
-      const rh              = r.reminder_hours as number
 
       const payload = {
         notification_type:  r.notif_type,
