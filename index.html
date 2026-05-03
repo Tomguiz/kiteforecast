@@ -639,6 +639,11 @@
     }
     .pp-notif-del:hover { border-color:rgba(239,68,68,.5); color:#f87171; background:rgba(239,68,68,.08); }
     .pp-empty { font-size:.82rem; color:var(--tdim); text-align:center; padding:24px 0; }
+    .pp-notif-schedule { margin-top:8px; display:flex; flex-direction:column; gap:4px; }
+    .pp-notif-session { font-size:.7rem; color:var(--gray); display:flex; flex-wrap:wrap; align-items:center; gap:4px; }
+    .pp-notif-session-date { font-weight:600; color:var(--text); }
+    .pp-notif-pill { display:inline-block; padding:1px 6px; border-radius:4px; font-size:.65rem; font-weight:700; background:rgba(56,189,248,.12); color:#38bdf8; border:1px solid rgba(56,189,248,.2); }
+    .pp-notif-pill.sent { background:rgba(100,116,139,.1); color:var(--tdim); border-color:rgba(100,116,139,.2); text-decoration:line-through; }
 
     /* notif bell on day card */
     .card-bell {
@@ -3800,30 +3805,67 @@ function toggleMasterNotif(){
   saveProfile(p);
   $('ppMasterToggle').classList.toggle('on',p.notifsEnabled!==false);
 }
-function renderNotifList(){
+async function renderNotifList(){
   const signedIn=!!_authSession?.user;
-  // Never show stored notifications to a signed-out user
   const allNotifs=signedIn?loadNotifs():[];
-  // visible = spot entries + standalone day entries (not fromSpot)
   const visible=allNotifs.filter(n=>n.type==='spot'||(n.type==='day'&&!n.fromSpot));
   const countEl=$('ppNotifCount');
   if(visible.length>0){countEl.style.display='inline-flex';countEl.textContent=visible.length;}
   else{countEl.style.display='none';}
   $('ppMasterToggle').className='pp-toggle'+(notifMasterEnabled()?' on':'');
   const list=$('ppNotifList');
-  if(!signedIn){
-    list.innerHTML='<div class="pp-empty">Sign in to manage your notifications</div>';
-    return;
-  }
+  if(!signedIn){list.innerHTML='<div class="pp-empty">Sign in to manage your notifications</div>';return;}
   if(!visible.length){list.innerHTML='<div class="pp-empty">No active notifications</div>';return;}
-  list.innerHTML=visible.map(n=>`
-    <div class="pp-notif-item">
-      <div class="pp-notif-info">
-        <div class="pp-notif-spot">🔔 ${n.spotName}</div>
-        <div class="pp-notif-day">${n.type==='spot'?'All sessions':n.label}</div>
+
+  // Fetch upcoming scheduled reminders from Supabase
+  const email=_authSession.user.email;
+  const sb=getSb();
+  let scheduleMap={}; // spotName -> [{session_date, reminder_hours, sent}]
+  if(sb){
+    const today=new Date().toISOString().slice(0,10);
+    const{data}=await sb.from('reminders').select('spot_name,session_date,reminder_hours,sent,notif_type')
+      .eq('email',email).eq('cancelled',false).eq('notif_type','spot')
+      .neq('session_date','2099-12-31').gte('session_date',today)
+      .order('session_date',{ascending:true}).order('reminder_hours',{ascending:false});
+    for(const r of data||[]){
+      if(!scheduleMap[r.spot_name]) scheduleMap[r.spot_name]=[];
+      scheduleMap[r.spot_name].push(r);
+    }
+  }
+
+  list.innerHTML=visible.map(n=>{
+    const rows=scheduleMap[n.spotName]||[];
+    // Group by session_date
+    const byDate={};
+    for(const r of rows){
+      if(!byDate[r.session_date]) byDate[r.session_date]=[];
+      byDate[r.session_date].push(r);
+    }
+    const dates=Object.keys(byDate).sort();
+    let scheduleHTML='';
+    if(dates.length){
+      scheduleHTML=`<div class="pp-notif-schedule">`;
+      for(const d of dates){
+        const hrs=byDate[d].sort((a,b)=>b.reminder_hours-a.reminder_hours);
+        const dayLabel=new Date(d+'T12:00:00').toLocaleDateString('en',{weekday:'short',month:'short',day:'numeric'});
+        const pills=hrs.map(r=>`<span class="pp-notif-pill${r.sent?' sent':''}">${r.reminder_hours}h</span>`).join('');
+        scheduleHTML+=`<div class="pp-notif-session"><span class="pp-notif-session-date">${dayLabel}</span>${pills}</div>`;
+      }
+      scheduleHTML+=`</div>`;
+    } else if(n.type==='spot'){
+      scheduleHTML=`<div class="pp-notif-schedule"><div class="pp-notif-session" style="color:var(--tdim);font-style:italic">No sessions forecast yet</div></div>`;
+    }
+    return `<div class="pp-notif-item" style="flex-direction:column;align-items:stretch;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div class="pp-notif-info">
+          <div class="pp-notif-spot">🔔 ${n.spotName}</div>
+          <div class="pp-notif-day">${n.type==='spot'?'All sessions':n.label}</div>
+        </div>
+        <button class="pp-notif-del" onclick="deleteNotifById('${n.id}')">🗑 Remove</button>
       </div>
-      <button class="pp-notif-del" onclick="deleteNotifById('${n.id}')">🗑 Remove</button>
-    </div>`).join('');
+      ${scheduleHTML}
+    </div>`;
+  }).join('');
 }
 function deleteNotifById(id){
   const notifs=loadNotifs();
