@@ -277,6 +277,7 @@
     .best-window-bar .bw-spot { color:var(--accent); font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:120px; }
     .bw-next { display:flex; align-items:center; gap:6px; flex-shrink:0; min-width:0; }
     .bw-next .bw-spot { max-width:90px; }
+    .bw-pill { flex:1; min-width:0; margin-bottom:0; cursor:pointer; }
     @media(max-width:500px){
       .best-window-bar { font-size:.72rem; gap:4px; padding:8px 10px; }
       .best-window-bar .bw-spot { max-width:80px; }
@@ -1929,9 +1930,17 @@ function updateBestWindowBar(){
   const isSameSession=next&&next.nextDateStr===best.dateStr&&next.spotName===best.spotName;
   const nextLabel=next&&!isSameSession?fmtDate(next.nextDateStr).short:null;
   const nextTime=next&&next.nextStartHr!==null?String(next.nextStartHr).padStart(2,'0')+'h00':'';
-  const nextPart=nextLabel?`<span class="bw-divider" style="color:var(--tdim)">|</span><span class="bw-next"><span>⏭ Next:</span><span class="bw-spot">${next.spotName}</span><span>·</span><span>${nextLabel}${nextTime?' · '+nextTime:''}</span></span>`:'';
-  bar.innerHTML=`<div class="best-window-bar"><span>🏆 Best:</span><span class="bw-spot">${best.spotName}</span><span>·</span><span>${bestLabel}${bestTime?' · '+bestTime:''}</span><span>·</span><span>${best.peakKn}kn</span>${nextPart}</div>`;
-  bar.querySelector('.best-window-bar').addEventListener('click',()=>pickSpot(best.spot));
+
+  const bestPill=`<div class="best-window-bar bw-pill" id="bwBest">
+    <span>🏆 Best:</span><span class="bw-spot">${best.spotName}</span><span>·</span><span>${bestLabel}${bestTime?' · '+bestTime:''}</span><span>·</span><span>${best.peakKn}kn</span>
+  </div>`;
+  const nextPill=nextLabel?`<div class="best-window-bar bw-pill" id="bwNext">
+    <span>⏭ Next:</span><span class="bw-spot">${next.spotName}</span><span>·</span><span>${nextLabel}${nextTime?' · '+nextTime:''}</span>
+  </div>`:'';
+
+  bar.innerHTML=`<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">${bestPill}${nextPill}</div>`;
+  bar.querySelector('#bwBest').addEventListener('click',()=>pickSpot(best.spot));
+  if(nextLabel) bar.querySelector('#bwNext').addEventListener('click',()=>pickSpot(next.spot));
 }
 async function searchOsmSpots(q){
   if(q.length<3) return [];
