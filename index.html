@@ -1877,12 +1877,22 @@ function updateBestWindowBar(){
   const allLoaded=loadedKeys.length===favKeys.length;
 
   // Find best (peak kn) and next (earliest date) across all fav spots
+  // For "next": prefer spots with an active notification, then earliest date
   let best=null, next=null;
   for(const key of loadedKeys){
     const entry=chipBestCache[key];
     if(!entry) continue;
     if(!best||entry.peakKn>best.peakKn) best=entry;
-    if(!next||entry.nextDateStr<next.nextDateStr) next=entry;
+    const hasNotif=hasSpotNotif(entry.spotName);
+    if(!next){
+      next=entry;
+    } else {
+      const nextHasNotif=hasSpotNotif(next.spotName);
+      // Notified spot beats non-notified; among same notif status, pick earliest
+      if((hasNotif&&!nextHasNotif)||(hasNotif===nextHasNotif&&entry.nextDateStr<next.nextDateStr)){
+        next=entry;
+      }
+    }
   }
 
   bar.style.display='block';
