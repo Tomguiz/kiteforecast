@@ -74,6 +74,7 @@ CREATE TABLE IF NOT EXISTS reminders (
   reminder_hours  integer       NOT NULL,  -- 72, 48, 24, 6, or 1
   send_at         timestamptz   NOT NULL,
   sent            boolean       NOT NULL DEFAULT false,
+  skipped         boolean       NOT NULL DEFAULT false,  -- true when sent=true but no email was sent (bad forecast at send time)
   cancelled       boolean       NOT NULL DEFAULT false,
   app_link        text,
   created_at      timestamptz   NOT NULL DEFAULT now()

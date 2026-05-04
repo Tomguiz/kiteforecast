@@ -170,13 +170,14 @@ Deno.serve(async () => {
       //         (last-minute good session that had no 72h)
       const rh = r.reminder_hours as number
       if (rh === 72 && !isGoodNow) {
-        // Bad forecast at 72h — skip silently
-        await supabase.from('reminders').update({ sent: true }).eq('id', r.id)
+        // Bad forecast at 72h — mark skipped (not emailed) so follow-up reminders
+        // don't treat this as a successful send
+        await supabase.from('reminders').update({ sent: true, skipped: true }).eq('id', r.id)
         continue
       }
 
       if (rh !== 72 && !isGoodNow) {
-        // Check if 72h was already sent for this (email, spot, date)
+        // Check if 72h was actually emailed (sent=true AND skipped=false/null)
         const { data: sent72 } = await supabase
           .from('reminders')
           .select('id')
@@ -186,14 +187,15 @@ Deno.serve(async () => {
           .eq('notif_type', r.notif_type)
           .eq('reminder_hours', 72)
           .eq('sent', true)
+          .eq('skipped', false)
           .limit(1)
 
         if (!sent72 || sent72.length === 0) {
-          // 72h was never sent (or was skipped) and forecast is bad — skip this one too
-          await supabase.from('reminders').update({ sent: true }).eq('id', r.id)
+          // 72h was never emailed and forecast is bad — skip this one too
+          await supabase.from('reminders').update({ sent: true, skipped: true }).eq('id', r.id)
           continue
         }
-        // 72h was sent → fall through and send this reminder (forecast update)
+        // 72h was actually emailed → fall through and send this reminder (forecast update)
       }
       // ─────────────────────────────────────────────────────────────────────
 
