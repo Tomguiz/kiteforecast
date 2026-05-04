@@ -3861,7 +3861,7 @@ async function renderNotifList(){
   let scheduleMap={}; // spotName -> [{session_date, reminder_hours, sent}]
   if(sb){
     const today=new Date().toISOString().slice(0,10);
-    const{data}=await sb.from('reminders').select('spot_name,session_date,reminder_hours,sent,skipped,notif_type,send_at')
+    const{data}=await sb.from('reminders').select('spot_name,session_date,reminder_hours,sent,notif_type,send_at')
       .eq('email',email).eq('cancelled',false).eq('notif_type','spot')
       .neq('session_date','2099-12-31').gte('session_date',today)
       .order('session_date',{ascending:true}).order('reminder_hours',{ascending:false});
@@ -3880,9 +3880,18 @@ async function renderNotifList(){
       byDate[r.session_date].push(r);
     }
     const dates=Object.keys(byDate).sort();
-    // Filter: only show a date as "confirmed" if 72h was actually emailed (sent=true AND skipped=false)
-    // A skipped 72h (bad forecast) means the session is still monitoring
-    const confirmedDates=dates.filter(d=>byDate[d].some(r=>r.reminder_hours===72&&r.sent&&!r.skipped));
+    // A date is "confirmed" if 72h was sent AND there are still unsent follow-up reminders (proof it was actually emailed)
+    // If 72h=sent but all others are also sent, it was skipped (silently dropped at bad forecast)
+    const confirmedDates=dates.filter(d=>{
+      const hrs=byDate[d];
+      const has72sent=hrs.some(r=>r.reminder_hours===72&&r.sent);
+      if(!has72sent) return false;
+      // If any non-72h reminder is still pending, the session was genuinely confirmed
+      const hasPending=hrs.some(r=>r.reminder_hours!==72&&!r.sent);
+      // Or if a non-72h reminder was already sent (email was delivered), it's confirmed
+      const hasFollowupSent=hrs.some(r=>r.reminder_hours!==72&&r.sent);
+      return hasPending||hasFollowupSent;
+    });
 
     let scheduleHTML='<div class="pp-notif-schedule">';
     if(confirmedDates.length){
@@ -3892,13 +3901,12 @@ async function renderNotifList(){
         const pills=hrs.map(r=>{
           const _sd=r.send_at?new Date(r.send_at):null;
           const t=_sd?_sd.toLocaleDateString([],{weekday:'short'})+' '+_sd.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'';
-          const wasSent=r.sent&&!r.skipped;
-          return `<span class="pp-notif-pill${wasSent?' sent':''}" title="Sends at ${t}">${r.reminder_hours}h${t?` <span style="font-weight:400;opacity:.7">${t}</span>`:''}${wasSent?' ✓':''}</span>`;
+          return `<span class="pp-notif-pill${r.sent?' sent':''}" title="Sends at ${t}">${r.reminder_hours}h${t?` <span style="font-weight:400;opacity:.7">${t}</span>`:''}${r.sent?' ✓':''}</span>`;
         }).join('');
         scheduleHTML+=`<div class="pp-notif-session"><span class="pp-notif-session-date">${dayLabel}</span>${pills}</div>`;
       }
     }
-    const monitoringDates=dates.filter(d=>!byDate[d].some(r=>r.reminder_hours===72&&r.sent));
+    const monitoringDates=dates.filter(d=>!confirmedDates.includes(d));
     if(monitoringDates.length){
       scheduleHTML+=`<div class="pp-notif-session" style="color:var(--tdim);font-size:.68rem;margin-top:2px;">🔍 Monitoring — alert sent if forecast is good:</div>`;
       for(const d of monitoringDates){
