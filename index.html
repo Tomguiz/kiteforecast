@@ -1015,7 +1015,7 @@
       </div>
       <!-- Signed in -->
       <div id="ppLoggedSection" style="display:none;flex-direction:column;gap:12px">
-        <div style="background:rgba(74,222,128,.07);border:1px solid rgba(74,222,128,.22);border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:12px">
+        <div id="ppSignedInCard" style="background:rgba(74,222,128,.07);border:1px solid rgba(74,222,128,.22);border-radius:12px;padding:14px 16px;display:flex;align-items:center;gap:12px">
           <span style="font-size:1.3rem;line-height:1;flex-shrink:0">✅</span>
           <div style="flex:1;min-width:0">
             <p style="margin:0 0 2px;font-size:.85rem;font-weight:700;color:#f1f5f9;">Signed in</p>
@@ -3966,6 +3966,19 @@ function updatePremiumUI(){
     if(phoneSection) phoneSection.style.display=p.smsEnabled?'block':'none';
     const phoneInput=$('ppPhoneInput'); if(phoneInput) phoneInput.value=p.phoneNumber||'';
   }
+  // Refresh profile button crown
+  const btn=$('profileBtn');
+  if(btn&&_authSession?.user){
+    const crown=btn.querySelector('span[style*="crown"], span[style*="👑"]');
+    if(premium&&!crown){
+      const c=document.createElement('span');
+      c.style.cssText='position:absolute;top:-5px;right:-5px;font-size:13px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5));';
+      c.textContent='👑';
+      btn.appendChild(c);
+    } else if(!premium&&crown){
+      crown.remove();
+    }
+  }
 }
 
 async function syncPremiumFromSupabase(email){
@@ -4023,11 +4036,21 @@ async function savePhone(){
 }
 
 // Handle ?premium=success / ?premium=cancelled on return from Stripe
-;(function(){
+;(async function(){
   const params=new URLSearchParams(location.search);
   if(params.get('premium')==='success'){
-    showToast('🎉 Welcome to Premium! SMS alerts are now enabled.');
     history.replaceState({},'',location.pathname);
+    // Poll Supabase up to 10s for the webhook to set is_premium=true
+    const email=loadProfile().email||_authSession?.user?.email;
+    if(email){
+      for(let i=0;i<10;i++){
+        await new Promise(r=>setTimeout(r,1000));
+        await syncPremiumFromSupabase(email);
+        if(isPremium()) break;
+      }
+    }
+    showToast('👑 Welcome to Premium! SMS alerts are now active.');
+    openProfilePanel('profile');
   } else if(params.get('premium')==='cancelled'){
     history.replaceState({},'',location.pathname);
   }
@@ -4321,10 +4344,14 @@ function updateAuthUI(){
   $('ppAuthSection').style.display=loggedIn?'none':'flex';
   $('ppLoggedSection').style.display=loggedIn?'flex':'none';
   if(loggedIn){
-    $('ppLoggedEmail').textContent=_authSession.user.email;
     const p=loadProfile();
-    const digestEl=$('ppDigestToggle');
-    if(digestEl) digestEl.classList.toggle('on',!!p.digestEnabled);
+    $('ppLoggedEmail').textContent=_authSession.user.email;
+    const digestEl=$('ppDigestToggle'); if(digestEl) digestEl.classList.toggle('on',!!p.digestEnabled);
+    // Show premium crown in the signed-in card
+    const signedInCard=$('ppSignedInCard');
+    if(signedInCard) signedInCard.innerHTML=isPremium()
+      ?`<span style="font-size:1.3rem;line-height:1;flex-shrink:0">👑</span><div style="flex:1;min-width:0"><p style="margin:0 0 2px;font-size:.85rem;font-weight:700;color:#f59e0b;">Premium</p><p id="ppLoggedEmail" style="margin:0;font-size:.78rem;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_authSession.user.email}</p></div>`
+      :`<span style="font-size:1.3rem;line-height:1;flex-shrink:0">✅</span><div style="flex:1;min-width:0"><p style="margin:0 0 2px;font-size:.85rem;font-weight:700;color:#f1f5f9;">Signed in</p><p id="ppLoggedEmail" style="margin:0;font-size:.78rem;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_authSession.user.email}</p></div>`;
   }
   // Hide tabs for unauthenticated users
   const tabs=document.querySelector('.pp-tabs');
@@ -4334,7 +4361,8 @@ function updateAuthUI(){
   if(loggedIn){
     const initials=getInitials(_authSession.user.email);
     btn.classList.add('logged-in');
-    btn.innerHTML=`<span class="profile-btn-initials">${initials}</span><span class="profile-btn-dot" id="profileDot"></span>`;
+    const crownBadge=isPremium()?`<span style="position:absolute;top:-5px;right:-5px;font-size:13px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5));">👑</span>`:'';
+    btn.innerHTML=`<span class="profile-btn-initials">${initials}</span>${crownBadge}<span class="profile-btn-dot" id="profileDot"></span>`;
   } else {
     btn.classList.remove('logged-in');
     btn.innerHTML=`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg><span class="profile-btn-dot" id="profileDot"></span>`;
