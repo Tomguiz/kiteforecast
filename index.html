@@ -278,9 +278,9 @@
     .bw-next { display:flex; align-items:center; gap:6px; flex-shrink:0; min-width:0; }
     .bw-pill { flex:1; min-width:0; margin-bottom:0; cursor:pointer; }
     @media(max-width:600px){
-      .best-window-bar { font-size:.72rem; gap:3px; padding:8px 10px; flex-direction:column; align-items:flex-start; }
-      .best-window-bar .bw-spot { max-width:none; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; width:100%; }
-      .bw-pill { width:100%; }
+      .best-window-bar { font-size:.72rem; gap:4px; padding:8px 10px; }
+      .best-window-bar .bw-spot { max-width:110px; }
+      .bw-pill { width:100%; flex:none; }
     }
     .chip { display:inline-flex; align-items:center; gap:6px; padding:6px 13px; border:1px solid var(--border); border-radius:99px; font-size:.78rem; color:var(--gray); cursor:pointer; transition:border-color .2s,color .2s; }
     .chip:hover { border-color:var(--accent); color:var(--accent); }
@@ -1998,7 +1998,7 @@ function updateBestWindowBar(){
   let best=null, next=null;
   for(const key of loadedKeys){
     const entry=chipBestCache[key];
-    if(!entry) continue;
+    if(!entry||!entry.nextDateStr) continue; // skip spots with no qualifying sessions
     if(!best||entry.peakKn>best.peakKn) best=entry;
     const hasNotif=hasSpotNotif(entry.spotName);
     if(!next){
@@ -2039,7 +2039,7 @@ function updateBestWindowBar(){
     <span>⏭ Next:</span><span class="bw-spot">${next.spotName}</span><span>·</span><span>${nextLabel}${nextTime?' · '+nextTime:''}</span>
   </div>`:'';
 
-  bar.innerHTML=`<div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;width:100%;padding:4px 0;">${bestPill}${nextPill}</div>`;
+  bar.innerHTML=`<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;width:100%;padding:2px 0;">${bestPill}${nextPill}</div>`;
   bar.querySelector('#bwBest').addEventListener('click',()=>pickSpot(best.spot));
   if(nextLabel) bar.querySelector('#bwNext').addEventListener('click',()=>pickSpot(next.spot));
   renderCompareBar();
