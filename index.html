@@ -2153,7 +2153,7 @@ async function fetchForecastFromSpot(spot){
       daily:['weather_code','temperature_2m_max','temperature_2m_min','windgusts_10m_max','sunrise','sunset'].join(','),
       forecast_days:10, timezone:'auto', windspeed_unit:'ms',
     });
-    const mP=new URLSearchParams({latitude:spot.lat,longitude:spot.lon,hourly:'wave_height',forecast_days:10,timezone:'auto'});
+    const mP=new URLSearchParams({latitude:spot.lat,longitude:spot.lon,hourly:'wave_height,wave_period,wave_direction',forecast_days:10,timezone:'auto'});
     const marineP=safeFetch(`https://marine-api.open-meteo.com/v1/marine?${mP}`,8000).catch(()=>null);
     const tideP=fetchTideData(spot.lat,spot.lon);
     cachedWx=await safeFetch(`https://api.open-meteo.com/v1/forecast?${p}`);
@@ -2558,10 +2558,27 @@ function buildMarineMap(m){
   cachedMarineHrMap=new Map();
   if(m&&m.hourly&&m.hourly.wave_height){
     m.hourly.time.forEach((t,i)=>{
-      const v=m.hourly.wave_height[i];
-      if(v!=null) cachedMarineHrMap.set(t.slice(0,13),v);
+      const h=m.hourly.wave_height[i];
+      const p=m.hourly.wave_period?.[i]??null;
+      const d=m.hourly.wave_direction?.[i]??null;
+      if(h!=null) cachedMarineHrMap.set(t.slice(0,13),{h,p,d});
     });
   }
+}
+function getSwellSummary(dateStr,srHour,ssHour){
+  if(!cachedMarineHrMap||!cachedMarineHrMap.size) return null;
+  const entries=[];
+  for(let hr=srHour;hr<=ssHour;hr++){
+    const key=`${dateStr}T${String(hr).padStart(2,'0')}`;
+    const v=cachedMarineHrMap.get(key);
+    if(v) entries.push(v);
+  }
+  if(!entries.length) return null;
+  const avgH=entries.reduce((s,e)=>s+e.h,0)/entries.length;
+  const avgP=entries[0].p!=null?entries.reduce((s,e)=>s+(e.p??0),0)/entries.length:null;
+  const dirs=entries.map(e=>e.d).filter(d=>d!=null);
+  const avgDir=dirs.length?['N','NE','E','SE','S','SW','W','NW'][Math.round((Math.atan2(dirs.reduce((s,d)=>s+Math.sin(d*Math.PI/180),0)/dirs.length,dirs.reduce((s,d)=>s+Math.cos(d*Math.PI/180),0)/dirs.length)*180/Math.PI+360)%360/45)%8]:null;
+  return {h:avgH.toFixed(1),p:avgP?avgP.toFixed(1):null,dir:avgDir};
 }
 
 function fmtTideTime(exactHr){
@@ -2585,8 +2602,8 @@ function findTideExtremes(dateStr,srHour,ssHour){
   if(!cachedMarineHrMap||!cachedMarineHrMap.size) return [];
   const all=[];
   for(let hr=0;hr<24;hr++){
-    const v=cachedMarineHrMap.get(`${dateStr}T${String(hr).padStart(2,'0')}`);
-    if(v!=null) all.push({hr,v});
+    const entry=cachedMarineHrMap.get(`${dateStr}T${String(hr).padStart(2,'0')}`);
+    if(entry!=null) all.push({hr,v:entry.h});
   }
   const day=all.filter(p=>p.hr>=srHour&&p.hr<=ssHour);
   if(day.length<2) return [];
@@ -2652,7 +2669,7 @@ async function fetchForecast(query){
       daily:['weather_code','temperature_2m_max','temperature_2m_min','windgusts_10m_max','sunrise','sunset'].join(','),
       forecast_days:10, timezone:'auto', windspeed_unit:'ms',
     });
-    const mP2=new URLSearchParams({latitude,longitude,hourly:'wave_height',forecast_days:10,timezone:'auto'});
+    const mP2=new URLSearchParams({latitude,longitude,hourly:'wave_height,wave_period,wave_direction',forecast_days:10,timezone:'auto'});
     const marineP2=safeFetch(`https://marine-api.open-meteo.com/v1/marine?${mP2}`,8000).catch(()=>null);
     const tideP2=fetchTideData(latitude,longitude);
     cachedWx=await safeFetch(`https://api.open-meteo.com/v1/forecast?${p}`);
@@ -2890,6 +2907,8 @@ function openModal(dateStr,dayIdx){
   const ssHour=parseInt(sunset.slice(11,13),10);
   const tides=findTideExtremes(dateStr,srHour,ssHour);
   const tideBadges=tides.map(t=>`<span class="m-badge tide-${t.type}">${t.type==='high'?'🌊 ↑':'🌊 ↓'} ${fmtTideTime(t.exactHr)} ${t.type==='high'?'High':'Low'}</span>`).join('');
+  const swell=getSwellSummary(dateStr,srHour,ssHour);
+  const swellBadge=swell?`<span class="m-badge">🌊 ${swell.h}m${swell.p?' · '+swell.p+'s':''}${swell.dir?' · '+swell.dir:''}</span>`:'';
   $('mSession').innerHTML=`
     <span class="rating-badge ${rating.cls}" style="width:auto;padding:5px 14px">${rating.label}</span>
     ${win?`<span class="m-badge green">🪁 ${win}</span>`:''}
@@ -2898,6 +2917,7 @@ function openModal(dateStr,dayIdx){
     ${domDir!==null?`<span class="m-badge">${isWindDirOK(domDir)?'✓':'✗'} ${compass(domDir)}</span>`:''}
     <span class="m-badge">🌡 avg ${avgTemp}°C</span>
     <span class="m-badge">🌅 ${srTime} · 🌇 ${ssTime}</span>
+    ${swellBadge}
     ${tideBadges}`;
 
   // timeline
@@ -2953,7 +2973,7 @@ function openModal(dateStr,dayIdx){
     const gustNumLeft=Math.min(gustPct,97);
     const showGust=h.gustKn>h.kn&&gustExt>4;
     const waveRaw=cachedMarineHrMap?cachedMarineHrMap.get(h.tStr.slice(0,13)):null;
-    const waveTxt=waveRaw!=null?waveRaw.toFixed(1)+'m':'—';
+    const waveTxt=waveRaw!=null?waveRaw.h.toFixed(1)+'m':'—';
 
     html+=`<div class="${rowCls}">
       <div class="${timeCls}">${kite}${h.tStr.slice(11,16)}</div>
