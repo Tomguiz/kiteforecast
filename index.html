@@ -1053,7 +1053,7 @@
             <div style="font-size:.75rem;color:var(--gray);line-height:1.6;margin-bottom:2px;">
               📱 SMS alerts — text 1h before your session<br/>
               📬 Weekly digest — every Monday forecast summary<br/>
-              ⭐ Unlimited favourite spots (free = 3 max)<br/>
+              ⭐ Unlimited favourite spots (free = 1)<br/>
               🎯 Priority support
             </div>
             <button class="btn-premium" id="ppUpgradeBtn" onclick="startCheckout()">Upgrade to Premium →</button>
@@ -2375,7 +2375,7 @@ function toggleFavorite(){
     favs.splice(idx,1);
   } else {
     if(!isPremium()&&favs.length>=FREE_FAV_LIMIT){
-      showToast(`Free plan: max ${FREE_FAV_LIMIT} spots. Upgrade to Premium for unlimited.`);
+      showToast(`Free riders get 1 spot. Go Premium to chase them all. 🪁`);
       openProfilePanel('profile');
       return;
     }
@@ -2438,6 +2438,16 @@ function renderHintChips(){
       chip.appendChild(label); chip.appendChild(rm);
       wrap.appendChild(chip);
     });
+
+    // Upsell chip for free users at the limit
+    if(signedIn && !isPremium() && favs.length >= FREE_FAV_LIMIT){
+      const upsell=document.createElement('div');
+      upsell.style.cssText='display:inline-flex;align-items:center;gap:6px;padding:6px 13px;border:1px dashed rgba(245,158,11,.4);border-radius:99px;font-size:.75rem;color:#f59e0b;cursor:pointer;background:rgba(245,158,11,.05);margin-top:2px;';
+      upsell.innerHTML='⚡ Chase more spots — <strong style="margin-left:2px">Go Premium</strong>';
+      upsell.title='Upgrade to follow unlimited spots';
+      upsell.addEventListener('click',()=>{ _signinContext='generic'; openProfilePanel('profile'); });
+      wrap.appendChild(upsell);
+    }
   }
 
   // Popular spots section
@@ -3954,7 +3964,7 @@ async function checkShowMySpotTab(){
 }
 
 // ── PREMIUM ──────────────────────────────────────────────────────────────────
-const FREE_FAV_LIMIT = 3
+const FREE_FAV_LIMIT = 1
 
 function isPremium(){ return !!loadProfile().isPremium; }
 
