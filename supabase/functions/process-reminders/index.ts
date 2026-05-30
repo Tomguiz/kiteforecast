@@ -250,7 +250,15 @@ Deno.serve(async () => {
         body:    JSON.stringify(payload),
       })
 
-      await supabase.from('reminders').update({ sent: true }).eq('id', r.id)
+      const update: Record<string, unknown> = { sent: true }
+      if (rh === 1) {
+        update.session_peak_kn  = peakKn
+        update.session_min_kn   = windMin
+        update.session_hours    = goodHours
+        update.session_rating   = rating
+        update.session_wind_dir = domDir !== null ? compass(domDir) : null
+      }
+      await supabase.from('reminders').update(update).eq('id', r.id)
       processed++
     } catch (e) {
       console.error('Failed to process reminder', r.id, e)

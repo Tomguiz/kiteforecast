@@ -78,6 +78,12 @@ CREATE TABLE IF NOT EXISTS reminders (
   skipped         boolean       NOT NULL DEFAULT false,  -- true when sent=true but no email was sent (bad forecast at send time)
   cancelled       boolean       NOT NULL DEFAULT false,
   app_link        text,
+  -- Wind stats written when the 1h reminder fires (ground-truth session data)
+  session_peak_kn    integer,
+  session_min_kn     integer,
+  session_hours      integer,
+  session_rating     text,
+  session_wind_dir   text,
   created_at      timestamptz   NOT NULL DEFAULT now()
 );
 
