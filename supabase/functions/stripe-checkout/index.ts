@@ -7,14 +7,14 @@ const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SB_SE
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, x-client-info',
 }
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS })
 
   const { email, success_url, cancel_url } = await req.json()
-  if (!email) return new Response(JSON.stringify({ error: 'email required' }), { status: 400, headers: CORS })
+  if (!email) return new Response(JSON.stringify({ error: 'email required' }), { status: 400, headers: { 'Content-Type': 'application/json', ...CORS } })
 
   // Get or create Stripe customer
   const { data: profile } = await supabase.from('profiles').select('stripe_customer_id').eq('email', email).single()
