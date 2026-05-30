@@ -1034,14 +1034,16 @@
         <button class="btn pp-save-btn" id="ppTideSaveBtn" onclick="saveTideKey()" style="margin-top:2px">Save</button>
         <p class="pp-note">Used to show exact high/low tide times. Free at worldtides.info/developer.</p>
         <div style="border-top:1px solid var(--border);margin:4px 0"></div>
-        <div class="pp-toggle-row">
-          <div>
-            <div style="font-size:.82rem;font-weight:600;color:var(--text)">📬 Weekly digest</div>
-            <div style="font-size:.72rem;color:var(--tdim);margin-top:2px">Every Monday — your week's kite sessions at a glance</div>
+        <div id="ppDigestSection">
+          <div class="pp-toggle-row" id="ppDigestRow">
+            <div>
+              <div style="font-size:.82rem;font-weight:600;color:var(--text)">📬 Weekly digest <span id="ppDigestPremiumBadge" style="display:none" class="premium-badge">PREMIUM</span></div>
+              <div style="font-size:.72rem;color:var(--tdim);margin-top:2px">Every Monday — your week's kite sessions at a glance</div>
+            </div>
+            <button class="pp-toggle" id="ppDigestToggle" onclick="toggleDigest()"><span></span></button>
           </div>
-          <button class="pp-toggle" id="ppDigestToggle" onclick="toggleDigest()"><span></span></button>
+          <button class="btn pp-save-btn" id="ppDigestNowBtn" onclick="sendDigestNow()" style="margin-top:2px">📩 Send me this week's forecast now</button>
         </div>
-        <button class="btn pp-save-btn" id="ppDigestNowBtn" onclick="sendDigestNow()" style="margin-top:2px">📩 Send me this week's forecast now</button>
         <div style="border-top:1px solid var(--border);margin:4px 0"></div>
 
         <!-- Premium section (non-premium) -->
@@ -1049,9 +1051,10 @@
           <div class="premium-card">
             <div style="font-size:.85rem;font-weight:700;color:#f59e0b;margin-bottom:6px;">⚡ Go Premium — €5.99/mo</div>
             <div style="font-size:.75rem;color:var(--gray);line-height:1.6;margin-bottom:2px;">
-              ✅ SMS alerts — get a text 1h before your session<br/>
-              ✅ Unlimited favourite spots (free = 3 max)<br/>
-              ✅ Priority support
+              📱 SMS alerts — text 1h before your session<br/>
+              📬 Weekly digest — every Monday forecast summary<br/>
+              ⭐ Unlimited favourite spots (free = 3 max)<br/>
+              🎯 Priority support
             </div>
             <button class="btn-premium" id="ppUpgradeBtn" onclick="startCheckout()">Upgrade to Premium →</button>
           </div>
@@ -1063,7 +1066,7 @@
             <span style="font-size:1.4rem;">⚡</span>
             <div style="flex:1;min-width:0">
               <div style="font-size:.85rem;font-weight:700;color:#f59e0b;">Premium active</div>
-              <div style="font-size:.72rem;color:var(--tdim);margin-top:2px;">SMS alerts &amp; unlimited spots enabled</div>
+              <div style="font-size:.72rem;color:var(--tdim);margin-top:2px;">SMS alerts · weekly digest · unlimited spots</div>
             </div>
             <button onclick="manageSubscription()" style="background:none;border:1px solid rgba(245,158,11,.3);border-radius:7px;padding:5px 10px;font-size:.72rem;color:#f59e0b;cursor:pointer;">Manage</button>
           </div>
@@ -3966,6 +3969,25 @@ function updatePremiumUI(){
     if(phoneSection) phoneSection.style.display=p.smsEnabled?'block':'none';
     const phoneInput=$('ppPhoneInput'); if(phoneInput) phoneInput.value=p.phoneNumber||'';
   }
+  // Gate weekly digest — visible but locked for non-premium
+  const digestToggle=$('ppDigestToggle');
+  const digestNowBtn=$('ppDigestNowBtn');
+  const digestBadge=$('ppDigestPremiumBadge');
+  const digestRow=$('ppDigestRow');
+  if(digestToggle){
+    digestToggle.disabled=!premium;
+    digestToggle.style.opacity=premium?'':'0.4';
+    digestToggle.style.cursor=premium?'':'not-allowed';
+    digestToggle.onclick=premium?toggleDigest:()=>showToast('👑 Weekly digest is a Premium feature');
+  }
+  if(digestNowBtn){
+    digestNowBtn.disabled=!premium;
+    digestNowBtn.style.opacity=premium?'':'0.4';
+    digestNowBtn.style.cursor=premium?'':'not-allowed';
+    digestNowBtn.onclick=premium?sendDigestNow:()=>showToast('👑 Weekly digest is a Premium feature');
+  }
+  if(digestBadge) digestBadge.style.display=premium?'none':'inline-flex';
+  if(digestRow) digestRow.title=premium?'':'Upgrade to Premium to unlock';
   // Refresh profile button crown
   const btn=$('profileBtn');
   if(btn&&_authSession?.user){
@@ -4376,6 +4398,7 @@ function updateEmailWarning(){
   if(emptyState) emptyState.style.display=loggedIn?'none':'block';
 }
 async function sendDigestNow(){
+  if(!isPremium()){ showToast('👑 Weekly digest is a Premium feature'); return; }
   const btn=$('ppDigestNowBtn'); if(!btn) return;
   btn.disabled=true; btn.textContent='Sending…';
   try{
@@ -4390,6 +4413,7 @@ async function sendDigestNow(){
   setTimeout(()=>{ btn.disabled=false; btn.textContent='📩 Send me this week\'s forecast now'; },4000);
 }
 async function toggleDigest(){
+  if(!isPremium()){ showToast('👑 Weekly digest is a Premium feature'); return; }
   const p=loadProfile();
   p.digestEnabled=!p.digestEnabled;
   saveProfile(p);
