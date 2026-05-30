@@ -660,7 +660,7 @@
     .share-btn { background:none; border:none; cursor:pointer; color:var(--tdim); padding:2px 4px; font-size:.85rem; transition:color .15s; vertical-align:middle; margin-left:2px; }
     .share-btn:hover { color:var(--accent); }
     /* ── Spot comparison ── */
-    .compare-toggle { display:flex; align-items:center; justify-content:center; gap:6px; padding:7px 16px; margin-bottom:10px; background:rgba(255,255,255,.04); border:1px solid var(--border); border-radius:10px; font-size:.75rem; color:var(--gray); cursor:pointer; transition:all .15s; width:100%; }
+    .compare-toggle { display:flex; align-items:center; justify-content:center; gap:6px; padding:9px 16px; margin-top:4px; margin-bottom:10px; background:rgba(255,255,255,.04); border:1px solid var(--border); border-radius:10px; font-size:.75rem; color:var(--gray); cursor:pointer; transition:all .15s; width:100%; }
     .compare-toggle:hover,.compare-toggle.open { border-color:rgba(0,212,255,.35); color:var(--accent); background:rgba(0,212,255,.06); }
     .compare-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; margin-bottom:12px; border-radius:12px; border:1px solid var(--border); background:rgba(255,255,255,.02); }
     .compare-table { border-collapse:collapse; width:100%; min-width:320px; font-size:.72rem; }
@@ -2021,7 +2021,7 @@ function updateBestWindowBar(){
   const{short:bestLabel}=fmtDate(best.dateStr);
   const bestTime=best.startHr!==null?String(best.startHr).padStart(2,'0')+'h00':'';
   const isSameSession=next&&next.nextDateStr===best.dateStr&&next.spotName===best.spotName;
-  const nextLabel=next&&!isSameSession?fmtDate(next.nextDateStr).short:null;
+  const nextLabel=next&&!isSameSession&&next.nextDateStr?fmtDate(next.nextDateStr).short:null;
   const nextTime=next&&next.nextStartHr!==null?String(next.nextStartHr).padStart(2,'0')+'h00':'';
 
   const bestPill=`<div class="best-window-bar bw-pill" id="bwBest">
@@ -2031,7 +2031,7 @@ function updateBestWindowBar(){
     <span>⏭ Next:</span><span class="bw-spot">${next.spotName}</span><span>·</span><span>${nextLabel}${nextTime?' · '+nextTime:''}</span>
   </div>`:'';
 
-  bar.innerHTML=`<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;width:100%;">${bestPill}${nextPill}</div>`;
+  bar.innerHTML=`<div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;width:100%;padding:4px 0;">${bestPill}${nextPill}</div>`;
   bar.querySelector('#bwBest').addEventListener('click',()=>pickSpot(best.spot));
   if(nextLabel) bar.querySelector('#bwNext').addEventListener('click',()=>pickSpot(next.spot));
   renderCompareBar();
