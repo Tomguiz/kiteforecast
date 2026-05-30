@@ -1019,6 +1019,14 @@
         <input type="text" id="ppTideKeyInput" class="pp-input" placeholder="Paste your WorldTides API key" />
         <button class="btn pp-save-btn" id="ppTideSaveBtn" onclick="saveTideKey()" style="margin-top:2px">Save</button>
         <p class="pp-note">Used to show exact high/low tide times. Free at worldtides.info/developer.</p>
+        <div style="border-top:1px solid var(--border);margin:4px 0"></div>
+        <div class="pp-toggle-row">
+          <div>
+            <div style="font-size:.82rem;font-weight:600;color:var(--text)">📬 Weekly digest</div>
+            <div style="font-size:.72rem;color:var(--tdim);margin-top:2px">Every Monday — your week's kite sessions at a glance</div>
+          </div>
+          <button class="pp-toggle" id="ppDigestToggle" onclick="toggleDigest()"><span></span></button>
+        </div>
         <button class="btn-reset" id="ppSignOutBtn" onclick="signOut()" style="font-size:.78rem;color:#f87171;text-align:left;padding:4px 0 0;">Sign out</button>
       </div>
     </div>
@@ -3225,6 +3233,15 @@ async function updateLastSeen(email){
   const sb=getSb(); if(!sb||!email) return;
   const{error}=await sb.from('profiles').upsert({email,last_seen_at:new Date().toISOString()},{onConflict:'email'});
   if(error) console.error('[updateLastSeen] error',error);
+  // Sync digest preference from server
+  const{data:prof}=await sb.from('profiles').select('digest_enabled').eq('email',email).single();
+  if(prof){
+    const p=loadProfile();
+    p.digestEnabled=!!prof.digest_enabled;
+    saveProfile(p);
+    const digestEl=$('ppDigestToggle');
+    if(digestEl) digestEl.classList.toggle('on',!!p.digestEnabled);
+  }
 }
 
 // Debounced activity tracker — fires at most once every 5 minutes
@@ -4017,7 +4034,12 @@ function updateAuthUI(){
   updateShareBanner();
   $('ppAuthSection').style.display=loggedIn?'none':'flex';
   $('ppLoggedSection').style.display=loggedIn?'flex':'none';
-  if(loggedIn) $('ppLoggedEmail').textContent=_authSession.user.email;
+  if(loggedIn){
+    $('ppLoggedEmail').textContent=_authSession.user.email;
+    const p=loadProfile();
+    const digestEl=$('ppDigestToggle');
+    if(digestEl) digestEl.classList.toggle('on',!!p.digestEnabled);
+  }
   // Hide tabs for unauthenticated users
   const tabs=document.querySelector('.pp-tabs');
   if(tabs) tabs.style.display=loggedIn?'flex':'none';
@@ -4038,6 +4060,14 @@ function updateEmailWarning(){
   $('ppEmailWarning').style.display='none';
   const emptyState=$('ppEmptyState');
   if(emptyState) emptyState.style.display=loggedIn?'none':'block';
+}
+async function toggleDigest(){
+  const p=loadProfile();
+  p.digestEnabled=!p.digestEnabled;
+  saveProfile(p);
+  $('ppDigestToggle').classList.toggle('on',!!p.digestEnabled);
+  const sb=getSb(); if(!sb||!p.email) return;
+  await sb.from('profiles').upsert({email:p.email,digest_enabled:!!p.digestEnabled},{onConflict:'email'});
 }
 function toggleMasterNotif(){
   const p=loadProfile();

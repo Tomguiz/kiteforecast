@@ -1,0 +1,145 @@
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+const SUPABASE_URL         = Deno.env.get('SUPABASE_URL')!
+const SUPABASE_SERVICE_KEY = Deno.env.get('SB_SERVICE_ROLE_KEY')!
+const MAKE_WEBHOOK_URL     = 'https://hook.eu1.make.com/6t9fgm6btixri2wf5lnx47requf416vs'
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
+
+const toKnots   = (ms: number) => Math.round(ms * 1.94384)
+const isRainy   = (code: number) => code >= 51
+const speedTier = (kn: number) => kn >= 25 ? 3 : kn >= 20 ? 2 : kn >= 15 ? 1 : 0
+
+function angleDiff(a: number, b: number): number {
+  const d = Math.abs(a - b) % 360
+  return d > 180 ? 360 - d : d
+}
+function isWindDirOK(dir: number, spotDirs: number[]): boolean {
+  if (!spotDirs.length) return true
+  return spotDirs.some(sd => angleDiff(dir, sd) <= 22.5)
+}
+
+async function fetchForecast(lat: number, lon: number) {
+  const params = new URLSearchParams({
+    latitude: String(lat), longitude: String(lon),
+    hourly: 'weather_code,windspeed_10m,winddirection_10m',
+    daily: 'sunrise,sunset',
+    forecast_days: '10', timezone: 'auto', windspeed_unit: 'ms',
+  })
+  const resp = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`)
+  const wx = await resp.json()
+  if (wx.error) throw new Error(wx.reason)
+  return wx
+}
+
+function getGoodSessions(wx: any, spotDirs: number[], spotDays: number[] | null) {
+  const { daily, hourly } = wx
+  const sessions = []
+  for (let i = 0; i < daily.time.length; i++) {
+    const dateStr = daily.time[i]
+    if (spotDays && spotDays.length) {
+      const dow = new Date(dateStr + 'T12:00:00').getDay()
+      if (!spotDays.includes(dow)) continue
+    }
+    const srH = parseInt(daily.sunrise[i].slice(11, 13), 10)
+    const ssH = parseInt(daily.sunset[i].slice(11, 13), 10)
+    let qh = 0, peakKn = 0, firstHr: number | null = null
+    hourly.time.forEach((t: string, j: number) => {
+      if (t.slice(0, 10) !== dateStr) return
+      const hr = parseInt(t.slice(11, 13), 10)
+      if (hr < srH || hr > ssH) return
+      const kn = toKnots(hourly.windspeed_10m[j])
+      const dir = hourly.winddirection_10m[j]
+      const code = hourly.weather_code[j] ?? 0
+      if (speedTier(kn) > 0 && !isRainy(code) && isWindDirOK(dir, spotDirs)) {
+        if (firstHr === null) firstHr = hr
+        qh++
+        if (kn > peakKn) peakKn = kn
+      }
+    })
+    if (qh >= 2) {
+      sessions.push({
+        date: dateStr,
+        date_label: new Date(dateStr + 'T12:00:00').toLocaleDateString('en', { weekday: 'long', day: 'numeric', month: 'long' }),
+        day_of_week: new Date(dateStr + 'T12:00:00').toLocaleDateString('en', { weekday: 'long' }),
+        start_time: firstHr !== null ? `${String(firstHr).padStart(2, '0')}h00` : '',
+        duration_hours: qh,
+        peak_kn: peakKn,
+      })
+    }
+  }
+  return sessions
+}
+
+Deno.serve(async () => {
+  // Fetch all users who have opted in to digest (digest_enabled = true on profiles)
+  const { data: profiles, error: profErr } = await supabase
+    .from('profiles')
+    .select('email')
+    .eq('digest_enabled', true)
+
+  if (profErr) return new Response(JSON.stringify({ error: profErr.message }), { status: 500 })
+
+  const emails = (profiles ?? []).map((p: any) => p.email)
+  if (!emails.length) return new Response(JSON.stringify({ sent: 0 }), { status: 200 })
+
+  // Fetch favourites for all opted-in users
+  const { data: favs } = await supabase
+    .from('favourites')
+    .select('email,spot_name,spot_lat,spot_lon,spot_dirs,spot_days')
+    .in('email', emails)
+
+  // Group favs by email
+  const favsByEmail = new Map<string, any[]>()
+  for (const f of favs ?? []) {
+    if (!favsByEmail.has(f.email)) favsByEmail.set(f.email, [])
+    favsByEmail.get(f.email)!.push(f)
+  }
+
+  // Cache forecasts by lat,lon to avoid duplicate API calls
+  const wxCache = new Map<string, any>()
+
+  let sent = 0
+
+  for (const email of emails) {
+    const userFavs = favsByEmail.get(email) ?? []
+    if (!userFavs.length) continue
+
+    const spotForecasts = []
+    for (const fav of userFavs) {
+      const key = `${fav.spot_lat},${fav.spot_lon}`
+      if (!wxCache.has(key)) {
+        try { wxCache.set(key, await fetchForecast(fav.spot_lat, fav.spot_lon)) }
+        catch { wxCache.set(key, null) }
+      }
+      const wx = wxCache.get(key)
+      if (!wx) continue
+      const sessions = getGoodSessions(wx, fav.spot_dirs ?? [], fav.spot_days ?? null)
+      if (sessions.length) {
+        spotForecasts.push({ spot: fav.spot_name, sessions })
+      }
+    }
+
+    const totalSessions = spotForecasts.reduce((s, sf) => s + sf.sessions.length, 0)
+
+    const payload = {
+      notification_type: 'digest',
+      email,
+      week_start: new Date().toLocaleDateString('en', { day: 'numeric', month: 'long', year: 'numeric' }),
+      total_good_sessions: totalSessions,
+      spots: spotForecasts,
+      has_sessions: totalSessions > 0,
+    }
+
+    await fetch(MAKE_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    sent++
+  }
+
+  return new Response(JSON.stringify({ sent, total_users: emails.length }), {
+    headers: { 'Content-Type': 'application/json' },
+  })
+})

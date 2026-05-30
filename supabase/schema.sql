@@ -41,8 +41,9 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- 3. Profiles table (last_seen_at tracking)
 CREATE TABLE IF NOT EXISTS profiles (
-  email        text        PRIMARY KEY,
-  last_seen_at timestamptz NOT NULL DEFAULT now()
+  email           text        PRIMARY KEY,
+  last_seen_at    timestamptz NOT NULL DEFAULT now(),
+  digest_enabled  boolean     NOT NULL DEFAULT false
 );
 
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
@@ -145,6 +146,25 @@ SELECT cron.schedule(
   $$
   SELECT net.http_post(
     url     := 'https://kpwmajtxmcfpakvonimf.supabase.co/functions/v1/check-new-sessions',
+    headers := jsonb_build_object(
+      'Content-Type',  'application/json',
+      'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwd21hanR4bWNmcGFrdm9uaW1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTcyMjYsImV4cCI6MjA5MDczMzIyNn0.QfQuIQbnfVUOApPbOdvCRbNsVdb0SBAwMX-hvioGJmg'
+    ),
+    body    := '{}'::jsonb
+  );
+  $$
+);
+
+-- Runs every Monday at 09:00 UTC — sends weekly digest to opted-in users
+SELECT cron.unschedule('weekly-digest') WHERE EXISTS (
+  SELECT 1 FROM cron.job WHERE jobname = 'weekly-digest'
+);
+SELECT cron.schedule(
+  'weekly-digest',
+  '0 9 * * 1',
+  $$
+  SELECT net.http_post(
+    url     := 'https://kpwmajtxmcfpakvonimf.supabase.co/functions/v1/weekly-digest',
     headers := jsonb_build_object(
       'Content-Type',  'application/json',
       'Authorization', 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwd21hanR4bWNmcGFrdm9uaW1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTcyMjYsImV4cCI6MjA5MDczMzIyNn0.QfQuIQbnfVUOApPbOdvCRbNsVdb0SBAwMX-hvioGJmg'
