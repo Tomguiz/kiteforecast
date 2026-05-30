@@ -1062,13 +1062,21 @@
 
         <!-- Premium section (premium user) -->
         <div id="ppPremiumActive" style="display:none">
-          <div class="premium-active-card">
-            <span style="font-size:1.4rem;">⚡</span>
-            <div style="flex:1;min-width:0">
-              <div style="font-size:.85rem;font-weight:700;color:#f59e0b;">Premium active</div>
-              <div style="font-size:.72rem;color:var(--tdim);margin-top:2px;">SMS alerts · weekly digest · unlimited spots</div>
+          <div class="premium-active-card" style="flex-direction:column;align-items:stretch;gap:10px;">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span style="font-size:1.6rem;line-height:1;">👑</span>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:.9rem;font-weight:800;color:#f59e0b;letter-spacing:.01em;">Premium</div>
+                <div style="font-size:.72rem;color:var(--tdim);margin-top:1px;">All features unlocked</div>
+              </div>
             </div>
-            <button onclick="manageSubscription()" style="background:none;border:1px solid rgba(245,158,11,.3);border-radius:7px;padding:5px 10px;font-size:.72rem;color:#f59e0b;cursor:pointer;">Manage</button>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:.72rem;">
+              <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.15);border-radius:8px;padding:8px 10px;color:var(--gray);">📱 SMS alerts</div>
+              <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.15);border-radius:8px;padding:8px 10px;color:var(--gray);">📬 Weekly digest</div>
+              <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.15);border-radius:8px;padding:8px 10px;color:var(--gray);">⭐ Unlimited spots</div>
+              <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.15);border-radius:8px;padding:8px 10px;color:var(--gray);">🎯 Priority support</div>
+            </div>
+            <button id="ppManageSubBtn" onclick="manageSubscription()" style="width:100%;padding:10px;background:transparent;border:1px solid rgba(245,158,11,.35);border-radius:8px;font-size:.78rem;font-weight:600;color:#f59e0b;cursor:pointer;transition:background .15s;" onmouseover="this.style.background='rgba(245,158,11,.1)'" onmouseout="this.style.background='transparent'">Manage subscription → cancel, change card</button>
           </div>
           <div style="border-top:1px solid var(--border);margin:12px 0 4px"></div>
           <div class="pp-toggle-row">
@@ -4042,9 +4050,22 @@ async function startCheckout(){
   }catch(e){ showToast('Error starting checkout: '+e.message); btn.disabled=false; btn.textContent='Upgrade to Premium →'; }
 }
 
-function manageSubscription(){
-  // Stripe customer portal — open Stripe billing page
-  window.open('https://billing.stripe.com/p/login/test_placeholder','_blank');
+async function manageSubscription(){
+  const btn=$('ppManageSubBtn'); if(btn){ btn.textContent='Opening…'; btn.disabled=true; }
+  const email=loadProfile().email||_authSession?.user?.email;
+  try{
+    const resp=await fetch('https://kpwmajtxmcfpakvonimf.supabase.co/functions/v1/stripe-portal',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwd21hanR4bWNmcGFrdm9uaW1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTcyMjYsImV4cCI6MjA5MDczMzIyNn0.QfQuIQbnfVUOApPbOdvCRbNsVdb0SBAwMX-hvioGJmg'},
+      body:JSON.stringify({email,return_url:location.origin+location.pathname}),
+    });
+    const{url,error}=await resp.json();
+    if(error) throw new Error(error);
+    location.href=url;
+  }catch(e){
+    showToast('Could not open billing portal: '+e.message);
+    if(btn){ btn.textContent='Manage subscription → cancel, change card'; btn.disabled=false; }
+  }
 }
 
 async function toggleSms(){
