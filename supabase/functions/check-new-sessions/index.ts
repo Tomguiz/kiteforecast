@@ -86,6 +86,7 @@ function computeQualSessions(wx, spotDirs) {
 Deno.serve(async () => {
   const today = new Date().toISOString().slice(0, 10)
 
+  // Fetch active reminders to know which (email, spot) pairs are subscribed and which dates already have rows
   const { data: active, error } = await supabase
     .from('reminders')
     .select('email,spot_name,spot_lat,spot_lon,spot_dirs,spot_city,spot_country,spot_map_link,app_link,session_date')
@@ -93,6 +94,22 @@ Deno.serve(async () => {
     .gte('session_date', today)
 
   if (error) return new Response(JSON.stringify({ error: error.message }), { status: 500 })
+
+  // Fetch spot_days preferences from favourites for every active (email, spot) pair
+  const pairs = [...new Set((active ?? []).map(r => `${r.email}|${r.spot_name}`))]
+  const spotDaysMap = new Map<string, number[] | null>()
+  if (pairs.length) {
+    const emails    = [...new Set((active ?? []).map(r => r.email))]
+    const spotNames = [...new Set((active ?? []).map(r => r.spot_name))]
+    const { data: favRows } = await supabase
+      .from('favourites')
+      .select('email,spot_name,spot_days')
+      .in('email', emails)
+      .in('spot_name', spotNames)
+    for (const f of favRows ?? []) {
+      spotDaysMap.set(`${f.email}|${f.spot_name}`, f.spot_days ?? null)
+    }
+  }
 
   const subMap = new Map()
   for (const r of active ?? []) {
@@ -103,7 +120,9 @@ Deno.serve(async () => {
         spot_lat: r.spot_lat, spot_lon: r.spot_lon,
         spot_dirs: r.spot_dirs, spot_city: r.spot_city,
         spot_country: r.spot_country, spot_map_link: r.spot_map_link,
-        app_link: r.app_link, existingDates: new Set(),
+        app_link: r.app_link,
+        spot_days: spotDaysMap.get(key) ?? null,
+        existingDates: new Set(),
       })
     }
     subMap.get(key).existingDates.add(r.session_date)
@@ -116,7 +135,14 @@ Deno.serve(async () => {
     try {
       const wx = await fetchForecast(sub.spot_lat, sub.spot_lon)
       const qualSessions = computeQualSessions(wx, sub.spot_dirs ?? [])
-      const newSessions = qualSessions.filter(s => !sub.existingDates.has(s.dateStr))
+      const newSessions = qualSessions.filter(s => {
+        if (sub.existingDates.has(s.dateStr)) return false
+        if (sub.spot_days && sub.spot_days.length) {
+          const dow = new Date(s.dateStr + 'T12:00:00').getDay()
+          if (!sub.spot_days.includes(dow)) return false
+        }
+        return true
+      })
 
       for (const sess of newSessions) {
         const sessionMs = new Date(sess.sessionStart).getTime()

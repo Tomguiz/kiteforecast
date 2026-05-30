@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS favourites (
   spot_lat    double precision NOT NULL,
   spot_lon    double precision NOT NULL,
   spot_dirs   integer[],
+  spot_days   integer[],        -- 0=Sun,1=Mon,...,6=Sat; NULL = any day
   created_at  timestamptz      NOT NULL DEFAULT now(),
   UNIQUE (email, spot_name)
 );

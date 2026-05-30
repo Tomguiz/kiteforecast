@@ -651,6 +651,11 @@
     .pp-notif-session-date { font-weight:600; color:var(--text); }
     .pp-notif-pill { display:inline-block; padding:1px 6px; border-radius:4px; font-size:.65rem; font-weight:700; background:rgba(56,189,248,.12); color:#38bdf8; border:1px solid rgba(56,189,248,.2); }
     .pp-notif-pill.sent { background:rgba(100,116,139,.1); color:var(--tdim); border-color:rgba(100,116,139,.2); text-decoration:line-through; }
+    .pp-day-filter { display:flex; align-items:center; gap:4px; margin-top:6px; flex-wrap:wrap; }
+    .pp-day-filter-label { font-size:.62rem; color:var(--tdim); margin-right:2px; }
+    .pp-day-chip { display:inline-flex; align-items:center; justify-content:center; width:26px; height:20px; border-radius:4px; font-size:.62rem; font-weight:700; cursor:pointer; border:1px solid rgba(100,116,139,.25); background:rgba(100,116,139,.08); color:var(--tdim); transition:background .15s,color .15s,border-color .15s; user-select:none; }
+    .pp-day-chip.on { background:rgba(56,189,248,.15); color:#38bdf8; border-color:rgba(56,189,248,.35); }
+    .pp-day-chip:hover { border-color:rgba(56,189,248,.5); }
 
     /* notif bell on day card */
     .card-bell {
@@ -3061,7 +3066,7 @@ async function syncFavsFromSupabase(email){
     const sb=getSb(); if(!sb) return;
     const {data,error}=await sb
       .from('favourites')
-      .select('spot_name,spot_label,spot_lat,spot_lon,spot_dirs')
+      .select('spot_name,spot_label,spot_lat,spot_lon,spot_dirs,spot_days')
       .eq('email',email);
     if(error){ console.error('favs sync error',error); return; }
     const local=loadFavs();
@@ -3071,6 +3076,7 @@ async function syncFavsFromSupabase(email){
       lat:   r.spot_lat,
       lon:   r.spot_lon,
       dirs:  r.spot_dirs||[],
+      days:  r.spot_days||null,
     }));
     // Push any local-only favs up to Supabase (e.g. pre-sync or offline adds)
     const localOnly=local.filter(lf=>!remote.some(rf=>rf.name===lf.name&&rf.lat===lf.lat));
@@ -3101,13 +3107,14 @@ async function pushFavToSupabase(email,fav,remove=false){
       spot_lat:   fav.lat,
       spot_lon:   fav.lon,
       spot_dirs:  fav.dirs||[],
+      spot_days:  fav.days||null,
     };
     const{error:insErr}=await sb.from('favourites').insert(row);
     if(insErr){
       if(insErr.code==='23505'){
         // Duplicate — update instead
         const{error:updErr}=await sb.from('favourites')
-          .update({spot_label:row.spot_label,spot_lat:row.spot_lat,spot_lon:row.spot_lon,spot_dirs:row.spot_dirs})
+          .update({spot_label:row.spot_label,spot_lat:row.spot_lat,spot_lon:row.spot_lon,spot_dirs:row.spot_dirs,spot_days:row.spot_days})
           .eq('email',email).eq('spot_name',fav.name);
         if(updErr) console.error('[favs] update error',updErr);
       } else {
@@ -3132,8 +3139,14 @@ async function recheckSpotSubscription(){
   const qualSessions=getQualSessions();
   if(!qualSessions.length) return;
   const spot=SPOTS.find(s=>s.name===spotName)||{name:spotName,lat:cachedLoc.latitude,lon:cachedLoc.longitude};
+  const fav=loadFavs().find(f=>f.name===spotName);
+  const spotDays=fav?.days&&fav.days.length?fav.days:null;
   const existingDays=new Set(loadNotifs().filter(n=>n.spotName===spotName&&n.type==='day').map(n=>n.date));
-  const newSessions=qualSessions.filter(s=>!existingDays.has(s.dateStr));
+  const newSessions=qualSessions.filter(s=>{
+    if(existingDays.has(s.dateStr)) return false;
+    if(spotDays){const dow=new Date(s.dateStr+'T12:00:00').getDay();if(!spotDays.includes(dow)) return false;}
+    return true;
+  });
   if(!newSessions.length) return;
   for(const sess of newSessions) await scheduleReminders(spot,sess,'spot');
   const notifs=loadNotifs();
@@ -3918,6 +3931,17 @@ async function renderNotifList(){
     }
     scheduleHTML+='</div>';
 
+    const fav=loadFavs().find(f=>f.name===n.spotName);
+    const activeDays=fav?.days&&fav.days.length?new Set(fav.days):null; // null = any day
+    const DAY_LABELS=['Su','Mo','Tu','We','Th','Fr','Sa'];
+    const dayChips=DAY_LABELS.map((lbl,i)=>{
+      const isOn=!activeDays||activeDays.has(i);
+      return `<span class="pp-day-chip${isOn?' on':''}" onclick="toggleSpotDay('${n.spotName}',${i})">${lbl}</span>`;
+    }).join('');
+    const dayFilterHTML=n.type==='spot'
+      ?`<div class="pp-day-filter"><span class="pp-day-filter-label">Days:</span>${dayChips}</div>`
+      :'';
+
     return `<div class="pp-notif-item" style="flex-direction:column;align-items:stretch;">
       <div style="display:flex;align-items:center;gap:10px;">
         <div class="pp-notif-info">
@@ -3926,6 +3950,7 @@ async function renderNotifList(){
         </div>
         <button class="pp-notif-del" onclick="deleteNotifById('${n.id}')">🗑 Remove</button>
       </div>
+      ${dayFilterHTML}
       ${scheduleHTML}
     </div>`;
   }).join('');
@@ -3944,6 +3969,52 @@ function deleteNotifById(id){
   renderNotifList();
   updateProfileDot();
   updateEmailWarning();
+  renderHintChips();
+  if(cachedLoc) renderGrid();
+}
+async function toggleSpotDay(spotName,dow){
+  const email=loadProfile().email; if(!email) return;
+  const favs=loadFavs();
+  const fi=favs.findIndex(f=>f.name===spotName);
+  if(fi<0) return;
+  const fav=favs[fi];
+  // Build current set — null means all 7 days on
+  const ALL=[0,1,2,3,4,5,6];
+  let days=fav.days&&fav.days.length?[...fav.days]:[...ALL];
+  if(days.includes(dow)){
+    days=days.filter(d=>d!==dow);
+    // Must keep at least 1 day
+    if(!days.length) days=[...ALL];
+  } else {
+    days.push(dow);
+    days.sort((a,b)=>a-b);
+  }
+  // null when all 7 selected (= any day, cleaner storage)
+  fav.days=days.length===7?null:days;
+  favs[fi]=fav;
+  saveFavs(favs);
+  // Persist to Supabase
+  const sb=getSb();
+  if(sb) await sb.from('favourites').update({spot_days:fav.days}).eq('email',email).eq('spot_name',spotName);
+  // Cancel reminders for dates that no longer match the day filter
+  if(sb&&fav.days){
+    const today=new Date().toISOString().slice(0,10);
+    const{data:pending}=await sb.from('reminders')
+      .select('id,session_date').eq('email',email).eq('spot_name',spotName)
+      .eq('cancelled',false).eq('sent',false).gte('session_date',today);
+    const toCancel=(pending||[]).filter(r=>{
+      const dow2=new Date(r.session_date+'T12:00:00').getDay();
+      return !fav.days.includes(dow2);
+    }).map(r=>r.id);
+    if(toCancel.length){
+      await sb.from('reminders').update({cancelled:true}).in('id',toCancel);
+      // Remove cancelled day entries from local notifs
+      const notifs=loadNotifs();
+      const cancelledDates=new Set((pending||[]).filter(r=>toCancel.includes(r.id)).map(r=>r.session_date));
+      saveNotifs(notifs.filter(n=>!(n.spotName===spotName&&n.type==='day'&&cancelledDates.has(n.date))));
+    }
+  }
+  renderNotifList();
   renderHintChips();
   if(cachedLoc) renderGrid();
 }
