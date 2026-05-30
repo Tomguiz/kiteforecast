@@ -15,15 +15,14 @@
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#111318;">
 <tr><td align="center" style="padding:24px 12px;">
 
-  <!-- Main container -->
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:580px;width:100%;">
 
-    <!-- HEADER CARD -->
+    <!-- HEADER -->
     <tr>
       <td style="background:linear-gradient(135deg,#0d4a7a 0%,#0a2d4d 100%);border-radius:14px 14px 0 0;padding:0;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
 
-          <!-- Brand row -->
+          <!-- Brand -->
           <tr>
             <td style="padding:24px 32px 20px 32px;">
               <table role="presentation" cellpadding="0" cellspacing="0" border="0">
@@ -35,7 +34,7 @@
             </td>
           </tr>
 
-          <!-- Badge row -->
+          <!-- Badges -->
           <tr>
             <td style="padding:0 32px 16px 32px;">
               <table role="presentation" cellpadding="0" cellspacing="0" border="0">
@@ -66,74 +65,11 @@
       </td>
     </tr>
 
-    <!-- SPOTS SECTION -->
-    <!-- ↓ Repeat this block for each spot via Make.com iterator -->
+    <!-- SPOTS BLOCK — pre-rendered HTML injected here -->
+    [[spots_html]]
 
-    <!-- SPOT HEADER -->
-    <tr>
-      <td style="background-color:#0f1520;border-left:1px solid #1e2535;border-right:1px solid #1e2535;border-top:1px solid #1e2535;padding:20px 32px 12px 32px;">
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-          <tr>
-            <td>
-              <p style="margin:0 0 2px 0;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#4a5568;">Spot</p>
-              <p style="margin:0;font-family:'Bebas Neue',Arial,sans-serif;font-size:26px;color:#5dd4f0;letter-spacing:1px;">&#128205; [[spots[].spot]]</p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-
-    <!-- SESSION ROWS — repeat for each session in spots[].sessions -->
-    <tr>
-      <td style="background-color:#141b27;border-left:1px solid #1e2535;border-right:1px solid #1e2535;padding:0 32px 8px 32px;">
-
-        <!-- Session row (repeat per session) -->
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:12px;background-color:#1a2235;border:1px solid #242d42;border-radius:10px;">
-          <tr>
-            <td style="padding:14px 18px;">
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <!-- Day + date -->
-                  <td style="vertical-align:middle;width:40%;">
-                    <p style="margin:0;font-family:'Bebas Neue',Arial,sans-serif;font-size:22px;color:#ffffff;letter-spacing:1px;">[[spots[].sessions[].day_of_week]]</p>
-                    <p style="margin:2px 0 0 0;font-size:12px;color:#4a5568;">[[spots[].sessions[].date_label]]</p>
-                  </td>
-                  <!-- Start time -->
-                  <td style="vertical-align:middle;text-align:center;width:30%;">
-                    <p style="margin:0;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4a5568;">Starts</p>
-                    <p style="margin:4px 0 0 0;font-family:'Bebas Neue',Arial,sans-serif;font-size:20px;color:#5dd4f0;">[[spots[].sessions[].start_time]]</p>
-                  </td>
-                  <!-- Wind stats -->
-                  <td style="vertical-align:middle;text-align:right;width:30%;">
-                    <p style="margin:0;font-family:'Bebas Neue',Arial,sans-serif;font-size:28px;color:#5dd4f0;line-height:1;">[[spots[].sessions[].peak_kn]]<span style="font-size:14px;color:#4a5568;"> kn</span></p>
-                    <p style="margin:2px 0 0 0;font-size:11px;color:#4a5568;">[[spots[].sessions[].duration_hours]]h of good wind</p>
-                  </td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-        </table>
-
-      </td>
-    </tr>
-
-    <!-- SPOT FOOTER SPACING -->
-    <tr>
-      <td style="background-color:#141b27;border-left:1px solid #1e2535;border-right:1px solid #1e2535;padding:0 32px 20px 32px;font-size:0;line-height:0;">&nbsp;</td>
-    </tr>
-
-    <!-- END SPOTS SECTION -->
-
-    <!-- NO SESSIONS STATE (shown when has_sessions = false) -->
-    <!--
-    <tr>
-      <td style="background-color:#141b27;border:1px solid #1e2535;border-top:none;padding:32px;text-align:center;">
-        <p style="margin:0 0 8px 0;font-size:32px;">&#128168;</p>
-        <p style="margin:0 0 4px 0;font-family:'Bebas Neue',Arial,sans-serif;font-size:22px;color:#4a5568;">No sessions this week</p>
-        <p style="margin:0;font-size:13px;color:#4a5568;">We're keeping an eye on your spots. You'll hear from us when the wind picks up.</p>
-      </td>
-    </tr>
-    -->
+    <!-- NO SESSIONS STATE -->
+    [[no_sessions_html]]
 
     <!-- CTA -->
     <tr>

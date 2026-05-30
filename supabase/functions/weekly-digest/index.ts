@@ -136,14 +136,65 @@ Deno.serve(async (req) => {
     }
 
     const totalSessions = spotForecasts.reduce((s, sf) => s + sf.sessions.length, 0)
+    const weekStart = new Date().toLocaleDateString('en', { day: 'numeric', month: 'long', year: 'numeric' })
+
+    // Pre-render spots HTML (max 10 spots)
+    const spotsHtml = spotForecasts.slice(0, 10).map(sf => {
+      const sessionRows = sf.sessions.map(sess => `
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:10px;background-color:#1a2235;border:1px solid #242d42;border-radius:10px;">
+          <tr>
+            <td style="padding:14px 18px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="vertical-align:middle;width:40%;">
+                    <p style="margin:0;font-family:'Bebas Neue',Arial,sans-serif;font-size:22px;color:#ffffff;letter-spacing:1px;">${sess.day_of_week}</p>
+                    <p style="margin:2px 0 0 0;font-size:12px;color:#4a5568;">${sess.date_label}</p>
+                  </td>
+                  <td style="vertical-align:middle;text-align:center;width:30%;">
+                    <p style="margin:0;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4a5568;">Starts</p>
+                    <p style="margin:4px 0 0 0;font-family:'Bebas Neue',Arial,sans-serif;font-size:20px;color:#5dd4f0;">${sess.start_time}</p>
+                  </td>
+                  <td style="vertical-align:middle;text-align:right;width:30%;">
+                    <p style="margin:0;font-family:'Bebas Neue',Arial,sans-serif;font-size:28px;color:#5dd4f0;line-height:1;">${sess.peak_kn}<span style="font-size:14px;color:#4a5568;"> kn</span></p>
+                    <p style="margin:2px 0 0 0;font-size:11px;color:#4a5568;">${sess.duration_hours}h of good wind</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>`).join('')
+
+      return `
+        <tr>
+          <td style="background-color:#0f1520;border-left:1px solid #1e2535;border-right:1px solid #1e2535;border-top:1px solid #1e2535;padding:20px 32px 4px 32px;">
+            <p style="margin:0 0 2px 0;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#4a5568;">Spot</p>
+            <p style="margin:0;font-family:'Bebas Neue',Arial,sans-serif;font-size:26px;color:#5dd4f0;letter-spacing:1px;">&#128205; ${sf.spot}</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="background-color:#141b27;border-left:1px solid #1e2535;border-right:1px solid #1e2535;padding:0 32px 20px 32px;">
+            ${sessionRows}
+          </td>
+        </tr>`
+    }).join('')
+
+    const noSessionsHtml = totalSessions === 0 ? `
+      <tr>
+        <td style="background-color:#141b27;border:1px solid #1e2535;border-top:none;padding:40px 32px;text-align:center;">
+          <p style="margin:0 0 8px 0;font-size:32px;">&#128168;</p>
+          <p style="margin:0 0 6px 0;font-family:'Bebas Neue',Arial,sans-serif;font-size:22px;color:#4a5568;">No sessions this week</p>
+          <p style="margin:0;font-size:13px;color:#4a5568;line-height:1.5;">We're keeping an eye on your spots.<br/>You'll hear from us when the wind picks up.</p>
+        </td>
+      </tr>` : ''
 
     const payload = {
       notification_type: 'digest',
       email,
-      week_start: new Date().toLocaleDateString('en', { day: 'numeric', month: 'long', year: 'numeric' }),
+      week_start: weekStart,
       total_good_sessions: totalSessions,
-      spots: spotForecasts,
       has_sessions: totalSessions > 0,
+      spots_html: spotsHtml,
+      no_sessions_html: noSessionsHtml,
     }
 
     await fetch(MAKE_WEBHOOK_URL, {
