@@ -1016,6 +1016,13 @@
         </div>
         <p class="pp-note" style="margin:0">Notifications &amp; favourites stay in sync across all your devices.</p>
         <div style="border-top:1px solid var(--border);margin:4px 0"></div>
+        <label class="pp-label">Nickname</label>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="text" id="ppNicknameInput" class="pp-input" placeholder="e.g. Tom" maxlength="32" style="flex:1" />
+          <button class="btn pp-save-btn" onclick="saveNickname()" style="flex-shrink:0">Save</button>
+        </div>
+        <p class="pp-note">Shown when you share a forecast with friends.</p>
+        <div style="border-top:1px solid var(--border);margin:4px 0"></div>
         <label class="pp-label">Tide API key <a href="https://www.worldtides.info/developer" target="_blank" rel="noopener" style="color:var(--accent);font-size:.75rem;font-weight:400;margin-left:6px">Get free key ↗</a></label>
         <input type="text" id="ppTideKeyInput" class="pp-input" placeholder="Paste your WorldTides API key" />
         <button class="btn pp-save-btn" id="ppTideSaveBtn" onclick="saveTideKey()" style="margin-top:2px">Save</button>
@@ -2527,12 +2534,30 @@ $('searchInput').addEventListener('keydown',e=>{
 document.addEventListener('click',e=>{if(!e.target.closest('.search-wrap'))closeAC();});
 function shareSpot(){
   if(!cachedLoc) return;
-  const senderName=loadProfile().displayName||loadProfile().email?.split('@')[0]||'Someone';
+  const p=loadProfile();
+  const senderName=p.nickname||p.email?.split('@')[0]||'Someone';
   const url=`${location.origin}${location.pathname}?spot=${encodeURIComponent(cachedLoc.name)}&share=1`;
+
+  // Build good-days snippet from cached forecast data
+  const key=`${cachedLoc.latitude},${cachedLoc.longitude}`;
+  const entry=chipBestCache[key];
+  let daysText='';
+  if(entry?.days10){
+    const goodDays=entry.days10.filter(d=>d.qh>=2).slice(0,3);
+    if(goodDays.length){
+      const labels=goodDays.map(d=>{
+        const dow=new Date(d.dateStr+'T12:00:00').toLocaleDateString('en',{weekday:'short'});
+        return `${dow} (${d.peakKn}kn)`;
+      });
+      daysText=` Looks good: ${labels.join(', ')}.`;
+    }
+  }
+
+  const text=`🪁 ${senderName} thinks ${cachedLoc.name} has good kite conditions.${daysText} Check it out!`;
   if(navigator.share){
-    navigator.share({title:`${cachedLoc.name} — Tichkes Forecast`,text:`${senderName} thinks ${cachedLoc.name} might be good — check the kite forecast!`,url}).catch(()=>{});
+    navigator.share({title:`${cachedLoc.name} — Tichkes Forecast`,text,url}).catch(()=>{});
   } else {
-    navigator.clipboard.writeText(url).then(()=>showToast('🔗 Link copied!')).catch(()=>showToast('Share: '+url));
+    navigator.clipboard.writeText(`${text}\n${url}`).then(()=>showToast('🔗 Link copied!')).catch(()=>showToast('Share: '+url));
   }
 }
 
@@ -3728,7 +3753,9 @@ function openProfilePanel(tab){
     $('profileOverlay').style.display='flex';
     document.body.style.overflow='hidden';
     switchPpTab(tab);
-    $('ppTideKeyInput').value=loadProfile().tideKey||'';
+    const _p=loadProfile();
+    $('ppTideKeyInput').value=_p.tideKey||'';
+    const _ni=$('ppNicknameInput'); if(_ni) _ni.value=_p.nickname||'';
     renderSignInOnboarding();
     updateAuthUI();
     renderNotifList();
@@ -3760,6 +3787,11 @@ function switchPpTab(tab){
   if(tab==='stats') renderStats();
 }
 function onEmailEdit(){}
+function saveNickname(){
+  const val=($('ppNicknameInput').value||'').trim();
+  const p=loadProfile(); p.nickname=val; saveProfile(p);
+  showToast(val?`✓ Nickname saved as "${val}"`:'Nickname cleared');
+}
 function loadTideKey(){ return (loadProfile().tideKey||'').trim(); }
 function saveTideKey(){
   const key=$('ppTideKeyInput').value.trim();
