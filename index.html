@@ -4061,7 +4061,7 @@ async function manageSubscription(){
     });
     const{url,error}=await resp.json();
     if(error) throw new Error(error);
-    location.href=url;
+    window.open(url,'_blank');
   }catch(e){
     showToast('Could not open billing portal: '+e.message);
     if(btn){ btn.textContent='Manage subscription → cancel, change card'; btn.disabled=false; }
