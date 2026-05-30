@@ -652,6 +652,13 @@
     .pp-notif-session-date { font-weight:600; color:var(--text); }
     .pp-notif-pill { display:inline-block; padding:1px 6px; border-radius:4px; font-size:.65rem; font-weight:700; background:rgba(56,189,248,.12); color:#38bdf8; border:1px solid rgba(56,189,248,.2); }
     .pp-notif-pill.sent { background:rgba(100,116,139,.1); color:var(--tdim); border-color:rgba(100,116,139,.2); text-decoration:line-through; }
+    /* ── Premium ── */
+    .premium-badge { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:99px; background:linear-gradient(135deg,#f59e0b,#d97706); color:#000; font-size:.65rem; font-weight:800; letter-spacing:.05em; vertical-align:middle; margin-left:6px; }
+    .premium-card { background:linear-gradient(135deg,rgba(245,158,11,.1),rgba(217,119,6,.06)); border:1px solid rgba(245,158,11,.3); border-radius:12px; padding:16px; }
+    .btn-premium { display:block; width:100%; padding:13px; background:linear-gradient(135deg,#f59e0b,#d97706); color:#000; border:none; border-radius:9px; font-size:.88rem; font-weight:800; cursor:pointer; text-align:center; letter-spacing:.03em; transition:opacity .15s; margin-top:10px; }
+    .btn-premium:hover { opacity:.9; }
+    .btn-premium:disabled { opacity:.5; cursor:default; }
+    .premium-active-card { background:linear-gradient(135deg,rgba(245,158,11,.08),rgba(217,119,6,.04)); border:1px solid rgba(245,158,11,.25); border-radius:12px; padding:14px 16px; display:flex; align-items:center; gap:12px; }
     /* ── Share banner ── */
     #shareBanner { position:sticky; top:0; z-index:200; display:none; align-items:center; gap:10px; padding:10px 16px; background:linear-gradient(135deg,rgba(0,212,255,.15),rgba(56,189,248,.08)); border-bottom:1px solid rgba(0,212,255,.25); font-size:.8rem; color:var(--text); }
     #shareBanner .sb-text { flex:1; line-height:1.4; }
@@ -964,6 +971,7 @@
         <button class="pp-tab active" id="ppTabProfile" onclick="switchPpTab('profile')">Profile</button>
         <button class="pp-tab" id="ppTabNotifs" onclick="switchPpTab('notifs')">Notifications <span id="ppNotifCount" style="display:none"></span></button>
         <button class="pp-tab" id="ppTabStats" onclick="switchPpTab('stats')">Stats</button>
+        <button class="pp-tab" id="ppTabMySpot" onclick="switchPpTab('myspot')" style="display:none">My Spot</button>
       </div>
       <button class="pp-close" onclick="closeProfilePanel()">✕</button>
     </div>
@@ -1034,8 +1042,52 @@
           <button class="pp-toggle" id="ppDigestToggle" onclick="toggleDigest()"><span></span></button>
         </div>
         <button class="btn pp-save-btn" id="ppDigestNowBtn" onclick="sendDigestNow()" style="margin-top:2px">📩 Send me this week's forecast now</button>
+        <div style="border-top:1px solid var(--border);margin:4px 0"></div>
+
+        <!-- Premium section (non-premium) -->
+        <div id="ppPremiumUpgrade">
+          <div class="premium-card">
+            <div style="font-size:.85rem;font-weight:700;color:#f59e0b;margin-bottom:6px;">⚡ Go Premium — €4.99/mo</div>
+            <div style="font-size:.75rem;color:var(--gray);line-height:1.6;margin-bottom:2px;">
+              ✅ SMS alerts — get a text 1h before your session<br/>
+              ✅ Unlimited favourite spots (free = 3 max)<br/>
+              ✅ Priority support
+            </div>
+            <button class="btn-premium" id="ppUpgradeBtn" onclick="startCheckout()">Upgrade to Premium →</button>
+          </div>
+        </div>
+
+        <!-- Premium section (premium user) -->
+        <div id="ppPremiumActive" style="display:none">
+          <div class="premium-active-card">
+            <span style="font-size:1.4rem;">⚡</span>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:.85rem;font-weight:700;color:#f59e0b;">Premium active</div>
+              <div style="font-size:.72rem;color:var(--tdim);margin-top:2px;">SMS alerts &amp; unlimited spots enabled</div>
+            </div>
+            <button onclick="manageSubscription()" style="background:none;border:1px solid rgba(245,158,11,.3);border-radius:7px;padding:5px 10px;font-size:.72rem;color:#f59e0b;cursor:pointer;">Manage</button>
+          </div>
+          <div style="border-top:1px solid var(--border);margin:12px 0 4px"></div>
+          <div class="pp-toggle-row">
+            <div>
+              <div style="font-size:.82rem;font-weight:600;color:var(--text)">📱 SMS alerts <span class="premium-badge">PREMIUM</span></div>
+              <div style="font-size:.72rem;color:var(--tdim);margin-top:2px">Text message 1h before your session</div>
+            </div>
+            <button class="pp-toggle" id="ppSmsToggle" onclick="toggleSms()"><span></span></button>
+          </div>
+          <div id="ppPhoneSection" style="display:none;margin-top:8px;">
+            <label class="pp-label">Phone number</label>
+            <input type="tel" id="ppPhoneInput" class="pp-input" placeholder="+32478123456" />
+            <button class="btn pp-save-btn" id="ppPhoneSaveBtn" onclick="savePhone()" style="margin-top:2px">Save</button>
+            <p class="pp-note">International format e.g. +32478123456. Used only for kite alerts.</p>
+          </div>
+        </div>
+
         <button class="btn-reset" id="ppSignOutBtn" onclick="signOut()" style="font-size:.78rem;color:#f87171;text-align:left;padding:4px 0 0;">Sign out</button>
       </div>
+    </div>
+    <div id="ppPanelMySpot" class="pp-body" style="display:none">
+      <div id="ppMySpotContent"></div>
     </div>
     <div id="ppPanelStats" class="pp-body" style="display:none">
       <div id="ppStatsContent"></div>
@@ -2319,6 +2371,11 @@ function toggleFavorite(){
   if(idx>=0){
     favs.splice(idx,1);
   } else {
+    if(!isPremium()&&favs.length>=FREE_FAV_LIMIT){
+      showToast(`Free plan: max ${FREE_FAV_LIMIT} spots. Upgrade to Premium for unlimited.`);
+      openProfilePanel('profile');
+      return;
+    }
     favs.push(favEntry);
   }
   saveFavs(favs);
@@ -2802,13 +2859,14 @@ function renderGrid(){
   const qdLabel=qualDaysCount===0
     ?`<span style="${qdCls};font-size:.8rem;font-weight:700;margin-left:10px">No sessions in ${totalDays} days</span>`
     :`<span style="${qdCls};font-size:.8rem;font-weight:700;margin-left:10px">${qualDaysCount} of ${totalDays} days rideable</span>`;
-  $('locName').innerHTML=`${loc.name}${loc.admin1&&loc.admin1!==loc.name?', '+loc.admin1:''}<a class="map-link" href="${mapsUrl}" target="_blank" rel="noopener" title="Open in Google Maps"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Maps</a><button class="notif-btn${hasSpotNotif(loc.name)?' active':''}" id="notifBtn" title="Get notified">${bellSVG(16)}</button><button class="fav-btn${isFav?' active':''}" id="favBtn" title="${isFav?'Remove from favourites':'Add to favourites'}">${isFav?'★':'☆'}</button><button class="share-btn" id="shareBtn" onclick="shareSpot()" title="Share this spot"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></button>${qdLabel}`;
+  $('locName').innerHTML=`${loc.name}${loc.admin1&&loc.admin1!==loc.name?', '+loc.admin1:''}<a class="map-link" href="${mapsUrl}" target="_blank" rel="noopener" title="Open in Google Maps"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Maps</a><button class="notif-btn${hasSpotNotif(loc.name)?' active':''}" id="notifBtn" title="Get notified">${bellSVG(16)}</button><button class="fav-btn${isFav?' active':''}" id="favBtn" title="${isFav?'Remove from favourites':'Add to favourites'}">${isFav?'★':'☆'}</button><button class="share-btn" id="shareBtn" onclick="shareSpot()" title="Share this spot"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></button><button class="share-btn" id="claimBtn" onclick="openClaimFlow()" title="Claim this spot as owner" style="margin-left:4px;font-size:.7rem;padding:4px 8px;white-space:nowrap">🏴 Claim</button>${qdLabel}`;
 
   $('locSub').textContent=`${loc.country} · ${loc.latitude.toFixed(2)}°, ${loc.longitude.toFixed(2)}°`+(windDirs.size>0?` · Winds: ${[...windDirs].sort((a,b)=>a-b).map(d=>compass(d)).join('/')}`:'');
   $('locHdr').style.display='block';
   $('shoreBar').classList.add('visible');
   $('resetBtn').style.display='inline-flex';
   document.body.classList.add('spot-loaded');
+  checkShowMySpotTab();
 
   const grid=$('forecastGrid');
   grid.innerHTML='';
@@ -3282,7 +3340,8 @@ document.addEventListener('keydown',touchLastSeen);
 document.addEventListener('touchstart',touchLastSeen,{passive:true});
 
 async function syncAllFromSupabase(email){
-  await Promise.all([syncNotifsFromSupabase(email), syncFavsFromSupabase(email), updateLastSeen(email)]);
+  await Promise.all([syncNotifsFromSupabase(email), syncFavsFromSupabase(email), updateLastSeen(email), syncPremiumFromSupabase(email)]);
+  checkShowMySpotTab();
 }
 
 let _syncFavsInFlight=false;
@@ -3779,13 +3838,202 @@ function switchPpTab(tab){
   $('ppTabProfile').classList.toggle('active',tab==='profile');
   $('ppTabNotifs').classList.toggle('active',tab==='notifs');
   $('ppTabStats').classList.toggle('active',tab==='stats');
+  $('ppTabMySpot').classList.toggle('active',tab==='myspot');
   $('ppPanelProfile').style.display=tab==='profile'?'flex':'none';
   $('ppPanelNotifs').style.display=tab==='notifs'?'flex':'none';
   $('ppPanelStats').style.display=tab==='stats'?'flex':'none';
+  $('ppPanelMySpot').style.display=tab==='myspot'?'flex':'none';
   if(tab==='notifs') renderNotifList();
   if(tab==='stats') renderStats();
+  if(tab==='myspot') renderMySpot();
 }
 function onEmailEdit(){}
+// ── SPOT OWNER DASHBOARD ─────────────────────────────────────────────────────
+function openClaimFlow(){
+  if(!_authSession?.user){ _signinContext='generic'; openProfilePanel('profile'); showToast('Sign in to claim a spot'); return; }
+  if(!cachedLoc) return;
+  openProfilePanel('myspot');
+}
+
+async function renderMySpot(){
+  const el=$('ppMySpotContent'); if(!el) return;
+  if(!_authSession?.user){ el.innerHTML='<div class="stats-empty">Sign in to manage your spot</div>'; return; }
+  el.innerHTML='<div class="stats-empty">Loading…</div>';
+  const email=loadProfile().email||_authSession.user.email;
+  const sb=getSb(); if(!sb) return;
+
+  const{data:claims}=await sb.from('spot_claims').select('*').eq('email',email).order('created_at',{ascending:false});
+  const spotName=cachedLoc?.name||'';
+
+  // Check if already claimed this spot
+  const existing=claims?.find(c=>c.spot_name===spotName);
+
+  let claimFormHTML='';
+  if(spotName){
+    if(existing){
+      const badge=existing.verified
+        ?`<span style="background:rgba(74,222,128,.15);border:1px solid rgba(74,222,128,.3);border-radius:99px;padding:2px 10px;font-size:.7rem;font-weight:700;color:#4ade80;">✓ Verified</span>`
+        :`<span style="background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);border-radius:99px;padding:2px 10px;font-size:.7rem;font-weight:700;color:#f59e0b;">⏳ Pending verification</span>`;
+      claimFormHTML=`
+        <div style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+            <div style="font-weight:700;color:var(--text);font-size:.85rem;">📍 ${existing.spot_name}</div>
+            ${badge}
+          </div>
+          ${existing.verified?`
+          <div style="font-size:.75rem;color:var(--gray);line-height:1.6;">
+            ${existing.business_name?`<div><strong>Business:</strong> ${existing.business_name}</div>`:''}
+            ${existing.website?`<div><strong>Website:</strong> <a href="${existing.website}" target="_blank" style="color:var(--accent)">${existing.website}</a></div>`:''}
+            ${existing.description?`<div style="margin-top:4px">${existing.description}</div>`:''}
+          </div>`:`<div style="font-size:.75rem;color:var(--tdim);">We'll verify your claim and get back to you within 48h.</div>`}
+        </div>`;
+    } else {
+      claimFormHTML=`
+        <div style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">
+          <div style="font-size:.82rem;font-weight:700;color:var(--text);margin-bottom:4px;">🏴 Claim <span style="color:var(--accent)">${spotName}</span></div>
+          <div style="font-size:.72rem;color:var(--tdim);margin-bottom:12px;">Are you the owner or manager of this spot? Claim it to add your business info.</div>
+          <label class="pp-label">Business name</label>
+          <input type="text" id="claimBizName" class="pp-input" placeholder="e.g. Riverwoods Kite Club" style="margin-bottom:8px"/>
+          <label class="pp-label">Website</label>
+          <input type="url" id="claimWebsite" class="pp-input" placeholder="https://yoursite.com" style="margin-bottom:8px"/>
+          <label class="pp-label">Description <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(optional)</span></label>
+          <input type="text" id="claimDesc" class="pp-input" placeholder="Lessons, rentals, bar…" style="margin-bottom:12px"/>
+          <button class="btn pp-save-btn" id="claimSubmitBtn" onclick="submitClaim('${spotName.replace(/'/g,"\\'")}')">Submit claim</button>
+        </div>`;
+    }
+  } else {
+    claimFormHTML=`<div style="font-size:.78rem;color:var(--tdim);margin-bottom:16px;">Open a spot forecast page first, then come back here to claim it.</div>`;
+  }
+
+  // All user's claims
+  const otherClaims=(claims||[]).filter(c=>c.spot_name!==spotName);
+  const otherHTML=otherClaims.length?`
+    <div class="stats-section-title">Your other claims</div>
+    ${otherClaims.map(c=>{
+      const badge=c.verified
+        ?`<span style="color:#4ade80;font-size:.68rem;font-weight:700;">✓ Verified</span>`
+        :`<span style="color:#f59e0b;font-size:.68rem;font-weight:700;">⏳ Pending</span>`;
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><span style="font-size:.78rem;color:var(--text)">${c.spot_name}</span>${badge}</div>`;
+    }).join('')}`:'';
+
+  el.innerHTML=claimFormHTML+otherHTML||'<div class="stats-empty">No claims yet.<br>Open a spot page and tap "Claim" to get started.</div>';
+}
+
+async function submitClaim(spotName){
+  const btn=$('claimSubmitBtn'); if(!btn) return;
+  const email=loadProfile().email||_authSession?.user?.email;
+  if(!email){ showToast('Sign in first'); return; }
+  btn.disabled=true; btn.textContent='Submitting…';
+  const bizName=($('claimBizName')?.value||'').trim();
+  const website=($('claimWebsite')?.value||'').trim();
+  const desc=($('claimDesc')?.value||'').trim();
+  const sb=getSb(); if(!sb){ btn.disabled=false; btn.textContent='Submit claim'; return; }
+  const{error}=await sb.from('spot_claims').upsert({email,spot_name:spotName,business_name:bizName||null,website:website||null,description:desc||null},{onConflict:'email,spot_name'});
+  if(error){ showToast('Error: '+error.message); btn.disabled=false; btn.textContent='Submit claim'; return; }
+  // Notify admin
+  await fetch('https://kpwmajtxmcfpakvonimf.supabase.co/functions/v1/claim-notify',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwd21hanR4bWNmcGFrdm9uaW1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTcyMjYsImV4cCI6MjA5MDczMzIyNn0.QfQuIQbnfVUOApPbOdvCRbNsVdb0SBAwMX-hvioGJmg'},
+    body:JSON.stringify({email,spot_name:spotName,business_name:bizName,website,description:desc}),
+  }).catch(()=>{});
+  showToast('✓ Claim submitted! We\'ll verify within 48h.');
+  renderMySpot();
+}
+
+// Show My Spot tab if user has any claims
+async function checkShowMySpotTab(){
+  if(!_authSession?.user) return;
+  const sb=getSb(); if(!sb) return;
+  const email=loadProfile().email||_authSession.user.email;
+  const{data}=await sb.from('spot_claims').select('id').eq('email',email).limit(1);
+  const tab=$('ppTabMySpot');
+  if(tab) tab.style.display=(data&&data.length)||cachedLoc?'inline-flex':'none';
+}
+
+// ── PREMIUM ──────────────────────────────────────────────────────────────────
+const FREE_FAV_LIMIT = 3
+
+function isPremium(){ return !!loadProfile().isPremium; }
+
+function updatePremiumUI(){
+  const premium=isPremium();
+  const upgradeEl=$('ppPremiumUpgrade'); if(upgradeEl) upgradeEl.style.display=premium?'none':'block';
+  const activeEl=$('ppPremiumActive');   if(activeEl)  activeEl.style.display=premium?'block':'none';
+  if(premium){
+    const p=loadProfile();
+    const smsEl=$('ppSmsToggle'); if(smsEl) smsEl.classList.toggle('on',!!p.smsEnabled);
+    const phoneSection=$('ppPhoneSection');
+    if(phoneSection) phoneSection.style.display=p.smsEnabled?'block':'none';
+    const phoneInput=$('ppPhoneInput'); if(phoneInput) phoneInput.value=p.phoneNumber||'';
+  }
+}
+
+async function syncPremiumFromSupabase(email){
+  const sb=getSb(); if(!sb||!email) return;
+  const{data}=await sb.from('profiles').select('is_premium,sms_enabled,phone_number').eq('email',email).single();
+  if(!data) return;
+  const p=loadProfile();
+  p.isPremium=!!data.is_premium;
+  p.smsEnabled=!!data.sms_enabled;
+  p.phoneNumber=data.phone_number||'';
+  saveProfile(p);
+  updatePremiumUI();
+}
+
+async function startCheckout(){
+  const btn=$('ppUpgradeBtn'); if(!btn) return;
+  const email=loadProfile().email||_authSession?.user?.email;
+  if(!email){ showToast('Sign in first'); return; }
+  btn.disabled=true; btn.textContent='Redirecting…';
+  try{
+    const resp=await fetch('https://kpwmajtxmcfpakvonimf.supabase.co/functions/v1/stripe-checkout',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwd21hanR4bWNmcGFrdm9uaW1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTcyMjYsImV4cCI6MjA5MDczMzIyNn0.QfQuIQbnfVUOApPbOdvCRbNsVdb0SBAwMX-hvioGJmg'},
+      body:JSON.stringify({email,success_url:location.origin+location.pathname+'?premium=success',cancel_url:location.origin+location.pathname+'?premium=cancelled'}),
+    });
+    const{url}=await resp.json();
+    if(url) location.href=url;
+    else throw new Error('No URL');
+  }catch(e){ showToast('Error starting checkout: '+e.message); btn.disabled=false; btn.textContent='Upgrade to Premium →'; }
+}
+
+function manageSubscription(){
+  // Stripe customer portal — open Stripe billing page
+  window.open('https://billing.stripe.com/p/login/test_placeholder','_blank');
+}
+
+async function toggleSms(){
+  if(!isPremium()){ showToast('SMS alerts are a Premium feature'); return; }
+  const p=loadProfile(); p.smsEnabled=!p.smsEnabled; saveProfile(p);
+  const sb=getSb();
+  if(sb) await sb.from('profiles').upsert({email:p.email,sms_enabled:p.smsEnabled},{onConflict:'email'});
+  const phoneSection=$('ppPhoneSection');
+  if(phoneSection) phoneSection.style.display=p.smsEnabled?'block':'none';
+  $('ppSmsToggle').classList.toggle('on',!!p.smsEnabled);
+}
+
+async function savePhone(){
+  const val=($('ppPhoneInput').value||'').trim();
+  if(val&&!/^\+[1-9]\d{6,14}$/.test(val)){ showToast('Use international format: +32478123456'); return; }
+  const p=loadProfile(); p.phoneNumber=val; saveProfile(p);
+  const sb=getSb();
+  if(sb) await sb.from('profiles').upsert({email:p.email,phone_number:val||null},{onConflict:'email'});
+  const btn=$('ppPhoneSaveBtn');
+  if(btn){ btn.classList.add('saved'); btn.textContent='✓ Saved'; setTimeout(()=>{ btn.classList.remove('saved'); btn.textContent='Save'; },2000); }
+}
+
+// Handle ?premium=success / ?premium=cancelled on return from Stripe
+;(function(){
+  const params=new URLSearchParams(location.search);
+  if(params.get('premium')==='success'){
+    showToast('🎉 Welcome to Premium! SMS alerts are now enabled.');
+    history.replaceState({},'',location.pathname);
+  } else if(params.get('premium')==='cancelled'){
+    history.replaceState({},'',location.pathname);
+  }
+})();
+
+// ─────────────────────────────────────────────────────────────────────────────
 function onNicknameInput(){
   const btn=$('ppNicknameSaveBtn');
   if(btn){ btn.classList.remove('saved'); btn.textContent='Save'; }
@@ -4069,6 +4317,7 @@ function getInitials(email){
 function updateAuthUI(){
   const loggedIn=!!_authSession?.user;
   updateShareBanner();
+  updatePremiumUI();
   $('ppAuthSection').style.display=loggedIn?'none':'flex';
   $('ppLoggedSection').style.display=loggedIn?'flex':'none';
   if(loggedIn){

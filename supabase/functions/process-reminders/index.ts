@@ -3,6 +3,9 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 const SUPABASE_URL            = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_KEY    = Deno.env.get('SB_SERVICE_ROLE_KEY')!
 const MAKE_WEBHOOK_URL        = 'https://hook.eu1.make.com/6t9fgm6btixri2wf5lnx47requf416vs'
+const TWILIO_ACCOUNT_SID      = Deno.env.get('TWILIO_ACCOUNT_SID') ?? ''
+const TWILIO_AUTH_TOKEN       = Deno.env.get('TWILIO_AUTH_TOKEN') ?? ''
+const TWILIO_FROM_NUMBER      = Deno.env.get('TWILIO_FROM_NUMBER') ?? ''
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
@@ -249,6 +252,26 @@ Deno.serve(async () => {
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify(payload),
       })
+
+      // SMS via Twilio — premium users only, 1h reminder only
+      if (rh === 1 && TWILIO_ACCOUNT_SID) {
+        const { data: prof } = await supabase
+          .from('profiles').select('is_premium,sms_enabled,phone_number')
+          .eq('email', r.email).single()
+        if (prof?.is_premium && prof?.sms_enabled && prof?.phone_number) {
+          const sessionLabel = goodHours >= 2
+            ? `${payload.session.start_time_formatted}–${payload.session.end_time_formatted} · ${peakKn}kn`
+            : rating
+          const smsBody = `🪁 Kite alert — ${r.spot_name} · ${payload.day_of_week} ${sessionLabel}. 1h before your session. tichkes.com`
+          const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`
+          const form = new URLSearchParams({ From: TWILIO_FROM_NUMBER, To: prof.phone_number, Body: smsBody })
+          await fetch(twilioUrl, {
+            method: 'POST',
+            headers: { 'Authorization': 'Basic ' + btoa(`${TWILIO_ACCOUNT_SID}:${TWILIO_AUTH_TOKEN}`), 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: form,
+          }).catch(e => console.error('Twilio error', e))
+        }
+      }
 
       const update: Record<string, unknown> = { sent: true }
       if (rh === 1) {

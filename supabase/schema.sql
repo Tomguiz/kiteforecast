@@ -41,10 +41,42 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- 3. Profiles table (last_seen_at tracking)
 CREATE TABLE IF NOT EXISTS profiles (
-  email           text        PRIMARY KEY,
-  last_seen_at    timestamptz NOT NULL DEFAULT now(),
-  digest_enabled  boolean     NOT NULL DEFAULT false
+  email                   text        PRIMARY KEY,
+  last_seen_at            timestamptz NOT NULL DEFAULT now(),
+  digest_enabled          boolean     NOT NULL DEFAULT false,
+  is_premium              boolean     NOT NULL DEFAULT false,
+  stripe_customer_id      text,
+  stripe_subscription_id  text,
+  phone_number            text,       -- E.164 format e.g. +32478123456
+  sms_enabled             boolean     NOT NULL DEFAULT false
 );
+
+-- Spot ownership claims
+CREATE TABLE IF NOT EXISTS spot_claims (
+  id            uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  email         text        NOT NULL,
+  spot_name     text        NOT NULL,
+  business_name text,
+  website       text,
+  description   text,
+  verified      boolean     NOT NULL DEFAULT false,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (email, spot_name)
+);
+
+ALTER TABLE spot_claims ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  CREATE POLICY "all_insert_claims" ON spot_claims FOR INSERT TO anon, authenticated WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "all_select_claims" ON spot_claims FOR SELECT TO anon, authenticated USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "all_update_claims" ON spot_claims FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 
