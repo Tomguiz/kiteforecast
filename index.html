@@ -3912,13 +3912,37 @@ async function renderMySpot(){
       claimFormHTML=`
         <div style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">
           <div style="font-size:.82rem;font-weight:700;color:var(--text);margin-bottom:4px;">🏴 Claim <span style="color:var(--accent)">${spotName}</span></div>
-          <div style="font-size:.72rem;color:var(--tdim);margin-bottom:12px;">Are you the owner or manager of this spot? Claim it to add your business info.</div>
+          <div style="font-size:.72rem;color:var(--tdim);margin-bottom:14px;">Are you the owner or manager of this spot? Claim it to add your business info.</div>
+
           <label class="pp-label">Business name</label>
-          <input type="text" id="claimBizName" class="pp-input" placeholder="e.g. Riverwoods Kite Club" style="margin-bottom:8px"/>
+          <input type="text" id="claimBizName" class="pp-input" placeholder="e.g. Riverwoods Kite Club" style="margin-bottom:12px"/>
+
           <label class="pp-label">Website</label>
-          <input type="url" id="claimWebsite" class="pp-input" placeholder="https://yoursite.com" style="margin-bottom:8px"/>
+          <input type="url" id="claimWebsite" class="pp-input" placeholder="https://yoursite.com" style="margin-bottom:12px"/>
+
+          <label class="pp-label">Contact person <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(optional)</span></label>
+          <input type="text" id="claimContactName" class="pp-input" placeholder="e.g. Jan Desmet" style="margin-bottom:12px"/>
+
+          <label class="pp-label">Phone number</label>
+          <input type="tel" id="claimPhone" class="pp-input" placeholder="+32478123456" style="margin-bottom:6px"/>
+          <div class="pp-toggle-row" style="margin-bottom:12px;">
+            <span style="font-size:.72rem;color:var(--tdim);">Show phone to the community</span>
+            <button class="pp-toggle" id="claimPhonePublicToggle" onclick="this.classList.toggle('on')"><span></span></button>
+          </div>
+
+          <label class="pp-label">Contact email</label>
+          <input type="email" id="claimContactEmail" class="pp-input" placeholder="info@myspot.com" style="margin-bottom:6px"/>
+          <div class="pp-toggle-row" style="margin-bottom:12px;">
+            <span style="font-size:.72rem;color:var(--tdim);">Show email to the community</span>
+            <button class="pp-toggle" id="claimEmailPublicToggle" onclick="this.classList.toggle('on')"><span></span></button>
+          </div>
+
+          <label class="pp-label">Live cam URL <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(optional — shown to everyone)</span></label>
+          <input type="url" id="claimLivecam" class="pp-input" placeholder="https://cam.myspot.com/live" style="margin-bottom:12px"/>
+
           <label class="pp-label">Description <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(optional)</span></label>
-          <input type="text" id="claimDesc" class="pp-input" placeholder="Lessons, rentals, bar…" style="margin-bottom:12px"/>
+          <textarea id="claimDesc" class="pp-input" placeholder="Lessons, rentals, bar, parking…" rows="4" style="margin-bottom:14px;resize:vertical;min-height:90px;font-family:inherit;font-size:.85rem;"></textarea>
+
           <button class="btn pp-save-btn" id="claimSubmitBtn" onclick="submitClaim('${spotName.replace(/'/g,"\\'")}')">Submit claim</button>
         </div>`;
     }
@@ -3945,17 +3969,34 @@ async function submitClaim(spotName){
   const email=loadProfile().email||_authSession?.user?.email;
   if(!email){ showToast('Sign in first'); return; }
   btn.disabled=true; btn.textContent='Submitting…';
-  const bizName=($('claimBizName')?.value||'').trim();
-  const website=($('claimWebsite')?.value||'').trim();
-  const desc=($('claimDesc')?.value||'').trim();
+  const bizName     =($('claimBizName')?.value||'').trim();
+  const website     =($('claimWebsite')?.value||'').trim();
+  const contactName =($('claimContactName')?.value||'').trim();
+  const phone       =($('claimPhone')?.value||'').trim();
+  const phonePublic =!!$('claimPhonePublicToggle')?.classList.contains('on');
+  const contactEmail=($('claimContactEmail')?.value||'').trim();
+  const emailPublic =!!$('claimEmailPublicToggle')?.classList.contains('on');
+  const livecam     =($('claimLivecam')?.value||'').trim();
+  const desc        =($('claimDesc')?.value||'').trim();
   const sb=getSb(); if(!sb){ btn.disabled=false; btn.textContent='Submit claim'; return; }
-  const{error}=await sb.from('spot_claims').upsert({email,spot_name:spotName,business_name:bizName||null,website:website||null,description:desc||null},{onConflict:'email,spot_name'});
+  const{error}=await sb.from('spot_claims').upsert({
+    email, spot_name:spotName,
+    business_name:  bizName||null,
+    website:        website||null,
+    contact_name:   contactName||null,
+    contact_phone:  phone||null,
+    phone_public:   phonePublic,
+    contact_email:  contactEmail||null,
+    email_public:   emailPublic,
+    livecam_url:    livecam||null,
+    description:    desc||null,
+  },{onConflict:'email,spot_name'});
   if(error){ showToast('Error: '+error.message); btn.disabled=false; btn.textContent='Submit claim'; return; }
   // Notify admin
   await fetch('https://kpwmajtxmcfpakvonimf.supabase.co/functions/v1/claim-notify',{
     method:'POST',
     headers:{'Content-Type':'application/json','Authorization':'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwd21hanR4bWNmcGFrdm9uaW1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTcyMjYsImV4cCI6MjA5MDczMzIyNn0.QfQuIQbnfVUOApPbOdvCRbNsVdb0SBAwMX-hvioGJmg'},
-    body:JSON.stringify({email,spot_name:spotName,business_name:bizName,website,description:desc}),
+    body:JSON.stringify({email,spot_name:spotName,business_name:bizName,website,contact_name:contactName,contact_phone:phone,phone_public:phonePublic,contact_email:contactEmail,email_public:emailPublic,livecam_url:livecam,description:desc}),
   }).catch(()=>{});
   showToast('✓ Claim submitted! We\'ll verify within 48h.');
   renderMySpot();

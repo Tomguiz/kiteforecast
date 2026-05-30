@@ -59,6 +59,12 @@ CREATE TABLE IF NOT EXISTS spot_claims (
   business_name text,
   website       text,
   description   text,
+  contact_name  text,
+  contact_phone text,
+  phone_public  boolean     NOT NULL DEFAULT false,
+  contact_email text,
+  email_public  boolean     NOT NULL DEFAULT false,
+  livecam_url   text,
   verified      boolean     NOT NULL DEFAULT false,
   created_at    timestamptz NOT NULL DEFAULT now(),
   UNIQUE (email, spot_name)
