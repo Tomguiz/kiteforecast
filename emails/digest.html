@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<meta name="x-apple-disable-message-reformatting"/>
+<title>KiteForecast — Weekly Digest</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@400;600&display=swap" rel="stylesheet"/>
+<!--[if mso]>
+<noscript><xml><o:OfficeDocumentSettings><o:PixelsPerInch>96</o:PixelsPerInch></o:OfficeDocumentSettings></xml></noscript>
+<![endif]-->
+</head>
+<body style="margin:0;padding:0;background-color:#111318;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
+
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#111318;">
+<tr><td align="center" style="padding:24px 12px;">
+
+  <!-- Main container -->
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:580px;width:100%;">
+
+    <!-- HEADER CARD -->
+    <tr>
+      <td style="background:linear-gradient(135deg,#0d4a7a 0%,#0a2d4d 100%);border-radius:14px 14px 0 0;padding:0;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+
+          <!-- Brand row -->
+          <tr>
+            <td style="padding:24px 32px 20px 32px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="font-size:18px;padding-right:8px;vertical-align:middle;">&#127993;</td>
+                  <td style="font-family:'Bebas Neue',Arial,sans-serif;font-size:17px;letter-spacing:3px;color:rgba(255,255,255,0.8);vertical-align:middle;">KITEFORECAST</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Badge row -->
+          <tr>
+            <td style="padding:0 32px 16px 32px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="background-color:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);border-radius:20px;padding:4px 12px;font-size:11px;font-weight:700;letter-spacing:1px;color:rgba(255,255,255,0.8);white-space:nowrap;">&#128197; WEEKLY DIGEST</td>
+                  <td style="width:8px;"></td>
+                  <td style="background-color:rgba(93,240,160,0.15);border:1px solid rgba(93,240,160,0.35);border-radius:20px;padding:4px 12px;font-size:11px;font-weight:700;letter-spacing:1px;color:#5df0a0;white-space:nowrap;">&#128168; [[total_good_sessions]] SESSIONS</td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Headline -->
+          <tr>
+            <td style="padding:0 32px 10px 32px;">
+              <h1 style="margin:0;font-family:'Bebas Neue',Arial,sans-serif;font-size:48px;line-height:1.0;font-weight:400;color:#ffffff;letter-spacing:1px;">Your week<br/><span style="color:#5dd4f0;">in the wind.</span></h1>
+            </td>
+          </tr>
+
+          <!-- Subheadline -->
+          <tr>
+            <td style="padding:0 32px 28px 32px;">
+              <p style="margin:0;font-size:15px;line-height:1.5;color:rgba(255,255,255,0.7);">Here's what's looking good across your favourite spots for the week of <strong style="color:#ffffff;">[[week_start]]</strong>.</p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+
+    <!-- SPOTS SECTION -->
+    <!-- ↓ Repeat this block for each spot via Make.com iterator -->
+
+    <!-- SPOT HEADER -->
+    <tr>
+      <td style="background-color:#0f1520;border-left:1px solid #1e2535;border-right:1px solid #1e2535;border-top:1px solid #1e2535;padding:20px 32px 12px 32px;">
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+          <tr>
+            <td>
+              <p style="margin:0 0 2px 0;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#4a5568;">Spot</p>
+              <p style="margin:0;font-family:'Bebas Neue',Arial,sans-serif;font-size:26px;color:#5dd4f0;letter-spacing:1px;">&#128205; [[spots[].spot]]</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+
+    <!-- SESSION ROWS — repeat for each session in spots[].sessions -->
+    <tr>
+      <td style="background-color:#141b27;border-left:1px solid #1e2535;border-right:1px solid #1e2535;padding:0 32px 8px 32px;">
+
+        <!-- Session row (repeat per session) -->
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:12px;background-color:#1a2235;border:1px solid #242d42;border-radius:10px;">
+          <tr>
+            <td style="padding:14px 18px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <!-- Day + date -->
+                  <td style="vertical-align:middle;width:40%;">
+                    <p style="margin:0;font-family:'Bebas Neue',Arial,sans-serif;font-size:22px;color:#ffffff;letter-spacing:1px;">[[spots[].sessions[].day_of_week]]</p>
+                    <p style="margin:2px 0 0 0;font-size:12px;color:#4a5568;">[[spots[].sessions[].date_label]]</p>
+                  </td>
+                  <!-- Start time -->
+                  <td style="vertical-align:middle;text-align:center;width:30%;">
+                    <p style="margin:0;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4a5568;">Starts</p>
+                    <p style="margin:4px 0 0 0;font-family:'Bebas Neue',Arial,sans-serif;font-size:20px;color:#5dd4f0;">[[spots[].sessions[].start_time]]</p>
+                  </td>
+                  <!-- Wind stats -->
+                  <td style="vertical-align:middle;text-align:right;width:30%;">
+                    <p style="margin:0;font-family:'Bebas Neue',Arial,sans-serif;font-size:28px;color:#5dd4f0;line-height:1;">[[spots[].sessions[].peak_kn]]<span style="font-size:14px;color:#4a5568;"> kn</span></p>
+                    <p style="margin:2px 0 0 0;font-size:11px;color:#4a5568;">[[spots[].sessions[].duration_hours]]h of good wind</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+        </table>
+
+      </td>
+    </tr>
+
+    <!-- SPOT FOOTER SPACING -->
+    <tr>
+      <td style="background-color:#141b27;border-left:1px solid #1e2535;border-right:1px solid #1e2535;padding:0 32px 20px 32px;font-size:0;line-height:0;">&nbsp;</td>
+    </tr>
+
+    <!-- END SPOTS SECTION -->
+
+    <!-- NO SESSIONS STATE (shown when has_sessions = false) -->
+    <!--
+    <tr>
+      <td style="background-color:#141b27;border:1px solid #1e2535;border-top:none;padding:32px;text-align:center;">
+        <p style="margin:0 0 8px 0;font-size:32px;">&#128168;</p>
+        <p style="margin:0 0 4px 0;font-family:'Bebas Neue',Arial,sans-serif;font-size:22px;color:#4a5568;">No sessions this week</p>
+        <p style="margin:0;font-size:13px;color:#4a5568;">We're keeping an eye on your spots. You'll hear from us when the wind picks up.</p>
+      </td>
+    </tr>
+    -->
+
+    <!-- CTA -->
+    <tr>
+      <td style="background-color:#141b27;border:1px solid #1e2535;border-top:none;padding:24px 32px;text-align:center;">
+        <a href="https://tichkes.com" style="display:inline-block;background-color:#0a7ac4;color:#ffffff;font-family:'DM Sans',Arial,sans-serif;font-size:15px;font-weight:600;padding:14px 32px;border-radius:9px;text-decoration:none;">&#127993; Check the full forecast</a>
+        <p style="margin:12px 0 0 0;font-size:12px;color:#4a5568;">See the full hourly breakdown on KiteForecast</p>
+      </td>
+    </tr>
+
+    <!-- FOOTER -->
+    <tr>
+      <td style="background-color:#0d0f14;border:1px solid #1e2535;border-top:none;border-radius:0 0 14px 14px;padding:16px 32px;text-align:center;">
+        <p style="margin:0 0 4px 0;font-family:'Bebas Neue',Arial,sans-serif;font-size:14px;letter-spacing:2px;color:#2a3347;">LIFE STARTS AT 25 KNOTS</p>
+        <p style="margin:0;font-size:11px;color:#2a3347;">Tichkes Corporation Inc. &mdash; All rights reserved</p>
+      </td>
+    </tr>
+
+  </table>
+
+</td></tr>
+</table>
+
+</body>
+</html>
