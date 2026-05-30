@@ -133,8 +133,8 @@ Deno.serve(async () => {
 
       const dayIdx = (wx.daily.time as string[]).indexOf(r.session_date)
       if (dayIdx === -1) {
-        // Date no longer in 10-day window — mark sent, skip email
-        await supabase.from('reminders').update({ sent: true }).eq('id', r.id)
+        // Date no longer in 10-day window — mark skipped, no email sent
+        await supabase.from('reminders').update({ sent: true, skipped: true }).eq('id', r.id)
         continue
       }
 
@@ -226,7 +226,7 @@ Deno.serve(async () => {
           start_time_formatted: sessionStart.slice(11, 16),
           end_time_formatted:   sessionEnd ? sessionEnd.slice(11, 16) : '',
           duration_hours:       goodHours,
-          wind_speed_peak_kn:   good.length ? peakKn : peakDayKn,
+          wind_speed_peak_kn:   peakKn,
           wind_speed_min_kn:    windMin,
           wind_gusts_kn:        gusts,
           wind_direction:       domDir !== null ? compass(domDir) : '—',
