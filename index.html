@@ -657,8 +657,9 @@
     #shareBanner .sb-text { flex:1; line-height:1.4; }
     #shareBanner .sb-cta { flex-shrink:0; padding:6px 14px; background:var(--accent); color:#000; border:none; border-radius:8px; font-size:.78rem; font-weight:700; cursor:pointer; white-space:nowrap; }
     #shareBanner .sb-close { flex-shrink:0; cursor:pointer; color:var(--tdim); font-size:1rem; padding:2px 4px; }
-    .share-btn { background:none; border:none; cursor:pointer; color:var(--tdim); padding:2px 4px; font-size:.85rem; transition:color .15s; vertical-align:middle; margin-left:2px; }
-    .share-btn:hover { color:var(--accent); }
+    .share-btn { background:none; border:1.5px solid rgba(255,255,255,.22); border-radius:7px; cursor:pointer; color:rgba(255,255,255,.55); padding:4px 7px; line-height:1; display:inline-flex; align-items:center; justify-content:center; transition:border-color .2s,color .2s,background .2s,transform .15s; vertical-align:middle; margin-left:6px; }
+    .share-btn:hover { border-color:rgba(0,212,255,.6); color:var(--accent); background:rgba(0,212,255,.08); transform:scale(1.08); }
+    .share-btn:focus { outline:none; }
     /* ── Spot comparison ── */
     .compare-toggle { display:flex; align-items:center; justify-content:center; gap:6px; padding:9px 16px; margin-top:4px; margin-bottom:10px; background:rgba(255,255,255,.04); border:1px solid var(--border); border-radius:10px; font-size:.75rem; color:var(--gray); cursor:pointer; transition:all .15s; width:100%; }
     .compare-toggle:hover,.compare-toggle.open { border-color:rgba(0,212,255,.35); color:var(--accent); background:rgba(0,212,255,.06); }
@@ -2777,7 +2778,7 @@ function renderGrid(){
   const qdLabel=qualDaysCount===0
     ?`<span style="${qdCls};font-size:.8rem;font-weight:700;margin-left:10px">No sessions in ${totalDays} days</span>`
     :`<span style="${qdCls};font-size:.8rem;font-weight:700;margin-left:10px">${qualDaysCount} of ${totalDays} days rideable</span>`;
-  $('locName').innerHTML=`${loc.name}${loc.admin1&&loc.admin1!==loc.name?', '+loc.admin1:''}<a class="map-link" href="${mapsUrl}" target="_blank" rel="noopener" title="Open in Google Maps"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Maps</a><button class="notif-btn${hasSpotNotif(loc.name)?' active':''}" id="notifBtn" title="Get notified">${bellSVG(16)}</button><button class="fav-btn${isFav?' active':''}" id="favBtn" title="${isFav?'Remove from favourites':'Add to favourites'}">${isFav?'★':'☆'}</button><button class="share-btn" id="shareBtn" onclick="shareSpot()" title="Share this spot">🔗</button>${qdLabel}`;
+  $('locName').innerHTML=`${loc.name}${loc.admin1&&loc.admin1!==loc.name?', '+loc.admin1:''}<a class="map-link" href="${mapsUrl}" target="_blank" rel="noopener" title="Open in Google Maps"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Maps</a><button class="notif-btn${hasSpotNotif(loc.name)?' active':''}" id="notifBtn" title="Get notified">${bellSVG(16)}</button><button class="fav-btn${isFav?' active':''}" id="favBtn" title="${isFav?'Remove from favourites':'Add to favourites'}">${isFav?'★':'☆'}</button><button class="share-btn" id="shareBtn" onclick="shareSpot()" title="Share this spot"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></button>${qdLabel}`;
 
   $('locSub').textContent=`${loc.country} · ${loc.latitude.toFixed(2)}°, ${loc.longitude.toFixed(2)}°`+(windDirs.size>0?` · Winds: ${[...windDirs].sort((a,b)=>a-b).map(d=>compass(d)).join('/')}`:'');
   $('locHdr').style.display='block';
