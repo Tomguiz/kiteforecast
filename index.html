@@ -652,6 +652,24 @@
     .pp-notif-session-date { font-weight:600; color:var(--text); }
     .pp-notif-pill { display:inline-block; padding:1px 6px; border-radius:4px; font-size:.65rem; font-weight:700; background:rgba(56,189,248,.12); color:#38bdf8; border:1px solid rgba(56,189,248,.2); }
     .pp-notif-pill.sent { background:rgba(100,116,139,.1); color:var(--tdim); border-color:rgba(100,116,139,.2); text-decoration:line-through; }
+    /* ── Spot comparison ── */
+    .compare-toggle { display:flex; align-items:center; justify-content:center; gap:6px; padding:7px 16px; margin-bottom:10px; background:rgba(255,255,255,.04); border:1px solid var(--border); border-radius:10px; font-size:.75rem; color:var(--gray); cursor:pointer; transition:all .15s; width:100%; }
+    .compare-toggle:hover,.compare-toggle.open { border-color:rgba(0,212,255,.35); color:var(--accent); background:rgba(0,212,255,.06); }
+    .compare-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; margin-bottom:12px; border-radius:12px; border:1px solid var(--border); background:rgba(255,255,255,.02); }
+    .compare-table { border-collapse:collapse; width:100%; min-width:320px; font-size:.72rem; }
+    .compare-table th { padding:8px 10px; text-align:left; color:var(--tdim); font-weight:600; font-size:.62rem; text-transform:uppercase; letter-spacing:.05em; border-bottom:1px solid var(--border); white-space:nowrap; position:sticky; left:0; background:#0f172a; z-index:1; }
+    .compare-table th:first-child { min-width:70px; }
+    .compare-table td { padding:7px 10px; border-bottom:1px solid rgba(255,255,255,.04); white-space:nowrap; vertical-align:middle; }
+    .compare-table td:first-child { font-weight:600; color:var(--text); font-size:.68rem; position:sticky; left:0; background:#0f172a; z-index:1; border-right:1px solid var(--border); }
+    .compare-table tr:last-child td { border-bottom:none; }
+    .compare-table tr:hover td { background:rgba(255,255,255,.03); }
+    .compare-table tr:hover td:first-child { background:#0f172a; }
+    .cmp-spot-hdr { font-size:.7rem; font-weight:700; color:var(--accent); max-width:100px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer; }
+    .cmp-spot-hdr:hover { text-decoration:underline; }
+    .cmp-good { color:#4ade80; font-weight:700; }
+    .cmp-ok { color:#fbbf24; font-weight:700; }
+    .cmp-none { color:var(--tdim); }
+    .cmp-best { background:rgba(56,189,248,.07) !important; }
     /* ── Stats panel ── */
     .stats-year-bar { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:16px; }
     .stats-year-btn { padding:4px 12px; border-radius:99px; border:1px solid var(--border); font-size:.75rem; color:var(--gray); cursor:pointer; background:transparent; transition:all .15s; }
@@ -830,6 +848,7 @@
       </div>
     </div>
     <div id="bestWindowBar" style="display:none"></div>
+    <div id="compareBar" style="display:none"></div>
     <div class="examples" id="hintChips"></div>
   </div>
   <!-- mobile map button -->
@@ -1900,7 +1919,29 @@ async function fetchChipQualDays(spot){
       }
     });
     chipFxCache[key]=qualDays;
-    chipBestCache[key]=bestDateStr?{dateStr:bestDateStr,peakKn:bestPeakKn,startHr:bestStartHr,nextDateStr,nextStartHr,spotName:spot.name,spot}:null;
+    // Build per-day breakdown for comparison view (reuse same fetch, no extra API call)
+    const days10=[];
+    wx.daily.time.forEach((dateStr,i)=>{
+      const srH=parseInt(wx.daily.sunrise[i].slice(11,13),10);
+      const ssH=parseInt(wx.daily.sunset[i].slice(11,13),10);
+      let qh=0,dayPeak=0,firstGoodHr=null,domDirSum=[0,0],domDirN=0;
+      wx.hourly.time.forEach((t,j)=>{
+        if(t.slice(0,10)!==dateStr) return;
+        const hr=parseInt(t.slice(11,13),10);
+        if(hr<srH||hr>ssH) return;
+        const kn=toKnotsR(wx.hourly.windspeed_10m[j]);
+        const dir=wx.hourly.winddirection_10m[j];
+        const code=wx.hourly.weather_code[j]??0;
+        if(speedTier(kn)>0&&!isRainy(code)&&isDirOK(dir)){
+          if(firstGoodHr===null) firstGoodHr=hr; qh++; if(kn>dayPeak) dayPeak=kn;
+          domDirSum[0]+=Math.sin(dir*Math.PI/180); domDirSum[1]+=Math.cos(dir*Math.PI/180); domDirN++;
+        }
+      });
+      const domDir=domDirN?['N','NE','E','SE','S','SW','W','NW'][Math.round((Math.atan2(domDirSum[0],domDirSum[1])*180/Math.PI+360)%360/45)%8]:null;
+      days10.push({dateStr,qh,peakKn:dayPeak,startHr:firstGoodHr,dir:domDir});
+    });
+    chipBestCache[key]=bestDateStr?{dateStr:bestDateStr,peakKn:bestPeakKn,startHr:bestStartHr,nextDateStr,nextStartHr,spotName:spot.name,spot,days10}:null;
+    if(!bestDateStr) chipBestCache[key]={dateStr:null,peakKn:0,startHr:null,nextDateStr:null,nextStartHr:null,spotName:spot.name,spot,days10};
     return qualDays;
   }catch{ chipFxCache[key]=null; chipBestCache[key]=null; return null; }
 }
@@ -1971,6 +2012,64 @@ function updateBestWindowBar(){
   bar.innerHTML=`<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;width:100%;">${bestPill}${nextPill}</div>`;
   bar.querySelector('#bwBest').addEventListener('click',()=>pickSpot(best.spot));
   if(nextLabel) bar.querySelector('#bwNext').addEventListener('click',()=>pickSpot(next.spot));
+  renderCompareBar();
+}
+
+let _compareOpen=false;
+function toggleCompare(){
+  _compareOpen=!_compareOpen;
+  renderCompareBar();
+}
+function renderCompareBar(){
+  const el=$('compareBar'); if(!el) return;
+  const favs=loadFavs();
+  if(!_authSession?.user||favs.length<2){ el.style.display='none'; return; }
+  const loadedEntries=favs.map(f=>chipBestCache[`${f.lat},${f.lon}`]).filter(Boolean);
+  if(loadedEntries.length<2){ el.style.display='none'; return; }
+  el.style.display='block';
+
+  if(!_compareOpen){
+    el.innerHTML=`<button class="compare-toggle" onclick="toggleCompare()">⚡ Compare your spots</button>`;
+    return;
+  }
+
+  // Collect all unique dates across all spots that have at least 1 good date
+  const allDates=[...new Set(loadedEntries.flatMap(e=>e.days10.filter(d=>d.qh>=2).map(d=>d.dateStr)))].sort();
+
+  // Build table header: sticky row label col + one col per spot
+  const spotHeaders=loadedEntries.map(e=>`<th><div class="cmp-spot-hdr" onclick="pickSpot(${JSON.stringify(e.spot).replace(/"/g,'&quot;')})" title="${e.spotName}">${e.spotName}</div></th>`).join('');
+
+  // Build rows — one per date
+  // Find best peakKn per row to highlight it
+  const rows=allDates.map(dateStr=>{
+    const{short}=fmtDate(dateStr);
+    const cells=loadedEntries.map(e=>{
+      const d=e.days10.find(x=>x.dateStr===dateStr);
+      if(!d||d.qh<2) return {html:`<td class="cmp-none">—</td>`,peak:0};
+      const cls=d.peakKn>=25?'cmp-good':d.peakKn>=20?'cmp-ok':'';
+      return {html:`<td class="${cls}">${d.peakKn}kn · ${d.qh}h${d.dir?' · '+d.dir:''}</td>`,peak:d.peakKn};
+    });
+    // Highlight the best cell in the row
+    const maxPeak=Math.max(...cells.map(c=>c.peak));
+    const finalCells=cells.map((c,i)=>{
+      if(maxPeak>0&&loadedEntries[i].days10.find(x=>x.dateStr===dateStr)?.peakKn===maxPeak){
+        return c.html.replace('<td ','<td class="cmp-best ').replace('<td>','<td class="cmp-best">');
+      }
+      return c.html;
+    }).join('');
+    return `<tr><td>${short}</td>${finalCells}</tr>`;
+  }).join('');
+
+  const noSessionsRow=!allDates.length?`<tr><td colspan="${loadedEntries.length+1}" style="color:var(--tdim);text-align:center;padding:16px">No good sessions forecast on any spot this week</td></tr>`:'';
+
+  el.innerHTML=`
+    <button class="compare-toggle open" onclick="toggleCompare()">⚡ Compare your spots ▲</button>
+    <div class="compare-wrap">
+      <table class="compare-table">
+        <thead><tr><th>Date</th>${spotHeaders}</tr></thead>
+        <tbody>${rows}${noSessionsRow}</tbody>
+      </table>
+    </div>`;
 }
 async function searchOsmSpots(q){
   if(q.length<3) return [];
@@ -2332,6 +2431,7 @@ function removeFav(f){
   saveFavs(favs);
   const email=_authSession?.user?.email;
   if(email) pushFavToSupabase(email,f,true);
+  _compareOpen=false;
   renderHintChips();
   // Reset star button if the removed spot is currently open
   if(cachedLoc&&cachedLoc.name===f.name){
