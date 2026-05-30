@@ -71,7 +71,15 @@ function getGoodSessions(wx: any, spotDirs: number[], spotDays: number[] | null)
   return sessions
 }
 
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+}
+
 Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS })
+
   // Optional email_filter: when set, send only to that user (on-demand trigger)
   let emailFilter: string | null = null
   try { const body = await req.json(); emailFilter = body?.email_filter ?? null } catch { /* no body */ }
@@ -147,6 +155,6 @@ Deno.serve(async (req) => {
   }
 
   return new Response(JSON.stringify({ sent, total_users: emails.length }), {
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...CORS },
   })
 })
