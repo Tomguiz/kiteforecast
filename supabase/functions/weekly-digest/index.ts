@@ -71,12 +71,19 @@ function getGoodSessions(wx: any, spotDirs: number[], spotDays: number[] | null)
   return sessions
 }
 
-Deno.serve(async () => {
-  // Fetch all users who have opted in to digest (digest_enabled = true on profiles)
-  const { data: profiles, error: profErr } = await supabase
-    .from('profiles')
-    .select('email')
-    .eq('digest_enabled', true)
+Deno.serve(async (req) => {
+  // Optional email_filter: when set, send only to that user (on-demand trigger)
+  let emailFilter: string | null = null
+  try { const body = await req.json(); emailFilter = body?.email_filter ?? null } catch { /* no body */ }
+
+  // Fetch opted-in users (or just the requesting user for on-demand sends)
+  let query = supabase.from('profiles').select('email')
+  if (emailFilter) {
+    query = query.eq('email', emailFilter)
+  } else {
+    query = query.eq('digest_enabled', true)
+  }
+  const { data: profiles, error: profErr } = await query
 
   if (profErr) return new Response(JSON.stringify({ error: profErr.message }), { status: 500 })
 

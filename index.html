@@ -1033,6 +1033,7 @@
           </div>
           <button class="pp-toggle" id="ppDigestToggle" onclick="toggleDigest()"><span></span></button>
         </div>
+        <button class="btn pp-save-btn" id="ppDigestNowBtn" onclick="sendDigestNow()" style="margin-top:2px">📩 Send me this week's forecast now</button>
         <button class="btn-reset" id="ppSignOutBtn" onclick="signOut()" style="font-size:.78rem;color:#f87171;text-align:left;padding:4px 0 0;">Sign out</button>
       </div>
     </div>
@@ -4096,6 +4097,20 @@ function updateEmailWarning(){
   $('ppEmailWarning').style.display='none';
   const emptyState=$('ppEmptyState');
   if(emptyState) emptyState.style.display=loggedIn?'none':'block';
+}
+async function sendDigestNow(){
+  const btn=$('ppDigestNowBtn'); if(!btn) return;
+  btn.disabled=true; btn.textContent='Sending…';
+  try{
+    const resp=await fetch('https://kpwmajtxmcfpakvonimf.supabase.co/functions/v1/weekly-digest',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwd21hanR4bWNmcGFrdm9uaW1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTcyMjYsImV4cCI6MjA5MDczMzIyNn0.QfQuIQbnfVUOApPbOdvCRbNsVdb0SBAwMX-hvioGJmg'},
+      body:JSON.stringify({email_filter:loadProfile().email}),
+    });
+    if(resp.ok){ btn.textContent='✓ Sent! Check your inbox'; }
+    else { btn.textContent='Error — try again'; }
+  }catch{ btn.textContent='Error — try again'; }
+  setTimeout(()=>{ btn.disabled=false; btn.textContent='📩 Send me this week\'s forecast now'; },4000);
 }
 async function toggleDigest(){
   const p=loadProfile();
