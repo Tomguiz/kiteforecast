@@ -652,6 +652,13 @@
     .pp-notif-session-date { font-weight:600; color:var(--text); }
     .pp-notif-pill { display:inline-block; padding:1px 6px; border-radius:4px; font-size:.65rem; font-weight:700; background:rgba(56,189,248,.12); color:#38bdf8; border:1px solid rgba(56,189,248,.2); }
     .pp-notif-pill.sent { background:rgba(100,116,139,.1); color:var(--tdim); border-color:rgba(100,116,139,.2); text-decoration:line-through; }
+    /* ── Share banner ── */
+    #shareBanner { position:sticky; top:0; z-index:200; display:none; align-items:center; gap:10px; padding:10px 16px; background:linear-gradient(135deg,rgba(0,212,255,.15),rgba(56,189,248,.08)); border-bottom:1px solid rgba(0,212,255,.25); font-size:.8rem; color:var(--text); }
+    #shareBanner .sb-text { flex:1; line-height:1.4; }
+    #shareBanner .sb-cta { flex-shrink:0; padding:6px 14px; background:var(--accent); color:#000; border:none; border-radius:8px; font-size:.78rem; font-weight:700; cursor:pointer; white-space:nowrap; }
+    #shareBanner .sb-close { flex-shrink:0; cursor:pointer; color:var(--tdim); font-size:1rem; padding:2px 4px; }
+    .share-btn { background:none; border:none; cursor:pointer; color:var(--tdim); padding:2px 4px; font-size:.85rem; transition:color .15s; vertical-align:middle; margin-left:2px; }
+    .share-btn:hover { color:var(--accent); }
     /* ── Spot comparison ── */
     .compare-toggle { display:flex; align-items:center; justify-content:center; gap:6px; padding:7px 16px; margin-bottom:10px; background:rgba(255,255,255,.04); border:1px solid var(--border); border-radius:10px; font-size:.75rem; color:var(--gray); cursor:pointer; transition:all .15s; width:100%; }
     .compare-toggle:hover,.compare-toggle.open { border-color:rgba(0,212,255,.35); color:var(--accent); background:rgba(0,212,255,.06); }
@@ -794,6 +801,13 @@
   </style>
 </head>
 <body>
+
+<!-- ══ SHARE BANNER ══ -->
+<div id="shareBanner">
+  <div class="sb-text">🪁 <span id="shareBannerText">Someone shared this spot with you.</span><br><span style="color:var(--tdim);font-size:.72rem">Sign up free to get wind alerts for this spot.</span></div>
+  <button class="sb-cta" onclick="_signinContext='notif';openProfilePanel()">Get alerts →</button>
+  <span class="sb-close" onclick="$('shareBanner').style.display='none'" title="Dismiss">✕</span>
+</div>
 
 <!-- ══ HEADER ══ -->
 <header class="hero">
@@ -2502,6 +2516,29 @@ $('searchInput').addEventListener('keydown',e=>{
   if(e.key==='Enter'){doSearch();}
 });
 document.addEventListener('click',e=>{if(!e.target.closest('.search-wrap'))closeAC();});
+function shareSpot(){
+  if(!cachedLoc) return;
+  const senderName=loadProfile().displayName||loadProfile().email?.split('@')[0]||'Someone';
+  const url=`${location.origin}${location.pathname}?spot=${encodeURIComponent(cachedLoc.name)}&share=1`;
+  if(navigator.share){
+    navigator.share({title:`${cachedLoc.name} — Tichkes Forecast`,text:`${senderName} thinks ${cachedLoc.name} might be good — check the kite forecast!`,url}).catch(()=>{});
+  } else {
+    navigator.clipboard.writeText(url).then(()=>showToast('🔗 Link copied!')).catch(()=>showToast('Share: '+url));
+  }
+}
+
+// ── Share banner: show when ?share=1 and not signed in ──
+function updateShareBanner(){
+  const params=new URLSearchParams(location.search);
+  if(!params.has('share')) return;
+  const banner=$('shareBanner');
+  if(!banner) return;
+  if(_authSession?.user){ banner.style.display='none'; return; }
+  const spotName=params.get('spot')||'this spot';
+  $('shareBannerText').textContent=`Someone shared ${spotName} with you.`;
+  banner.style.display='flex';
+}
+
 // Persistent event delegation for dynamically rendered spot-header buttons
 document.addEventListener('click',function(e){
   if(e.target.closest('#notifBtn')){e.stopPropagation();toggleSpotNotif();return;}
@@ -2512,6 +2549,7 @@ $('hintLegend').innerHTML=buildLegendHTML();
 $('resultsLegend').innerHTML=buildLegendHTML();
 initAuth();
 initInstallBanner();
+updateShareBanner();
 
 // ══════════════════════════════════
 //  FETCH
@@ -2714,7 +2752,7 @@ function renderGrid(){
   const qdLabel=qualDaysCount===0
     ?`<span style="${qdCls};font-size:.8rem;font-weight:700;margin-left:10px">No sessions in ${totalDays} days</span>`
     :`<span style="${qdCls};font-size:.8rem;font-weight:700;margin-left:10px">${qualDaysCount} of ${totalDays} days rideable</span>`;
-  $('locName').innerHTML=`${loc.name}${loc.admin1&&loc.admin1!==loc.name?', '+loc.admin1:''}<a class="map-link" href="${mapsUrl}" target="_blank" rel="noopener" title="Open in Google Maps"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Maps</a><button class="notif-btn${hasSpotNotif(loc.name)?' active':''}" id="notifBtn" title="Get notified">${bellSVG(16)}</button><button class="fav-btn${isFav?' active':''}" id="favBtn" title="${isFav?'Remove from favourites':'Add to favourites'}">${isFav?'★':'☆'}</button>${qdLabel}`;
+  $('locName').innerHTML=`${loc.name}${loc.admin1&&loc.admin1!==loc.name?', '+loc.admin1:''}<a class="map-link" href="${mapsUrl}" target="_blank" rel="noopener" title="Open in Google Maps"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Maps</a><button class="notif-btn${hasSpotNotif(loc.name)?' active':''}" id="notifBtn" title="Get notified">${bellSVG(16)}</button><button class="fav-btn${isFav?' active':''}" id="favBtn" title="${isFav?'Remove from favourites':'Add to favourites'}">${isFav?'★':'☆'}</button><button class="share-btn" id="shareBtn" onclick="shareSpot()" title="Share this spot">🔗</button>${qdLabel}`;
 
   $('locSub').textContent=`${loc.country} · ${loc.latitude.toFixed(2)}°, ${loc.longitude.toFixed(2)}°`+(windDirs.size>0?` · Winds: ${[...windDirs].sort((a,b)=>a-b).map(d=>compass(d)).join('/')}`:'');
   $('locHdr').style.display='block';
@@ -3956,6 +3994,7 @@ function getInitials(email){
 }
 function updateAuthUI(){
   const loggedIn=!!_authSession?.user;
+  updateShareBanner();
   $('ppAuthSection').style.display=loggedIn?'none':'flex';
   $('ppLoggedSection').style.display=loggedIn?'flex':'none';
   if(loggedIn) $('ppLoggedEmail').textContent=_authSession.user.email;
