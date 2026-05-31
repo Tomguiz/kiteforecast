@@ -504,12 +504,15 @@
       display:flex; align-items:center; justify-content:space-between;
       padding:16px 18px 0; border-bottom:1px solid var(--border); flex-shrink:0;
     }
-    .pp-tabs { display:flex; gap:0; }
+    .pp-tabs { display:flex; gap:0; overflow-x:auto; scrollbar-width:none; -ms-overflow-style:none; position:relative; }
+    .pp-tabs::-webkit-scrollbar { display:none; }
+    .pp-tabs::after { content:'›'; position:sticky; right:0; top:0; bottom:0; padding:10px 6px; font-size:1.1rem; color:var(--accent); background:linear-gradient(to right, transparent, var(--surface) 60%); pointer-events:none; flex-shrink:0; display:none; }
+    .pp-tabs.has-scroll::after { display:block; }
     .pp-tab {
       background:none; border:none; cursor:pointer;
       font-size:.82rem; font-weight:600; color:var(--gray);
       padding:10px 16px; border-bottom:2px solid transparent;
-      transition:color .15s, border-color .15s; white-space:nowrap;
+      transition:color .15s, border-color .15s; white-space:nowrap; flex-shrink:0;
     }
     .pp-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
     .pp-tab span {
@@ -4926,6 +4929,9 @@ async function syncPremiumFromSupabase(email){
   const adminTab=$('ppTabAdmin');
   if(adminTab) adminTab.style.display=p.isAdmin?'inline-flex':'none';
   if(p.isAdmin && window._pendingReviewSpot) openAdminReview();
+  // Scroll hint: show arrow indicator on tabs if overflow
+  const tabsEl=document.querySelector('.pp-tabs');
+  if(tabsEl) tabsEl.classList.add('has-scroll');
 }
 
 async function startCheckout(){
