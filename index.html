@@ -5150,9 +5150,14 @@ function updateAuthUI(){
     const digestEl=$('ppDigestToggle'); if(digestEl) digestEl.classList.toggle('on',!!p.digestEnabled);
     // Show premium crown in the signed-in card
     const signedInCard=$('ppSignedInCard');
+    const avatarUrl=_authSession.user.user_metadata?.avatar_url||_authSession.user.user_metadata?.picture||'';
+    const displayName=_authSession.user.user_metadata?.full_name||_authSession.user.user_metadata?.name||'';
+    const avatarHtml=avatarUrl
+      ?`<img src="${avatarUrl}" alt="" style="width:40px;height:40px;border-radius:50%;object-fit:cover;flex-shrink:0;border:2px solid rgba(255,255,255,.15);" onerror="this.style.display='none'">`
+      :`<span style="font-size:1.3rem;line-height:1;flex-shrink:0">${isPremium()?'👑':'✅'}</span>`;
     if(signedInCard) signedInCard.innerHTML=isPremium()
-      ?`<span style="font-size:1.3rem;line-height:1;flex-shrink:0">👑</span><div style="flex:1;min-width:0"><p style="margin:0 0 2px;font-size:.85rem;font-weight:700;color:#f59e0b;">Premium</p><p id="ppLoggedEmail" style="margin:0;font-size:.78rem;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_authSession.user.email}</p></div>`
-      :`<span style="font-size:1.3rem;line-height:1;flex-shrink:0">✅</span><div style="flex:1;min-width:0"><p style="margin:0 0 2px;font-size:.85rem;font-weight:700;color:#f1f5f9;">Signed in</p><p id="ppLoggedEmail" style="margin:0;font-size:.78rem;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_authSession.user.email}</p></div>`;
+      ?`${avatarHtml}<div style="flex:1;min-width:0">${displayName?`<p style="margin:0 0 1px;font-size:.85rem;font-weight:700;color:#f59e0b;">${displayName} 👑</p>`:'<p style="margin:0 0 1px;font-size:.85rem;font-weight:700;color:#f59e0b;">Premium</p>'}<p id="ppLoggedEmail" style="margin:0;font-size:.78rem;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_authSession.user.email}</p></div>`
+      :`${avatarHtml}<div style="flex:1;min-width:0">${displayName?`<p style="margin:0 0 1px;font-size:.85rem;font-weight:700;color:#f1f5f9;">${displayName}</p>`:'<p style="margin:0 0 1px;font-size:.85rem;font-weight:700;color:#f1f5f9;">Signed in</p>'}<p id="ppLoggedEmail" style="margin:0;font-size:.78rem;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_authSession.user.email}</p></div>`;
   }
   // Hide tabs for unauthenticated users
   const tabs=document.querySelector('.pp-tabs');
@@ -5160,10 +5165,15 @@ function updateAuthUI(){
   // Update profile button
   const btn=$('profileBtn');
   if(loggedIn){
+    const avatarUrl=_authSession.user.user_metadata?.avatar_url||_authSession.user.user_metadata?.picture||'';
     const initials=getInitials(_authSession.user.email);
     btn.classList.add('logged-in');
     const crownBadge=isPremium()?`<span style="position:absolute;top:-5px;right:-5px;font-size:13px;line-height:1;filter:drop-shadow(0 1px 2px rgba(0,0,0,.5));">👑</span>`:'';
-    btn.innerHTML=`<span class="profile-btn-initials">${initials}</span>${crownBadge}<span class="profile-btn-dot" id="profileDot"></span>`;
+    if(avatarUrl){
+      btn.innerHTML=`<img src="${avatarUrl}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'profile-btn-initials',textContent:'${initials}'}))"/>${crownBadge}<span class="profile-btn-dot" id="profileDot"></span>`;
+    } else {
+      btn.innerHTML=`<span class="profile-btn-initials">${initials}</span>${crownBadge}<span class="profile-btn-dot" id="profileDot"></span>`;
+    }
   } else {
     btn.classList.remove('logged-in');
     btn.innerHTML=`<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg><span class="profile-btn-dot" id="profileDot"></span>`;
