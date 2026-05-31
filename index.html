@@ -3447,8 +3447,9 @@ function openModal(dateStr,dayIdx){
 
     const timeStr=h.tStr.slice(11,16);
     const isSelected=_attendSessionStart===timeStr&&_attendDateStr===dateStr;
-    const lastCol=isSelected
-      ?`<div style="display:flex;justify-content:flex-end"><button onclick="event.stopPropagation();confirmSessionFromModal('${dateStr}','${timeStr}')" style="background:#4ade80;color:#000;border:none;border-radius:8px;font-size:.65rem;font-weight:800;padding:5px 10px;cursor:pointer;white-space:nowrap;letter-spacing:.02em">🏄 I'm going at ${timeStr}</button></div>`
+    const isConfirmed=_attendCache[dateStr]?.start_time===timeStr;
+    const lastCol=isConfirmed
+      ?`<div style="display:flex;justify-content:flex-end"><span style="font-size:.7rem;font-weight:700;color:#4ade80">✓ Going</span></div>`
       :condTD;
     html+=`<div class="${rowCls} modal-hour-row${isSelected?' selected-start':''}" onclick="selectSessionStart('${timeStr}','${dateStr}',this)">
       <div class="${timeCls}">${kite}${timeStr}</div>
@@ -3482,12 +3483,14 @@ function openModal(dateStr,dayIdx){
   // Session attendance status bar
   if(goodHours>=2){
     const existing=_attendCache[dateStr];
-    html+=`<div id="modalAttendBar" style="margin:12px 0 4px;padding:10px 14px;background:rgba(34,197,94,.07);border:1px solid rgba(34,197,94,.15);border-radius:10px;font-size:.78rem;color:rgba(34,197,94,.8);">
-      ${existing
-        ?`✓ You're going · <strong style="color:#4ade80">${existing.start_time}</strong> · <button onclick="cancelAttendance('${dateStr}')" style="background:none;border:none;color:#f87171;font-size:.72rem;cursor:pointer;padding:0;margin-left:6px">Cancel</button>`
-        :'🏄 Tap a time row to confirm you\'re going — friends will be notified'
-      }
-    </div>`;
+    const selTime=_attendSessionStart&&_attendDateStr===dateStr?_attendSessionStart:null;
+    const barBg=selTime?'rgba(34,197,94,.1)':existing?'rgba(34,197,94,.07)':'rgba(34,197,94,.04)';
+    const barBorder=selTime?'rgba(34,197,94,.35)':existing?'rgba(34,197,94,.15)':'rgba(34,197,94,.12)';
+    const barContent=selTime
+      ?`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px"><div style="font-size:.82rem;color:#f1f5f9;font-weight:600">🏄 Starting at <strong style="color:#4ade80">${selTime}</strong></div><div style="display:flex;gap:8px;flex-shrink:0"><button onclick="event.stopPropagation();selectSessionStart('${selTime}','${dateStr}',null)" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#94a3b8;border-radius:8px;font-size:.78rem;font-weight:600;padding:7px 12px;cursor:pointer">✕ Cancel</button><button onclick="event.stopPropagation();confirmSessionFromModal('${dateStr}','${selTime}')" style="background:#4ade80;border:none;color:#000;border-radius:8px;font-size:.78rem;font-weight:800;padding:7px 16px;cursor:pointer">✓ Confirm</button></div></div>`
+      :existing?`✓ You're going · <strong style="color:#4ade80">${existing.start_time}</strong> · <button onclick="cancelAttendance('${dateStr}')" style="background:none;border:none;color:#f87171;font-size:.72rem;cursor:pointer;padding:0;margin-left:6px">Cancel attendance</button>`
+      :'🏄 Tap any hour row to set your session start time';
+    html+=`<div id="modalAttendBar" style="margin:12px 0 4px;padding:12px 14px;background:${barBg};border:1px solid ${barBorder};border-radius:10px;font-size:.78rem;color:rgba(34,197,94,.8);">${barContent}</div>`;
   }
 
   $('mBody').innerHTML=html;
@@ -4547,25 +4550,35 @@ function selectSessionStart(timeStr, dateStr, rowEl){
 
   // Select new row
   _attendSessionStart=timeStr; _attendDateStr=dateStr;
-  rowEl.classList.add('selected-start');
-  const timeDiv=rowEl.querySelector('div');
-  if(timeDiv&&!timeDiv.querySelector('.session-start-badge')){
-    const badge=document.createElement('span');
-    badge.className='session-start-badge'; badge.textContent='START';
-    timeDiv.appendChild(badge);
-  }
+  if(rowEl) rowEl.classList.add('selected-start');
 
-  // Show confirm bar
+  // Update action bar
   updateModalAttendBar(dateStr, timeStr);
 }
 
-function updateModalAttendBar(dateStr){
+function updateModalAttendBar(dateStr, selectedTime){
   const bar=$('modalAttendBar'); if(!bar) return;
   const existing=_attendCache[dateStr];
-  if(existing){
-    bar.innerHTML=`✓ You're going · <strong style="color:#4ade80">${existing.start_time}</strong> · <button onclick="cancelAttendance('${dateStr}')" style="background:none;border:none;color:#f87171;font-size:.72rem;cursor:pointer;padding:0;margin-left:6px">Cancel</button>`;
+  if(selectedTime){
+    // Row selected — show confirm/cancel action bar
+    bar.style.background='rgba(34,197,94,.1)';
+    bar.style.borderColor='rgba(34,197,94,.35)';
+    bar.innerHTML=`
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+        <div style="font-size:.82rem;color:#f1f5f9;font-weight:600">🏄 Starting at <strong style="color:#4ade80">${selectedTime}</strong></div>
+        <div style="display:flex;gap:8px;flex-shrink:0">
+          <button onclick="event.stopPropagation();selectSessionStart('${selectedTime}','${dateStr}',null)" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#94a3b8;border-radius:8px;font-size:.78rem;font-weight:600;padding:7px 12px;cursor:pointer">✕ Cancel</button>
+          <button onclick="event.stopPropagation();confirmSessionFromModal('${dateStr}','${selectedTime}')" style="background:#4ade80;border:none;color:#000;border-radius:8px;font-size:.78rem;font-weight:800;padding:7px 16px;cursor:pointer">✓ Confirm</button>
+        </div>
+      </div>`;
+  } else if(existing){
+    bar.style.background='rgba(34,197,94,.07)';
+    bar.style.borderColor='rgba(34,197,94,.15)';
+    bar.innerHTML=`✓ You're going · <strong style="color:#4ade80">${existing.start_time}</strong> · <button onclick="cancelAttendance('${dateStr}')" style="background:none;border:none;color:#f87171;font-size:.72rem;cursor:pointer;padding:0;margin-left:6px">Cancel attendance</button>`;
   } else {
-    bar.innerHTML='🏄 Tap a time row to confirm you\'re going — friends will be notified';
+    bar.style.background='rgba(34,197,94,.04)';
+    bar.style.borderColor='rgba(34,197,94,.12)';
+    bar.innerHTML='🏄 Tap any hour row to set your session start time';
   }
 }
 
