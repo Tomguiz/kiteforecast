@@ -4540,9 +4540,13 @@ async function renderFriendsPanel(){
   } else if(!outgoing.length){
     $('friendsList').innerHTML='<div class="stats-empty">No friends yet — search by nickname to add some!</div>';
   } else {
+    // Fetch nicknames for outgoing recipients
+    const outEmails=outgoing.map(r=>r.recipient);
+    const{data:outProfiles}=await sb.from('profiles').select('email,nickname').in('email',outEmails);
+    const outNickMap=Object.fromEntries((outProfiles||[]).map(p=>[p.email,p.nickname||'someone']));
     $('friendsList').innerHTML=outgoing.map(r=>`
       <div style="padding:10px 0;border-bottom:1px solid var(--border);font-size:.8rem;color:var(--tdim)">
-        ⏳ Request sent to <strong style="color:var(--text)">${r.recipient}</strong>
+        ⏳ Request sent to <strong style="color:var(--text)">${outNickMap[r.recipient]||'someone'}</strong>
         <button class="btn-reset" style="font-size:.7rem;color:#f87171;margin-left:8px" onclick="cancelFriendRequest('${r.id}')">Cancel</button>
       </div>`).join('');
   }
@@ -5609,7 +5613,8 @@ async function renderNotifList(){
     const{data}=await sb.from('reminders').select('spot_name,session_date,reminder_hours,sent,skipped,notif_type,send_at')
       .eq('email',email).eq('cancelled',false).eq('notif_type','spot')
       .neq('session_date','2099-12-31').gte('session_date',today)
-      .order('session_date',{ascending:true}).order('reminder_hours',{ascending:false});
+      .order('session_date',{ascending:true})
+      .order('reminder_hours',{ascending:false});
     for(const r of data||[]){
       if(!scheduleMap[r.spot_name]) scheduleMap[r.spot_name]=[];
       scheduleMap[r.spot_name].push(r);
