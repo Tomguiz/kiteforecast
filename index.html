@@ -2670,8 +2670,8 @@ async function fetchSpotInfo(spotName) {
 async function renderSpotInfoCard(spotName) {
   const el = $('spotInfoCard'); if(!el) return;
   el.innerHTML = '';
+  _spotInfoOpen = false;
   const info = await fetchSpotInfo(spotName);
-  console.log('[spotInfo] spot:', spotName, '| result:', info);
 
   if(!info) {
     // Unclaimed state — always show a teaser to drive claim conversions
@@ -2696,7 +2696,7 @@ async function renderSpotInfoCard(spotName) {
 
   const verifiedBadge = info.verified
     ? `<span class="spot-info-badge verified">✓ Verified</span>`
-    : `<span class="spot-info-badge unverified">⚠️ Unverified</span>`;
+    : `<span class="spot-info-badge unverified">⚠️ Unverified info</span>`;
 
   const lessonBtn = info.lesson_url
     ? `<a href="${info.lesson_url}" target="_blank" rel="noopener" class="spot-cta-btn spot-cta-lesson" onclick="trackCtaClick('${spotName}','lesson')">🎓 Book a lesson</a>`
@@ -2733,12 +2733,12 @@ async function renderSpotInfoCard(spotName) {
       <div class="spot-info-header" onclick="_spotInfoOpen=!_spotInfoOpen;this.querySelector('.spot-info-chevron').classList.toggle('open',_spotInfoOpen);this.nextElementSibling.style.display=_spotInfoOpen?'flex':'none'">
         <div style="flex:1">
           <div class="spot-info-title">📍 ${info.business_name || spotName}</div>
-          <div class="spot-info-subtitle">Spot info &amp; bookings</div>
+          <div class="spot-info-subtitle">Lessons · Gear rental · Contact — tap to open</div>
         </div>
         ${verifiedBadge}
-        <svg class="spot-info-chevron open" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+        <svg class="spot-info-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
       </div>
-      <div class="spot-info-body">
+      <div class="spot-info-body" style="display:none">
         ${ctaGrid}
         ${metaHTML}
         ${descHTML}
