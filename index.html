@@ -2718,7 +2718,7 @@ async function renderSpotInfoCard(spotName) {
     : `<span class="spot-info-badge unverified">⚠️ Unverified info</span>`;
 
   const webcamBtn = info.livecam_url
-    ? `<a href="${info.livecam_url}" target="_blank" rel="noopener" class="spot-cta-btn spot-cta-webcam" onclick="trackCtaClick('${spotName}','livecam')">🎥 Live Action on the spot</a>`
+    ? `<a href="${info.livecam_url}" target="_blank" rel="noopener" class="spot-cta-btn spot-cta-webcam" onclick="trackCtaClick('${spotName}','livecam')">🎥 Live action on the spot — webcam</a>`
     : '';
   const lessonBtn = info.lesson_url
     ? `<a href="${info.lesson_url}" target="_blank" rel="noopener" class="spot-cta-btn spot-cta-lesson" onclick="trackCtaClick('${spotName}','lesson')">🎓 Book a lesson</a>`
