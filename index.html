@@ -4606,7 +4606,7 @@ function updateModalAttendBar(dateStr){
 async function confirmSessionFromModal(dateStr, startTime){
   const loc=cachedLoc; if(!loc) return;
   const cb=$('mAttendConfirm'); if(cb){ cb.disabled=true; cb.textContent='Saving…'; }
-  await confirmAttendance(dateStr, loc.name, loc.lat, loc.lon, startTime);
+  await confirmAttendance(dateStr, loc.name, loc.latitude, loc.longitude, startTime);
   _attendSessionStart=null; _attendDateStr=null;
 
   // Auto-subscribe day notification if not already set
@@ -6069,11 +6069,11 @@ async function renderNotifList(){
   // Fetch upcoming scheduled reminders from Supabase
   const email=_authSession.user.email;
   const sb=getSb();
-  let scheduleMap={}; // spotName -> [{session_date, reminder_hours, sent}]
+  let scheduleMap={}; // spotName -> [{session_date, reminder_hours, sent, notif_type}]
   if(sb){
     const today=new Date().toISOString().slice(0,10);
     const{data}=await sb.from('reminders').select('spot_name,session_date,reminder_hours,sent,skipped,notif_type,send_at')
-      .eq('email',email).eq('cancelled',false).eq('notif_type','spot')
+      .eq('email',email).eq('cancelled',false)
       .neq('session_date','2099-12-31').gte('session_date',today)
       .order('session_date',{ascending:true})
       .order('reminder_hours',{ascending:false});
@@ -6082,15 +6082,26 @@ async function renderNotifList(){
       scheduleMap[r.spot_name].push(r);
     }
   }
+  // Also pull session attendance start times for display
+  let attendMap={}; // dateStr -> start_time
+  const email2=_authSession?.user?.email;
+  if(sb&&email2){
+    const today=new Date().toISOString().slice(0,10);
+    const{data:att}=await sb.from('session_attendances').select('session_date,start_time')
+      .eq('email',email2).eq('cancelled',false).gte('session_date',today);
+    for(const r of att||[]) attendMap[r.session_date]=r.start_time;
+  }
 
   list.innerHTML=visible.map(n=>{
     const rows=scheduleMap[n.spotName]||[];
-    // Group by session_date — only show dates where 72h was sent OR 72h hasn't fired yet but is pending
+    // Group by session_date
     const byDate={};
     for(const r of rows){
       if(!byDate[r.session_date]) byDate[r.session_date]=[];
       byDate[r.session_date].push(r);
     }
+    // For day notifs, also include the session date itself even if no reminders fetched yet
+    if(n.type==='day'&&n.date&&!byDate[n.date]) byDate[n.date]=[];
     const dates=Object.keys(byDate).sort();
     // A date is "confirmed" if the 72h reminder was genuinely emailed (sent=true AND skipped=false)
     const confirmedDates=dates.filter(d=>
@@ -6102,12 +6113,13 @@ async function renderNotifList(){
       for(const d of confirmedDates){
         const hrs=byDate[d].sort((a,b)=>b.reminder_hours-a.reminder_hours);
         const dayLabel=new Date(d+'T12:00:00').toLocaleDateString('en',{weekday:'short',month:'short',day:'numeric'});
+        const startT=attendMap[d]?` · 🏄 ${attendMap[d]}`:'';
         const pills=hrs.map(r=>{
           const _sd=r.send_at?new Date(r.send_at):null;
           const t=_sd?_sd.toLocaleDateString([],{weekday:'short'})+' '+_sd.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'';
           return `<span class="pp-notif-pill${r.sent?' sent':''}" title="Sends at ${t}">${r.reminder_hours}h${t?` <span style="font-weight:400;opacity:.7">${t}</span>`:''}${r.sent?' ✓':''}</span>`;
         }).join('');
-        scheduleHTML+=`<div class="pp-notif-session"><span class="pp-notif-session-date">${dayLabel}</span>${pills}</div>`;
+        scheduleHTML+=`<div class="pp-notif-session"><span class="pp-notif-session-date">${dayLabel}${startT}</span>${pills}</div>`;
       }
     }
     const confirmedSet=new Set(confirmedDates);
@@ -6117,16 +6129,21 @@ async function renderNotifList(){
       for(const d of monitoringDates){
         const hrs=byDate[d].sort((a,b)=>b.reminder_hours-a.reminder_hours);
         const dayLabel=new Date(d+'T12:00:00').toLocaleDateString('en',{weekday:'short',month:'short',day:'numeric'});
+        const startT=attendMap[d]?` · 🏄 ${attendMap[d]}`:'';
         const pills=hrs.map(r=>{
           const _sd=r.send_at?new Date(r.send_at):null;
           const t=_sd?_sd.toLocaleDateString([],{weekday:'short'})+' '+_sd.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'';
           return `<span class="pp-notif-pill" style="opacity:.5">${r.reminder_hours}h${t?` <span style="font-weight:400">${t}</span>`:''}</span>`;
         }).join('');
-        scheduleHTML+=`<div class="pp-notif-session" style="padding-left:10px;"><span class="pp-notif-session-date" style="color:var(--tdim)">${dayLabel}</span>${pills}</div>`;
+        scheduleHTML+=`<div class="pp-notif-session" style="padding-left:10px;"><span class="pp-notif-session-date" style="color:var(--tdim)">${dayLabel}${startT}</span>${pills}</div>`;
       }
     }
     if(!confirmedDates.length&&!monitoringDates.length){
-      scheduleHTML+=`<div class="pp-notif-session" style="color:var(--tdim);font-style:italic">No sessions forecast yet</div>`;
+      const startT=n.type==='day'&&n.date&&attendMap[n.date]?` · 🏄 ${attendMap[n.date]}`:'';
+      const dayLabel=n.type==='day'&&n.date?new Date(n.dateStr+'T12:00:00').toLocaleDateString('en',{weekday:'short',month:'short',day:'numeric'}):'';
+      scheduleHTML+=startT
+        ?`<div class="pp-notif-session" style="color:var(--tdim);font-size:.75rem">${dayLabel}${startT} — notifications pending</div>`
+        :`<div class="pp-notif-session" style="color:var(--tdim);font-style:italic">No sessions forecast yet</div>`;
     }
     scheduleHTML+='</div>';
 
