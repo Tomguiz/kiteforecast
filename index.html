@@ -4480,12 +4480,14 @@ async function renderFriendsPanel(){
   const sb=getSb(); const email=_authSession?.user?.email||loadProfile().email;
   if(!sb||!email){ $('friendsList').innerHTML='<div class="stats-empty">Sign in to see friends.</div>'; return; }
 
-  $('friendsList').innerHTML='<div class="stats-empty">Loading…</div>';
+  if(!_friendsCache) $('friendsList').innerHTML='<div class="stats-empty">Loading…</div>';
 
-  // Fetch all friendships involving this user
-  const{data:rows}=await sb.from('friendships').select('*')
-    .or(`requester.eq.${email},recipient.eq.${email}`);
-  _friendsCache=rows||[];
+  // Fetch all friendships involving this user (skip if cache is fresh)
+  if(!_friendsCache){
+    const{data:rows}=await sb.from('friendships').select('*')
+      .or(`requester.eq.${email},recipient.eq.${email}`);
+    _friendsCache=rows||[];
+  }
 
   const accepted = _friendsCache.filter(r=>r.status==='accepted');
   const incoming = _friendsCache.filter(r=>r.status==='pending'&&r.recipient===email);
@@ -4621,24 +4623,24 @@ async function sendFriendRequest(recipientEmail, recipientNick){
 async function respondFriendRequest(id, status){
   const sb=getSb(); if(!sb) return;
   await sb.from('friendships').update({status}).eq('id',id);
-  _friendsCache=null;
-  renderFriendsPanel();
+  if(_friendsCache) _friendsCache=_friendsCache.map(r=>r.id===id?{...r,status}:r);
+  await renderFriendsPanel();
   showToast(status==='accepted'?'Friend added! 🎉':'Request declined.');
 }
 
 async function removeFriend(id){
   const sb=getSb(); if(!sb) return;
   await sb.from('friendships').delete().eq('id',id);
-  _friendsCache=null;
-  renderFriendsPanel();
+  if(_friendsCache) _friendsCache=_friendsCache.filter(r=>r.id!==id);
+  await renderFriendsPanel();
   showToast('Friend removed.');
 }
 
 async function cancelFriendRequest(id){
   const sb=getSb(); if(!sb) return;
   await sb.from('friendships').delete().eq('id',id);
-  _friendsCache=null;
-  renderFriendsPanel();
+  if(_friendsCache) _friendsCache=_friendsCache.filter(r=>r.id!==id);
+  await renderFriendsPanel();
   showToast('Request cancelled.');
 }
 
