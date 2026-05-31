@@ -1008,7 +1008,7 @@
         <!-- Step 2: code entry (hidden until code sent) -->
         <div id="ppStep2" style="display:none;flex-direction:column;gap:10px">
           <p class="pp-note" style="margin:0">Code sent to <strong id="ppCodeEmail"></strong></p>
-          <input type="text" id="ppCodeInput" class="pp-input" placeholder="••••••••" maxlength="12" inputmode="numeric" pattern="[0-9]*" style="letter-spacing:.2em;font-size:1.2rem;text-align:center" autocomplete="one-time-code" />
+          <input type="text" id="ppCodeInput" class="pp-input" placeholder="••••••••" maxlength="8" inputmode="numeric" pattern="[0-9]*" style="letter-spacing:.2em;font-size:1.2rem;text-align:center" autocomplete="one-time-code" oninput="this.value=this.value.replace(/\D/g,'')" onpaste="setTimeout(()=>this.value=this.value.replace(/\D/g,''),0)" />
           <button class="btn pp-save-btn" id="ppVerifyBtn" onclick="verifyOtpCode()">Verify &amp; sign in</button>
           <button class="btn-reset" style="font-size:.78rem;color:var(--tdim);text-align:center;padding:2px 0" onclick="resetOtpFlow()">← Use a different email</button>
         </div>
@@ -5075,7 +5075,7 @@ document.addEventListener('visibilitychange',()=>{
         <p class="nsm-sub">Code sent to <strong id="nsmCodeEmail"></strong></p>
       </div>
       <div class="nsm-code-row">
-        <input type="text" id="nsmCodeInput" class="nsm-code-input" placeholder="••••••" maxlength="12" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" onkeydown="if(event.key==='Enter')nsmVerifyCode()" />
+        <input type="text" id="nsmCodeInput" class="nsm-code-input" placeholder="••••••" maxlength="8" inputmode="numeric" pattern="[0-9]*" autocomplete="one-time-code" oninput="this.value=this.value.replace(/\D/g,'')" onpaste="setTimeout(()=>this.value=this.value.replace(/\D/g,''),0)" onkeydown="if(event.key==='Enter')nsmVerifyCode()" />
       </div>
       <button class="nsm-cta" id="nsmVerifyBtn" onclick="nsmVerifyCode()">Confirm &amp; get notified</button>
       <button class="nsm-back" onclick="nsmResetFlow()">← Use a different email</button>
