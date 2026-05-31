@@ -795,6 +795,15 @@
     }
     .card-going-btn:hover { background:rgba(34,197,94,.22); }
     .card-going-btn.going { background:rgba(34,197,94,.25); color:#fff; border-color:rgba(34,197,94,.5); }
+    /* Going indicator on day card */
+    .card-going-indicator { width:100%;margin-top:5px;padding:5px 0;border-radius:7px;font-size:.62rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;background:rgba(34,197,94,.2);color:#4ade80;border:1px solid rgba(34,197,94,.4);text-align:center; }
+    /* Hour row session selection */
+    .modal-hour-row { cursor:pointer; transition:background .12s; border-radius:6px; }
+    .modal-hour-row:hover { background:rgba(255,255,255,.04); }
+    .modal-hour-row.selected-start { background:rgba(34,197,94,.12) !important; border-left:3px solid #4ade80; }
+    .session-start-badge { display:inline-block;background:#4ade80;color:#000;font-size:.6rem;font-weight:800;padding:2px 6px;border-radius:6px;margin-left:6px;vertical-align:middle;letter-spacing:.04em; }
+    /* Attend confirm bar at bottom of modal */
+    .attend-confirm-bar { position:sticky;bottom:0;left:0;right:0;background:linear-gradient(to top,#111827 80%,transparent);padding:16px 20px 20px;margin:0 -20px -20px;display:flex;align-items:center;gap:10px; }
     /* Attendance bottom sheet */
     .attend-sheet-overlay { position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.6);backdrop-filter:blur(3px);display:flex;align-items:flex-end;justify-content:center; }
     .attend-sheet { background:#111827;border-radius:20px 20px 0 0;padding:24px 20px 36px;width:100%;max-width:480px;box-shadow:0 -8px 40px rgba(0,0,0,.5); }
@@ -1319,6 +1328,8 @@ let cachedWx          = null;
 let cachedLoc         = null;
 let _modalDateStr  = null;
 let _modalDayIdx   = null;
+let _attendSessionStart = null; // selected start time in modal
+let _attendDateStr = null;
 let cachedHrMap       = null;
 let cachedMarineHrMap = null;
 let cachedTideExtremes= null; // [{time, height, type:'high'|'low'}] for current spot+day
@@ -3306,7 +3317,7 @@ function renderGrid(){
       ${hPill}
       ${tideLine}
       <div class="rating-badge ${rating.cls}">${rating.label}</div>
-      ${goodHours>=2?`<button class="card-going-btn" id="going-${dateStr}" onclick="event.stopPropagation();openAttendSheet('${dateStr}',${i},'${loc.name}',${loc.lat},${loc.lon})">🏄 I'm going</button>`:''}
+      ${goodHours>=2?`<div class="card-going-indicator" id="going-${dateStr}" style="display:none"></div>`:''}
     `;
     grid.appendChild(card);
   });
@@ -3432,8 +3443,10 @@ function openModal(dateStr,dayIdx){
     const waveRaw=cachedMarineHrMap?cachedMarineHrMap.get(h.tStr.slice(0,13)):null;
     const waveTxt=waveRaw!=null?waveRaw.h.toFixed(1)+'m':'—';
 
-    html+=`<div class="${rowCls}">
-      <div class="${timeCls}">${kite}${h.tStr.slice(11,16)}</div>
+    const timeStr=h.tStr.slice(11,16);
+    const isSelected=_attendSessionStart===timeStr&&_attendDateStr===dateStr;
+    html+=`<div class="${rowCls} modal-hour-row${isSelected?' selected-start':''}" onclick="selectSessionStart('${timeStr}','${dateStr}',this)">
+      <div class="${timeCls}">${kite}${timeStr}${isSelected?'<span class="session-start-badge">START</span>':''}</div>
       <div class="c-wx">${wxIcon}</div>
       <div class="c-temp" style="color:${tempCol}">${h.temp}°</div>
       <div class="c-wind">
@@ -3461,6 +3474,14 @@ function openModal(dateStr,dayIdx){
     <div>• Last-minute good session? You'll still be notified.</div>
   </div>`;
 
+  // Session attendance hint
+  if(goodHours>=2){
+    const existing=_attendCache[dateStr];
+    html+=`<div id="modalAttendBar" style="margin:12px 0 80px;padding:12px 14px;background:rgba(34,197,94,.07);border:1px solid rgba(34,197,94,.2);border-radius:10px;font-size:.78rem;color:rgba(34,197,94,.8);">
+      🏄 ${existing?`You're going · <strong style="color:#4ade80">${existing.start_time}</strong> · <button onclick="cancelAttendance('${dateStr}')" style="background:none;border:none;color:#f87171;font-size:.75rem;cursor:pointer;padding:0;margin-left:4px">Cancel</button>`:'Tap a time row above to set your session start time'}
+    </div>`;
+  }
+
   $('mBody').innerHTML=html;
   $('modalOverlay').style.display='flex';
   // Lock background scroll without breaking mobile (position:fixed trick)
@@ -3480,6 +3501,7 @@ function openModal(dateStr,dayIdx){
 function closeModal(){
   $('modalOverlay').style.display='none';
   $('searchInput').blur();
+  _attendSessionStart=null; _attendDateStr=null;
   // Restore background scroll position
   const scrollY=parseInt(document.body.dataset.scrollY||'0',10);
   document.body.style.position='';
@@ -4498,29 +4520,92 @@ async function submitSpotSuggestion(){
   showSpotPendingMsg(name);
 }
 
+function selectSessionStart(timeStr, dateStr, rowEl){
+  if(!_authSession?.user){ showToast('Sign in to confirm attendance'); _signinContext='generic'; openProfilePanel(); return; }
+
+  // Deselect previous
+  document.querySelectorAll('.modal-hour-row.selected-start').forEach(r=>{
+    r.classList.remove('selected-start');
+    const badge=r.querySelector('.session-start-badge');
+    if(badge) badge.remove();
+  });
+
+  // Toggle off if same row clicked again
+  if(_attendSessionStart===timeStr && _attendDateStr===dateStr){
+    _attendSessionStart=null; _attendDateStr=null;
+    updateModalAttendBar(dateStr);
+    return;
+  }
+
+  // Select new row
+  _attendSessionStart=timeStr; _attendDateStr=dateStr;
+  rowEl.classList.add('selected-start');
+  const timeDiv=rowEl.querySelector('div');
+  if(timeDiv&&!timeDiv.querySelector('.session-start-badge')){
+    const badge=document.createElement('span');
+    badge.className='session-start-badge'; badge.textContent='START';
+    timeDiv.appendChild(badge);
+  }
+
+  // Show confirm bar
+  updateModalAttendBar(dateStr, timeStr);
+}
+
+function updateModalAttendBar(dateStr, startTime){
+  const bar=$('modalAttendBar'); if(!bar) return;
+  const existing=_attendCache[dateStr];
+  if(startTime){
+    bar.style.background='rgba(34,197,94,.12)';
+    bar.style.borderColor='rgba(34,197,94,.4)';
+    bar.innerHTML=`
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <div style="font-size:.82rem;color:#4ade80;font-weight:600">🏄 Starting at <strong>${startTime}</strong></div>
+        <button onclick="confirmSessionFromModal('${dateStr}','${startTime}')" class="btn pp-save-btn" style="font-size:.78rem;padding:8px 16px;white-space:nowrap">Confirm &amp; notify friends →</button>
+      </div>`;
+  } else if(existing){
+    bar.style.background='rgba(34,197,94,.07)';
+    bar.style.borderColor='rgba(34,197,94,.2)';
+    bar.innerHTML=`🏄 You're going · <strong style="color:#4ade80">${existing.start_time}</strong> · <button onclick="cancelAttendance('${dateStr}')" style="background:none;border:none;color:#f87171;font-size:.75rem;cursor:pointer;padding:0;margin-left:4px">Cancel</button>`;
+  } else {
+    bar.style.background='rgba(34,197,94,.07)';
+    bar.style.borderColor='rgba(34,197,94,.2)';
+    bar.innerHTML='🏄 Tap a time row above to set your session start time';
+  }
+}
+
+async function confirmSessionFromModal(dateStr, startTime){
+  const loc=cachedLoc; if(!loc) return;
+  const btn=event?.target; if(btn){ btn.disabled=true; btn.textContent='Saving…'; }
+  await confirmAttendance(dateStr, loc.name, loc.lat, loc.lon, startTime);
+  updateModalAttendBar(dateStr);
+  // Update day card indicator
+  const ind=document.getElementById(`going-${dateStr}`);
+  if(ind){ ind.style.display='block'; ind.textContent=`✓ Going · ${startTime}`; }
+}
+
 async function handlePendingJoin(){
   const j=window._pendingJoin; if(!j) return;
   window._pendingJoin=null;
-  // Search for the spot
   const searchInput=$('searchInput');
-  if(searchInput){ searchInput.value=j.spot; }
-  // Trigger search
+  if(searchInput) searchInput.value=j.spot;
   try{ await doSearch(j.spot); }catch(e){}
-  // Wait for grid to render then open the attend sheet for the right date
+  // Wait for grid to render then open the modal for that date
   setTimeout(()=>{
-    const btn=document.getElementById(`going-${j.date}`);
-    if(btn){
-      btn.scrollIntoView({behavior:'smooth',block:'center'});
-      setTimeout(()=>{
-        // Find lat/lon from current loc
-        const lat=cachedLoc?.lat||0; const lon=cachedLoc?.lon||0;
-        openAttendSheet(j.date,0,j.spot,lat,lon);
-        // Pre-fill start time suggestion
+    const ind=document.getElementById(`going-${j.date}`);
+    if(ind){ ind.scrollIntoView({behavior:'smooth',block:'center'}); }
+    // Find the day index and open modal
+    const daily=cachedWx?.daily;
+    if(daily){
+      const idx=daily.time.indexOf(j.date);
+      if(idx>=0){
         setTimeout(()=>{
-          const sel=$('attendStartTime');
-          if(sel&&j.start_time) sel.value=j.start_time;
-        },100);
-      },300);
+          openModal(j.date,idx);
+          // Pre-select the suggested start time
+          if(j.start_time){
+            _attendSessionStart=j.start_time; _attendDateStr=j.date;
+          }
+        },400);
+      }
     }
   },1500);
 }
@@ -4557,22 +4642,22 @@ async function loadAttendances(){
     }
   }
 
-  // Update all going buttons
-  document.querySelectorAll('.card-going-btn').forEach(btn=>{
-    const dateStr=btn.id.replace('going-','');
+  // Update all day card going indicators
+  document.querySelectorAll('.card-going-indicator').forEach(ind=>{
+    const dateStr=ind.id.replace('going-','');
     const myAttend=_attendCache[dateStr];
     const theirList=friendsAttend[dateStr]||[];
-    let html='🏄 I\'m going';
-    if(myAttend) html=`✓ Going · ${myAttend.start_time}`;
-    if(theirList.length){
-      const names=theirList.map(r=>r.nickname).join(', ');
-      const friendLine=`<span style="display:block;font-size:.58rem;color:#4ade80;margin-top:2px">👥 ${names}</span>`;
-      html=(myAttend?`✓ Going · ${myAttend.start_time}`:'🏄 I\'m going')+friendLine;
-      btn.innerHTML=html;
-      btn.classList.toggle('going',!!myAttend);
+    if(myAttend||theirList.length){
+      ind.style.display='block';
+      let html='';
+      if(myAttend) html+=`✓ Going · ${myAttend.start_time}`;
+      if(theirList.length){
+        const names=theirList.map(r=>r.nickname).join(', ');
+        html+=(html?'<br>':'')+`<span style="font-size:.58rem;color:#4ade80">👥 ${names}</span>`;
+      }
+      ind.innerHTML=html;
     } else {
-      btn.textContent=html;
-      btn.classList.toggle('going',!!myAttend);
+      ind.style.display='none';
     }
   });
 }
@@ -4630,10 +4715,10 @@ function closeAttendSheet(){
   const el=$('attendSheet'); if(el) el.remove();
 }
 
-async function confirmAttendance(dateStr, spotName, lat, lon){
+async function confirmAttendance(dateStr, spotName, lat, lon, startTimeOverride){
   const sb=getSb(); const email=_authSession?.user?.email||loadProfile().email;
   if(!sb||!email) return;
-  const startTime=$('attendStartTime')?.value||'12:00';
+  const startTime=startTimeOverride||$('attendStartTime')?.value||'12:00';
   const durationH=parseInt($('attendDuration')?.value||'2');
   const note=($('attendNote')?.value||'').trim();
   const nickname=loadProfile().nickname||email.split('@')[0];
