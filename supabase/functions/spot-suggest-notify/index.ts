@@ -11,20 +11,21 @@ const CORS = {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS })
 
-  const { name, location, lat, lon, dirs, business, website, note, contact_email } = await req.json()
+  const { name, location, lat, lon, dirs, business, website, note, contact_email, contact_name } = await req.json()
 
   const payload = {
     notification_type: 'spot_suggestion',
     admin_email:       ADMIN_EMAIL,
-    spot_name:         name        || '—',
-    location:          location    || '—',
-    lat:               lat         || '—',
-    lon:               lon         || '—',
-    good_wind_dirs:    dirs        || '—',
-    business_name:     business    || '—',
-    website:           website     || '—',
-    note:              note        || '—',
+    spot_name:         name          || '—',
+    location:          location      || '—',
+    lat:               lat           || '—',
+    lon:               lon           || '—',
+    good_wind_dirs:    dirs          || '—',
+    business_name:     business      || '—',
+    website:           website       || '—',
+    note:              note          || '—',
     contact_email:     contact_email || '—',
+    contact_name:      contact_name  || '—',
     submitted_at:      new Date().toLocaleString('en', { dateStyle: 'full', timeStyle: 'short' }),
     maps_link:         lat && lon ? `https://maps.google.com/?q=${lat},${lon}` : '—',
   }

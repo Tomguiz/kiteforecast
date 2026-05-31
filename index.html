@@ -4373,7 +4373,9 @@ async function submitSpotSuggestion(){
   const business =($('suggestBusiness')?.value||'').trim();
   const website  =($('suggestWebsite')?.value||'').trim();
   const note     =($('suggestNote')?.value||'').trim();
-  const profileEmail = loadProfile().email||_authSession?.user?.email||'';
+  const profile = loadProfile();
+  const profileEmail = profile.email||_authSession?.user?.email||'';
+  const profileName  = profile.nickname||profile.email?.split('@')[0]||'';
   const contactEmail =($('suggestEmail')?.value||'').trim() || profileEmail;
 
   // Validate required fields
@@ -4403,7 +4405,7 @@ async function submitSpotSuggestion(){
   fetch('https://kpwmajtxmcfpakvonimf.supabase.co/functions/v1/spot-suggest-notify',{
     method:'POST',
     headers:{'Content-Type':'application/json','Authorization':'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwd21hanR4bWNmcGFrdm9uaW1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTcyMjYsImV4cCI6MjA5MDczMzIyNn0.QfQuIQbnfVUOApPbOdvCRbNsVdb0SBAwMX-hvioGJmg'},
-    body: JSON.stringify({ name, location, lat, lon, dirs, business, website, note, contact_email: contactEmail }),
+    body: JSON.stringify({ name, location, lat, lon, dirs, business, website, note, contact_email: contactEmail, contact_name: profileName||'—' }),
   }).catch(()=>{});
 
   // Remember submitted spot name so we can show "pending review" on next search
