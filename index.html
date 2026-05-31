@@ -693,6 +693,7 @@
     .spot-info-note { font-size:.72rem; color:var(--tdim); line-height:1.5; padding:10px 12px; background:rgba(245,158,11,.06); border:1px solid rgba(245,158,11,.2); border-radius:8px; }
     .spot-info-chevron { transition:transform .2s; color:var(--tdim); }
     .spot-info-chevron.open { transform:rotate(180deg); }
+    .spot-info-open-btn { display:inline-flex; align-items:center; gap:4px; padding:5px 10px; border-radius:8px; background:rgba(0,212,255,.12); border:1px solid rgba(0,212,255,.3); color:var(--accent); font-size:.72rem; font-weight:700; white-space:nowrap; }
     /* unclaimed state */
     .spot-info-unclaimed { display:flex; flex-direction:column; align-items:center; gap:8px; padding:20px 18px; text-align:center; }
     .spot-info-unclaimed-icon { font-size:1.6rem; line-height:1; }
@@ -2730,13 +2731,16 @@ async function renderSpotInfoCard(spotName) {
 
   el.innerHTML = `
     <div class="spot-info-card">
-      <div class="spot-info-header" onclick="_spotInfoOpen=!_spotInfoOpen;this.querySelector('.spot-info-chevron').classList.toggle('open',_spotInfoOpen);this.nextElementSibling.style.display=_spotInfoOpen?'flex':'none'">
+      <div class="spot-info-header" onclick="_spotInfoOpen=!_spotInfoOpen;this.querySelector('.spot-info-chevron').classList.toggle('open',_spotInfoOpen);this.querySelector('.spot-info-chevron').style.display=_spotInfoOpen?'block':'none';this.nextElementSibling.style.display=_spotInfoOpen?'flex':'none';this.querySelector('.spot-info-open-btn').style.display=_spotInfoOpen?'none':'inline-flex'">
         <div style="flex:1">
           <div class="spot-info-title">📍 ${info.business_name || spotName}</div>
-          <div class="spot-info-subtitle">Lessons · Gear rental · Contact — tap to open</div>
+          <div class="spot-info-subtitle">Lessons · Gear rental · Contact</div>
         </div>
-        ${verifiedBadge}
-        <svg class="spot-info-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
+          ${verifiedBadge}
+          <span class="spot-info-open-btn">See spot info <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg></span>
+          <svg class="spot-info-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="display:none"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
       </div>
       <div class="spot-info-body" style="display:none">
         ${ctaGrid}
