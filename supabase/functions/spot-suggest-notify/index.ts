@@ -13,6 +13,11 @@ Deno.serve(async (req) => {
 
   const { name, location, lat, lon, dirs, business, website, note, contact_email, contact_name } = await req.json()
 
+  // Build one-click review link for admin
+  const reviewData = { name, location, lat, lon, business, website, note, contact_name, contact_email }
+  const reviewToken = btoa(JSON.stringify(reviewData))
+  const review_link = `https://tomguiz.github.io/kiteforecast/?review=${reviewToken}`
+
   const payload = {
     notification_type: 'spot_suggestion',
     admin_email:       ADMIN_EMAIL,
@@ -28,6 +33,7 @@ Deno.serve(async (req) => {
     contact_name:      contact_name  || '—',
     submitted_at:      new Date().toLocaleString('en', { dateStyle: 'full', timeStyle: 'short' }),
     maps_link:         lat && lon ? `https://maps.google.com/?q=${lat},${lon}` : '—',
+    review_link,
   }
 
   await fetch(MAKE_WEBHOOK_URL, {

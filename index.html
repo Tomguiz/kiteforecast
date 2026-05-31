@@ -4655,6 +4655,7 @@ async function syncPremiumFromSupabase(email){
   updatePremiumUI();
   const adminTab=$('ppTabAdmin');
   if(adminTab) adminTab.style.display=p.isAdmin?'inline-flex':'none';
+  if(p.isAdmin && window._pendingReviewSpot) openAdminReview();
 }
 
 async function startCheckout(){
@@ -4732,6 +4733,47 @@ async function savePhone(){
     history.replaceState({},'',location.pathname);
   }
 })();
+
+// Handle ?review=<base64-spot-data> — admin one-click spot approval
+;(function(){
+  const params=new URLSearchParams(location.search);
+  const reviewParam=params.get('review');
+  if(!reviewParam) return;
+  history.replaceState({},'',location.pathname);
+  try{
+    const spot=JSON.parse(atob(reviewParam));
+    window._pendingReviewSpot=spot;
+  }catch(e){}
+})();
+
+function openAdminReview(){
+  const spot=window._pendingReviewSpot;
+  if(!spot) return;
+  openProfilePanel('admin');
+  // Wait for admin panel to render then open the pre-filled form
+  setTimeout(()=>{
+    adminOpenSpot(null);
+    setTimeout(()=>{
+      if($('adSpotName'))    $('adSpotName').value    = spot.name     ||'';
+      if($('adDisplayName')) $('adDisplayName').value = spot.name     ||'';
+      if($('adLat'))         $('adLat').value          = spot.lat      ||'';
+      if($('adLon'))         $('adLon').value          = spot.lon      ||'';
+      if($('adCountry'))     $('adCountry').value      = spot.location ||'';
+      if($('adBizName'))     $('adBizName').value      = spot.business ||'';
+      if($('adWebsite'))     $('adWebsite').value      = spot.website  ||'';
+      if($('adDesc'))        $('adDesc').value         = spot.note     ||'';
+      // Show a banner so admin knows what they're reviewing
+      const el=$('adminEditForm');
+      if(el){
+        const banner=document.createElement('div');
+        banner.style.cssText='background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:10px 14px;font-size:.78rem;color:#fbbf24;margin-bottom:10px;';
+        banner.innerHTML=`⚡ Pre-filled from spot request by <strong>${spot.contact_name||'a user'}</strong> (${spot.contact_email||'—'}) — review, adjust if needed, then save.`;
+        el.querySelector('div')?.prepend(banner);
+      }
+      window._pendingReviewSpot=null;
+    },100);
+  },400);
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 function onNicknameInput(){
