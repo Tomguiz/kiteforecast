@@ -170,14 +170,18 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- User-submitted spot suggestions (when search finds nothing)
 CREATE TABLE IF NOT EXISTS spot_suggestions (
-  id              uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-  suggested_name  text        NOT NULL,
+  id              uuid             PRIMARY KEY DEFAULT gen_random_uuid(),
+  suggested_name  text             NOT NULL,
   location        text,
+  lat             double precision,
+  lon             double precision,
   note            text,
-  submitted_by    text,       -- email, null for anonymous
-  reviewed        boolean     NOT NULL DEFAULT false,
-  created_at      timestamptz NOT NULL DEFAULT now()
+  submitted_by    text,
+  reviewed        boolean          NOT NULL DEFAULT false,
+  created_at      timestamptz      NOT NULL DEFAULT now()
 );
+DO $$ BEGIN ALTER TABLE spot_suggestions ADD COLUMN lat double precision; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE spot_suggestions ADD COLUMN lon double precision; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
 
 ALTER TABLE spot_suggestions ENABLE ROW LEVEL SECURITY;
 

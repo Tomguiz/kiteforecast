@@ -950,13 +950,63 @@
     <div style="font-size:2.5rem;margin-bottom:10px">⚠️</div>
     <h3 id="errorTitle">Location not found</h3>
     <p id="errorMsg" style="font-size:.85rem;margin-top:4px">Try a different search term.</p>
-    <div id="suggestSpotWrap" style="display:none;margin-top:16px;padding:14px 16px;background:rgba(0,212,255,.06);border:1px solid rgba(0,212,255,.2);border-radius:12px;text-align:left">
-      <div style="font-size:.82rem;font-weight:700;color:var(--text);margin-bottom:4px">🪁 Know a kite spot here?</div>
-      <div style="font-size:.75rem;color:var(--tdim);margin-bottom:12px">Suggest it and we'll add it to the app for everyone.</div>
-      <input type="text" id="suggestName" class="pp-input" placeholder="Spot name (e.g. Koksijde Beach)" style="margin-bottom:8px"/>
-      <input type="text" id="suggestLocation" class="pp-input" placeholder="City / region / country" style="margin-bottom:8px"/>
-      <textarea id="suggestNote" class="pp-input" placeholder="Any extra info — website, school, coordinates…" rows="2" style="margin-bottom:12px;resize:none;font-family:inherit;font-size:.85rem;min-height:60px"></textarea>
-      <button class="btn pp-save-btn" id="suggestSubmitBtn" onclick="submitSpotSuggestion()" style="width:100%">Suggest this spot</button>
+    <div id="suggestSpotWrap" style="display:none;margin-top:16px;background:rgba(0,212,255,.06);border:1px solid rgba(0,212,255,.2);border-radius:14px;text-align:left;overflow:hidden">
+      <div style="padding:14px 16px 10px;border-bottom:1px solid rgba(0,212,255,.15)">
+        <div style="font-size:.88rem;font-weight:700;color:var(--text)">🪁 Request a new spot</div>
+        <div style="font-size:.73rem;color:var(--tdim);margin-top:3px">Fill in as much as you can — we'll review and add it to the app.</div>
+      </div>
+      <div style="padding:14px 16px;display:flex;flex-direction:column;gap:10px">
+
+        <div>
+          <label class="pp-label">Spot name <span style="color:#f87171">*</span></label>
+          <input type="text" id="suggestName" class="pp-input" placeholder="e.g. Koksijde Beach"/>
+        </div>
+
+        <div>
+          <label class="pp-label">Location <span style="color:#f87171">*</span> <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(city, region, country)</span></label>
+          <input type="text" id="suggestLocation" class="pp-input" placeholder="e.g. Koksijde, West Flanders, Belgium"/>
+        </div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div>
+            <label class="pp-label">Latitude <span style="color:#f87171">*</span></label>
+            <input type="number" id="suggestLat" class="pp-input" placeholder="e.g. 51.12" step="0.0001"/>
+          </div>
+          <div>
+            <label class="pp-label">Longitude <span style="color:#f87171">*</span></label>
+            <input type="number" id="suggestLon" class="pp-input" placeholder="e.g. 2.65" step="0.0001"/>
+          </div>
+        </div>
+        <div style="font-size:.68rem;color:var(--tdim);margin-top:-6px">💡 Find coordinates at <a href="https://maps.google.com" target="_blank" style="color:var(--accent)">maps.google.com</a> — right-click the spot → copy coordinates</div>
+
+        <div>
+          <label class="pp-label">Good wind directions <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(optional)</span></label>
+          <input type="text" id="suggestDirs" class="pp-input" placeholder="e.g. SW, W, NW"/>
+        </div>
+
+        <div>
+          <label class="pp-label">School / business name <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(optional)</span></label>
+          <input type="text" id="suggestBusiness" class="pp-input" placeholder="e.g. Icarus Kite School"/>
+        </div>
+
+        <div>
+          <label class="pp-label">Website <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(optional)</span></label>
+          <input type="url" id="suggestWebsite" class="pp-input" placeholder="https://…"/>
+        </div>
+
+        <div>
+          <label class="pp-label">Your email <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(optional — so we can follow up)</span></label>
+          <input type="email" id="suggestEmail" class="pp-input" placeholder="you@example.com"/>
+        </div>
+
+        <div>
+          <label class="pp-label">Anything else? <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(optional)</span></label>
+          <textarea id="suggestNote" class="pp-input" rows="2" placeholder="Parking, access, membership, webcam link…" style="resize:none;font-family:inherit;font-size:.85rem;min-height:58px"></textarea>
+        </div>
+
+        <div style="font-size:.68rem;color:var(--tdim)"><span style="color:#f87171">*</span> Required fields</div>
+        <button class="btn pp-save-btn" id="suggestSubmitBtn" onclick="submitSpotSuggestion()" style="width:100%">Send spot request →</button>
+      </div>
     </div>
   </div>
 
@@ -2949,7 +2999,14 @@ async function fetchForecast(query){
     if(!geo.results?.length){
       $('errorTitle').textContent='Location not found';
       $('errorMsg').textContent=`Could not find "${query}". Try a more specific name.`;
-      const sw=$('suggestSpotWrap'); if(sw){ sw.style.display='block'; $('suggestName').value=query; $('suggestLocation').value=''; $('suggestNote').value=''; }
+      const sw=$('suggestSpotWrap'); if(sw){
+        sw.style.display='block';
+        $('suggestName').value=query;
+        $('suggestLocation').value=''; $('suggestLat').value=''; $('suggestLon').value='';
+        $('suggestDirs').value=''; $('suggestBusiness').value=''; $('suggestWebsite').value=''; $('suggestNote').value='';
+        const pe=loadProfile().email||_authSession?.user?.email||'';
+        if($('suggestEmail')) $('suggestEmail').value=pe;
+      }
       showOnly('errorState'); return;
     }
     const sw=$('suggestSpotWrap'); if(sw) sw.style.display='none';
@@ -4251,18 +4308,55 @@ async function submitClaim(spotName){
 
 async function submitSpotSuggestion(){
   const btn=$('suggestSubmitBtn'); if(!btn) return;
-  const name=($('suggestName')?.value||'').trim();
-  const location=($('suggestLocation')?.value||'').trim();
-  const note=($('suggestNote')?.value||'').trim();
-  if(!name){ showToast('Please enter a spot name'); return; }
+  const name     =($('suggestName')?.value||'').trim();
+  const location =($('suggestLocation')?.value||'').trim();
+  const lat      =($('suggestLat')?.value||'').trim();
+  const lon      =($('suggestLon')?.value||'').trim();
+  const dirs     =($('suggestDirs')?.value||'').trim();
+  const business =($('suggestBusiness')?.value||'').trim();
+  const website  =($('suggestWebsite')?.value||'').trim();
+  const note     =($('suggestNote')?.value||'').trim();
+  const profileEmail = loadProfile().email||_authSession?.user?.email||'';
+  const contactEmail =($('suggestEmail')?.value||'').trim() || profileEmail;
+
+  // Validate required fields
+  const errors=[];
+  if(!name)     errors.push('suggestName');
+  if(!location) errors.push('suggestLocation');
+  if(!lat||isNaN(parseFloat(lat))) errors.push('suggestLat');
+  if(!lon||isNaN(parseFloat(lon))) errors.push('suggestLon');
+  if(errors.length){
+    errors.forEach(id=>{ const el=$(id); if(el){ el.style.border='1.5px solid #f87171'; el.focus(); } });
+    showToast('Please fill in all required fields');
+    return;
+  }
+  // Clear error borders
+  ['suggestName','suggestLocation','suggestLat','suggestLon'].forEach(id=>{ const el=$(id); if(el) el.style.border=''; });
+
   btn.disabled=true; btn.textContent='Sending…';
   const sb=getSb();
-  const email=loadProfile().email||_authSession?.user?.email||null;
+
+  // Save to DB
   if(sb){
-    await sb.from('spot_suggestions').insert({ suggested_name:name, location:location||null, note:note||null, submitted_by:email||null }).catch(()=>{});
+    await sb.from('spot_suggestions').insert({
+      suggested_name: name,
+      location,
+      lat:  parseFloat(lat),
+      lon:  parseFloat(lon),
+      note: [dirs&&`Dirs: ${dirs}`, business&&`Business: ${business}`, website&&`Website: ${website}`, note].filter(Boolean).join(' | ')||null,
+      submitted_by: contactEmail||null,
+    }).catch(()=>{});
   }
-  showToast('🙌 Thanks! We\'ll review your suggestion.');
-  btn.disabled=false; btn.textContent='Suggest this spot';
+
+  // Notify admin via Make.com webhook
+  fetch('https://kpwmajtxmcfpakvonimf.supabase.co/functions/v1/spot-suggest-notify',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwd21hanR4bWNmcGFrdm9uaW1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTcyMjYsImV4cCI6MjA5MDczMzIyNn0.QfQuIQbnfVUOApPbOdvCRbNsVdb0SBAwMX-hvioGJmg'},
+    body: JSON.stringify({ name, location, lat, lon, dirs, business, website, note, contact_email: contactEmail }),
+  }).catch(()=>{});
+
+  showToast('🙌 Spot request sent! We\'ll review and add it soon.');
+  btn.disabled=false; btn.textContent='Send spot request →';
   $('suggestSpotWrap').style.display='none';
 }
 
