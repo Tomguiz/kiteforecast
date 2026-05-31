@@ -2713,24 +2713,20 @@ function getSwellSummary(dateStr,srHour,ssHour){
 }
 
 
-// ── STORMGLASS TIDES ──────────────────────────────────────────────────────────
-const STORMGLASS_KEY = 'YOUR_STORMGLASS_KEY'; // replace after signup
+// ── STORMGLASS TIDES (via Supabase proxy — key stays server-side) ─────────────
+const TIDE_PROXY = 'https://kpwmajtxmcfpakvonimf.supabase.co/functions/v1/tide-proxy';
+const TIDE_ANON  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwd21hanR4bWNmcGFrdm9uaW1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTcyMjYsImV4cCI6MjA5MDczMzIyNn0.QfQuIQbnfVUOApPbOdvCRbNsVdb0SBAwMX-hvioGJmg';
 
 async function fetchStormglassTides(lat, lon) {
-  if(!STORMGLASS_KEY || STORMGLASS_KEY === 'YOUR_STORMGLASS_KEY') return null;
   // Cache by lat/lon/date — one request per spot per day
   const dateKey = new Date().toISOString().slice(0,10);
   const cacheKey = `sg_tides_${lat.toFixed(3)}_${lon.toFixed(3)}_${dateKey}`;
-  try {
-    const cached = sessionStorage.getItem(cacheKey);
-    if(cached) return JSON.parse(cached);
-  } catch(e) {}
-
+  try { const cached=sessionStorage.getItem(cacheKey); if(cached) return JSON.parse(cached); } catch(e) {}
   try {
     const start = new Date(); start.setHours(0,0,0,0);
     const end   = new Date(); end.setDate(end.getDate()+1); end.setHours(23,59,59,0);
-    const url = `https://api.stormglass.io/v2/tide/extremes/point?lat=${lat}&lng=${lon}&start=${start.toISOString()}&end=${end.toISOString()}`;
-    const resp = await fetch(url, { headers: { Authorization: STORMGLASS_KEY } });
+    const url = `${TIDE_PROXY}?lat=${lat}&lng=${lon}&start=${encodeURIComponent(start.toISOString())}&end=${encodeURIComponent(end.toISOString())}`;
+    const resp = await fetch(url, { headers: { Authorization: `Bearer ${TIDE_ANON}` } });
     if(!resp.ok) return null;
     const data = await resp.json();
     const extremes = (data.data || []).map(e => ({
