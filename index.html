@@ -6437,12 +6437,13 @@ updateProfileDot();
 $('ppMasterToggle').classList.toggle('on', notifMasterEnabled());
 
 // Wire persistent attend bar buttons
-$('mAttendCancel').onclick=function(){
+const _cancelBtn=$('mAttendCancel'), _confirmBtn=$('mAttendConfirm');
+if(_cancelBtn) _cancelBtn.onclick=function(){
   document.querySelectorAll('.modal-hour-row.selected-start').forEach(r=>r.classList.remove('selected-start'));
   _attendSessionStart=null; _attendDateStr=null;
   $('mAttendBar').style.display='none';
 };
-$('mAttendConfirm').onclick=function(){
+if(_confirmBtn) _confirmBtn.onclick=function(){
   if(_attendSessionStart&&_attendDateStr) confirmSessionFromModal(_attendDateStr,_attendSessionStart);
 };
 // fetchTimestamp element is after the script tag — defer until DOM is fully parsed
