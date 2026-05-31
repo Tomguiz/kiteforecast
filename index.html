@@ -2241,7 +2241,7 @@ async function fetchForecastFromSpot(spot){
     });
     const mP=new URLSearchParams({latitude:spot.lat,longitude:spot.lon,hourly:'wave_height,wave_period,wave_direction',forecast_days:10,timezone:'auto'});
     const marineP=safeFetch(`https://marine-api.open-meteo.com/v1/marine?${mP}`,8000).catch(()=>null);
-    const tidesP=fetchStormglassTides(spot.lat,spot.lon);
+    const tidesP=isPremium()?fetchStormglassTides(spot.lat,spot.lon):Promise.resolve(null);
     cachedWx=await safeFetch(`https://api.open-meteo.com/v1/forecast?${p}`);
     if(cachedWx.error) throw new Error(cachedWx.reason||'API error');
     if(!manualShoreSet){
@@ -2798,7 +2798,7 @@ async function fetchForecast(query){
     });
     const mP2=new URLSearchParams({latitude,longitude,hourly:'wave_height,wave_period,wave_direction',forecast_days:10,timezone:'auto'});
     const marineP2=safeFetch(`https://marine-api.open-meteo.com/v1/marine?${mP2}`,8000).catch(()=>null);
-    const tidesP2=fetchStormglassTides(latitude,longitude);
+    const tidesP2=isPremium()?fetchStormglassTides(latitude,longitude):Promise.resolve(null);
     cachedWx=await safeFetch(`https://api.open-meteo.com/v1/forecast?${p}`);
     if(cachedWx.error) throw new Error(cachedWx.reason||'API error');
 
@@ -3043,7 +3043,7 @@ function openModal(dateStr,dayIdx){
     <span class="m-badge">🌡 avg ${avgTemp}°C</span>
     <span class="m-badge">🌅 ${srTime} · 🌇 ${ssTime}</span>
     ${swellBadge}
-    ${fmtTideBadges(cachedTideExtremes, dateStr)}`;
+    ${isPremium()?fmtTideBadges(cachedTideExtremes,dateStr):'<span class="m-badge" style="opacity:.5;cursor:pointer;" onclick="_signinContext=\'generic\';openProfilePanel(\'profile\')">🌊 Tides — 👑 Premium</span>'}`;
 
   // timeline
   const maxKn=Math.max(30,...hours.map(h=>h.kn));
