@@ -4597,6 +4597,13 @@ async function sendFriendRequest(recipientEmail, recipientNick){
   if(!sb||!email) return;
   await sb.from('friendships').insert({requester:email, recipient:recipientEmail, status:'pending'});
   showToast('Friend request sent to '+recipientNick+' 👋');
+  // Fire email notification — fire and forget
+  const nickname=loadProfile().nickname||email.split('@')[0];
+  fetch('https://kpwmajtxmcfpakvonimf.supabase.co/functions/v1/friend-request-notify',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwd21hanR4bWNmcGFrdm9uaW1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTcyMjYsImV4cCI6MjA5MDczMzIyNn0.QfQuIQbnfVUOApPbOdvCRbNsVdb0SBAwMX-hvioGJmg'},
+    body:JSON.stringify({requester_email:email, requester_nickname:nickname, recipient_email:recipientEmail}),
+  }).catch(()=>{});
   _friendsCache=null;
   await renderFriendsPanel();
   await doFriendSearch($('friendSearchInput').value||'');
@@ -5014,6 +5021,15 @@ async function savePhone(){
   }
 })();
 
+// Handle ?tab=friends — auto-open Friends tab (from friend request email)
+;(function(){
+  const params=new URLSearchParams(location.search);
+  if(params.get('tab')==='friends'){
+    history.replaceState({},'',location.pathname);
+    window._pendingTab='friends';
+  }
+})();
+
 // Handle ?review=<base64-spot-data> — admin one-click spot approval
 // Sign out any existing session first so the magic link login takes effect
 ;(async function(){
@@ -5202,6 +5218,8 @@ async function initAuth(){
       setTimeout(()=>checkNicknameRequired(), 800);
       // Update friend request badge
       setTimeout(()=>updateFriendRequestBadge(), 1200);
+      // Auto-open pending tab from URL param (e.g. ?tab=friends from email)
+      if(window._pendingTab){ const t=window._pendingTab; window._pendingTab=null; setTimeout(()=>{ openProfilePanel(t); },600); }
       if(pendingNotif){
         const pn=pendingNotif; pendingNotif=null;
         if(pn.type==='spot') addSpotNotif(pn.spot,pn.sessions);
