@@ -4285,14 +4285,31 @@ async function adminOpenSpot(spotName){
   el.style.display='block';
   el.scrollIntoView({behavior:'smooth',block:'start'});
 
+  const isNew = !s;
   el.innerHTML=`
     <div style="background:rgba(0,212,255,.05);border:1px solid rgba(0,212,255,.2);border-radius:12px;padding:16px;">
-      <div style="font-size:.85rem;font-weight:700;color:var(--accent);margin-bottom:14px">${s?'✏️ Edit: '+s.spot_name:'➕ Add spot'}</div>
+      <div style="font-size:.85rem;font-weight:700;color:var(--accent);margin-bottom:14px">${isNew?'➕ Add new spot':'✏️ Edit: '+s.spot_name}</div>
 
-      <label class="pp-label">Spot name (DB key — must match SPOTS array)</label>
-      <input type="text" id="adSpotName" class="pp-input" value="${s?.spot_name||''}" placeholder="e.g. Riverwoods Beachclub" style="margin-bottom:10px" ${s?'readonly style="margin-bottom:10px;opacity:.6"':'style="margin-bottom:10px"'}/>
+      <label class="pp-label">Spot name <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">${isNew?'(unique key — shown in search)':'(key — cannot be changed)'}</span></label>
+      <input type="text" id="adSpotName" class="pp-input" value="${s?.spot_name||''}" placeholder="e.g. Koksijde Beach" style="margin-bottom:10px${isNew?'':';opacity:.55'}" ${isNew?'':'readonly'}/>
 
-      <label class="pp-label">Display name <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(overrides spot name in card)</span></label>
+      ${isNew?`
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
+        <div>
+          <label class="pp-label">Latitude</label>
+          <input type="number" id="adLat" class="pp-input" placeholder="51.36" step="0.0001"/>
+        </div>
+        <div>
+          <label class="pp-label">Longitude</label>
+          <input type="number" id="adLon" class="pp-input" placeholder="3.31" step="0.0001"/>
+        </div>
+        <div>
+          <label class="pp-label">Country</label>
+          <input type="text" id="adCountry" class="pp-input" placeholder="Belgium"/>
+        </div>
+      </div>`:''}
+
+      <label class="pp-label">Display name <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(shown in spot card header)</span></label>
       <input type="text" id="adDisplayName" class="pp-input" value="${s?.display_name||''}" placeholder="e.g. RBSC Duinbergen" style="margin-bottom:10px"/>
 
       <label class="pp-label">Business name</label>
@@ -4339,17 +4356,26 @@ async function adminOpenSpot(spotName){
       </div>
 
       <div style="display:flex;gap:8px">
-        <button class="btn pp-save-btn" onclick="adminSaveSpotInfo('${s?.spot_name?.replace(/'/g,"\\'")||''}')" style="flex:1">Save</button>
+        <button class="btn pp-save-btn" id="adSaveBtn" onclick="adminSaveSpotInfo()" style="flex:1">${isNew?'Add spot':'Save changes'}</button>
         <button onclick="$('adminEditForm').style.display='none'" style="flex-shrink:0;padding:10px 16px;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:10px;color:var(--tdim);font-size:.82rem;cursor:pointer">Cancel</button>
       </div>
     </div>`;
 }
 
-async function adminSaveSpotInfo(existingSpotName){
+async function adminSaveSpotInfo(){
   const sb=getSb(); if(!sb) return;
   if(!loadProfile().isAdmin){ showToast('Access denied'); return; }
+  const btn=$('adSaveBtn'); if(btn){ btn.disabled=true; btn.textContent='Saving…'; }
   const spotName=($('adSpotName')?.value||'').trim();
-  if(!spotName){ showToast('Spot name is required'); return; }
+  if(!spotName){ showToast('Spot name is required'); if(btn){btn.disabled=false;btn.textContent='Save';} return; }
+
+  const isNew=!(_adminSpots||[]).find(x=>x.spot_name===spotName);
+  const lat=parseFloat($('adLat')?.value||'0');
+  const lon=parseFloat($('adLon')?.value||'0');
+  const country=($('adCountry')?.value||'').trim();
+
+  if(isNew&&(!lat||!lon)){ showToast('Latitude and longitude are required for new spots'); if(btn){btn.disabled=false;btn.textContent='Add spot';} return; }
+
   const row={
     spot_name:       spotName,
     display_name:    ($('adDisplayName')?.value||'').trim()||null,
@@ -4371,8 +4397,16 @@ async function adminSaveSpotInfo(existingSpotName){
     updated_at:      new Date().toISOString(),
   };
   const{error}=await sb.from('spot_info').upsert(row,{onConflict:'spot_name'});
-  if(error){ showToast('Error: '+error.message); return; }
-  showToast('✓ Spot info saved!');
+  if(error){ showToast('Error: '+error.message); if(btn){btn.disabled=false;btn.textContent=isNew?'Add spot':'Save changes';} return; }
+
+  // For new spots: inject into in-memory SPOTS so search works immediately (until next deploy)
+  if(isNew && lat && lon){
+    if(typeof SPOTS!=='undefined' && !SPOTS.find(x=>x.name===spotName)){
+      SPOTS.push({name:spotName, loc:country, lat, lon, dirs:[]});
+    }
+  }
+
+  showToast(isNew?'✓ New spot added! Search works until next page reload — add to SPOTS array in code to make it permanent.':'✓ Spot info saved!');
   $('adminEditForm').style.display='none';
   renderAdminPanel();
   if(cachedLoc?.name===spotName) renderSpotInfoCard(spotName);
