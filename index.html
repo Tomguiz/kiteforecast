@@ -4371,7 +4371,7 @@ async function submitSpotSuggestion(){
       location,
       note: [dirs&&`Dirs: ${dirs}`, business&&`Business: ${business}`, website&&`Website: ${website}`, note].filter(Boolean).join(' | ')||null,
       submitted_by: contactEmail||null,
-    }).catch(()=>{});
+    }).then(()=>{}).catch(()=>{});
   }
 
   fetch('https://kpwmajtxmcfpakvonimf.supabase.co/functions/v1/spot-suggest-notify',{
