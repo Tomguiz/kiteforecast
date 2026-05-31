@@ -1167,10 +1167,10 @@
         </div>
         <p class="pp-note" style="margin:0">Notifications &amp; favourites stay in sync across all your devices.</p>
         <div style="border-top:1px solid var(--border);margin:4px 0"></div>
-        <label class="pp-label">Nickname</label>
-        <input type="text" id="ppNicknameInput" class="pp-input" placeholder="e.g. Tom" maxlength="32" oninput="onNicknameInput()" onblur="saveNickname()" />
-        <button class="btn pp-save-btn" id="ppNicknameSaveBtn" onclick="saveNickname()" style="margin-top:2px">Save</button>
-        <p class="pp-note">Used when you share a spot with friends.</p>
+        <label class="pp-label">Nickname <span style="color:#f87171;font-weight:400;text-transform:none;letter-spacing:0">* required</span></label>
+        <input type="text" id="ppNicknameInput" class="pp-input" placeholder="e.g. TomKite" maxlength="32" oninput="onNicknameInput()" />
+        <button class="btn pp-save-btn" id="ppNicknameSaveBtn" onclick="saveNickname(false)" style="margin-top:2px">Save</button>
+        <p class="pp-note">Unique username — visible to friends. Letters, numbers, _ . - allowed.</p>
         <div style="border-top:1px solid var(--border);margin:4px 0"></div>
         <div id="ppDigestSection">
           <div class="pp-toggle-row" id="ppDigestRow">
@@ -4873,11 +4873,77 @@ function onNicknameInput(){
   const btn=$('ppNicknameSaveBtn');
   if(btn){ btn.classList.remove('saved'); btn.textContent='Save'; }
 }
-function saveNickname(){
-  const val=($('ppNicknameInput').value||'').trim();
+
+function showNicknameModal(){
+  if($('nicknameModal')) return; // already showing
+  const modal=document.createElement('div');
+  modal.id='nicknameModal';
+  modal.style.cssText='position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);';
+  modal.innerHTML=`
+    <div style="background:#0f1623;border:1px solid rgba(0,212,255,.25);border-radius:18px;padding:32px 28px;max-width:380px;width:100%;box-shadow:0 24px 64px rgba(0,0,0,.6);">
+      <div style="text-align:center;margin-bottom:24px;">
+        <div style="font-size:2.2rem;margin-bottom:10px;">🪁</div>
+        <div style="font-size:1.2rem;font-weight:800;color:#f1f5f9;margin-bottom:6px;">Choose your nickname</div>
+        <div style="font-size:.85rem;color:#64748b;line-height:1.5;">This is how friends will find you.<br/>Pick something unique — you can't change it easily later.</div>
+      </div>
+      <input type="text" id="modalNicknameInput" class="pp-input" placeholder="e.g. TomKite" maxlength="32"
+        style="margin-bottom:10px;font-size:1rem;text-align:center;"
+        oninput="this.value=this.value.replace(/[^a-zA-Z0-9_.\- ]/g,'')"
+        onkeydown="if(event.key==='Enter') saveNickname(true)"/>
+      <button class="btn pp-save-btn" id="modalNicknameSaveBtn" onclick="saveNickname(true)" style="width:100%;font-size:.95rem;">Continue →</button>
+      <p class="pp-note" style="text-align:center;margin-top:10px;">Letters, numbers, _ . - and spaces · 2–32 chars</p>
+    </div>`;
+  document.body.appendChild(modal);
+  setTimeout(()=>{ const i=$('modalNicknameInput'); if(i) i.focus(); }, 100);
+}
+
+async function checkNicknameRequired(){
+  const p=loadProfile();
+  if(p.nickname) return; // already set locally
+  // Check DB
+  const sb=getSb(); const email=_authSession?.user?.email||p.email;
+  if(!sb||!email) return;
+  const{data}=await sb.from('profiles').select('nickname').eq('email',email).maybeSingle();
+  if(data?.nickname){
+    // Sync to local
+    p.nickname=data.nickname; saveProfile(p);
+    const ni=$('ppNicknameInput'); if(ni) ni.value=data.nickname;
+    return;
+  }
+  // No nickname — show modal with Google name as suggestion
+  showNicknameModal();
+  setTimeout(()=>{
+    const suggested=_authSession?.user?.user_metadata?.name||_authSession?.user?.user_metadata?.full_name||'';
+    const firstWord=(suggested.split(' ')[0]||'').replace(/[^a-zA-Z0-9_.\- ]/g,'');
+    const mi=$('modalNicknameInput');
+    if(mi && firstWord && !mi.value) mi.value=firstWord;
+  }, 150);
+}
+async function saveNickname(fromModal){
+  const inputId = fromModal ? 'modalNicknameInput' : 'ppNicknameInput';
+  const btnId   = fromModal ? 'modalNicknameSaveBtn' : 'ppNicknameSaveBtn';
+  const val=($( inputId)?.value||'').trim();
+  const btn=$(btnId);
+  if(!val){ showToast('Nickname cannot be empty'); return; }
+  if(!/^[a-zA-Z0-9_.\- ]{2,32}$/.test(val)){ showToast('2–32 chars, letters/numbers/._- only'); return; }
+
+  if(btn){ btn.disabled=true; btn.textContent='Saving…'; }
+
+  const email=_authSession?.user?.email||loadProfile().email;
+  const sb=getSb();
+  if(sb && email){
+    // Check uniqueness
+    const{data:existing}=await sb.from('profiles').select('email').eq('nickname',val).neq('email',email).maybeSingle();
+    if(existing){ showToast('❌ Nickname already taken — try another'); if(btn){ btn.disabled=false; btn.textContent='Save'; } return; }
+    // Upsert nickname
+    await sb.from('profiles').upsert({email, nickname:val},{onConflict:'email'});
+  }
+
   const p=loadProfile(); p.nickname=val; saveProfile(p);
-  const btn=$('ppNicknameSaveBtn');
-  if(btn){ btn.classList.add('saved'); btn.textContent='✓ Saved'; setTimeout(()=>{ btn.classList.remove('saved'); btn.textContent='Save'; },2000); }
+  if(btn){ btn.disabled=false; btn.classList.add('saved'); btn.textContent='✓ Saved'; setTimeout(()=>{ btn.classList.remove('saved'); btn.textContent='Save'; },2000); }
+
+  // Dismiss modal if called from it
+  if(fromModal){ const m=$('nicknameModal'); if(m) m.remove(); showToast('👋 Welcome, '+val+'!'); }
 }
 // ── AUTH ──
 async function initAuth(){
@@ -4936,6 +5002,8 @@ async function initAuth(){
       }
       // Only toast on a genuine new sign-in, not on session restore at page load
       if(isNew) showToast('✓ Signed in as '+email);
+      // Check nickname after every sign-in
+      setTimeout(()=>checkNicknameRequired(), 800);
       if(pendingNotif){
         const pn=pendingNotif; pendingNotif=null;
         if(pn.type==='spot') addSpotNotif(pn.spot,pn.sessions);
