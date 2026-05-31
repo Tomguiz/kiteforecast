@@ -4601,7 +4601,7 @@ function updateModalAttendBar(dateStr){
 
 async function confirmSessionFromModal(dateStr, startTime){
   const loc=cachedLoc; if(!loc) return;
-  const btn=event?.target; if(btn){ btn.disabled=true; btn.textContent='Saving…'; }
+  const cb=$('mAttendConfirm'); if(cb){ cb.disabled=true; cb.textContent='Saving…'; }
   await confirmAttendance(dateStr, loc.name, loc.lat, loc.lon, startTime);
   _attendSessionStart=null; _attendDateStr=null;
 
@@ -4663,6 +4663,9 @@ async function confirmSessionFromModal(dateStr, startTime){
       }
     }
   }
+
+  // Reset confirm button
+  const cb=$('mAttendConfirm'); if(cb){ cb.disabled=false; cb.textContent='✓ Confirm'; }
 
   // Re-render modal and grid bell
   openModal(dateStr, _modalDayIdx);
