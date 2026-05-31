@@ -3468,7 +3468,15 @@ function openModal(dateStr,dayIdx){
         <span class="c-dl">${compass(h.dir)}<span style="font-size:.65rem;color:var(--tdim);font-weight:400"> ${h.dir}°</span></span>
       </div>
       ${lastCol}
-    </div>`;
+    </div>
+    ${isSelected?`<div id="inlineAttendBar-${timeStr}" style="margin:0 0 2px;padding:10px 14px;background:rgba(34,197,94,.1);border-left:3px solid #4ade80;border-radius:0 0 8px 8px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+      <div style="font-size:.82rem;color:#f1f5f9;font-weight:600">🏄 Starting at <strong style="color:#4ade80">${timeStr}</strong></div>
+      <div style="display:flex;gap:8px;flex-shrink:0">
+        <button onclick="event.stopPropagation();selectSessionStart('${timeStr}','${dateStr}',null)" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#94a3b8;border-radius:8px;font-size:.78rem;font-weight:600;padding:7px 12px;cursor:pointer">✕ Cancel</button>
+        <button onclick="event.stopPropagation();confirmSessionFromModal('${dateStr}','${timeStr}')" style="background:#4ade80;border:none;color:#000;border-radius:8px;font-size:.78rem;font-weight:800;padding:7px 16px;cursor:pointer">✓ Confirm</button>
+      </div>
+    </div>`:''}
+    `;
   });
   if(!ssDone) html+=`<div class="m-sun-row ss">🌇 Sunset ${ssTime}</div>`;
 
@@ -3480,15 +3488,13 @@ function openModal(dateStr,dayIdx){
     <div>• Last-minute good session? You'll still be notified.</div>
   </div>`;
 
-  // Session attendance status bar
+  // Session attendance status bar (shows current state, confirm/cancel is inline under row)
   if(goodHours>=2){
     const existing=_attendCache[dateStr];
-    const selTime=_attendSessionStart&&_attendDateStr===dateStr?_attendSessionStart:null;
-    const barBg=selTime?'rgba(34,197,94,.1)':existing?'rgba(34,197,94,.07)':'rgba(34,197,94,.04)';
-    const barBorder=selTime?'rgba(34,197,94,.35)':existing?'rgba(34,197,94,.15)':'rgba(34,197,94,.12)';
-    const barContent=selTime
-      ?`<div style="display:flex;align-items:center;justify-content:space-between;gap:12px"><div style="font-size:.82rem;color:#f1f5f9;font-weight:600">🏄 Starting at <strong style="color:#4ade80">${selTime}</strong></div><div style="display:flex;gap:8px;flex-shrink:0"><button onclick="event.stopPropagation();selectSessionStart('${selTime}','${dateStr}',null)" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#94a3b8;border-radius:8px;font-size:.78rem;font-weight:600;padding:7px 12px;cursor:pointer">✕ Cancel</button><button onclick="event.stopPropagation();confirmSessionFromModal('${dateStr}','${selTime}')" style="background:#4ade80;border:none;color:#000;border-radius:8px;font-size:.78rem;font-weight:800;padding:7px 16px;cursor:pointer">✓ Confirm</button></div></div>`
-      :existing?`✓ You're going · <strong style="color:#4ade80">${existing.start_time}</strong> · <button onclick="cancelAttendance('${dateStr}')" style="background:none;border:none;color:#f87171;font-size:.72rem;cursor:pointer;padding:0;margin-left:6px">Cancel attendance</button>`
+    const barBg=existing?'rgba(34,197,94,.07)':'rgba(34,197,94,.04)';
+    const barBorder=existing?'rgba(34,197,94,.15)':'rgba(34,197,94,.12)';
+    const barContent=existing
+      ?`✓ You're going · <strong style="color:#4ade80">${existing.start_time}</strong> · <button onclick="cancelAttendance('${dateStr}')" style="background:none;border:none;color:#f87171;font-size:.72rem;cursor:pointer;padding:0;margin-left:6px">Cancel attendance</button>`
       :'🏄 Tap any hour row to set your session start time';
     html+=`<div id="modalAttendBar" style="margin:12px 0 4px;padding:12px 14px;background:${barBg};border:1px solid ${barBorder};border-radius:10px;font-size:.78rem;color:rgba(34,197,94,.8);">${barContent}</div>`;
   }
@@ -4552,26 +4558,14 @@ function selectSessionStart(timeStr, dateStr, rowEl){
   _attendSessionStart=timeStr; _attendDateStr=dateStr;
   if(rowEl) rowEl.classList.add('selected-start');
 
-  // Update action bar
-  updateModalAttendBar(dateStr, timeStr);
+  // Scroll inline bar into view
+  setTimeout(()=>{ const b=document.getElementById(`inlineAttendBar-${timeStr}`); if(b) b.scrollIntoView({behavior:'smooth',block:'nearest'}); },50);
 }
 
-function updateModalAttendBar(dateStr, selectedTime){
+function updateModalAttendBar(dateStr){
   const bar=$('modalAttendBar'); if(!bar) return;
   const existing=_attendCache[dateStr];
-  if(selectedTime){
-    // Row selected — show confirm/cancel action bar
-    bar.style.background='rgba(34,197,94,.1)';
-    bar.style.borderColor='rgba(34,197,94,.35)';
-    bar.innerHTML=`
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
-        <div style="font-size:.82rem;color:#f1f5f9;font-weight:600">🏄 Starting at <strong style="color:#4ade80">${selectedTime}</strong></div>
-        <div style="display:flex;gap:8px;flex-shrink:0">
-          <button onclick="event.stopPropagation();selectSessionStart('${selectedTime}','${dateStr}',null)" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:#94a3b8;border-radius:8px;font-size:.78rem;font-weight:600;padding:7px 12px;cursor:pointer">✕ Cancel</button>
-          <button onclick="event.stopPropagation();confirmSessionFromModal('${dateStr}','${selectedTime}')" style="background:#4ade80;border:none;color:#000;border-radius:8px;font-size:.78rem;font-weight:800;padding:7px 16px;cursor:pointer">✓ Confirm</button>
-        </div>
-      </div>`;
-  } else if(existing){
+  if(existing){
     bar.style.background='rgba(34,197,94,.07)';
     bar.style.borderColor='rgba(34,197,94,.15)';
     bar.innerHTML=`✓ You're going · <strong style="color:#4ade80">${existing.start_time}</strong> · <button onclick="cancelAttendance('${dateStr}')" style="background:none;border:none;color:#f87171;font-size:.72rem;cursor:pointer;padding:0;margin-left:6px">Cancel attendance</button>`;
