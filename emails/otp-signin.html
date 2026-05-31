@@ -36,8 +36,11 @@
 
               <!-- Code box -->
               <div style="background-color:#0a0f1e;border:2px solid #38bdf8;border-radius:12px;padding:24px;text-align:center;margin-bottom:28px;">
-                <p style="margin:0 0 4px;font-size:0.75rem;color:#64748b;letter-spacing:0.1em;text-transform:uppercase;">Sign-in code</p>
-                <p style="margin:0;font-size:2.4rem;font-weight:700;color:#38bdf8;letter-spacing:0.15em;user-select:all;-webkit-user-select:all;">{{ .Token }}</p>
+                <p style="margin:0 0 12px;font-size:0.75rem;color:#64748b;letter-spacing:0.1em;text-transform:uppercase;">Your sign-in code</p>
+                <div style="display:inline-block;background:#38bdf8;border-radius:8px;padding:12px 28px;">
+                  <span style="font-size:2.2rem;font-weight:900;color:#0a0f1e;letter-spacing:0;font-family:'Courier New',Courier,monospace;">{{ .Token }}</span>
+                </div>
+                <p style="margin:10px 0 0;font-size:0.78rem;color:#64748b;">Tap and hold the code above to copy it</p>
               </div>
 
               <p style="margin:0;font-size:0.82rem;color:#475569;line-height:1.6;">
