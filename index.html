@@ -4196,6 +4196,7 @@ async function fireConfirmationWebhook(spot, sessions){
         spot_country:      spotCountry,
         spot_map_link:     `https://www.google.com/maps?q=${spotLat},${spotLon}`,
         app_link:          appUrl,
+        manage_link:       `${location.origin}${location.pathname}?tab=notifs`,
         days,
       })
     });
@@ -5439,12 +5440,13 @@ async function savePhone(){
   }
 })();
 
-// Handle ?tab=friends — auto-open Friends tab (from friend request email)
+// Handle ?tab= — auto-open a profile tab (from email links)
 ;(function(){
   const params=new URLSearchParams(location.search);
-  if(params.get('tab')==='friends'){
+  const tab=params.get('tab');
+  if(tab==='friends'||tab==='notifs'){
     history.replaceState({},'',location.pathname);
-    window._pendingTab='friends';
+    window._pendingTab=tab;
   }
 })();
 
