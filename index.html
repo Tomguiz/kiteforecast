@@ -4815,10 +4815,25 @@ async function cancelAttendance(dateStr){
   if(!sb||!email) return;
   await sb.from('session_attendances').update({cancelled:true}).eq('email',email).eq('session_date',dateStr);
   delete _attendCache[dateStr];
-  const btn=document.getElementById(`going-${dateStr}`);
-  if(btn){ btn.classList.remove('going'); btn.textContent='🏄 I\'m going'; }
-  closeAttendSheet();
-  showToast('Attendance cancelled.');
+  _attendSessionStart=null; _attendDateStr=null;
+
+  // Remove the day notification if it exists
+  // (spot-level notif stays — user will still get notified if spot has good sessions)
+  const loc=cachedLoc;
+  if(loc && hasDayNotif(loc.name, dateStr)){
+    removeDayNotif(loc.name, dateStr);
+    showToast('Attendance & day notification cancelled.');
+  } else {
+    showToast('Attendance cancelled.');
+  }
+
+  // Update day card indicator
+  const ind=document.getElementById(`going-${dateStr}`);
+  if(ind){ ind.style.display='none'; ind.textContent=''; }
+
+  // Re-render modal if open on this date
+  if(_modalDateStr===dateStr) openModal(dateStr, _modalDayIdx);
+  renderGrid();
 }
 
 // ── FRIENDS ──────────────────────────────────────────────────────────────────
