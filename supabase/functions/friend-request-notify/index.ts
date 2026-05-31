@@ -1,7 +1,7 @@
 // Notifies a user by email when someone sends them a friend request
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const MAKE_WEBHOOK_URL = 'https://hook.eu1.make.com/YOUR_FRIEND_REQUEST_WEBHOOK'
+const MAKE_WEBHOOK_URL = 'https://hook.eu1.make.com/6t9fgm6btixri2wf5lnx47requf416vs'
 const SUPABASE_URL     = Deno.env.get('SUPABASE_URL')     ?? 'https://kpwmajtxmcfpakvonimf.supabase.co'
 const SUPABASE_SERVICE = Deno.env.get('SERVICE_ROLE_KEY') ?? ''
 
