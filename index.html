@@ -4430,7 +4430,7 @@ async function renderAdminPanel(){
 
   const [{data:spotData},{data:suggData}] = await Promise.all([
     sb.from('spot_info').select('*').order('spot_name'),
-    sb.from('spot_suggestions').select('*').eq('reviewed',false).order('created_at',{ascending:false}),
+    sb.from('spot_suggestions').select('*').or('reviewed.eq.false,reviewed.is.null').order('created_at',{ascending:false}),
   ]);
   _adminSpots = spotData||[];
   const pendingSuggs = suggData||[];
