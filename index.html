@@ -2724,12 +2724,13 @@ async function fetchStormglassTides(lat, lon) {
   try { const cached=sessionStorage.getItem(cacheKey); if(cached) return JSON.parse(cached); } catch(e) {}
   try {
     const start = new Date(); start.setHours(0,0,0,0);
-    const end   = new Date(); end.setDate(end.getDate()+1); end.setHours(23,59,59,0);
+    const end   = new Date(); end.setDate(end.getDate()+10); end.setHours(23,59,59,0);
     const url = `${TIDE_PROXY}?lat=${lat}&lng=${lon}&start=${encodeURIComponent(start.toISOString())}&end=${encodeURIComponent(end.toISOString())}`;
     const resp = await fetch(url, { headers: { Authorization: `Bearer ${TIDE_ANON}` } });
     if(!resp.ok) return null;
     const data = await resp.json();
     const extremes = (data.data || []).map(e => ({
+      date: e.time.slice(0,10),
       time: new Date(e.time).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
       height: e.height != null ? e.height.toFixed(1) : null,
       type: e.type === 'high' ? 'high' : 'low',
@@ -2739,9 +2740,11 @@ async function fetchStormglassTides(lat, lon) {
   } catch(e) { console.warn('Stormglass tide error', e); return null; }
 }
 
-function fmtTideBadges(extremes) {
+function fmtTideBadges(extremes, dateStr) {
   if(!extremes || !extremes.length) return '';
-  return extremes.map(t => {
+  const filtered = dateStr ? extremes.filter(t => t.date === dateStr) : extremes;
+  if(!filtered.length) return '';
+  return filtered.map(t => {
     const icon = t.type === 'high' ? '🌊 ↑' : '🌊 ↓';
     const label = t.type === 'high' ? 'High' : 'Low';
     const h = t.height != null ? ` ${t.height}m` : '';
@@ -3040,7 +3043,7 @@ function openModal(dateStr,dayIdx){
     <span class="m-badge">🌡 avg ${avgTemp}°C</span>
     <span class="m-badge">🌅 ${srTime} · 🌇 ${ssTime}</span>
     ${swellBadge}
-    ${fmtTideBadges(cachedTideExtremes)}`;
+    ${fmtTideBadges(cachedTideExtremes, dateStr)}`;
 
   // timeline
   const maxKn=Math.max(30,...hours.map(h=>h.kn));
