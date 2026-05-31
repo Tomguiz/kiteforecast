@@ -3395,7 +3395,11 @@ async function syncFavsFromSupabase(email){
     const localOnly=local.filter(lf=>!remote.some(rf=>rf.name===lf.name&&rf.lat===lf.lat));
     for(const fav of localOnly) pushFavToSupabase(email,fav,false);
     // Merge: Supabase remote + local-only additions
-    const merged=[...remote,...localOnly];
+    let merged=[...remote,...localOnly];
+    // Enforce free plan limit — keep only the first spot if not premium
+    if(!isPremium()&&merged.length>FREE_FAV_LIMIT){
+      merged=merged.slice(0,FREE_FAV_LIMIT);
+    }
     saveFavs(merged);
     renderHintChips();
   } finally {
