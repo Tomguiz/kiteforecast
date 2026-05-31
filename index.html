@@ -974,15 +974,15 @@
 
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
           <div>
-            <label class="pp-label">Latitude <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(optional)</span></label>
-            <input type="number" id="suggestLat" class="pp-input" placeholder="e.g. 51.12" step="0.0001"/>
+            <label class="pp-label">Latitude <span style="color:#f87171">*</span></label>
+            <input type="number" id="suggestLat" class="pp-input" placeholder="e.g. 51.1234" step="0.0001"/>
           </div>
           <div>
-            <label class="pp-label">Longitude <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(optional)</span></label>
-            <input type="number" id="suggestLon" class="pp-input" placeholder="e.g. 2.65" step="0.0001"/>
+            <label class="pp-label">Longitude <span style="color:#f87171">*</span></label>
+            <input type="number" id="suggestLon" class="pp-input" placeholder="e.g. 2.6543" step="0.0001"/>
           </div>
         </div>
-        <div style="font-size:.68rem;color:var(--tdim);margin-top:-6px">💡 Find coordinates at <a href="https://maps.google.com" target="_blank" style="color:var(--accent)">maps.google.com</a> — right-click the spot → copy coordinates</div>
+        <a href="https://maps.google.com" target="_blank" style="display:inline-flex;align-items:center;gap:5px;margin-top:-2px;padding:6px 12px;background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.25);border-radius:8px;font-size:.72rem;font-weight:700;color:var(--accent);text-decoration:none">📍 Open Google Maps → search the spot → long-press → copy coordinates</a>
 
         <div>
           <label class="pp-label">Good wind directions <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(optional)</span></label>
@@ -1009,7 +1009,7 @@
           <textarea id="suggestNote" class="pp-input" rows="2" placeholder="Parking, access, membership, webcam link…" style="resize:none;font-family:inherit;font-size:.85rem;min-height:58px"></textarea>
         </div>
 
-        <div style="font-size:.68rem;color:var(--tdim)"><span style="color:#f87171">*</span> Spot name and location are required</div>
+        <div style="font-size:.68rem;color:var(--tdim)"><span style="color:#f87171">*</span> Required fields</div>
         <button class="btn pp-save-btn" id="suggestSubmitBtn" onclick="submitSpotSuggestion()" style="width:100%">Send spot request →</button>
       </div>
     </div>
@@ -4341,14 +4341,18 @@ async function submitSpotSuggestion(){
   const profileEmail = loadProfile().email||_authSession?.user?.email||'';
   const contactEmail =($('suggestEmail')?.value||'').trim() || profileEmail;
 
-  // Only name + location are required
-  if(!name||!location){
-    if(!name){ const el=$('suggestName'); if(el) el.style.border='1.5px solid #f87171'; }
-    if(!location){ const el=$('suggestLocation'); if(el) el.style.border='1.5px solid #f87171'; }
-    showToast('Please enter a spot name and location');
+  // Validate required fields
+  const missing=[];
+  if(!name)                          missing.push(['suggestName',     'Spot name is required']);
+  if(!location)                      missing.push(['suggestLocation',  'Location is required']);
+  if(!lat||isNaN(parseFloat(lat)))   missing.push(['suggestLat',       'Latitude is required']);
+  if(!lon||isNaN(parseFloat(lon)))   missing.push(['suggestLon',       'Longitude is required']);
+  if(missing.length){
+    missing.forEach(([id])=>{ const el=$(id); if(el){ el.style.border='1.5px solid #f87171'; el.scrollIntoView({behavior:'smooth',block:'center'}); } });
+    showToast('⚠️ '+missing[0][1]);
     return;
   }
-  ['suggestName','suggestLocation'].forEach(id=>{ const el=$(id); if(el) el.style.border=''; });
+  ['suggestName','suggestLocation','suggestLat','suggestLon'].forEach(id=>{ const el=$(id); if(el) el.style.border=''; });
 
   // Fire-and-forget — never block the UI on network calls
   const sb=getSb();
