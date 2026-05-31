@@ -4601,8 +4601,11 @@ async function confirmSessionFromModal(dateStr, startTime){
         const sunrise=daily.sunrise[dayIdx];
         const sunset=daily.sunset[dayIdx];
         const{good,peakKn,domDir,day}=buildDay(dateStr,sunrise,sunset);
-        const sessionStart=good.length?good[0].tStr:dateStr+'T'+startTime+':00';
-        const sessionEnd=good.length?good[good.length-1].tStr:dateStr+'T'+startTime+':00';
+        // Use user's confirmed start time — override the forecast window start
+        const sessionStart=dateStr+'T'+startTime+':00';
+        // End time = confirmed start + duration of good window (capped at sunset)
+        const goodAfterStart=good.filter(h=>h.tStr>=sessionStart);
+        const sessionEnd=goodAfterStart.length?goodAfterStart[goodAfterStart.length-1].tStr:dateStr+'T'+startTime+':00';
         const gusts=good.length?Math.max(...good.map(h=>h.gustKn||0)):0;
         const windMin=good.length?Math.min(...good.map(h=>h.kn)):0;
         const[,weatherDesc]=wmoInfo(daily.weather_code[dayIdx]);
@@ -4617,6 +4620,23 @@ async function confirmSessionFromModal(dateStr, startTime){
           daylight_hours:day.length,wind_consistency_pct:0,
         };
         addDayNotif({name:loc.name,lat:loc.latitude,lon:loc.longitude},dateStr,sessInfo);
+      } else {
+        // Already has day notif — just update the send_at times to match confirmed start
+        const sb=getSb(); const email=_authSession?.user?.email||loadProfile().email;
+        if(sb&&email){
+          const sessionMs=new Date(dateStr+'T'+startTime+':00').getTime();
+          const now=Date.now();
+          for(const h of [72,48,24,6,1]){
+            const send_at=new Date(sessionMs-h*3600*1000).toISOString();
+            if(new Date(send_at).getTime()>now){
+              sb.from('reminders').update({send_at})
+                .eq('email',email).eq('spot_name',loc.name)
+                .eq('session_date',dateStr).eq('notif_type','day')
+                .eq('reminder_hours',h).eq('sent',false)
+                .then(()=>{}).catch(()=>{});
+            }
+          }
+        }
       }
     }
   }
