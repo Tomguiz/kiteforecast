@@ -3500,24 +3500,21 @@ function openModal(dateStr,dayIdx){
     html+=`<div id="modalAttendBar" style="margin:12px 0 4px;padding:12px 14px;background:${barBg};border:1px solid ${barBorder};border-radius:10px;font-size:.78rem;color:rgba(34,197,94,.8);">${barContent}</div>`;
   }
 
-  // Event delegation — replace node to clear any prior listeners
-  const oldBody=$('mBody');
-  const mBody=oldBody.cloneNode(false);
+  const mBody=$('mBody');
   mBody.innerHTML=html;
-  oldBody.parentNode.replaceChild(mBody,oldBody);
-  mBody.addEventListener('click', function(e){
-    // Confirm/cancel attendance buttons
-    const confirmBtn=e.target.closest('[data-attend-confirm]');
-    if(confirmBtn){ e.stopPropagation(); confirmSessionFromModal(confirmBtn.dataset.attendDate, confirmBtn.dataset.attendConfirm); return; }
-    const cancelBtn=e.target.closest('[data-attend-cancel]');
-    if(cancelBtn){ e.stopPropagation(); selectSessionStart(cancelBtn.dataset.attendCancel, cancelBtn.dataset.attendDate, null); return; }
-    const cancelAttendBtn=e.target.closest('[data-cancel-attend]');
-    if(cancelAttendBtn){ e.stopPropagation(); cancelAttendance(cancelAttendBtn.dataset.cancelAttend); return; }
-    // Hour row tap — must not be inside inline bar
-    if(e.target.closest('#inlineAttendBar-'+(_attendSessionStart||''))) return;
-    const row=e.target.closest('.modal-hour-row');
-    if(row&&row.dataset.time&&row.dataset.date){ selectSessionStart(row.dataset.time, row.dataset.date, row); return; }
-  }, {passive:false});
+  if(!mBody._attendHandler){
+    mBody._attendHandler=function(e){
+      const confirmBtn=e.target.closest('[data-attend-confirm]');
+      if(confirmBtn){ e.stopPropagation(); confirmSessionFromModal(confirmBtn.dataset.attendDate, confirmBtn.dataset.attendConfirm); return; }
+      const cancelBtn=e.target.closest('[data-attend-cancel]');
+      if(cancelBtn){ e.stopPropagation(); selectSessionStart(cancelBtn.dataset.attendCancel, cancelBtn.dataset.attendDate, null); return; }
+      const cancelAttendBtn=e.target.closest('[data-cancel-attend]');
+      if(cancelAttendBtn){ e.stopPropagation(); cancelAttendance(cancelAttendBtn.dataset.cancelAttend); return; }
+      const row=e.target.closest('.modal-hour-row');
+      if(row&&row.dataset.time&&row.dataset.date){ selectSessionStart(row.dataset.time, row.dataset.date, row); }
+    };
+    mBody.addEventListener('click', mBody._attendHandler);
+  }
 
   $('modalOverlay').style.display='flex';
   // Lock background scroll without breaking mobile (position:fixed trick)
@@ -3528,8 +3525,8 @@ function openModal(dateStr,dayIdx){
   document.body.dataset.scrollY=scrollY;
   // scroll modal to first qualifying row
   requestAnimationFrame(()=>{
-    mBody.scrollTop=0;
-    const first=mBody.querySelector('.kite-on');
+    $('mBody').scrollTop=0;
+    const first=$('mBody').querySelector('.kite-on');
     if(first) first.scrollIntoView({block:'center'});
   });
 }
