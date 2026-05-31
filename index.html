@@ -721,6 +721,7 @@
     .spot-cta-webcam { background:linear-gradient(135deg,#dc2626,#b91c1c); color:#fff; position:relative; overflow:hidden; }
     .spot-cta-webcam::before { content:''; position:absolute; inset:0; background:rgba(255,255,255,.08); animation:webcam-pulse 1.8s ease-in-out infinite; border-radius:10px; }
     @keyframes webcam-pulse { 0%,100%{opacity:0} 50%{opacity:1} }
+    @keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.4)} }
     .webcam-dot { width:7px; height:7px; border-radius:50%; background:#ff6b6b; box-shadow:0 0 6px 2px rgba(255,100,100,.7); animation:dot-blink 1.2s ease-in-out infinite; flex-shrink:0; }
     @keyframes dot-blink { 0%,100%{opacity:1;box-shadow:0 0 6px 2px rgba(255,100,100,.7)} 50%{opacity:.4;box-shadow:0 0 2px 1px rgba(255,100,100,.3)} }
     /* youtube embed */
@@ -2554,6 +2555,7 @@ function loadUserDirsForSpot(name){
   const all=loadAllUserDirs(); return all[name]||null;
 }
 
+function isFavSpot(spotName){ return loadFavs().some(f=>f.name===spotName); }
 function isFavorite(loc){
   if(!_authSession?.user) return false;
   return loadFavs().some(f=>f.name===loc.name&&f.lat===loc.latitude);
@@ -6181,6 +6183,11 @@ function toggleSpotNotif(){
       removeSpotNotif(loc.name);
       showToast('🔕 Notifications removed');
     } else {
+      if(!isFavSpot(loc.name)){
+        showToast('★ Add this spot to your favourites first');
+        const favBtn=$('favBtn'); if(favBtn){ favBtn.style.animation='none'; favBtn.offsetHeight; favBtn.style.animation='pulse .4s 2'; }
+        return;
+      }
       addSpotNotif({name:loc.name,lat:loc.latitude,lon:loc.longitude},getQualSessions());
       showToast('📧 Confirmation email sent!');
     }
@@ -6264,6 +6271,11 @@ function toggleDayNotif(e,dateStr,dayIdx){
     removeDayNotif(loc.name,dateStr);
     showToast('🔕 Notification removed');
   } else {
+    if(!isFavSpot(loc.name)){
+      showToast('★ Add this spot to your favourites first');
+      const favBtn=$('favBtn'); if(favBtn){ favBtn.style.animation='none'; favBtn.offsetHeight; favBtn.style.animation='pulse .4s 2'; }
+      return;
+    }
     addDayNotif(spot,dateStr,sessInfo);
     showToast('📧 Confirmation email sent!');
   }
