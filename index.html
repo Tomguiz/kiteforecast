@@ -3899,8 +3899,8 @@ function showUpgradeModal(){
 let _upgradeModalDismissed=false;
 function updateUpgradeModal(){
   const m=$('upgradeModal'); if(!m) return;
-  if(!_authSession?.user||isPremium()||_upgradeModalDismissed){ m.style.display='none'; return; }
-  if(loadFavs().length>=FREE_FAV_LIMIT) m.style.display='block';
+  // Only show if user explicitly triggered it — never auto-show
+  if(isPremium()) m.style.display='none';
 }
 
 // ── SPOT OWNER DASHBOARD ─────────────────────────────────────────────────────
