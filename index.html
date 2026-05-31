@@ -3043,7 +3043,7 @@ function openModal(dateStr,dayIdx){
     <span class="m-badge">🌡 avg ${avgTemp}°C</span>
     <span class="m-badge">🌅 ${srTime} · 🌇 ${ssTime}</span>
     ${swellBadge}
-    ${isPremium()?fmtTideBadges(cachedTideExtremes,dateStr):'<span class="m-badge" style="opacity:.5;cursor:pointer;" onclick="_signinContext=\'generic\';openProfilePanel(\'profile\')">🌊 Tides — 👑 Premium</span>'}`;
+    ${isPremium()?fmtTideBadges(cachedTideExtremes,dateStr):'<span class="m-badge" style="cursor:pointer;background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.4);color:#f59e0b;" onclick="showUpgradeModal()">🌊 Tide times · <strong>Upgrade to Premium ↗</strong></span>'}`;
 
   // timeline
   const maxKn=Math.max(30,...hours.map(h=>h.kn));
