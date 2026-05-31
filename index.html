@@ -4694,6 +4694,10 @@ async function handlePendingJoin(){
           // Pre-select the suggested start time
           if(j.start_time){
             _attendSessionStart=j.start_time; _attendDateStr=j.date;
+            const row=$('mBody')?.querySelector(`.modal-hour-row[data-time="${j.start_time}"]`);
+            $('mAttendLabel').innerHTML=`🏄 Starting at <strong style="color:#4ade80">${j.start_time}</strong>`;
+            $('mAttendBar').style.display='flex';
+            if(row) row.classList.add('selected-start');
           }
         },400);
       }
