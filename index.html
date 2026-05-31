@@ -2683,6 +2683,9 @@ $('resultsLegend').innerHTML=buildLegendHTML();
 initAuth();
 initInstallBanner();
 updateShareBanner();
+// Re-render chips after auth settles in case sync finished before auth listener fired
+setTimeout(()=>renderHintChips(), 800);
+setTimeout(()=>renderHintChips(), 2500);
 
 // ══════════════════════════════════
 //  FETCH
