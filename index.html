@@ -799,8 +799,9 @@
     /* Going indicator on day card */
     .card-going-indicator { width:100%;margin-top:5px;padding:5px 0;border-radius:7px;font-size:.62rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;background:rgba(34,197,94,.2);color:#4ade80;border:1px solid rgba(34,197,94,.4);text-align:center; }
     /* Hour row session selection */
-    .modal-hour-row { cursor:pointer; transition:background .12s; border-radius:6px; }
+    .modal-hour-row { cursor:pointer; transition:background .12s; border-radius:6px; -webkit-tap-highlight-color:rgba(34,197,94,.15); user-select:none; -webkit-user-select:none; }
     .modal-hour-row:hover { background:rgba(255,255,255,.04); }
+    .modal-hour-row:active { background:rgba(34,197,94,.08); }
     .modal-hour-row.selected-start { background:rgba(34,197,94,.12) !important; border-left:3px solid #4ade80; }
     .session-start-badge { display:inline-block;background:#4ade80;color:#000;font-size:.6rem;font-weight:800;padding:2px 6px;border-radius:6px;margin-left:6px;vertical-align:middle;letter-spacing:.04em; }
     /* Attend confirm bar at bottom of modal */
@@ -3499,10 +3500,12 @@ function openModal(dateStr,dayIdx){
     html+=`<div id="modalAttendBar" style="margin:12px 0 4px;padding:12px 14px;background:${barBg};border:1px solid ${barBorder};border-radius:10px;font-size:.78rem;color:rgba(34,197,94,.8);">${barContent}</div>`;
   }
 
-  $('mBody').innerHTML=html;
-
-  // Event delegation for hour row taps and attend buttons
-  $('mBody').onclick=function(e){
+  // Event delegation — replace node to clear any prior listeners
+  const oldBody=$('mBody');
+  const mBody=oldBody.cloneNode(false);
+  mBody.innerHTML=html;
+  oldBody.parentNode.replaceChild(mBody,oldBody);
+  mBody.addEventListener('click', function(e){
     // Confirm/cancel attendance buttons
     const confirmBtn=e.target.closest('[data-attend-confirm]');
     if(confirmBtn){ e.stopPropagation(); confirmSessionFromModal(confirmBtn.dataset.attendDate, confirmBtn.dataset.attendConfirm); return; }
@@ -3510,10 +3513,11 @@ function openModal(dateStr,dayIdx){
     if(cancelBtn){ e.stopPropagation(); selectSessionStart(cancelBtn.dataset.attendCancel, cancelBtn.dataset.attendDate, null); return; }
     const cancelAttendBtn=e.target.closest('[data-cancel-attend]');
     if(cancelAttendBtn){ e.stopPropagation(); cancelAttendance(cancelAttendBtn.dataset.cancelAttend); return; }
-    // Hour row tap
+    // Hour row tap — must not be inside inline bar
+    if(e.target.closest('#inlineAttendBar-'+(_attendSessionStart||''))) return;
     const row=e.target.closest('.modal-hour-row');
     if(row&&row.dataset.time&&row.dataset.date){ selectSessionStart(row.dataset.time, row.dataset.date, row); return; }
-  };
+  }, {passive:false});
 
   $('modalOverlay').style.display='flex';
   // Lock background scroll without breaking mobile (position:fixed trick)
@@ -3524,8 +3528,8 @@ function openModal(dateStr,dayIdx){
   document.body.dataset.scrollY=scrollY;
   // scroll modal to first qualifying row
   requestAnimationFrame(()=>{
-    $('mBody').scrollTop=0; // reset first
-    const first=$('mBody').querySelector('.kite-on');
+    mBody.scrollTop=0;
+    const first=mBody.querySelector('.kite-on');
     if(first) first.scrollIntoView({block:'center'});
   });
 }
