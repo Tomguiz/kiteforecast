@@ -4341,9 +4341,7 @@ function showSpotPendingMsg(spotName){
 function checkSpotPending(query){
   try{
     const pending=JSON.parse(sessionStorage.getItem('pendingSpots')||'[]');
-    const match=pending.find(n=>n===query.toLowerCase()||query.toLowerCase().includes(n)||n.includes(query.toLowerCase()));
-    if(match){
-      const original=pending.find(n=>n===match)||match;
+    if(pending.includes(query.toLowerCase())){
       showSpotPendingMsg(query);
       return true;
     }
