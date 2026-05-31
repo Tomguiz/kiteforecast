@@ -4581,9 +4581,49 @@ async function confirmSessionFromModal(dateStr, startTime){
   const btn=event?.target; if(btn){ btn.disabled=true; btn.textContent='Saving…'; }
   await confirmAttendance(dateStr, loc.name, loc.lat, loc.lon, startTime);
   _attendSessionStart=null; _attendDateStr=null;
-  // Re-render modal to clear selection and update bar
+
+  // Auto-subscribe day notification if not already set
+  if(!hasDayNotif(loc.name, dateStr)){
+    if(!isFavSpot(loc.name)){
+      // Auto-add to favourites first
+      const favs=loadFavs();
+      if(!favs.some(f=>f.name===loc.name)){
+        favs.push({name:loc.name,lat:loc.latitude,lon:loc.longitude,dirs:[...windDirs],days:null});
+        saveFavs(favs);
+        pushFavToSupabase(_authSession.user.email,favs[favs.length-1]);
+      }
+    }
+    // Build session info for the notification
+    const daily=cachedWx?.daily;
+    if(daily){
+      const dayIdx=daily.time.indexOf(dateStr);
+      if(dayIdx>=0){
+        const sunrise=daily.sunrise[dayIdx];
+        const sunset=daily.sunset[dayIdx];
+        const{good,peakKn,domDir,day}=buildDay(dateStr,sunrise,sunset);
+        const sessionStart=good.length?good[0].tStr:dateStr+'T'+startTime+':00';
+        const sessionEnd=good.length?good[good.length-1].tStr:dateStr+'T'+startTime+':00';
+        const gusts=good.length?Math.max(...good.map(h=>h.gustKn||0)):0;
+        const windMin=good.length?Math.min(...good.map(h=>h.kn)):0;
+        const[,weatherDesc]=wmoInfo(daily.weather_code[dayIdx]);
+        const rating=rateDay(good.length,peakKn,daily.weather_code[dayIdx],false,0);
+        const sessInfo={
+          sessionStart,sessionEnd,duration_hours:good.length,
+          peakKn,windMin,gusts,domDir:domDir!==null?compass(domDir):'—',
+          weather_description:weatherDesc,rating_label:rating.label,
+          temperature_max:Math.round(daily.temperature_2m_max[dayIdx]),
+          temperature_min:Math.round(daily.temperature_2m_min[dayIdx]),
+          sunrise:sunrise.slice(11,16),sunset:sunset.slice(11,16),
+          daylight_hours:day.length,wind_consistency_pct:0,
+        };
+        addDayNotif({name:loc.name,lat:loc.latitude,lon:loc.longitude},dateStr,sessInfo);
+      }
+    }
+  }
+
+  // Re-render modal and grid bell
   openModal(dateStr, _modalDayIdx);
-  // Update day card indicator
+  renderGrid();
   const ind=document.getElementById(`going-${dateStr}`);
   if(ind){ ind.style.display='block'; ind.textContent=`✓ Going · ${startTime}`; }
 }
