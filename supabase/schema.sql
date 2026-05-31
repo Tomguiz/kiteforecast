@@ -142,6 +142,32 @@ DO $$ BEGIN
   CREATE POLICY "all_select_spot_info" ON spot_info FOR SELECT TO anon, authenticated USING (true);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
+-- Admin-added spots (merged into SPOTS array at startup for all users)
+CREATE TABLE IF NOT EXISTS spot_overrides (
+  id         uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  name       text        NOT NULL UNIQUE,
+  loc        text        NOT NULL DEFAULT '',
+  lat        double precision NOT NULL,
+  lon        double precision NOT NULL,
+  dirs       integer[]   NOT NULL DEFAULT '{}',
+  active     boolean     NOT NULL DEFAULT true,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE spot_overrides ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  CREATE POLICY "all_select_spot_overrides" ON spot_overrides FOR SELECT TO anon, authenticated USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "all_insert_spot_overrides" ON spot_overrides FOR INSERT TO anon, authenticated WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "all_update_spot_overrides" ON spot_overrides FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
 -- User-submitted spot suggestions (when search finds nothing)
 CREATE TABLE IF NOT EXISTS spot_suggestions (
   id              uuid        PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -2832,9 +2832,23 @@ document.addEventListener('click',function(e){
   if(e.target.closest('#notifBtn')){e.stopPropagation();toggleSpotNotif();return;}
   if(e.target.closest('#favBtn')){e.stopPropagation();toggleFavorite();return;}
 });
-renderHintChips();
-$('hintLegend').innerHTML=buildLegendHTML();
-$('resultsLegend').innerHTML=buildLegendHTML();
+// Load admin-added spots from DB and merge into SPOTS before anything else runs
+(async()=>{
+  try{
+    const sb=getSb(); if(!sb) return;
+    const{data}=await sb.from('spot_overrides').select('name,loc,lat,lon,dirs').eq('active',true);
+    if(data?.length){
+      data.forEach(r=>{
+        if(!SPOTS.find(s=>s.name===r.name)){
+          SPOTS.push({name:r.name,loc:r.loc||'',lat:r.lat,lon:r.lon,dirs:r.dirs||[]});
+        }
+      });
+    }
+  }catch(e){}
+  renderHintChips();
+  $('hintLegend').innerHTML=buildLegendHTML();
+  $('resultsLegend').innerHTML=buildLegendHTML();
+})();
 initAuth();
 initInstallBanner();
 updateShareBanner();
@@ -4399,14 +4413,17 @@ async function adminSaveSpotInfo(){
   const{error}=await sb.from('spot_info').upsert(row,{onConflict:'spot_name'});
   if(error){ showToast('Error: '+error.message); if(btn){btn.disabled=false;btn.textContent=isNew?'Add spot':'Save changes';} return; }
 
-  // For new spots: inject into in-memory SPOTS so search works immediately (until next deploy)
+  // For new spots: persist to spot_overrides so it loads for all users on next page load
   if(isNew && lat && lon){
-    if(typeof SPOTS!=='undefined' && !SPOTS.find(x=>x.name===spotName)){
-      SPOTS.push({name:spotName, loc:country, lat, lon, dirs:[]});
-    }
+    const{error:oe}=await sb.from('spot_overrides').upsert({
+      name:spotName, loc:country||'', lat, lon, dirs:[], active:true
+    },{onConflict:'name'});
+    if(oe){ showToast('spot_info saved but spot_overrides failed: '+oe.message); }
+    // Also inject into in-memory SPOTS for immediate use in this session
+    if(!SPOTS.find(x=>x.name===spotName)) SPOTS.push({name:spotName,loc:country||'',lat,lon,dirs:[]});
   }
 
-  showToast(isNew?'✓ New spot added! Search works until next page reload — add to SPOTS array in code to make it permanent.':'✓ Spot info saved!');
+  showToast(isNew?'✓ New spot added — visible to all users on next load!':'✓ Spot info saved!');
   $('adminEditForm').style.display='none';
   renderAdminPanel();
   if(cachedLoc?.name===spotName) renderSpotInfoCard(spotName);
