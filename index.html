@@ -2709,41 +2709,6 @@ function getSwellSummary(dateStr,srHour,ssHour){
   return {h:avgH.toFixed(1),p:avgP?avgP.toFixed(1):null,dir:avgDir};
 }
 
-function fmtTideTime(exactHr){
-  const h=Math.floor(exactHr);
-  const m=Math.round((exactHr-h)*60);
-  if(m===60) return `${String(h+1).padStart(2,'0')}:00`;
-  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
-}
-
-function findTideExtremes(dateStr,srHour,ssHour){
-  // Wave-height centroid from Open-Meteo Marine
-  if(!cachedMarineHrMap||!cachedMarineHrMap.size) return [];
-  const all=[];
-  for(let hr=0;hr<24;hr++){
-    const entry=cachedMarineHrMap.get(`${dateStr}T${String(hr).padStart(2,'0')}`);
-    if(entry!=null) all.push({hr,v:entry.h});
-  }
-  const day=all.filter(p=>p.hr>=srHour&&p.hr<=ssHour);
-  if(day.length<2) return [];
-  const maxV=Math.max(...day.map(p=>p.v));
-  const minV=Math.min(...day.map(p=>p.v));
-  if(maxV===minV) return [];
-  function centroid(peakHr,type){
-    const win=all.filter(p=>Math.abs(p.hr-peakHr)<=2);
-    if(win.length<2) return peakHr;
-    const base=type==='high'?Math.min(...win.map(p=>p.v)):Math.max(...win.map(p=>p.v));
-    let wSum=0,tSum=0;
-    for(const p of win){ const w=type==='high'?Math.max(0,p.v-base):Math.max(0,base-p.v); wSum+=w; tSum+=w*p.hr; }
-    return wSum>0?tSum/wSum:peakHr;
-  }
-  const hiPt=day.find(p=>p.v===maxV);
-  const loPt=day.find(p=>p.v===minV);
-  return [
-    {type:'high',exactHr:centroid(hiPt.hr,'high'),v:maxV},
-    {type:'low', exactHr:centroid(loPt.hr,'low'), v:minV},
-  ].sort((a,b)=>a.exactHr-b.exactHr);
-}
 
 async function safeFetch(url,timeoutMs=20000){
   const ctrl=new AbortController();
@@ -2909,9 +2874,7 @@ function renderGrid(){
     const rating=rateDay(goodHours,peakKn,code,hasBadDir,peakDayKn);
     const _srH=parseInt(daily.sunrise[i].slice(11,13),10);
     const _ssH=parseInt(daily.sunset[i].slice(11,13),10);
-    const _tides=findTideExtremes(dateStr,_srH,_ssH);
-    const tideLine=_tides.length?`<div class="card-tide">${_tides.map((t,ti)=>(ti>0?'<span class="td-sep">·</span>':'')+`<span class="td-${t.type==='high'?'hi':'lo'}">${t.type==='high'?'↑':'↓'} ${fmtTideTime(t.exactHr)}</span>`).join('')}</div>`
-:'';
+    const tideLine='';
 
     const barHTML=day.map(h=>{
       const cls={perfect:'hb-perfect',verygood:'hb-verygood',good:'hb-good',lightdir:'hb-lightdir',light:'hb-light'}[h.type]||'hb-light';
@@ -3023,8 +2986,7 @@ function openModal(dateStr,dayIdx){
   const ssTime=sunset.slice(11,16);
   const srHour=parseInt(sunrise.slice(11,13),10);
   const ssHour=parseInt(sunset.slice(11,13),10);
-  const tides=findTideExtremes(dateStr,srHour,ssHour);
-  const tideBadges=tides.map(t=>`<span class="m-badge tide-${t.type}">${t.type==='high'?'🌊 ↑':'🌊 ↓'} ${fmtTideTime(t.exactHr)} ${t.type==='high'?'High':'Low'}</span>`).join('');
+  const tideBadges='';
   const swell=getSwellSummary(dateStr,srHour,ssHour);
   const swellBadge=swell?`<span class="m-badge">🌊 ${swell.h}m${swell.p?' · '+swell.p+'s':''}${swell.dir?' · '+swell.dir:''}</span>`:'';
   $('mSession').innerHTML=`
