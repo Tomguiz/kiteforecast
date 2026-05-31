@@ -11,6 +11,19 @@
   <meta name="apple-mobile-web-app-title" content="KiteForecast" />
   <meta name="theme-color" content="#0a0f1e" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script>
+  // Eagerly init Supabase client so detectSessionInUrl catches #access_token before anything strips the hash
+  window._sbEarlyInit=(function(){
+    try{
+      if(!window.supabase) return null;
+      const SB_URL='https://kpwmajtxmcfpakvonimf.supabase.co';
+      const SB_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwd21hanR4bWNmcGFrdm9uaW1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTcyMjYsImV4cCI6MjA5MDczMzIyNn0.QfQuIQbnfVUOApPbOdvCRbNsVdb0SBAwMX-hvioGJmg';
+      return window.supabase.createClient(SB_URL, SB_ANON, {
+        auth:{ persistSession:true, autoRefreshToken:true, detectSessionInUrl:true, storageKey:'kf-auth' }
+      });
+    }catch(e){ return null; }
+  })();
+  </script>
   <style>
     :root {
       --bg:       #070c18;
@@ -3475,6 +3488,7 @@ function initSpotsMap(){
 
 function getSb(){
   if(!_sb){
+    if(window._sbEarlyInit){ _sb=window._sbEarlyInit; window._sbEarlyInit=null; return _sb; }
     if(!window.supabase){ console.error('Supabase SDK not loaded'); return null; }
     // One-time migration: pull old default Supabase localStorage key into kfStorage
     try{
