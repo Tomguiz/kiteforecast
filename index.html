@@ -944,6 +944,14 @@
     <div style="font-size:2.5rem;margin-bottom:10px">⚠️</div>
     <h3 id="errorTitle">Location not found</h3>
     <p id="errorMsg" style="font-size:.85rem;margin-top:4px">Try a different search term.</p>
+    <div id="suggestSpotWrap" style="display:none;margin-top:16px;padding:14px 16px;background:rgba(0,212,255,.06);border:1px solid rgba(0,212,255,.2);border-radius:12px;text-align:left">
+      <div style="font-size:.82rem;font-weight:700;color:var(--text);margin-bottom:4px">🪁 Know a kite spot here?</div>
+      <div style="font-size:.75rem;color:var(--tdim);margin-bottom:12px">Suggest it and we'll add it to the app for everyone.</div>
+      <input type="text" id="suggestName" class="pp-input" placeholder="Spot name (e.g. Koksijde Beach)" style="margin-bottom:8px"/>
+      <input type="text" id="suggestLocation" class="pp-input" placeholder="City / region / country" style="margin-bottom:8px"/>
+      <textarea id="suggestNote" class="pp-input" placeholder="Any extra info — website, school, coordinates…" rows="2" style="margin-bottom:12px;resize:none;font-family:inherit;font-size:.85rem;min-height:60px"></textarea>
+      <button class="btn pp-save-btn" id="suggestSubmitBtn" onclick="submitSpotSuggestion()" style="width:100%">Suggest this spot</button>
+    </div>
   </div>
 
   <!-- results -->
@@ -2674,6 +2682,17 @@ async function renderSpotInfoCard(spotName) {
   _spotInfoOpen = false;
   const info = await fetchSpotInfo(spotName);
 
+  // Show webcam button in header if available
+  const webcamBtn = $('webcamBtn');
+  if(webcamBtn) {
+    if(info?.livecam_url) {
+      webcamBtn.href = info.livecam_url;
+      webcamBtn.style.display = 'inline-flex';
+    } else {
+      webcamBtn.style.display = 'none';
+    }
+  }
+
   if(!info) {
     // Unclaimed state — always show a teaser to drive claim conversions
     el.innerHTML = `
@@ -2733,7 +2752,7 @@ async function renderSpotInfoCard(spotName) {
     <div class="spot-info-card">
       <div class="spot-info-header" onclick="_spotInfoOpen=!_spotInfoOpen;this.querySelector('.spot-info-chevron').classList.toggle('open',_spotInfoOpen);this.querySelector('.spot-info-chevron').style.display=_spotInfoOpen?'block':'none';this.nextElementSibling.style.display=_spotInfoOpen?'flex':'none';this.querySelector('.spot-info-open-btn').style.display=_spotInfoOpen?'none':'inline-flex'">
         <div style="flex:1">
-          <div class="spot-info-title">📍 ${info.business_name || spotName}</div>
+          <div class="spot-info-title">📍 ${info.display_name || info.business_name || spotName}</div>
           <div class="spot-info-subtitle">Lessons · Gear rental · Contact</div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
@@ -2912,8 +2931,10 @@ async function fetchForecast(query){
     if(!geo.results?.length){
       $('errorTitle').textContent='Location not found';
       $('errorMsg').textContent=`Could not find "${query}". Try a more specific name.`;
+      const sw=$('suggestSpotWrap'); if(sw){ sw.style.display='block'; $('suggestName').value=query; $('suggestLocation').value=''; $('suggestNote').value=''; }
       showOnly('errorState'); return;
     }
+    const sw=$('suggestSpotWrap'); if(sw) sw.style.display='none';
     const{latitude,longitude,name,country,admin1}=geo.results[0];
     const _knownSpot=SPOTS.find(s=>s.name.toLowerCase()===name.toLowerCase());
     const _locParts=_knownSpot?_knownSpot.loc.split(', '):null;
@@ -3033,7 +3054,7 @@ function renderGrid(){
   const qdLabel=qualDaysCount===0
     ?`<span style="${qdCls};font-size:.8rem;font-weight:700;margin-left:10px">No sessions in ${totalDays} days</span>`
     :`<span style="${qdCls};font-size:.8rem;font-weight:700;margin-left:10px">${qualDaysCount} of ${totalDays} days rideable</span>`;
-  $('locName').innerHTML=`${loc.name}${loc.admin1&&loc.admin1!==loc.name?', '+loc.admin1:''}<a class="map-link" href="${mapsUrl}" target="_blank" rel="noopener" title="Open in Google Maps"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Maps</a><button class="notif-btn${hasSpotNotif(loc.name)?' active':''}" id="notifBtn" title="Get notified">${bellSVG(16)}</button><button class="fav-btn${isFav?' active':''}" id="favBtn" title="${isFav?'Remove from favourites':'Add to favourites'}">${isFav?'★':'☆'}</button><button class="share-btn" id="shareBtn" onclick="shareSpot()" title="Share this spot"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></button><button class="share-btn" id="claimBtn" onclick="openClaimFlow()" title="Claim this spot as owner" style="margin-left:4px;font-size:.7rem;padding:4px 8px;white-space:nowrap">🏴 Claim</button>${qdLabel}`;
+  $('locName').innerHTML=`${loc.name}${loc.admin1&&loc.admin1!==loc.name?', '+loc.admin1:''}<a class="map-link" href="${mapsUrl}" target="_blank" rel="noopener" title="Open in Google Maps"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Maps</a><button class="notif-btn${hasSpotNotif(loc.name)?' active':''}" id="notifBtn" title="Get notified">${bellSVG(16)}</button><button class="fav-btn${isFav?' active':''}" id="favBtn" title="${isFav?'Remove from favourites':'Add to favourites'}">${isFav?'★':'☆'}</button><button class="share-btn" id="shareBtn" onclick="shareSpot()" title="Share this spot"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></button><a class="share-btn" id="webcamBtn" style="display:none;font-size:.7rem;padding:4px 8px;white-space:nowrap;text-decoration:none" target="_blank" rel="noopener" title="Live webcam" onclick="trackCtaClick('${loc.name}','livecam')">📷</a><button class="share-btn" id="claimBtn" onclick="openClaimFlow()" title="Claim this spot as owner" style="margin-left:4px;font-size:.7rem;padding:4px 8px;white-space:nowrap">🏴 Claim</button>${qdLabel}`;
 
   $('locSub').textContent=`${loc.country} · ${loc.latitude.toFixed(2)}°, ${loc.longitude.toFixed(2)}°`+(windDirs.size>0?` · Winds: ${[...windDirs].sort((a,b)=>a-b).map(d=>compass(d)).join('/')}`:'');
   $('locHdr').style.display='block';
@@ -4079,6 +4100,9 @@ async function renderMySpot(){
           <div style="font-size:.82rem;font-weight:700;color:var(--text);margin-bottom:4px;">🏴 Claim <span style="color:var(--accent)">${spotName}</span></div>
           <div style="font-size:.72rem;color:var(--tdim);margin-bottom:14px;">Are you the owner or manager of this spot? Claim it to add your business info.</div>
 
+          <label class="pp-label">Spot display name <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(optional — rename how this spot appears)</span></label>
+          <input type="text" id="claimDisplayName" class="pp-input" placeholder="e.g. RBSC Duinbergen" style="margin-bottom:12px"/>
+
           <label class="pp-label">Business name</label>
           <input type="text" id="claimBizName" class="pp-input" placeholder="e.g. Riverwoods Kite Club" style="margin-bottom:12px"/>
 
@@ -4157,6 +4181,7 @@ async function submitClaim(spotName){
   const email=loadProfile().email||_authSession?.user?.email;
   if(!email){ showToast('Sign in first'); return; }
   btn.disabled=true; btn.textContent='Submitting…';
+  const displayName =($('claimDisplayName')?.value||'').trim();
   const bizName     =($('claimBizName')?.value||'').trim();
   const website     =($('claimWebsite')?.value||'').trim();
   const contactName =($('claimContactName')?.value||'').trim();
@@ -4175,6 +4200,7 @@ async function submitClaim(spotName){
   const sb=getSb(); if(!sb){ btn.disabled=false; btn.textContent='Submit claim'; return; }
   const{error}=await sb.from('spot_claims').upsert({
     email, spot_name:spotName,
+    display_name:     displayName||null,
     business_name:    bizName||null,
     website:          website||null,
     contact_name:     contactName||null,
@@ -4200,6 +4226,23 @@ async function submitClaim(spotName){
   }).catch(()=>{});
   showToast('✓ Claim submitted! We\'ll verify within 48h.');
   renderMySpot();
+}
+
+async function submitSpotSuggestion(){
+  const btn=$('suggestSubmitBtn'); if(!btn) return;
+  const name=($('suggestName')?.value||'').trim();
+  const location=($('suggestLocation')?.value||'').trim();
+  const note=($('suggestNote')?.value||'').trim();
+  if(!name){ showToast('Please enter a spot name'); return; }
+  btn.disabled=true; btn.textContent='Sending…';
+  const sb=getSb();
+  const email=loadProfile().email||_authSession?.user?.email||null;
+  if(sb){
+    await sb.from('spot_suggestions').insert({ suggested_name:name, location:location||null, note:note||null, submitted_by:email||null }).catch(()=>{});
+  }
+  showToast('🙌 Thanks! We\'ll review your suggestion.');
+  btn.disabled=false; btn.textContent='Suggest this spot';
+  $('suggestSpotWrap').style.display='none';
 }
 
 // Show My Spot tab if user has any claims

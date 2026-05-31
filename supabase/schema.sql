@@ -97,6 +97,7 @@ CREATE TABLE IF NOT EXISTS spot_claims (
 );
 
 -- Add missing columns to existing spot_claims tables (idempotent)
+DO $$ BEGIN ALTER TABLE spot_claims ADD COLUMN display_name    text; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE spot_claims ADD COLUMN address         text; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE spot_claims ADD COLUMN lesson_url      text; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE spot_claims ADD COLUMN gear_url        text; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
@@ -109,6 +110,7 @@ DO $$ BEGIN ALTER TABLE spot_claims ADD COLUMN membership_note text; EXCEPTION W
 CREATE TABLE IF NOT EXISTS spot_info (
   id               uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
   spot_name        text        NOT NULL UNIQUE,
+  display_name     text,                              -- overrides spot_name in the card header
   business_name    text,
   website          text,
   description      text,
@@ -133,6 +135,27 @@ ALTER TABLE spot_info ENABLE ROW LEVEL SECURITY;
 
 DO $$ BEGIN
   CREATE POLICY "all_select_spot_info" ON spot_info FOR SELECT TO anon, authenticated USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- User-submitted spot suggestions (when search finds nothing)
+CREATE TABLE IF NOT EXISTS spot_suggestions (
+  id              uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  suggested_name  text        NOT NULL,
+  location        text,
+  note            text,
+  submitted_by    text,       -- email, null for anonymous
+  reviewed        boolean     NOT NULL DEFAULT false,
+  created_at      timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE spot_suggestions ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  CREATE POLICY "all_insert_suggestions" ON spot_suggestions FOR INSERT TO anon, authenticated WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "all_select_suggestions" ON spot_suggestions FOR SELECT TO anon, authenticated USING (true);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- CTA click tracking (lesson, gear, website, instagram, facebook, livecam)
