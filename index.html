@@ -955,6 +955,10 @@
     <div style="font-size:2.5rem;margin-bottom:10px">⚠️</div>
     <h3 id="errorTitle">Location not found</h3>
     <p id="errorMsg" style="font-size:.85rem;margin-top:4px">Try a different search term.</p>
+    <div id="spotPendingMsg" style="display:none;margin-top:12px;padding:12px 16px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:12px;font-size:.82rem;color:#fbbf24;text-align:center">
+      ⏳ <strong id="spotPendingName"></strong> has been requested and is currently being reviewed by our team. We'll add it to the app soon!
+    </div>
+    <button onclick="goHome()" style="margin-top:14px;padding:9px 24px;background:rgba(255,255,255,.08);border:1px solid var(--border);border-radius:10px;color:var(--text);font-size:.85rem;font-weight:700;cursor:pointer">← Back to search</button>
     <div id="suggestSpotWrap" style="display:none;margin-top:16px;background:rgba(0,212,255,.06);border:1px solid rgba(0,212,255,.2);border-radius:14px;text-align:left;overflow:hidden">
       <div style="padding:14px 16px 10px;border-bottom:1px solid rgba(0,212,255,.15)">
         <div style="font-size:.88rem;font-weight:700;color:var(--text)">🪁 Request a new spot</div>
@@ -3019,8 +3023,9 @@ async function fetchForecast(query){
     if(!geo.results?.length){
       $('errorTitle').textContent='Location not found';
       $('errorMsg').textContent=`Could not find "${query}". Try a more specific name.`;
+      const isPending=checkSpotPending(query);
       const sw=$('suggestSpotWrap'); if(sw){
-        sw.style.display='block';
+        sw.style.display=isPending?'none':'block';
         $('suggestName').value=query;
         $('suggestLocation').value=''; $('suggestCoords').value=''; $('suggestLat').value=''; $('suggestLon').value='';
         $('suggestDirs').value=''; $('suggestBusiness').value=''; $('suggestWebsite').value=''; $('suggestNote').value='';
@@ -4326,6 +4331,27 @@ async function submitClaim(spotName){
   renderMySpot();
 }
 
+function showSpotPendingMsg(spotName){
+  const msg=$('spotPendingMsg'); const nameEl=$('spotPendingName');
+  if(!msg||!nameEl) return;
+  msg.style.display='block';
+  nameEl.textContent=spotName;
+}
+
+function checkSpotPending(query){
+  try{
+    const pending=JSON.parse(sessionStorage.getItem('pendingSpots')||'[]');
+    const match=pending.find(n=>n===query.toLowerCase()||query.toLowerCase().includes(n)||n.includes(query.toLowerCase()));
+    if(match){
+      const original=pending.find(n=>n===match)||match;
+      showSpotPendingMsg(query);
+      return true;
+    }
+  }catch(e){}
+  const msg=$('spotPendingMsg'); if(msg) msg.style.display='none';
+  return false;
+}
+
 function splitCoords(val){
   // Accepts "51.361390881916336, 3.327422018080811" or "51,361, 3,327" etc.
   const parts = val.replace(/,(\d)/g,' $1').replace(/,/g,'.').trim().split(/\s+/);
@@ -4380,9 +4406,15 @@ async function submitSpotSuggestion(){
     body: JSON.stringify({ name, location, lat, lon, dirs, business, website, note, contact_email: contactEmail }),
   }).catch(()=>{});
 
+  // Remember submitted spot name so we can show "pending review" on next search
+  try{ const pending=JSON.parse(sessionStorage.getItem('pendingSpots')||'[]'); pending.push(name.toLowerCase()); sessionStorage.setItem('pendingSpots',JSON.stringify([...new Set(pending)])); }catch(e){}
+
   showToast('🙌 Spot request sent! We\'ll review and add it soon.');
   btn.disabled=false; btn.textContent='Send spot request →';
   $('suggestSpotWrap').style.display='none';
+
+  // Show pending message immediately for this search
+  showSpotPendingMsg(name);
 }
 
 // ── ADMIN PANEL ──────────────────────────────────────────────────────────────
