@@ -4638,9 +4638,16 @@ async function removeFriend(id){
 
 async function cancelFriendRequest(id){
   const sb=getSb(); if(!sb) return;
-  await sb.from('friendships').delete().eq('id',id);
+  // Remove row from DOM immediately
+  const btn=document.querySelector(`button[onclick="cancelFriendRequest('${id}')"]`);
+  if(btn) btn.closest('div[style*="border-bottom"]')?.remove();
+  // Delete from DB and update cache
+  sb.from('friendships').delete().eq('id',id).then(()=>{}).catch(()=>{});
   if(_friendsCache) _friendsCache=_friendsCache.filter(r=>r.id!==id);
-  await renderFriendsPanel();
+  // If no rows left show empty state
+  const fl=$('friendsList');
+  if(fl&&!fl.querySelector('div[style*="border-bottom"]'))
+    fl.innerHTML='<div class="stats-empty">No friends yet — search by nickname to add some!</div>';
   showToast('Request cancelled.');
 }
 
