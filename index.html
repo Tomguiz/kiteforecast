@@ -4332,8 +4332,8 @@ async function submitSpotSuggestion(){
   const btn=$('suggestSubmitBtn'); if(!btn) return;
   const name     =($('suggestName')?.value||'').trim();
   const location =($('suggestLocation')?.value||'').trim();
-  const lat      =($('suggestLat')?.value||'').trim();
-  const lon      =($('suggestLon')?.value||'').trim();
+  const lat      =($('suggestLat')?.value||'').trim().replace(',','.');
+  const lon      =($('suggestLon')?.value||'').trim().replace(',','.');
   const dirs     =($('suggestDirs')?.value||'').trim();
   const business =($('suggestBusiness')?.value||'').trim();
   const website  =($('suggestWebsite')?.value||'').trim();
