@@ -4924,7 +4924,16 @@ async function initAuth(){
       const email=session.user.email;
       const p=loadProfile();
       const isNew=email!==p.email;
-      if(isNew) await syncAllFromSupabase(email);
+      if(isNew){
+        await syncAllFromSupabase(email);
+        renderHintChips();
+        renderNotifList();
+        updateProfileDot();
+      } else {
+        // Same account returning — still sync favs/notifs in case they changed elsewhere
+        syncFavsFromSupabase(email).then(()=>renderHintChips());
+        syncNotifsFromSupabase(email).then(()=>{ renderNotifList(); renderHintChips(); });
+      }
       // Only toast on a genuine new sign-in, not on session restore at page load
       if(isNew) showToast('✓ Signed in as '+email);
       if(pendingNotif){
