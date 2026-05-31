@@ -786,6 +786,18 @@
     .card-bell svg { display:block; transition:fill .15s; }
     .card-bell svg .bell-fill     { fill:none; }
     .card-bell.active svg .bell-fill { fill:var(--accent); }
+    /* "I'm going" button on day cards */
+    .card-going-btn {
+      width:100%; margin-top:5px; padding:5px 0; border-radius:7px; border:none; cursor:pointer;
+      font-size:.62rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase;
+      background:rgba(34,197,94,.12); color:#4ade80; border:1px solid rgba(34,197,94,.25);
+      transition:background .15s,color .15s;
+    }
+    .card-going-btn:hover { background:rgba(34,197,94,.22); }
+    .card-going-btn.going { background:rgba(34,197,94,.25); color:#fff; border-color:rgba(34,197,94,.5); }
+    /* Attendance bottom sheet */
+    .attend-sheet-overlay { position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.6);backdrop-filter:blur(3px);display:flex;align-items:flex-end;justify-content:center; }
+    .attend-sheet { background:#111827;border-radius:20px 20px 0 0;padding:24px 20px 36px;width:100%;max-width:480px;box-shadow:0 -8px 40px rgba(0,0,0,.5); }
 
     /* notif bell in spot header */
     .notif-btn {
@@ -3285,7 +3297,9 @@ function renderGrid(){
       ${dirPill}
       ${hPill}
       ${tideLine}
-      <div class="rating-badge ${rating.cls}">${rating.label}</div>`;
+      <div class="rating-badge ${rating.cls}">${rating.label}</div>
+      ${goodHours>=2?`<button class="card-going-btn" id="going-${dateStr}" onclick="event.stopPropagation();openAttendSheet('${dateStr}',${i},'${loc.name}',${loc.lat},${loc.lon})">🏄 I'm going</button>`:''}
+    `;
     grid.appendChild(card);
   });
 
@@ -3294,6 +3308,7 @@ function renderGrid(){
 
   showOnly('results');
   renderSpotInfoCard(loc.name);
+  if(_authSession?.user) loadAttendances();
 
   // ── deep-link: scroll to & highlight the target date card ──
   if(window._deepLinkDate){
@@ -4471,6 +4486,121 @@ async function submitSpotSuggestion(){
 
   // Show pending message immediately for this search
   showSpotPendingMsg(name);
+}
+
+// ── SESSION ATTENDANCE ───────────────────────────────────────────────────────
+let _attendCache={}; // dateStr -> attendance row or null
+
+async function loadAttendances(){
+  const sb=getSb(); const email=_authSession?.user?.email||loadProfile().email;
+  if(!sb||!email) return;
+  const today=new Date().toISOString().slice(0,10);
+  const{data}=await sb.from('session_attendances').select('*')
+    .eq('email',email).eq('cancelled',false).gte('session_date',today);
+  _attendCache={};
+  (data||[]).forEach(r=>{ _attendCache[r.session_date]=r; });
+  // Update all going buttons
+  document.querySelectorAll('.card-going-btn').forEach(btn=>{
+    const dateStr=btn.id.replace('going-','');
+    if(_attendCache[dateStr]){
+      btn.classList.add('going');
+      btn.textContent=`✓ Going · ${_attendCache[dateStr].start_time}`;
+    }
+  });
+}
+
+function openAttendSheet(dateStr, dayIdx, spotName, lat, lon){
+  if(!_authSession?.user){ showToast('Sign in to confirm attendance'); _signinContext='generic'; openProfilePanel(); return; }
+  if($('attendSheet')) return;
+
+  const existing=_attendCache[dateStr];
+  const label=new Date(dateStr+'T12:00:00').toLocaleDateString('en',{weekday:'long',month:'short',day:'numeric'});
+
+  // Build time options from good wind hours
+  const timeOpts=['06:00','07:00','08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00'];
+  const timeSelOpts=timeOpts.map(t=>`<option value="${t}"${existing?.start_time===t?' selected':''}>${t}</option>`).join('');
+  const durOpts=[1,2,3,4,5].map(h=>`<option value="${h}"${(existing?.duration_h||2)===h?' selected':''}>${h}h on water</option>`).join('');
+
+  const overlay=document.createElement('div');
+  overlay.className='attend-sheet-overlay';
+  overlay.id='attendSheet';
+  overlay.onclick=e=>{ if(e.target===overlay) closeAttendSheet(); };
+  overlay.innerHTML=`
+    <div class="attend-sheet">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+        <div>
+          <div style="font-size:1rem;font-weight:800;color:#f1f5f9">🏄 I'm going kiting!</div>
+          <div style="font-size:.8rem;color:#64748b;margin-top:2px">${spotName} · ${label}</div>
+        </div>
+        <button onclick="closeAttendSheet()" style="background:none;border:none;color:#64748b;font-size:1.2rem;cursor:pointer;padding:4px">✕</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">
+        <div>
+          <label style="font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px">Start time</label>
+          <select id="attendStartTime" class="pp-input" style="padding:10px 12px">
+            ${timeSelOpts}
+          </select>
+        </div>
+        <div>
+          <label style="font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px">Duration</label>
+          <select id="attendDuration" class="pp-input" style="padding:10px 12px">
+            ${durOpts}
+          </select>
+        </div>
+      </div>
+      <input type="text" id="attendNote" class="pp-input" placeholder="Add a note… (optional)" maxlength="100" value="${existing?.note||''}" style="margin-bottom:16px"/>
+      <button onclick="confirmAttendance('${dateStr}','${spotName}',${lat},${lon})" class="btn pp-save-btn" style="width:100%;font-size:.95rem">
+        ${existing?'Update session':'Confirm — notify my friends'}
+      </button>
+      ${existing?`<button onclick="cancelAttendance('${dateStr}')" style="width:100%;margin-top:8px;background:none;border:none;color:#f87171;font-size:.8rem;cursor:pointer;padding:6px">Cancel my attendance</button>`:''}
+    </div>`;
+  document.body.appendChild(overlay);
+  setTimeout(()=>{ const s=$('attendStartTime'); if(s) s.focus(); },100);
+}
+
+function closeAttendSheet(){
+  const el=$('attendSheet'); if(el) el.remove();
+}
+
+async function confirmAttendance(dateStr, spotName, lat, lon){
+  const sb=getSb(); const email=_authSession?.user?.email||loadProfile().email;
+  if(!sb||!email) return;
+  const startTime=$('attendStartTime')?.value||'12:00';
+  const durationH=parseInt($('attendDuration')?.value||'2');
+  const note=($('attendNote')?.value||'').trim();
+  const nickname=loadProfile().nickname||email.split('@')[0];
+
+  const row={email,nickname,spot_name:spotName,spot_lat:lat,spot_lon:lon,
+    session_date:dateStr,start_time:startTime,duration_h:durationH,
+    note:note||null,cancelled:false};
+
+  await sb.from('session_attendances').upsert(row,{onConflict:'email,spot_name,session_date'});
+  _attendCache[dateStr]=row;
+
+  // Update button immediately
+  const btn=$(`going-${dateStr}`)||document.getElementById(`going-${dateStr}`);
+  if(btn){ btn.classList.add('going'); btn.textContent=`✓ Going · ${startTime}`; }
+
+  closeAttendSheet();
+  showToast(`✓ Session confirmed · ${startTime} · ${durationH}h`);
+
+  // Notify friends — fire and forget
+  fetch('https://kpwmajtxmcfpakvonimf.supabase.co/functions/v1/session-attend-notify',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwd21hanR4bWNmcGFrdm9uaW1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTcyMjYsImV4cCI6MjA5MDczMzIyNn0.QfQuIQbnfVUOApPbOdvCRbNsVdb0SBAwMX-hvioGJmg'},
+    body:JSON.stringify({email,nickname,spot_name:spotName,session_date:dateStr,start_time:startTime,duration_h:durationH,note:note||''}),
+  }).catch(()=>{});
+}
+
+async function cancelAttendance(dateStr){
+  const sb=getSb(); const email=_authSession?.user?.email||loadProfile().email;
+  if(!sb||!email) return;
+  await sb.from('session_attendances').update({cancelled:true}).eq('email',email).eq('session_date',dateStr);
+  delete _attendCache[dateStr];
+  const btn=document.getElementById(`going-${dateStr}`);
+  if(btn){ btn.classList.remove('going'); btn.textContent='🏄 I\'m going'; }
+  closeAttendSheet();
+  showToast('Attendance cancelled.');
 }
 
 // ── FRIENDS ──────────────────────────────────────────────────────────────────

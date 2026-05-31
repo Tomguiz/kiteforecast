@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>KiteForecast &mdash; Your friend is going kiting!</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+</head>
+<body style="margin:0;padding:0;background-color:#080a0f;font-family:'DM Sans',Arial,sans-serif;color:#e8eaf0;">
+
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#080a0f;">
+<tr><td align="center" style="padding:32px 16px;">
+<table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;">
+
+  <!-- HEADER -->
+  <tr><td style="background:linear-gradient(135deg,#064e3b,#0a3d6b);border-radius:16px 16px 0 0;padding:36px 40px 28px 40px;">
+    <table cellpadding="0" cellspacing="0" border="0" style="margin-bottom:22px;">
+      <tr>
+        <td style="font-size:20px;padding-right:8px;">&#127993;</td>
+        <td style="font-family:'Bebas Neue',Arial,sans-serif;font-size:20px;letter-spacing:3px;color:rgba(255,255,255,0.85);">KITEFORECAST</td>
+      </tr>
+    </table>
+    <table cellpadding="0" cellspacing="0" border="0" style="margin-bottom:16px;">
+      <tr>
+        <td style="background:rgba(74,222,128,0.15);border:1px solid rgba(74,222,128,0.4);border-radius:20px;padding:5px 12px;font-size:11px;font-weight:700;letter-spacing:1.5px;color:#4ade80;white-space:nowrap;">&#127940; SESSION ALERT</td>
+      </tr>
+    </table>
+    <div style="font-family:'Bebas Neue',Arial,sans-serif;font-size:52px;line-height:1.0;color:#ffffff;letter-spacing:1px;margin-bottom:8px;">
+      <span style="color:#4ade80;">[[attendee_nickname]]</span><br/>is going kiting!
+    </div>
+    <div style="font-size:15px;color:rgba(255,255,255,0.72);">Your friend confirmed a session — will you join them on the water?</div>
+  </td></tr>
+
+  <!-- SESSION DETAILS -->
+  <tr><td style="background-color:#161b27;border:1px solid #1e2535;border-top:none;padding:28px 40px;">
+
+    <!-- Session card -->
+    <table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:20px;">
+      <tr>
+        <td style="background:rgba(74,222,128,.06);border:1px solid rgba(74,222,128,.2);border-radius:12px;padding:20px 24px;">
+          <table cellpadding="0" cellspacing="0" border="0" width="100%">
+            <tr>
+              <td style="padding-bottom:14px;" colspan="2">
+                <div style="font-size:1.1rem;font-weight:700;color:#4ade80;">&#128205; [[spot_name]]</div>
+                <div style="font-size:.85rem;color:rgba(255,255,255,.55);margin-top:3px;">[[session_date]]</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="width:50%;padding-right:10px;">
+                <div style="font-size:.7rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#4a5568;margin-bottom:4px;">On the water</div>
+                <div style="font-size:1.3rem;font-weight:800;color:#ffffff;">[[start_time]] – [[end_time]]</div>
+                <div style="font-size:.78rem;color:#64748b;">[[duration_h]]h session</div>
+              </td>
+              <td style="width:50%;text-align:right;">
+                <a href="[[maps_link]]" style="display:inline-block;background:#0a7ac4;color:#fff;font-size:12px;font-weight:600;padding:8px 14px;border-radius:8px;text-decoration:none;">&#128506; Open map</a>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+
+    <!-- Note if present -->
+    <table cellpadding="0" cellspacing="0" border="0" width="100%" style="display:[[note_display]]">
+      <tr>
+        <td style="background:rgba(255,255,255,.03);border:1px solid #1e2535;border-radius:10px;padding:14px 18px;margin-bottom:20px;">
+          <div style="font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#4a5568;margin-bottom:6px;">Note from [[attendee_nickname]]</div>
+          <div style="font-size:.9rem;color:#e8eaf0;">[[note]]</div>
+        </td>
+      </tr>
+    </table>
+
+  </td></tr>
+
+  <!-- CTA -->
+  <tr><td style="background-color:#111827;border:1px solid #1e2535;border-top:none;padding:28px 40px;text-align:center;">
+    <a href="[[app_link]]" style="display:inline-block;background:linear-gradient(135deg,#16a34a,#15803d);color:#ffffff;font-family:'DM Sans',Arial,sans-serif;font-size:16px;font-weight:700;padding:16px 40px;border-radius:10px;text-decoration:none;">&#127940; Check the forecast &amp; join!</a>
+    <div style="font-size:12px;color:#4a5568;margin-top:12px;">Opens the app &rarr; [[spot_name]] forecast</div>
+  </td></tr>
+
+  <!-- FOOTER -->
+  <tr><td style="background-color:#0d0f14;border:1px solid #1e2535;border-top:none;border-radius:0 0 16px 16px;padding:18px 40px;text-align:center;">
+    <div style="font-family:'Bebas Neue',Arial,sans-serif;font-size:16px;letter-spacing:2.5px;color:#2a3347;margin-bottom:5px;">LIFE STARTS AT 25 KNOTS</div>
+    <div style="font-size:11px;color:#2a3347;">Tichkes Corporation Inc. &mdash; All rights reserved</div>
+  </td></tr>
+
+</table>
+</td></tr>
+</table>
+</body>
+</html>
