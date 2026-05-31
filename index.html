@@ -4793,7 +4793,8 @@ async function savePhone(){
 })();
 
 // Handle ?review=<base64-spot-data> — admin one-click spot approval
-;(function(){
+// Sign out any existing session first so the magic link login takes effect
+;(async function(){
   const params=new URLSearchParams(location.search);
   const reviewParam=params.get('review');
   if(!reviewParam) return;
@@ -4802,6 +4803,14 @@ async function savePhone(){
     const spot=JSON.parse(atob(reviewParam));
     window._pendingReviewSpot=spot;
   }catch(e){}
+  // Sign out current session so the magic link auth session is active
+  const sb=getSb();
+  if(sb){
+    const {data:{session}}=await sb.auth.getSession();
+    if(session && session.user?.email !== 'tom.guisgand@gmail.com'){
+      await sb.auth.signOut();
+    }
+  }
 })();
 
 function openAdminReview(){
