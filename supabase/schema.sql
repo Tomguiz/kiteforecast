@@ -7,7 +7,27 @@
 CREATE EXTENSION IF NOT EXISTS pg_cron;
 CREATE EXTENSION IF NOT EXISTS pg_net;
 
--- 2. Favourites table
+-- 2. Tide cache (shared across all users — one Stormglass call per spot per day)
+CREATE TABLE IF NOT EXISTS tide_cache (
+  id         uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  spot_key   text        NOT NULL,  -- 'lat,lon' rounded to 3 decimals
+  date       date        NOT NULL,
+  extremes   jsonb       NOT NULL,
+  fetched_at timestamptz NOT NULL DEFAULT now(),
+  UNIQUE (spot_key, date)
+);
+
+ALTER TABLE tide_cache ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  CREATE POLICY "all_select_tide_cache" ON tide_cache FOR SELECT TO anon, authenticated USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "all_insert_tide_cache" ON tide_cache FOR INSERT TO anon, authenticated WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- 3. Favourites table
 CREATE TABLE IF NOT EXISTS favourites (
   id          uuid             PRIMARY KEY DEFAULT gen_random_uuid(),
   email       text             NOT NULL,
