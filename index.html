@@ -972,17 +972,15 @@
           <input type="text" id="suggestLocation" class="pp-input" placeholder="e.g. Koksijde, West Flanders, Belgium"/>
         </div>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-          <div>
-            <label class="pp-label">Latitude <span style="color:#f87171">*</span></label>
-            <input type="number" id="suggestLat" class="pp-input" placeholder="e.g. 51.1234" step="0.0001"/>
-          </div>
-          <div>
-            <label class="pp-label">Longitude <span style="color:#f87171">*</span></label>
-            <input type="number" id="suggestLon" class="pp-input" placeholder="e.g. 2.6543" step="0.0001"/>
+        <div>
+          <label class="pp-label">Coordinates <span style="color:#f87171">*</span> <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(paste from Google Maps)</span></label>
+          <input type="text" id="suggestCoords" class="pp-input" placeholder="e.g. 51.361390, 3.327422" oninput="splitCoords(this.value)"/>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px">
+            <input type="text" id="suggestLat" class="pp-input" placeholder="Latitude" style="font-size:.78rem;opacity:.7"/>
+            <input type="text" id="suggestLon" class="pp-input" placeholder="Longitude" style="font-size:.78rem;opacity:.7"/>
           </div>
         </div>
-        <a href="https://maps.google.com" target="_blank" style="display:inline-flex;align-items:center;gap:5px;margin-top:-2px;padding:6px 12px;background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.25);border-radius:8px;font-size:.72rem;font-weight:700;color:var(--accent);text-decoration:none">📍 Open Google Maps → search the spot → long-press → copy coordinates</a>
+        <a href="https://maps.google.com" target="_blank" style="display:inline-flex;align-items:center;gap:5px;margin-top:-4px;padding:6px 12px;background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.25);border-radius:8px;font-size:.72rem;font-weight:700;color:var(--accent);text-decoration:none">📍 Open Google Maps → long-press the spot → tap the coordinates → copy</a>
 
         <div>
           <label class="pp-label">Good wind directions <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(optional)</span></label>
@@ -3024,7 +3022,7 @@ async function fetchForecast(query){
       const sw=$('suggestSpotWrap'); if(sw){
         sw.style.display='block';
         $('suggestName').value=query;
-        $('suggestLocation').value=''; $('suggestLat').value=''; $('suggestLon').value='';
+        $('suggestLocation').value=''; $('suggestCoords').value=''; $('suggestLat').value=''; $('suggestLon').value='';
         $('suggestDirs').value=''; $('suggestBusiness').value=''; $('suggestWebsite').value=''; $('suggestNote').value='';
         const pe=loadProfile().email||_authSession?.user?.email||'';
         if($('suggestEmail')) $('suggestEmail').value=pe;
@@ -4326,6 +4324,17 @@ async function submitClaim(spotName){
   }).catch(()=>{});
   showToast('✓ Claim submitted! We\'ll verify within 48h.');
   renderMySpot();
+}
+
+function splitCoords(val){
+  // Accepts "51.361390881916336, 3.327422018080811" or "51,361, 3,327" etc.
+  const parts = val.replace(/,(\d)/g,' $1').replace(/,/g,'.').trim().split(/\s+/);
+  const nums = parts.map(p=>parseFloat(p)).filter(n=>!isNaN(n));
+  if(nums.length>=2){
+    const latEl=$('suggestLat'), lonEl=$('suggestLon');
+    if(latEl){ latEl.value=nums[0]; latEl.style.border=''; }
+    if(lonEl){ lonEl.value=nums[1]; lonEl.style.border=''; }
+  }
 }
 
 async function submitSpotSuggestion(){
