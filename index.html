@@ -4520,11 +4520,27 @@ async function renderFriendsPanel(){
   }
 
   // Friends list
+  // Fetch all nicknames needed at once
+  const allEmails=[
+    ...accepted.map(r=>r.requester===email?r.recipient:r.requester),
+    ...outgoing.map(r=>r.recipient),
+  ];
+  const nickMap={};
+  if(allEmails.length){
+    const{data:allProfiles}=await sb.from('profiles').select('email,nickname').in('email',allEmails);
+    (allProfiles||[]).forEach(p=>{ nickMap[p.email]=p.nickname||'someone'; });
+  }
+
+  // Outgoing pending requests (always shown if any)
+  const outgoingHtml = outgoing.map(r=>`
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 0;border-bottom:1px solid var(--border);font-size:.8rem;color:var(--tdim)">
+      <span>⏳ Request sent to <strong style="color:var(--text)">${nickMap[r.recipient]||'someone'}</strong></span>
+      <button class="btn-reset" style="font-size:.7rem;color:#f87171;padding:4px 8px;border:1px solid rgba(248,113,113,.3);border-radius:6px;white-space:nowrap" onclick="cancelFriendRequest('${r.id}')">Cancel</button>
+    </div>`).join('');
+
+  // Accepted friends
   if(accepted.length){
-    const friendEmails=accepted.map(r=>r.requester===email?r.recipient:r.requester);
-    const{data:profiles}=await sb.from('profiles').select('email,nickname').in('email',friendEmails);
-    const nickMap=Object.fromEntries((profiles||[]).map(p=>[p.email,p.nickname||p.email]));
-    $('friendsList').innerHTML=accepted.map(r=>{
+    const acceptedHtml=accepted.map(r=>{
       const fe=r.requester===email?r.recipient:r.requester;
       return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 0;border-bottom:1px solid var(--border);">
         <div style="display:flex;align-items:center;gap:10px">
@@ -4537,18 +4553,11 @@ async function renderFriendsPanel(){
         <button class="btn-reset" style="font-size:.7rem;color:var(--tdim);padding:4px 8px;border:1px solid var(--border);border-radius:6px" onclick="removeFriend('${r.id}')">Remove</button>
       </div>`;
     }).join('');
-  } else if(!outgoing.length){
-    $('friendsList').innerHTML='<div class="stats-empty">No friends yet — search by nickname to add some!</div>';
+    $('friendsList').innerHTML=outgoingHtml+acceptedHtml;
+  } else if(outgoing.length){
+    $('friendsList').innerHTML=outgoingHtml;
   } else {
-    // Fetch nicknames for outgoing recipients
-    const outEmails=outgoing.map(r=>r.recipient);
-    const{data:outProfiles}=await sb.from('profiles').select('email,nickname').in('email',outEmails);
-    const outNickMap=Object.fromEntries((outProfiles||[]).map(p=>[p.email,p.nickname||'someone']));
-    $('friendsList').innerHTML=outgoing.map(r=>`
-      <div style="padding:10px 0;border-bottom:1px solid var(--border);font-size:.8rem;color:var(--tdim)">
-        ⏳ Request sent to <strong style="color:var(--text)">${outNickMap[r.recipient]||'someone'}</strong>
-        <button class="btn-reset" style="font-size:.7rem;color:#f87171;margin-left:8px" onclick="cancelFriendRequest('${r.id}')">Cancel</button>
-      </div>`).join('');
+    $('friendsList').innerHTML='<div class="stats-empty">No friends yet — search by nickname to add some!</div>';
   }
 }
 
