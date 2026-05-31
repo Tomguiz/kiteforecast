@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Sign in to KiteForecast</title>
+  <meta name="x-apple-disable-message-reformatting"/>
 </head>
 <body style="margin:0;padding:0;background-color:#0a0f1e;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
   <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#0a0f1e;padding:40px 16px;">
@@ -18,7 +19,7 @@
                 🪁 KiteForecast
               </p>
               <p style="margin:6px 0 0;font-size:0.85rem;color:#64748b;letter-spacing:0.05em;text-transform:uppercase;">
-                by Tichkes
+                by The Tichkes
               </p>
             </td>
           </tr>
@@ -38,7 +39,7 @@
               <div style="background-color:#0a0f1e;border:2px solid #38bdf8;border-radius:12px;padding:24px;text-align:center;margin-bottom:28px;">
                 <p style="margin:0 0 12px;font-size:0.75rem;color:#64748b;letter-spacing:0.1em;text-transform:uppercase;">Your sign-in code</p>
                 <div style="display:inline-block;background:#38bdf8;border-radius:8px;padding:12px 28px;">
-                  <span style="font-size:2.2rem;font-weight:900;color:#0a0f1e;letter-spacing:0;font-family:'Courier New',Courier,monospace;">{{ .Token }}</span>
+                  <a href="#" x-apple-data-detectors="false" style="font-size:2.2rem;font-weight:900;color:#0a0f1e;letter-spacing:0;font-family:'Courier New',Courier,monospace;text-decoration:none;">{{ .Token }}</a>
                 </div>
                 <p style="margin:10px 0 0;font-size:0.78rem;color:#64748b;">Tap and hold the code above to copy it</p>
               </div>
