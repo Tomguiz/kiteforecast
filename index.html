@@ -1216,23 +1216,26 @@
             </div>
             <button id="ppManageSubBtn" onclick="manageSubscription()" style="width:100%;padding:10px;background:transparent;border:1px solid rgba(245,158,11,.35);border-radius:8px;font-size:.78rem;font-weight:600;color:#f59e0b;cursor:pointer;transition:background .15s;" onmouseover="this.style.background='rgba(245,158,11,.1)'" onmouseout="this.style.background='transparent'">Manage subscription → cancel, change card</button>
           </div>
-          <div style="border-top:1px solid var(--border);margin:12px 0 4px"></div>
-          <div class="pp-toggle-row">
-            <div>
-              <div style="font-size:.82rem;font-weight:600;color:var(--text)">📱 SMS alerts <span class="premium-badge">PREMIUM</span></div>
-              <div style="font-size:.72rem;color:var(--tdim);margin-top:2px">Text message 1h before your session</div>
+          <div style="border-top:1px solid var(--border);margin:16px 0"></div>
+          <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:12px;padding:14px 16px;">
+            <div class="pp-toggle-row" style="margin-bottom:0">
+              <div>
+                <div style="font-size:.85rem;font-weight:600;color:var(--text)">📱 SMS alerts <span class="premium-badge">PREMIUM</span></div>
+                <div style="font-size:.73rem;color:var(--tdim);margin-top:3px">Text message 1h before your session</div>
+              </div>
+              <button class="pp-toggle" id="ppSmsToggle" onclick="toggleSms()"><span></span></button>
             </div>
-            <button class="pp-toggle" id="ppSmsToggle" onclick="toggleSms()"><span></span></button>
-          </div>
-          <div id="ppPhoneSection" style="display:none;margin-top:8px;">
-            <label class="pp-label">Phone number</label>
-            <input type="tel" id="ppPhoneInput" class="pp-input" placeholder="+32478123456" />
-            <button class="btn pp-save-btn" id="ppPhoneSaveBtn" onclick="savePhone()" style="margin-top:2px">Save</button>
-            <p class="pp-note">International format e.g. +32478123456. Used only for kite alerts.</p>
+            <div id="ppPhoneSection" style="display:none;margin-top:14px;border-top:1px solid var(--border);padding-top:14px;">
+              <label class="pp-label">Phone number</label>
+              <input type="tel" id="ppPhoneInput" class="pp-input" placeholder="+32478123456" style="margin-bottom:8px"/>
+              <button class="btn pp-save-btn" id="ppPhoneSaveBtn" onclick="savePhone()">Save</button>
+              <p class="pp-note" style="margin-top:8px">International format e.g. +32478123456. Used only for kite alerts.</p>
+            </div>
           </div>
         </div>
 
-        <button class="btn-reset" id="ppSignOutBtn" onclick="signOut()" style="font-size:.78rem;color:#f87171;text-align:left;padding:4px 0 0;">Sign out</button>
+        <div style="border-top:1px solid var(--border);margin:8px 0 4px"></div>
+        <button class="btn-reset" id="ppSignOutBtn" onclick="signOut()" style="width:100%;padding:12px;border-radius:10px;border:1px solid rgba(248,113,113,.25);background:rgba(248,113,113,.06);font-size:.85rem;font-weight:600;color:#f87171;text-align:center;cursor:pointer;">Sign out</button>
       </div>
     </div>
     <div id="ppPanelMySpot" class="pp-body" style="display:none">
