@@ -33,10 +33,11 @@ Deno.serve(async (req) => {
 
   const friendEmails = friendships.map((f: any) => f.requester === email ? f.recipient : f.requester)
 
-  // Get friend profiles (nickname + email)
+  // Get friend profiles — only those who want these notifications
   const { data: friends } = await admin.from('profiles')
-    .select('email,nickname')
+    .select('email,nickname,friend_session_notifs')
     .in('email', friendEmails)
+    .or('friend_session_notifs.is.null,friend_session_notifs.eq.true')
 
   // Format date nicely
   const dateLabel = new Date(session_date + 'T12:00:00').toLocaleDateString('en', {

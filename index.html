@@ -1198,7 +1198,15 @@
           </div>
           <button class="btn pp-save-btn" id="ppDigestNowBtn" onclick="sendDigestNow()" style="margin-top:2px">📩 Send me this week's forecast now</button>
         </div>
-        <div style="border-top:1px solid var(--border);margin:4px 0"></div>
+        <div style="border-top:1px solid var(--border);margin:12px 0 8px"></div>
+        <div class="pp-toggle-row">
+          <div>
+            <div style="font-size:.82rem;font-weight:600;color:var(--text)">👥 Friends session alerts</div>
+            <div style="font-size:.72rem;color:var(--tdim);margin-top:2px">Email me when a friend confirms they're going kiting</div>
+          </div>
+          <button class="pp-toggle" id="ppFriendSessionToggle" onclick="toggleFriendSessionNotifs()"><span></span></button>
+        </div>
+        <div style="border-top:1px solid var(--border);margin:8px 0 4px"></div>
 
         <!-- Premium section (non-premium) -->
         <div id="ppPremiumUpgrade">
@@ -3683,6 +3691,8 @@ async function updateLastSeen(email){
     saveProfile(p);
     const digestEl=$('ppDigestToggle');
     if(digestEl) digestEl.classList.toggle('on',!!p.digestEnabled);
+    const fst=$('ppFriendSessionToggle');
+    if(fst) fst.classList.toggle('on', p.friendSessionNotifs!==false);
   }
 }
 
@@ -5131,7 +5141,7 @@ function updatePremiumUI(){
 
 async function syncPremiumFromSupabase(email){
   const sb=getSb(); if(!sb||!email) return;
-  const{data,error}=await sb.from('profiles').select('is_premium,sms_enabled,phone_number,is_admin,nickname').eq('email',email).single();
+  const{data,error}=await sb.from('profiles').select('is_premium,sms_enabled,phone_number,is_admin,nickname,friend_session_notifs').eq('email',email).single();
   if(error) console.warn('syncPremium error:',error.message);
   const p=loadProfile();
   if(data){
@@ -5140,7 +5150,11 @@ async function syncPremiumFromSupabase(email){
     p.phoneNumber=data.phone_number||'';
     p.isAdmin=!!data.is_admin;
     if(data.nickname) p.nickname=data.nickname;
+    if(data.friend_session_notifs!==null&&data.friend_session_notifs!==undefined)
+      p.friendSessionNotifs=data.friend_session_notifs!==false;
     saveProfile(p);
+    const fst=$('ppFriendSessionToggle');
+    if(fst) fst.classList.toggle('on', p.friendSessionNotifs!==false);
   }
   updatePremiumUI();
   const adminTab=$('ppTabAdmin');
@@ -5714,6 +5728,16 @@ async function toggleDigest(){
   const sb=getSb(); if(!sb||!p.email) return;
   await sb.from('profiles').upsert({email:p.email,digest_enabled:!!p.digestEnabled},{onConflict:'email'});
 }
+async function toggleFriendSessionNotifs(){
+  const p=loadProfile();
+  p.friendSessionNotifs = p.friendSessionNotifs===false ? true : false; // default true
+  saveProfile(p);
+  $('ppFriendSessionToggle').classList.toggle('on', p.friendSessionNotifs!==false);
+  const sb=getSb(); if(!sb||!p.email) return;
+  await sb.from('profiles').upsert({email:p.email, friend_session_notifs:p.friendSessionNotifs!==false},{onConflict:'email'});
+  showToast(p.friendSessionNotifs===false ? 'Friend session alerts off' : 'Friend session alerts on');
+}
+
 function toggleMasterNotif(){
   const p=loadProfile();
   p.notifsEnabled=!notifMasterEnabled();
