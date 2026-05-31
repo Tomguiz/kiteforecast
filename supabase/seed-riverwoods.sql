@@ -35,7 +35,7 @@ INSERT INTO spot_info (
   true,
   'Zeedijk-Het Zoute 832 B, 8300 Knokke-Heist',
   NULL,
-  'https://riverwoodsbeachclub.be/en/jackfly',
+  'https://booking.jackfly.be/',
   'https://riverwoodsbeachclub.be/en/kitesurf',
   'https://www.instagram.com/riverwoodsbeachclub/',
   'https://www.facebook.com/RWBCbytero/',

@@ -1029,6 +1029,7 @@
         <button class="pp-tab" id="ppTabNotifs" onclick="switchPpTab('notifs')">Notifications <span id="ppNotifCount" style="display:none"></span></button>
         <button class="pp-tab" id="ppTabStats" onclick="switchPpTab('stats')">Stats</button>
         <button class="pp-tab" id="ppTabMySpot" onclick="switchPpTab('myspot')" style="display:none">My Spot</button>
+        <button class="pp-tab" id="ppTabAdmin" onclick="switchPpTab('admin')" style="display:none">⚙️ Admin</button>
       </div>
       <button class="pp-close" onclick="closeProfilePanel()">✕</button>
     </div>
@@ -1151,6 +1152,9 @@
     </div>
     <div id="ppPanelMySpot" class="pp-body" style="display:none">
       <div id="ppMySpotContent"></div>
+    </div>
+    <div id="ppPanelAdmin" class="pp-body" style="display:none">
+      <div id="ppAdminContent"></div>
     </div>
     <div id="ppPanelStats" class="pp-body" style="display:none">
       <div id="ppStatsContent"></div>
@@ -4034,13 +4038,16 @@ function switchPpTab(tab){
   $('ppTabNotifs').classList.toggle('active',tab==='notifs');
   $('ppTabStats').classList.toggle('active',tab==='stats');
   $('ppTabMySpot').classList.toggle('active',tab==='myspot');
+  if($('ppTabAdmin')) $('ppTabAdmin').classList.toggle('active',tab==='admin');
   $('ppPanelProfile').style.display=tab==='profile'?'flex':'none';
   $('ppPanelNotifs').style.display=tab==='notifs'?'flex':'none';
   $('ppPanelStats').style.display=tab==='stats'?'flex':'none';
   $('ppPanelMySpot').style.display=tab==='myspot'?'flex':'none';
+  if($('ppPanelAdmin')) $('ppPanelAdmin').style.display=tab==='admin'?'flex':'none';
   if(tab==='notifs') renderNotifList();
   if(tab==='stats') renderStats();
   if(tab==='myspot') renderMySpot();
+  if(tab==='admin') renderAdminPanel();
 }
 function onEmailEdit(){}
 function showUpgradeModal(){
@@ -4245,6 +4252,133 @@ async function submitSpotSuggestion(){
   $('suggestSpotWrap').style.display='none';
 }
 
+// ── ADMIN PANEL ──────────────────────────────────────────────────────────────
+let _adminSpots=null;
+
+async function renderAdminPanel(){
+  const el=$('ppAdminContent'); if(!el) return;
+  if(!loadProfile().isAdmin){ el.innerHTML='<div class="stats-empty">Access denied.</div>'; return; }
+  el.innerHTML='<div style="color:var(--tdim);font-size:.8rem;padding:8px 0">Loading spots…</div>';
+  const sb=getSb(); if(!sb) return;
+  const{data}=await sb.from('spot_info').select('*').order('spot_name');
+  _adminSpots=data||[];
+
+  const rows=_adminSpots.map(s=>`
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="adminOpenSpot('${s.spot_name.replace(/'/g,"\\'")}')">
+      <div>
+        <div style="font-size:.82rem;font-weight:700;color:var(--text)">${s.display_name||s.business_name||s.spot_name}</div>
+        <div style="font-size:.7rem;color:var(--tdim)">${s.spot_name}${s.verified?' · ✓ Verified':' · ⚠️ Unverified'}</div>
+      </div>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color:var(--tdim)"><polyline points="9 18 15 12 9 6"/></svg>
+    </div>`).join('');
+
+  el.innerHTML=`
+    <div class="stats-section-title" style="margin-bottom:8px">Spot info — ${_adminSpots.length} spots</div>
+    <button class="btn pp-save-btn" onclick="adminOpenSpot(null)" style="margin-bottom:14px;width:100%">+ Add new spot</button>
+    ${rows||'<div class="stats-empty">No spots yet.</div>'}
+    <div id="adminEditForm" style="display:none;margin-top:16px"></div>`;
+}
+
+async function adminOpenSpot(spotName){
+  const el=$('adminEditForm'); if(!el) return;
+  const s=spotName?(_adminSpots||[]).find(x=>x.spot_name===spotName):null;
+  el.style.display='block';
+  el.scrollIntoView({behavior:'smooth',block:'start'});
+
+  el.innerHTML=`
+    <div style="background:rgba(0,212,255,.05);border:1px solid rgba(0,212,255,.2);border-radius:12px;padding:16px;">
+      <div style="font-size:.85rem;font-weight:700;color:var(--accent);margin-bottom:14px">${s?'✏️ Edit: '+s.spot_name:'➕ Add spot'}</div>
+
+      <label class="pp-label">Spot name (DB key — must match SPOTS array)</label>
+      <input type="text" id="adSpotName" class="pp-input" value="${s?.spot_name||''}" placeholder="e.g. Riverwoods Beachclub" style="margin-bottom:10px" ${s?'readonly style="margin-bottom:10px;opacity:.6"':'style="margin-bottom:10px"'}/>
+
+      <label class="pp-label">Display name <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(overrides spot name in card)</span></label>
+      <input type="text" id="adDisplayName" class="pp-input" value="${s?.display_name||''}" placeholder="e.g. RBSC Duinbergen" style="margin-bottom:10px"/>
+
+      <label class="pp-label">Business name</label>
+      <input type="text" id="adBizName" class="pp-input" value="${s?.business_name||''}" placeholder="e.g. Jackfly Kite School" style="margin-bottom:10px"/>
+
+      <label class="pp-label">Website</label>
+      <input type="url" id="adWebsite" class="pp-input" value="${s?.website||''}" placeholder="https://…" style="margin-bottom:10px"/>
+
+      <label class="pp-label">Address</label>
+      <input type="text" id="adAddress" class="pp-input" value="${s?.address||''}" placeholder="Street, City" style="margin-bottom:10px"/>
+
+      <label class="pp-label">Phone</label>
+      <input type="text" id="adPhone" class="pp-input" value="${s?.phone||''}" placeholder="+32…" style="margin-bottom:4px"/>
+      <div class="pp-toggle-row" style="margin-bottom:10px"><span style="font-size:.72rem;color:var(--tdim)">Public</span><button class="pp-toggle${s?.phone_public?' on':''}" id="adPhonePublic" onclick="this.classList.toggle('on')"><span></span></button></div>
+
+      <label class="pp-label">Email</label>
+      <input type="text" id="adEmail" class="pp-input" value="${s?.email||''}" placeholder="info@…" style="margin-bottom:4px"/>
+      <div class="pp-toggle-row" style="margin-bottom:10px"><span style="font-size:.72rem;color:var(--tdim)">Public</span><button class="pp-toggle${s?.email_public?' on':''}" id="adEmailPublic" onclick="this.classList.toggle('on')"><span></span></button></div>
+
+      <label class="pp-label">Lesson booking URL</label>
+      <input type="url" id="adLessonUrl" class="pp-input" value="${s?.lesson_url||''}" placeholder="https://…" style="margin-bottom:10px"/>
+
+      <label class="pp-label">Gear rental URL</label>
+      <input type="url" id="adGearUrl" class="pp-input" value="${s?.gear_url||''}" placeholder="https://…" style="margin-bottom:10px"/>
+
+      <label class="pp-label">Live cam URL</label>
+      <input type="url" id="adLivecam" class="pp-input" value="${s?.livecam_url||''}" placeholder="https://…" style="margin-bottom:10px"/>
+
+      <label class="pp-label">Instagram URL</label>
+      <input type="url" id="adInstagram" class="pp-input" value="${s?.instagram_url||''}" placeholder="https://instagram.com/…" style="margin-bottom:10px"/>
+
+      <label class="pp-label">Facebook URL</label>
+      <input type="url" id="adFacebook" class="pp-input" value="${s?.facebook_url||''}" placeholder="https://facebook.com/…" style="margin-bottom:10px"/>
+
+      <label class="pp-label">Description</label>
+      <textarea id="adDesc" class="pp-input" rows="3" placeholder="Describe the spot…" style="margin-bottom:10px;resize:vertical;min-height:72px;font-family:inherit;font-size:.85rem">${s?.description||''}</textarea>
+
+      <label class="pp-label">Membership / access note</label>
+      <input type="text" id="adMembershipNote" class="pp-input" value="${s?.membership_note||''}" placeholder="e.g. Day pass €15 incl. insurance" style="margin-bottom:10px"/>
+
+      <div class="pp-toggle-row" style="margin-bottom:14px">
+        <span style="font-size:.82rem;font-weight:600;color:var(--text)">✓ Mark as verified</span>
+        <button class="pp-toggle${s?.verified?' on':''}" id="adVerified" onclick="this.classList.toggle('on')"><span></span></button>
+      </div>
+
+      <div style="display:flex;gap:8px">
+        <button class="btn pp-save-btn" onclick="adminSaveSpotInfo('${s?.spot_name?.replace(/'/g,"\\'")||''}')" style="flex:1">Save</button>
+        <button onclick="$('adminEditForm').style.display='none'" style="flex-shrink:0;padding:10px 16px;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:10px;color:var(--tdim);font-size:.82rem;cursor:pointer">Cancel</button>
+      </div>
+    </div>`;
+}
+
+async function adminSaveSpotInfo(existingSpotName){
+  const sb=getSb(); if(!sb) return;
+  if(!loadProfile().isAdmin){ showToast('Access denied'); return; }
+  const spotName=($('adSpotName')?.value||'').trim();
+  if(!spotName){ showToast('Spot name is required'); return; }
+  const row={
+    spot_name:       spotName,
+    display_name:    ($('adDisplayName')?.value||'').trim()||null,
+    business_name:   ($('adBizName')?.value||'').trim()||null,
+    website:         ($('adWebsite')?.value||'').trim()||null,
+    address:         ($('adAddress')?.value||'').trim()||null,
+    phone:           ($('adPhone')?.value||'').trim()||null,
+    phone_public:    !!$('adPhonePublic')?.classList.contains('on'),
+    email:           ($('adEmail')?.value||'').trim()||null,
+    email_public:    !!$('adEmailPublic')?.classList.contains('on'),
+    lesson_url:      ($('adLessonUrl')?.value||'').trim()||null,
+    gear_url:        ($('adGearUrl')?.value||'').trim()||null,
+    livecam_url:     ($('adLivecam')?.value||'').trim()||null,
+    instagram_url:   ($('adInstagram')?.value||'').trim()||null,
+    facebook_url:    ($('adFacebook')?.value||'').trim()||null,
+    description:     ($('adDesc')?.value||'').trim()||null,
+    membership_note: ($('adMembershipNote')?.value||'').trim()||null,
+    verified:        !!$('adVerified')?.classList.contains('on'),
+    updated_at:      new Date().toISOString(),
+  };
+  const{error}=await sb.from('spot_info').upsert(row,{onConflict:'spot_name'});
+  if(error){ showToast('Error: '+error.message); return; }
+  showToast('✓ Spot info saved!');
+  $('adminEditForm').style.display='none';
+  renderAdminPanel();
+  if(cachedLoc?.name===spotName) renderSpotInfoCard(spotName);
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 // Show My Spot tab if user has any claims
 async function checkShowMySpotTab(){
   if(!_authSession?.user) return;
@@ -4308,14 +4442,17 @@ function updatePremiumUI(){
 
 async function syncPremiumFromSupabase(email){
   const sb=getSb(); if(!sb||!email) return;
-  const{data}=await sb.from('profiles').select('is_premium,sms_enabled,phone_number').eq('email',email).single();
+  const{data}=await sb.from('profiles').select('is_premium,sms_enabled,phone_number,is_admin').eq('email',email).single();
   if(!data) return;
   const p=loadProfile();
   p.isPremium=!!data.is_premium;
   p.smsEnabled=!!data.sms_enabled;
   p.phoneNumber=data.phone_number||'';
+  p.isAdmin=!!data.is_admin;
   saveProfile(p);
   updatePremiumUI();
+  const adminTab=$('ppTabAdmin');
+  if(adminTab) adminTab.style.display=p.isAdmin?'inline-flex':'none';
 }
 
 async function startCheckout(){

@@ -68,8 +68,13 @@ CREATE TABLE IF NOT EXISTS profiles (
   stripe_customer_id      text,
   stripe_subscription_id  text,
   phone_number            text,       -- E.164 format e.g. +32478123456
-  sms_enabled             boolean     NOT NULL DEFAULT false
+  sms_enabled             boolean     NOT NULL DEFAULT false,
+  is_admin                boolean     NOT NULL DEFAULT false
 );
+
+-- Grant admin to tom.guisgand@gmail.com (idempotent)
+INSERT INTO profiles (email, is_admin) VALUES ('tom.guisgand@gmail.com', true)
+ON CONFLICT (email) DO UPDATE SET is_admin = true;
 
 -- Spot ownership claims
 CREATE TABLE IF NOT EXISTS spot_claims (
