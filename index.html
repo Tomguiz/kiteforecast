@@ -701,6 +701,12 @@
     .spot-info-unclaimed-sub { font-size:.75rem; color:var(--tdim); line-height:1.5; max-width:280px; }
     .spot-info-claim-cta { margin-top:4px; padding:9px 20px; background:rgba(0,212,255,.12); border:1px solid rgba(0,212,255,.3); border-radius:10px; color:var(--accent); font-size:.8rem; font-weight:700; cursor:pointer; transition:background .15s; }
     .spot-info-claim-cta:hover { background:rgba(0,212,255,.2); }
+    /* webcam pill */
+    .spot-cta-webcam { background:linear-gradient(135deg,#dc2626,#b91c1c); color:#fff; position:relative; overflow:hidden; }
+    .spot-cta-webcam::before { content:''; position:absolute; inset:0; background:rgba(255,255,255,.08); animation:webcam-pulse 1.8s ease-in-out infinite; border-radius:10px; }
+    @keyframes webcam-pulse { 0%,100%{opacity:0} 50%{opacity:1} }
+    .webcam-dot { width:7px; height:7px; border-radius:50%; background:#ff6b6b; box-shadow:0 0 6px 2px rgba(255,100,100,.7); animation:dot-blink 1.2s ease-in-out infinite; flex-shrink:0; }
+    @keyframes dot-blink { 0%,100%{opacity:1;box-shadow:0 0 6px 2px rgba(255,100,100,.7)} 50%{opacity:.4;box-shadow:0 0 2px 1px rgba(255,100,100,.3)} }
     /* ── Spot comparison ── */
     .compare-toggle { display:flex; align-items:center; justify-content:center; gap:6px; padding:9px 16px; margin-top:4px; margin-bottom:10px; background:rgba(255,255,255,.04); border:1px solid var(--border); border-radius:10px; font-size:.75rem; color:var(--gray); cursor:pointer; transition:all .15s; width:100%; }
     .compare-toggle:hover,.compare-toggle.open { border-color:rgba(0,212,255,.35); color:var(--accent); background:rgba(0,212,255,.06); }
@@ -2686,17 +2692,6 @@ async function renderSpotInfoCard(spotName) {
   _spotInfoOpen = false;
   const info = await fetchSpotInfo(spotName);
 
-  // Show webcam button in header if available
-  const webcamBtn = $('webcamBtn');
-  if(webcamBtn) {
-    if(info?.livecam_url) {
-      webcamBtn.href = info.livecam_url;
-      webcamBtn.style.display = 'inline-flex';
-    } else {
-      webcamBtn.style.display = 'none';
-    }
-  }
-
   if(!info) {
     // Unclaimed state — always show a teaser to drive claim conversions
     el.innerHTML = `
@@ -2722,6 +2717,9 @@ async function renderSpotInfoCard(spotName) {
     ? `<span class="spot-info-badge verified">✓ Verified</span>`
     : `<span class="spot-info-badge unverified">⚠️ Unverified info</span>`;
 
+  const webcamBtn = info.livecam_url
+    ? `<a href="${info.livecam_url}" target="_blank" rel="noopener" class="spot-cta-btn spot-cta-webcam" onclick="trackCtaClick('${spotName}','livecam')"><span class="webcam-dot"></span> Live webcam</a>`
+    : '';
   const lessonBtn = info.lesson_url
     ? `<a href="${info.lesson_url}" target="_blank" rel="noopener" class="spot-cta-btn spot-cta-lesson" onclick="trackCtaClick('${spotName}','lesson')">🎓 Book a lesson</a>`
     : '';
@@ -2732,9 +2730,11 @@ async function renderSpotInfoCard(spotName) {
     ? `<a href="${info.website}" target="_blank" rel="noopener" class="spot-cta-btn spot-cta-website" onclick="trackCtaClick('${spotName}','website')">🌐 Visit website</a>`
     : '';
 
-  const ctaGrid = (lessonBtn || gearBtn)
-    ? `<div class="spot-info-ctas">${lessonBtn}${gearBtn}</div>${websiteBtn ? `<div style="margin-top:8px">${websiteBtn}</div>` : ''}`
-    : websiteBtn ? `<div>${websiteBtn}</div>` : '';
+  const ctaGrid = [
+    webcamBtn ? `<div>${webcamBtn}</div>` : '',
+    (lessonBtn || gearBtn) ? `<div class="spot-info-ctas">${lessonBtn}${gearBtn}</div>` : '',
+    websiteBtn ? `<div>${websiteBtn}</div>` : '',
+  ].filter(Boolean).join('');
 
   const metaRows = [];
   if(info.address) metaRows.push(`<div class="spot-info-meta-row">📍 <span>${info.address}</span></div>`);
@@ -3058,7 +3058,7 @@ function renderGrid(){
   const qdLabel=qualDaysCount===0
     ?`<span style="${qdCls};font-size:.8rem;font-weight:700;margin-left:10px">No sessions in ${totalDays} days</span>`
     :`<span style="${qdCls};font-size:.8rem;font-weight:700;margin-left:10px">${qualDaysCount} of ${totalDays} days rideable</span>`;
-  $('locName').innerHTML=`${loc.name}${loc.admin1&&loc.admin1!==loc.name?', '+loc.admin1:''}<a class="map-link" href="${mapsUrl}" target="_blank" rel="noopener" title="Open in Google Maps"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Maps</a><button class="notif-btn${hasSpotNotif(loc.name)?' active':''}" id="notifBtn" title="Get notified">${bellSVG(16)}</button><button class="fav-btn${isFav?' active':''}" id="favBtn" title="${isFav?'Remove from favourites':'Add to favourites'}">${isFav?'★':'☆'}</button><button class="share-btn" id="shareBtn" onclick="shareSpot()" title="Share this spot"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></button><a class="share-btn" id="webcamBtn" style="display:none;font-size:.7rem;padding:4px 8px;white-space:nowrap;text-decoration:none" target="_blank" rel="noopener" title="Live webcam" onclick="trackCtaClick('${loc.name}','livecam')">📷</a><button class="share-btn" id="claimBtn" onclick="openClaimFlow()" title="Claim this spot as owner" style="margin-left:4px;font-size:.7rem;padding:4px 8px;white-space:nowrap">🏴 Claim</button>${qdLabel}`;
+  $('locName').innerHTML=`${loc.name}${loc.admin1&&loc.admin1!==loc.name?', '+loc.admin1:''}<a class="map-link" href="${mapsUrl}" target="_blank" rel="noopener" title="Open in Google Maps"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Maps</a><button class="notif-btn${hasSpotNotif(loc.name)?' active':''}" id="notifBtn" title="Get notified">${bellSVG(16)}</button><button class="fav-btn${isFav?' active':''}" id="favBtn" title="${isFav?'Remove from favourites':'Add to favourites'}">${isFav?'★':'☆'}</button><button class="share-btn" id="shareBtn" onclick="shareSpot()" title="Share this spot"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></button><button class="share-btn" id="claimBtn" onclick="openClaimFlow()" title="Claim this spot as owner" style="margin-left:4px;font-size:.7rem;padding:4px 8px;white-space:nowrap">🏴 Claim</button>${qdLabel}`;
 
   $('locSub').textContent=`${loc.country} · ${loc.latitude.toFixed(2)}°, ${loc.longitude.toFixed(2)}°`+(windDirs.size>0?` · Winds: ${[...windDirs].sort((a,b)=>a-b).map(d=>compass(d)).join('/')}`:'');
   $('locHdr').style.display='block';
