@@ -3412,7 +3412,6 @@ async function syncFavsFromSupabase(email){
     for(const fav of localOnly) pushFavToSupabase(email,fav,false);
     // Merge: Supabase remote + local-only additions
     const merged=[...remote,...localOnly];
-    if(merged.length===0) return;
     saveFavs(merged);
     renderHintChips();
   } finally {
