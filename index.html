@@ -1104,6 +1104,7 @@
         <button class="pp-tab active" id="ppTabProfile" onclick="switchPpTab('profile')">Profile</button>
         <button class="pp-tab" id="ppTabNotifs" onclick="switchPpTab('notifs')">Notifications <span id="ppNotifCount" style="display:none"></span></button>
         <button class="pp-tab" id="ppTabStats" onclick="switchPpTab('stats')">Stats</button>
+        <button class="pp-tab" id="ppTabFriends" onclick="switchPpTab('friends')">Friends <span id="ppFriendReqCount" style="display:none;background:#f87171;color:#fff;border-radius:999px;font-size:.65rem;padding:1px 5px;margin-left:2px;font-weight:700"></span></button>
         <button class="pp-tab" id="ppTabMySpot" onclick="switchPpTab('myspot')" style="display:none">My Spot</button>
         <button class="pp-tab" id="ppTabAdmin" onclick="switchPpTab('admin')" style="display:none">⚙️ Admin</button>
       </div>
@@ -1243,6 +1244,27 @@
     </div>
     <div id="ppPanelAdmin" class="pp-body" style="display:none">
       <div id="ppAdminContent"></div>
+    </div>
+    <div id="ppPanelFriends" class="pp-body" style="display:none;flex-direction:column;gap:14px">
+      <!-- Search -->
+      <div style="position:relative">
+        <input type="text" id="friendSearchInput" class="pp-input" placeholder="Search by nickname…" maxlength="32"
+          oninput="onFriendSearch()" style="padding-right:40px"/>
+        <span style="position:absolute;right:12px;top:50%;transform:translateY(-50%);color:var(--tdim);font-size:.85rem;pointer-events:none">🔍</span>
+      </div>
+      <div id="friendSearchResults" style="display:none;flex-direction:column;gap:6px"></div>
+      <!-- Pending requests -->
+      <div id="friendRequestsSection" style="display:none">
+        <div class="stats-section-title" style="margin-bottom:8px">Friend requests</div>
+        <div id="friendRequestsList" style="display:flex;flex-direction:column;gap:6px"></div>
+      </div>
+      <!-- Friends list -->
+      <div id="friendsListSection">
+        <div class="stats-section-title" style="margin-bottom:8px">My friends</div>
+        <div id="friendsList" style="display:flex;flex-direction:column;gap:6px">
+          <div class="stats-empty">Loading…</div>
+        </div>
+      </div>
     </div>
     <div id="ppPanelStats" class="pp-body" style="display:none">
       <div id="ppStatsContent"></div>
@@ -4160,16 +4182,19 @@ function switchPpTab(tab){
   $('ppTabNotifs').classList.toggle('active',tab==='notifs');
   $('ppTabStats').classList.toggle('active',tab==='stats');
   $('ppTabMySpot').classList.toggle('active',tab==='myspot');
-  if($('ppTabAdmin')) $('ppTabAdmin').classList.toggle('active',tab==='admin');
+  if($('ppTabAdmin'))   $('ppTabAdmin').classList.toggle('active',tab==='admin');
+  if($('ppTabFriends')) $('ppTabFriends').classList.toggle('active',tab==='friends');
   $('ppPanelProfile').style.display=tab==='profile'?'flex':'none';
   $('ppPanelNotifs').style.display=tab==='notifs'?'flex':'none';
   $('ppPanelStats').style.display=tab==='stats'?'flex':'none';
   $('ppPanelMySpot').style.display=tab==='myspot'?'flex':'none';
-  if($('ppPanelAdmin')) $('ppPanelAdmin').style.display=tab==='admin'?'flex':'none';
-  if(tab==='notifs') renderNotifList();
-  if(tab==='stats') renderStats();
-  if(tab==='myspot') renderMySpot();
-  if(tab==='admin') renderAdminPanel();
+  if($('ppPanelAdmin'))   $('ppPanelAdmin').style.display=tab==='admin'?'flex':'none';
+  if($('ppPanelFriends')) $('ppPanelFriends').style.display=tab==='friends'?'flex':'none';
+  if(tab==='notifs')  renderNotifList();
+  if(tab==='stats')   renderStats();
+  if(tab==='myspot')  renderMySpot();
+  if(tab==='admin')   renderAdminPanel();
+  if(tab==='friends') renderFriendsPanel();
 }
 function onEmailEdit(){}
 function showUpgradeModal(){
@@ -4443,6 +4468,164 @@ async function submitSpotSuggestion(){
 
   // Show pending message immediately for this search
   showSpotPendingMsg(name);
+}
+
+// ── FRIENDS ──────────────────────────────────────────────────────────────────
+let _friendsCache=null;
+
+async function renderFriendsPanel(){
+  const sb=getSb(); const email=_authSession?.user?.email||loadProfile().email;
+  if(!sb||!email){ $('friendsList').innerHTML='<div class="stats-empty">Sign in to see friends.</div>'; return; }
+
+  $('friendsList').innerHTML='<div class="stats-empty">Loading…</div>';
+
+  // Fetch all friendships involving this user
+  const{data:rows}=await sb.from('friendships').select('*')
+    .or(`requester.eq.${email},recipient.eq.${email}`);
+  _friendsCache=rows||[];
+
+  const accepted = _friendsCache.filter(r=>r.status==='accepted');
+  const incoming = _friendsCache.filter(r=>r.status==='pending'&&r.recipient===email);
+  const outgoing = _friendsCache.filter(r=>r.status==='pending'&&r.requester===email);
+
+  // Update red badge
+  const badge=$('ppFriendReqCount');
+  if(badge){ badge.textContent=incoming.length; badge.style.display=incoming.length?'inline':'none'; }
+
+  // Pending incoming requests
+  const reqSection=$('friendRequestsSection');
+  const reqList=$('friendRequestsList');
+  if(incoming.length){
+    reqSection.style.display='block';
+    // Fetch nicknames for requesters
+    const emails=incoming.map(r=>r.requester);
+    const{data:profiles}=await sb.from('profiles').select('email,nickname').in('email',emails);
+    const nickMap=Object.fromEntries((profiles||[]).map(p=>[p.email,p.nickname||p.email]));
+    reqList.innerHTML=incoming.map(r=>`
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.2);border-radius:10px;padding:10px 12px;">
+        <div>
+          <div style="font-size:.82rem;font-weight:700;color:#fbbf24">${nickMap[r.requester]||r.requester}</div>
+          <div style="font-size:.7rem;color:var(--tdim)">wants to be your friend</div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn pp-save-btn" style="font-size:.72rem;padding:5px 10px" onclick="respondFriendRequest('${r.id}','accepted')">Accept</button>
+          <button class="btn-reset" style="font-size:.72rem;padding:5px 10px;border:1px solid var(--border);border-radius:8px;color:var(--tdim)" onclick="respondFriendRequest('${r.id}','declined')">Decline</button>
+        </div>
+      </div>`).join('');
+  } else {
+    reqSection.style.display='none';
+  }
+
+  // Friends list
+  if(accepted.length){
+    const friendEmails=accepted.map(r=>r.requester===email?r.recipient:r.requester);
+    const{data:profiles}=await sb.from('profiles').select('email,nickname').in('email',friendEmails);
+    const nickMap=Object.fromEntries((profiles||[]).map(p=>[p.email,p.nickname||p.email]));
+    $('friendsList').innerHTML=accepted.map(r=>{
+      const fe=r.requester===email?r.recipient:r.requester;
+      return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 0;border-bottom:1px solid var(--border);">
+        <div style="display:flex;align-items:center;gap:10px">
+          <div style="width:34px;height:34px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:800;color:#000;flex-shrink:0">${(nickMap[fe]||'?')[0].toUpperCase()}</div>
+          <div>
+            <div style="font-size:.82rem;font-weight:700;color:var(--text)">${nickMap[fe]||fe}</div>
+            <div style="font-size:.7rem;color:var(--tdim)">friend</div>
+          </div>
+        </div>
+        <button class="btn-reset" style="font-size:.7rem;color:var(--tdim);padding:4px 8px;border:1px solid var(--border);border-radius:6px" onclick="removeFriend('${r.id}')">Remove</button>
+      </div>`;
+    }).join('');
+  } else if(!outgoing.length){
+    $('friendsList').innerHTML='<div class="stats-empty">No friends yet — search by nickname to add some!</div>';
+  } else {
+    $('friendsList').innerHTML=outgoing.map(r=>`
+      <div style="padding:10px 0;border-bottom:1px solid var(--border);font-size:.8rem;color:var(--tdim)">
+        ⏳ Request sent to <strong style="color:var(--text)">${r.recipient}</strong>
+        <button class="btn-reset" style="font-size:.7rem;color:#f87171;margin-left:8px" onclick="cancelFriendRequest('${r.id}')">Cancel</button>
+      </div>`).join('');
+  }
+}
+
+let _friendSearchTimer=null;
+function onFriendSearch(){
+  clearTimeout(_friendSearchTimer);
+  const val=($('friendSearchInput').value||'').trim();
+  if(!val){ $('friendSearchResults').style.display='none'; $('friendSearchResults').innerHTML=''; return; }
+  _friendSearchTimer=setTimeout(()=>doFriendSearch(val), 350);
+}
+
+async function doFriendSearch(query){
+  const sb=getSb(); const email=_authSession?.user?.email||loadProfile().email;
+  if(!sb||!email) return;
+  const{data}=await sb.from('profiles').select('email,nickname')
+    .ilike('nickname',`%${query}%`).neq('email',email).limit(8);
+  const results=data||[];
+  const el=$('friendSearchResults');
+  if(!results.length){ el.style.display='flex'; el.innerHTML='<div class="stats-empty">No users found.</div>'; return; }
+
+  // Check existing friendships
+  const existingEmails=new Set((_friendsCache||[]).map(r=>r.requester===email?r.recipient:r.requester));
+  const pendingOut=new Set((_friendsCache||[]).filter(r=>r.status==='pending'&&r.requester===email).map(r=>r.recipient));
+
+  el.style.display='flex';
+  el.innerHTML=results.map(u=>{
+    const isFriend=existingEmails.has(u.email);
+    const isPending=pendingOut.has(u.email);
+    const btn=isFriend
+      ?`<span style="font-size:.72rem;color:#4ade80">✓ Friends</span>`
+      :isPending
+      ?`<span style="font-size:.72rem;color:var(--tdim)">⏳ Pending</span>`
+      :`<button class="btn pp-save-btn" style="font-size:.72rem;padding:5px 12px" onclick="sendFriendRequest('${u.email}','${u.nickname}')">Add friend</button>`;
+    return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div style="width:30px;height:30px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:800;color:#000;flex-shrink:0">${(u.nickname||'?')[0].toUpperCase()}</div>
+        <span style="font-size:.82rem;font-weight:600;color:var(--text)">${u.nickname}</span>
+      </div>
+      ${btn}
+    </div>`;
+  }).join('');
+}
+
+async function sendFriendRequest(recipientEmail, recipientNick){
+  const sb=getSb(); const email=_authSession?.user?.email||loadProfile().email;
+  if(!sb||!email) return;
+  await sb.from('friendships').insert({requester:email, recipient:recipientEmail, status:'pending'});
+  showToast('Friend request sent to '+recipientNick+' 👋');
+  _friendsCache=null;
+  await renderFriendsPanel();
+  await doFriendSearch($('friendSearchInput').value||'');
+}
+
+async function respondFriendRequest(id, status){
+  const sb=getSb(); if(!sb) return;
+  await sb.from('friendships').update({status}).eq('id',id);
+  _friendsCache=null;
+  renderFriendsPanel();
+  showToast(status==='accepted'?'Friend added! 🎉':'Request declined.');
+}
+
+async function removeFriend(id){
+  const sb=getSb(); if(!sb) return;
+  await sb.from('friendships').delete().eq('id',id);
+  _friendsCache=null;
+  renderFriendsPanel();
+  showToast('Friend removed.');
+}
+
+async function cancelFriendRequest(id){
+  const sb=getSb(); if(!sb) return;
+  await sb.from('friendships').delete().eq('id',id);
+  _friendsCache=null;
+  renderFriendsPanel();
+  showToast('Request cancelled.');
+}
+
+async function updateFriendRequestBadge(){
+  const sb=getSb(); const email=_authSession?.user?.email||loadProfile().email;
+  if(!sb||!email) return;
+  const{count}=await sb.from('friendships').select('id',{count:'exact',head:true})
+    .eq('recipient',email).eq('status','pending');
+  const badge=$('ppFriendReqCount');
+  if(badge){ badge.textContent=count||0; badge.style.display=count?'inline':'none'; }
 }
 
 // ── ADMIN PANEL ──────────────────────────────────────────────────────────────
@@ -5004,6 +5187,8 @@ async function initAuth(){
       if(isNew) showToast('✓ Signed in as '+email);
       // Check nickname after every sign-in
       setTimeout(()=>checkNicknameRequired(), 800);
+      // Update friend request badge
+      setTimeout(()=>updateFriendRequestBadge(), 1200);
       if(pendingNotif){
         const pn=pendingNotif; pendingNotif=null;
         if(pn.type==='spot') addSpotNotif(pn.spot,pn.sessions);
