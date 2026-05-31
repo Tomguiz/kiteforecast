@@ -2623,8 +2623,11 @@ function shareSpot(){
     const goodDays=entry.days10.filter(d=>d.qh>=2).slice(0,3);
     if(goodDays.length){
       const labels=goodDays.map(d=>{
-        const dow=new Date(d.dateStr+'T12:00:00').toLocaleDateString('en',{weekday:'short'});
-        return `${dow} (${d.peakKn}kn)`;
+        const date=new Date(d.dateStr+'T12:00:00');
+        const dow=date.toLocaleDateString('en',{weekday:'long'});
+        const day=date.getDate().toString().padStart(2,'0');
+        const month=(date.getMonth()+1).toString().padStart(2,'0');
+        return `${dow} ${day}/${month} (${d.peakKn}kn)`;
       });
       daysText=` Looks good: ${labels.join(', ')}.`;
     }
