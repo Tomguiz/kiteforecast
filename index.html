@@ -667,6 +667,39 @@
     .share-btn { background:none; border:1.5px solid rgba(255,255,255,.22); border-radius:7px; cursor:pointer; color:rgba(255,255,255,.55); padding:4px 7px; line-height:1; display:inline-flex; align-items:center; justify-content:center; transition:border-color .2s,color .2s,background .2s,transform .15s; vertical-align:middle; margin-left:6px; }
     .share-btn:hover { border-color:rgba(0,212,255,.6); color:var(--accent); background:rgba(0,212,255,.08); transform:scale(1.08); }
     .share-btn:focus { outline:none; }
+    /* ── Spot Info card ── */
+    .spot-info-card { margin:16px 0; border-radius:14px; border:1px solid var(--border); background:rgba(255,255,255,.03); overflow:hidden; }
+    .spot-info-header { display:flex; align-items:center; gap:10px; padding:14px 18px; border-bottom:1px solid var(--border); cursor:pointer; }
+    .spot-info-header:hover { background:rgba(255,255,255,.04); }
+    .spot-info-title { flex:1; font-size:.85rem; font-weight:700; color:var(--text); }
+    .spot-info-subtitle { font-size:.72rem; color:var(--tdim); margin-top:2px; }
+    .spot-info-badge { font-size:.62rem; font-weight:700; padding:2px 8px; border-radius:99px; border:1px solid; white-space:nowrap; }
+    .spot-info-badge.verified { color:#4ade80; border-color:rgba(74,222,128,.3); background:rgba(74,222,128,.08); }
+    .spot-info-badge.unverified { color:var(--tdim); border-color:var(--border); }
+    .spot-info-body { padding:16px 18px; display:flex; flex-direction:column; gap:12px; }
+    .spot-info-ctas { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .spot-cta-btn { display:flex; align-items:center; justify-content:center; gap:7px; padding:12px 10px; border-radius:10px; border:none; font-size:.82rem; font-weight:700; cursor:pointer; text-decoration:none; transition:opacity .15s; }
+    .spot-cta-btn:hover { opacity:.85; }
+    .spot-cta-lesson { background:linear-gradient(135deg,#0ea5e9,#0284c7); color:#fff; }
+    .spot-cta-gear   { background:linear-gradient(135deg,#10b981,#059669); color:#fff; }
+    .spot-cta-website{ background:rgba(255,255,255,.08); color:var(--text); border:1px solid var(--border); }
+    .spot-info-meta { display:flex; flex-direction:column; gap:6px; font-size:.75rem; color:var(--gray); }
+    .spot-info-meta-row { display:flex; align-items:baseline; gap:6px; }
+    .spot-info-meta a { color:var(--accent); text-decoration:none; }
+    .spot-info-meta a:hover { text-decoration:underline; }
+    .spot-info-social { display:flex; flex-wrap:wrap; gap:8px; }
+    .spot-info-social a { display:inline-flex; align-items:center; gap:5px; padding:5px 10px; border-radius:8px; background:rgba(255,255,255,.06); border:1px solid var(--border); font-size:.72rem; color:var(--text); text-decoration:none; transition:background .15s; }
+    .spot-info-social a:hover { background:rgba(255,255,255,.12); }
+    .spot-info-note { font-size:.72rem; color:var(--tdim); line-height:1.5; padding:10px 12px; background:rgba(245,158,11,.06); border:1px solid rgba(245,158,11,.2); border-radius:8px; }
+    .spot-info-chevron { transition:transform .2s; color:var(--tdim); }
+    .spot-info-chevron.open { transform:rotate(180deg); }
+    /* unclaimed state */
+    .spot-info-unclaimed { display:flex; flex-direction:column; align-items:center; gap:8px; padding:20px 18px; text-align:center; }
+    .spot-info-unclaimed-icon { font-size:1.6rem; line-height:1; }
+    .spot-info-unclaimed-title { font-size:.85rem; font-weight:700; color:var(--text); }
+    .spot-info-unclaimed-sub { font-size:.75rem; color:var(--tdim); line-height:1.5; max-width:280px; }
+    .spot-info-claim-cta { margin-top:4px; padding:9px 20px; background:rgba(0,212,255,.12); border:1px solid rgba(0,212,255,.3); border-radius:10px; color:var(--accent); font-size:.8rem; font-weight:700; cursor:pointer; transition:background .15s; }
+    .spot-info-claim-cta:hover { background:rgba(0,212,255,.2); }
     /* ── Spot comparison ── */
     .compare-toggle { display:flex; align-items:center; justify-content:center; gap:6px; padding:9px 16px; margin-top:4px; margin-bottom:10px; background:rgba(255,255,255,.04); border:1px solid var(--border); border-radius:10px; font-size:.75rem; color:var(--gray); cursor:pointer; transition:all .15s; width:100%; }
     .compare-toggle:hover,.compare-toggle.open { border-color:rgba(0,212,255,.35); color:var(--accent); background:rgba(0,212,255,.06); }
@@ -934,6 +967,8 @@
       </div>
       <span class="shore-hint" id="shoreHint">Select good wind directions for this spot</span>
     </div>
+
+    <div id="spotInfoCard"></div>
 
     <div class="forecast-grid" id="forecastGrid"></div>
 
@@ -2623,6 +2658,104 @@ $('searchInput').addEventListener('keydown',e=>{
   if(e.key==='Enter'){doSearch();}
 });
 document.addEventListener('click',e=>{if(!e.target.closest('.search-wrap'))closeAC();});
+// ── SPOT INFO CARD ───────────────────────────────────────────────────────────
+let _spotInfoOpen = true;
+
+async function fetchSpotInfo(spotName) {
+  const sb = getSb(); if(!sb) return null;
+  const { data } = await sb.from('spot_info').select('*').eq('spot_name', spotName).single();
+  return data || null;
+}
+
+async function renderSpotInfoCard(spotName) {
+  const el = $('spotInfoCard'); if(!el) return;
+  el.innerHTML = '';
+  const info = await fetchSpotInfo(spotName);
+  console.log('[spotInfo] spot:', spotName, '| result:', info);
+
+  if(!info) {
+    // Unclaimed state — always show a teaser to drive claim conversions
+    el.innerHTML = `
+      <div class="spot-info-card">
+        <div class="spot-info-header" onclick="_spotInfoOpen=!_spotInfoOpen;this.querySelector('.spot-info-chevron').classList.toggle('open',_spotInfoOpen);this.nextElementSibling.style.display=_spotInfoOpen?'flex':'none'">
+          <div style="flex:1">
+            <div class="spot-info-title">📍 Spot info &amp; bookings</div>
+            <div class="spot-info-subtitle">Lessons · Gear rental · Contact</div>
+          </div>
+          <svg class="spot-info-chevron open" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="spot-info-unclaimed">
+          <div class="spot-info-unclaimed-icon">🏴</div>
+          <div class="spot-info-unclaimed-title">No info yet for this spot</div>
+          <div class="spot-info-unclaimed-sub">Are you the owner or manager here? Claim this spot to add lesson bookings, gear rental, and contact details.</div>
+          <button class="spot-info-claim-cta" onclick="openClaimFlow()">Claim this spot →</button>
+        </div>
+      </div>`;
+    return;
+  }
+
+  const verifiedBadge = info.verified
+    ? `<span class="spot-info-badge verified">✓ Verified</span>`
+    : `<span class="spot-info-badge unverified">⚠️ Unverified</span>`;
+
+  const lessonBtn = info.lesson_url
+    ? `<a href="${info.lesson_url}" target="_blank" rel="noopener" class="spot-cta-btn spot-cta-lesson" onclick="trackCtaClick('${spotName}','lesson')">🎓 Book a lesson</a>`
+    : '';
+  const gearBtn = info.gear_url
+    ? `<a href="${info.gear_url}" target="_blank" rel="noopener" class="spot-cta-btn spot-cta-gear" onclick="trackCtaClick('${spotName}','gear')">🪁 Rent kite gear</a>`
+    : '';
+  const websiteBtn = info.website
+    ? `<a href="${info.website}" target="_blank" rel="noopener" class="spot-cta-btn spot-cta-website" onclick="trackCtaClick('${spotName}','website')">🌐 Visit website</a>`
+    : '';
+
+  const ctaGrid = (lessonBtn || gearBtn)
+    ? `<div class="spot-info-ctas">${lessonBtn}${gearBtn}</div>${websiteBtn ? `<div style="margin-top:8px">${websiteBtn}</div>` : ''}`
+    : websiteBtn ? `<div>${websiteBtn}</div>` : '';
+
+  const metaRows = [];
+  if(info.address) metaRows.push(`<div class="spot-info-meta-row">📍 <span>${info.address}</span></div>`);
+  if(info.phone && info.phone_public) metaRows.push(`<div class="spot-info-meta-row">📞 <a href="tel:${info.phone}">${info.phone}</a></div>`);
+  if(info.email && info.email_public) metaRows.push(`<div class="spot-info-meta-row">✉️ <a href="mailto:${info.email}">${info.email}</a></div>`);
+  if(info.contact_name) metaRows.push(`<div class="spot-info-meta-row">👤 <span>${info.contact_name}</span></div>`);
+  const metaHTML = metaRows.length ? `<div class="spot-info-meta">${metaRows.join('')}</div>` : '';
+
+  const socialLinks = [];
+  if(info.instagram_url) socialLinks.push(`<a href="${info.instagram_url}" target="_blank" rel="noopener" onclick="trackCtaClick('${spotName}','instagram')">📸 Instagram</a>`);
+  if(info.facebook_url) socialLinks.push(`<a href="${info.facebook_url}" target="_blank" rel="noopener" onclick="trackCtaClick('${spotName}','facebook')">👥 Facebook</a>`);
+  if(info.livecam_url) socialLinks.push(`<a href="${info.livecam_url}" target="_blank" rel="noopener" onclick="trackCtaClick('${spotName}','livecam')">📷 Live cam</a>`);
+  const socialHTML = socialLinks.length ? `<div class="spot-info-social">${socialLinks.join('')}</div>` : '';
+
+  const descHTML = info.description ? `<p style="margin:0;font-size:.78rem;color:var(--gray);line-height:1.6;">${info.description}</p>` : '';
+  const noteHTML = info.membership_note ? `<div class="spot-info-note">ℹ️ ${info.membership_note}</div>` : '';
+
+  el.innerHTML = `
+    <div class="spot-info-card">
+      <div class="spot-info-header" onclick="_spotInfoOpen=!_spotInfoOpen;this.querySelector('.spot-info-chevron').classList.toggle('open',_spotInfoOpen);this.nextElementSibling.style.display=_spotInfoOpen?'flex':'none'">
+        <div style="flex:1">
+          <div class="spot-info-title">📍 ${info.business_name || spotName}</div>
+          <div class="spot-info-subtitle">Spot info &amp; bookings</div>
+        </div>
+        ${verifiedBadge}
+        <svg class="spot-info-chevron open" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="spot-info-body">
+        ${ctaGrid}
+        ${metaHTML}
+        ${descHTML}
+        ${noteHTML}
+        ${socialHTML}
+        ${!info.verified ? `<div style="font-size:.68rem;color:var(--tdim);text-align:center;margin-top:4px;">Owner of this spot? <span style="color:var(--accent);cursor:pointer;" onclick="openClaimFlow()">Claim it to manage your info →</span></div>` : ''}
+      </div>
+    </div>`;
+}
+
+async function trackCtaClick(spotName, ctaType) {
+  const sb = getSb(); if(!sb) return;
+  const email = loadProfile().email || null;
+  sb.from('spot_cta_clicks').insert({ spot_name: spotName, cta_type: ctaType, user_email: email }).then(() => {});
+}
+// ─────────────────────────────────────────────────────────────────────────────
+
 function shareSpot(){
   if(!cachedLoc) return;
   const p=loadProfile();
@@ -2985,6 +3118,7 @@ function renderGrid(){
   updateFetchTimestamp();
 
   showOnly('results');
+  renderSpotInfoCard(loc.name);
 
   // ── deep-link: scroll to & highlight the target date card ──
   if(window._deepLinkDate){
@@ -3964,11 +4098,34 @@ async function renderMySpot(){
             <button class="pp-toggle" id="claimEmailPublicToggle" onclick="this.classList.toggle('on')"><span></span></button>
           </div>
 
-          <label class="pp-label">Live cam URL <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(optional — shown to everyone)</span></label>
+          <label class="pp-label">Address <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(optional)</span></label>
+          <input type="text" id="claimAddress" class="pp-input" placeholder="e.g. Zeedijk-Het Zoute 832, Knokke-Heist" style="margin-bottom:12px"/>
+
+          <label class="pp-label">Live cam URL <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(optional)</span></label>
           <input type="url" id="claimLivecam" class="pp-input" placeholder="https://cam.myspot.com/live" style="margin-bottom:12px"/>
 
+          <div style="border-top:1px solid var(--border);margin:4px 0 12px"></div>
+          <div style="font-size:.75rem;font-weight:700;color:#f59e0b;margin-bottom:4px;">🎓 Lessons &amp; gear</div>
+          <div style="font-size:.7rem;color:var(--tdim);margin-bottom:10px;">Links open your website — kiters tap "Book a lesson" or "Rent kite gear" and land there directly.</div>
+
+          <label class="pp-label">Lesson booking page <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(optional)</span></label>
+          <input type="url" id="claimLessonUrl" class="pp-input" placeholder="https://yoursite.com/book-lessons" style="margin-bottom:12px"/>
+
+          <label class="pp-label">Gear rental page <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(optional)</span></label>
+          <input type="url" id="claimGearUrl" class="pp-input" placeholder="https://yoursite.com/rent-gear" style="margin-bottom:12px"/>
+
+          <label class="pp-label">Instagram <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(optional)</span></label>
+          <input type="url" id="claimInstagram" class="pp-input" placeholder="https://instagram.com/yourspot" style="margin-bottom:12px"/>
+
+          <label class="pp-label">Facebook <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(optional)</span></label>
+          <input type="url" id="claimFacebook" class="pp-input" placeholder="https://facebook.com/yourspot" style="margin-bottom:12px"/>
+
+          <div style="border-top:1px solid var(--border);margin:4px 0 12px"></div>
           <label class="pp-label">Description <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(optional)</span></label>
-          <textarea id="claimDesc" class="pp-input" placeholder="Lessons, rentals, bar, parking…" rows="4" style="margin-bottom:14px;resize:vertical;min-height:90px;font-family:inherit;font-size:.85rem;"></textarea>
+          <textarea id="claimDesc" class="pp-input" placeholder="Tell kiters what makes your spot special — facilities, water conditions, access…" rows="4" style="margin-bottom:12px;resize:vertical;min-height:90px;font-family:inherit;font-size:.85rem;"></textarea>
+
+          <label class="pp-label">Membership / access note <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(optional)</span></label>
+          <input type="text" id="claimMembershipNote" class="pp-input" placeholder="e.g. Day pass €15 incl. insurance · Members free" style="margin-bottom:14px"/>
 
           <button class="btn pp-save-btn" id="claimSubmitBtn" onclick="submitClaim('${spotName.replace(/'/g,"\\'")}')">Submit claim</button>
         </div>`;
@@ -4003,20 +4160,32 @@ async function submitClaim(spotName){
   const phonePublic =!!$('claimPhonePublicToggle')?.classList.contains('on');
   const contactEmail=($('claimContactEmail')?.value||'').trim();
   const emailPublic =!!$('claimEmailPublicToggle')?.classList.contains('on');
-  const livecam     =($('claimLivecam')?.value||'').trim();
-  const desc        =($('claimDesc')?.value||'').trim();
+  const address         =($('claimAddress')?.value||'').trim();
+  const livecam         =($('claimLivecam')?.value||'').trim();
+  const lessonUrl       =($('claimLessonUrl')?.value||'').trim();
+  const gearUrl         =($('claimGearUrl')?.value||'').trim();
+  const instagram       =($('claimInstagram')?.value||'').trim();
+  const facebook        =($('claimFacebook')?.value||'').trim();
+  const desc            =($('claimDesc')?.value||'').trim();
+  const membershipNote  =($('claimMembershipNote')?.value||'').trim();
   const sb=getSb(); if(!sb){ btn.disabled=false; btn.textContent='Submit claim'; return; }
   const{error}=await sb.from('spot_claims').upsert({
     email, spot_name:spotName,
-    business_name:  bizName||null,
-    website:        website||null,
-    contact_name:   contactName||null,
-    contact_phone:  phone||null,
-    phone_public:   phonePublic,
-    contact_email:  contactEmail||null,
-    email_public:   emailPublic,
-    livecam_url:    livecam||null,
-    description:    desc||null,
+    business_name:    bizName||null,
+    website:          website||null,
+    contact_name:     contactName||null,
+    contact_phone:    phone||null,
+    phone_public:     phonePublic,
+    contact_email:    contactEmail||null,
+    email_public:     emailPublic,
+    address:          address||null,
+    livecam_url:      livecam||null,
+    lesson_url:       lessonUrl||null,
+    gear_url:         gearUrl||null,
+    instagram_url:    instagram||null,
+    facebook_url:     facebook||null,
+    description:      desc||null,
+    membership_note:  membershipNote||null,
   },{onConflict:'email,spot_name'});
   if(error){ showToast('Error: '+error.message); btn.disabled=false; btn.textContent='Submit claim'; return; }
   // Notify admin

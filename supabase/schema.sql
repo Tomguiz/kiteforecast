@@ -73,22 +73,86 @@ CREATE TABLE IF NOT EXISTS profiles (
 
 -- Spot ownership claims
 CREATE TABLE IF NOT EXISTS spot_claims (
-  id            uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
-  email         text        NOT NULL,
-  spot_name     text        NOT NULL,
-  business_name text,
-  website       text,
-  description   text,
-  contact_name  text,
-  contact_phone text,
-  phone_public  boolean     NOT NULL DEFAULT false,
-  contact_email text,
-  email_public  boolean     NOT NULL DEFAULT false,
-  livecam_url   text,
-  verified      boolean     NOT NULL DEFAULT false,
-  created_at    timestamptz NOT NULL DEFAULT now(),
+  id               uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  email            text        NOT NULL,
+  spot_name        text        NOT NULL,
+  business_name    text,
+  website          text,
+  description      text,
+  contact_name     text,
+  contact_phone    text,
+  phone_public     boolean     NOT NULL DEFAULT false,
+  contact_email    text,
+  email_public     boolean     NOT NULL DEFAULT false,
+  address          text,
+  livecam_url      text,
+  lesson_url       text,
+  gear_url         text,
+  instagram_url    text,
+  facebook_url     text,
+  membership_note  text,
+  verified         boolean     NOT NULL DEFAULT false,
+  created_at       timestamptz NOT NULL DEFAULT now(),
   UNIQUE (email, spot_name)
 );
+
+-- Add missing columns to existing spot_claims tables (idempotent)
+DO $$ BEGIN ALTER TABLE spot_claims ADD COLUMN address         text; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE spot_claims ADD COLUMN lesson_url      text; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE spot_claims ADD COLUMN gear_url        text; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE spot_claims ADD COLUMN instagram_url   text; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE spot_claims ADD COLUMN facebook_url    text; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE spot_claims ADD COLUMN membership_note text; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+
+-- Published spot info (one row per spot — manually verified by admin or auto-promoted from spot_claims)
+-- This is the table read by the frontend spot info card
+CREATE TABLE IF NOT EXISTS spot_info (
+  id               uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  spot_name        text        NOT NULL UNIQUE,
+  business_name    text,
+  website          text,
+  description      text,
+  contact_name     text,
+  phone            text,
+  phone_public     boolean     NOT NULL DEFAULT false,
+  email            text,
+  email_public     boolean     NOT NULL DEFAULT false,
+  address          text,
+  livecam_url      text,
+  lesson_url       text,
+  gear_url         text,
+  instagram_url    text,
+  facebook_url     text,
+  membership_note  text,
+  verified         boolean     NOT NULL DEFAULT false,  -- true = owner has been verified
+  created_at       timestamptz NOT NULL DEFAULT now(),
+  updated_at       timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE spot_info ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  CREATE POLICY "all_select_spot_info" ON spot_info FOR SELECT TO anon, authenticated USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- CTA click tracking (lesson, gear, website, instagram, facebook, livecam)
+CREATE TABLE IF NOT EXISTS spot_cta_clicks (
+  id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  spot_name   text        NOT NULL,
+  cta_type    text        NOT NULL,  -- 'lesson' | 'gear' | 'website' | 'instagram' | 'facebook' | 'livecam'
+  user_email  text,                  -- null for anonymous users
+  clicked_at  timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE spot_cta_clicks ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  CREATE POLICY "all_insert_cta_clicks" ON spot_cta_clicks FOR INSERT TO anon, authenticated WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "all_select_cta_clicks" ON spot_cta_clicks FOR SELECT TO anon, authenticated USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 ALTER TABLE spot_claims ENABLE ROW LEVEL SECURITY;
 
