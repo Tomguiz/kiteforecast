@@ -4537,7 +4537,7 @@ async function renderFriendsPanel(){
   const outgoingHtml = outgoing.map(r=>`
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 0;border-bottom:1px solid var(--border);font-size:.8rem;color:var(--tdim)">
       <span>⏳ Request sent to <strong style="color:var(--text)">${nickMap[r.recipient]||'someone'}</strong></span>
-      <button class="btn-reset" style="font-size:.7rem;color:#f87171;padding:4px 8px;border:1px solid rgba(248,113,113,.3);border-radius:6px;white-space:nowrap" onclick="cancelFriendRequest('${r.id}')">Cancel</button>
+      <button class="btn-reset" data-frid="${r.id}" style="font-size:.7rem;color:#f87171;padding:4px 8px;border:1px solid rgba(248,113,113,.3);border-radius:6px;white-space:nowrap" onclick="cancelFriendRequest('${r.id}')">Cancel</button>
     </div>`).join('');
 
   // Accepted friends
@@ -4638,15 +4638,15 @@ async function removeFriend(id){
 
 async function cancelFriendRequest(id){
   const sb=getSb(); if(!sb) return;
-  // Remove row from DOM immediately
-  const btn=document.querySelector(`button[onclick="cancelFriendRequest('${id}')"]`);
-  if(btn) btn.closest('div[style*="border-bottom"]')?.remove();
+  // Remove row from DOM immediately using data attribute
+  const btn=document.querySelector(`button[data-frid="${id}"]`);
+  if(btn) btn.closest('div')?.remove();
   // Delete from DB and update cache
   sb.from('friendships').delete().eq('id',id).then(()=>{}).catch(()=>{});
   if(_friendsCache) _friendsCache=_friendsCache.filter(r=>r.id!==id);
   // If no rows left show empty state
   const fl=$('friendsList');
-  if(fl&&!fl.querySelector('div[style*="border-bottom"]'))
+  if(fl&&fl.children.length===0)
     fl.innerHTML='<div class="stats-empty">No friends yet — search by nickname to add some!</div>';
   showToast('Request cancelled.');
 }
