@@ -4911,14 +4911,17 @@ function updatePremiumUI(){
 
 async function syncPremiumFromSupabase(email){
   const sb=getSb(); if(!sb||!email) return;
-  const{data}=await sb.from('profiles').select('is_premium,sms_enabled,phone_number,is_admin').eq('email',email).single();
-  if(!data) return;
+  const{data,error}=await sb.from('profiles').select('is_premium,sms_enabled,phone_number,is_admin,nickname').eq('email',email).single();
+  if(error) console.warn('syncPremium error:',error.message);
   const p=loadProfile();
-  p.isPremium=!!data.is_premium;
-  p.smsEnabled=!!data.sms_enabled;
-  p.phoneNumber=data.phone_number||'';
-  p.isAdmin=!!data.is_admin;
-  saveProfile(p);
+  if(data){
+    p.isPremium=!!data.is_premium;
+    p.smsEnabled=!!data.sms_enabled;
+    p.phoneNumber=data.phone_number||'';
+    p.isAdmin=!!data.is_admin;
+    if(data.nickname) p.nickname=data.nickname;
+    saveProfile(p);
+  }
   updatePremiumUI();
   const adminTab=$('ppTabAdmin');
   if(adminTab) adminTab.style.display=p.isAdmin?'inline-flex':'none';
