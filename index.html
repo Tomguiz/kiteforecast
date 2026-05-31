@@ -2718,7 +2718,7 @@ async function renderSpotInfoCard(spotName) {
     : `<span class="spot-info-badge unverified">⚠️ Unverified info</span>`;
 
   const webcamBtn = info.livecam_url
-    ? `<a href="${info.livecam_url}" target="_blank" rel="noopener" class="spot-cta-btn spot-cta-webcam" onclick="trackCtaClick('${spotName}','livecam')"><span class="webcam-dot"></span> Live webcam</a>`
+    ? `<a href="${info.livecam_url}" target="_blank" rel="noopener" class="spot-cta-btn spot-cta-webcam" onclick="trackCtaClick('${spotName}','livecam')"><span class="webcam-dot"></span> Live spot webcam ▶</a>`
     : '';
   const lessonBtn = info.lesson_url
     ? `<a href="${info.lesson_url}" target="_blank" rel="noopener" class="spot-cta-btn spot-cta-lesson" onclick="trackCtaClick('${spotName}','lesson')">🎓 Book a lesson</a>`
@@ -2757,7 +2757,7 @@ async function renderSpotInfoCard(spotName) {
       <div class="spot-info-header" onclick="_spotInfoOpen=!_spotInfoOpen;this.querySelector('.spot-info-chevron').classList.toggle('open',_spotInfoOpen);this.querySelector('.spot-info-chevron').style.display=_spotInfoOpen?'block':'none';this.nextElementSibling.style.display=_spotInfoOpen?'flex':'none';this.querySelector('.spot-info-open-btn').style.display=_spotInfoOpen?'none':'inline-flex'">
         <div style="flex:1">
           <div class="spot-info-title">📍 ${info.display_name || info.business_name || spotName}</div>
-          <div class="spot-info-subtitle">Lessons · Gear rental · Contact</div>
+          <div class="spot-info-subtitle">Lessons · Gear rental · Contact${info.livecam_url ? ' · <span style="display:inline-flex;align-items:center;gap:4px;color:#f87171;font-weight:700"><span class="webcam-dot" style="width:5px;height:5px"></span>Live cam</span>' : ''}</div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
           ${verifiedBadge}
