@@ -2905,14 +2905,16 @@ document.addEventListener('click',function(e){
 // Load admin-added spots from DB and merge into SPOTS before anything else runs
 (async()=>{
   try{
-    const sb=getSb(); if(!sb) return;
-    const{data}=await sb.from('spot_overrides').select('name,loc,lat,lon,dirs').eq('active',true);
-    if(data?.length){
-      data.forEach(r=>{
-        if(!SPOTS.find(s=>s.name===r.name)){
-          SPOTS.push({name:r.name,loc:r.loc||'',lat:r.lat,lon:r.lon,dirs:r.dirs||[]});
-        }
-      });
+    const sb=getSb();
+    if(sb){
+      const{data}=await sb.from('spot_overrides').select('name,loc,lat,lon,dirs').eq('active',true);
+      if(data?.length){
+        data.forEach(r=>{
+          if(!SPOTS.find(s=>s.name===r.name)){
+            SPOTS.push({name:r.name,loc:r.loc||'',lat:r.lat,lon:r.lon,dirs:r.dirs||[]});
+          }
+        });
+      }
     }
   }catch(e){}
   renderHintChips();
