@@ -48,19 +48,21 @@ Deno.serve(async (req) => {
   const endH = (h + duration_h) % 24
   const endTime = `${String(endH).padStart(2,'0')}:${String(m).padStart(2,'0')}`
 
-  // App deep link to that spot
-  const appLink = `https://tomguiz.github.io/kiteforecast/?spot=${encodeURIComponent(spot_name)}`
+  // Join deep link — opens app, searches spot, auto-opens attend sheet for same date
+  const joinData = btoa(JSON.stringify({ spot: spot_name, date: session_date, start_time }))
+  const joinUrl  = `https://tomguiz.github.io/kiteforecast/?join=${joinData}`
+  const appLink  = `https://tomguiz.github.io/kiteforecast/?spot=${encodeURIComponent(spot_name)}`
 
   // Send one webhook per friend
   const sends = (friends || []).map(async (friend: any) => {
-    // Generate magic link for this friend
-    let friend_link = appLink
+    // Generate magic link that auto-logs in friend and redirects to join URL
+    let join_link = joinUrl
     try {
       const { data, error } = await admin.auth.admin.generateLink({
         type: 'magiclink', email: friend.email,
-        options: { redirectTo: appLink },
+        options: { redirectTo: joinUrl },
       })
-      if (!error && data?.properties?.action_link) friend_link = data.properties.action_link
+      if (!error && data?.properties?.action_link) join_link = data.properties.action_link
     } catch (e) {}
 
     return fetch(MAKE_WEBHOOK_URL, {
@@ -78,7 +80,8 @@ Deno.serve(async (req) => {
         duration_h,
         note:               note || '',
         maps_link:          `https://maps.google.com/?q=${encodeURIComponent(spot_name)}`,
-        app_link:           friend_link,
+        app_link:           appLink,
+        join_link,
       }),
     })
   })

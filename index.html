@@ -4488,6 +4488,33 @@ async function submitSpotSuggestion(){
   showSpotPendingMsg(name);
 }
 
+async function handlePendingJoin(){
+  const j=window._pendingJoin; if(!j) return;
+  window._pendingJoin=null;
+  // Search for the spot
+  const searchInput=$('searchInput');
+  if(searchInput){ searchInput.value=j.spot; }
+  // Trigger search
+  try{ await doSearch(j.spot); }catch(e){}
+  // Wait for grid to render then open the attend sheet for the right date
+  setTimeout(()=>{
+    const btn=document.getElementById(`going-${j.date}`);
+    if(btn){
+      btn.scrollIntoView({behavior:'smooth',block:'center'});
+      setTimeout(()=>{
+        // Find lat/lon from current loc
+        const lat=cachedLoc?.lat||0; const lon=cachedLoc?.lon||0;
+        openAttendSheet(j.date,0,j.spot,lat,lon);
+        // Pre-fill start time suggestion
+        setTimeout(()=>{
+          const sel=$('attendStartTime');
+          if(sel&&j.start_time) sel.value=j.start_time;
+        },100);
+      },300);
+    }
+  },1500);
+}
+
 // ── SESSION ATTENDANCE ───────────────────────────────────────────────────────
 let _attendCache={}; // dateStr -> attendance row or null
 
@@ -4495,16 +4522,47 @@ async function loadAttendances(){
   const sb=getSb(); const email=_authSession?.user?.email||loadProfile().email;
   if(!sb||!email) return;
   const today=new Date().toISOString().slice(0,10);
-  const{data}=await sb.from('session_attendances').select('*')
+  const spotName=cachedLoc?.name;
+
+  // My own attendances
+  const{data:mine}=await sb.from('session_attendances').select('*')
     .eq('email',email).eq('cancelled',false).gte('session_date',today);
   _attendCache={};
-  (data||[]).forEach(r=>{ _attendCache[r.session_date]=r; });
+  (mine||[]).forEach(r=>{ _attendCache[r.session_date]=r; });
+
+  // Friends' attendances for this spot
+  let friendsAttend={};
+  if(spotName){
+    // Get friend emails
+    const{data:friendships}=await sb.from('friendships').select('requester,recipient')
+      .or(`requester.eq.${email},recipient.eq.${email}`).eq('status','accepted');
+    const friendEmails=(friendships||[]).map(f=>f.requester===email?f.recipient:f.requester);
+    if(friendEmails.length){
+      const{data:theirAttend}=await sb.from('session_attendances').select('*')
+        .in('email',friendEmails).eq('spot_name',spotName).eq('cancelled',false).gte('session_date',today);
+      (theirAttend||[]).forEach(r=>{
+        if(!friendsAttend[r.session_date]) friendsAttend[r.session_date]=[];
+        friendsAttend[r.session_date].push(r);
+      });
+    }
+  }
+
   // Update all going buttons
   document.querySelectorAll('.card-going-btn').forEach(btn=>{
     const dateStr=btn.id.replace('going-','');
-    if(_attendCache[dateStr]){
-      btn.classList.add('going');
-      btn.textContent=`✓ Going · ${_attendCache[dateStr].start_time}`;
+    const myAttend=_attendCache[dateStr];
+    const theirList=friendsAttend[dateStr]||[];
+    let html='🏄 I\'m going';
+    if(myAttend) html=`✓ Going · ${myAttend.start_time}`;
+    if(theirList.length){
+      const names=theirList.map(r=>r.nickname).join(', ');
+      const friendLine=`<span style="display:block;font-size:.58rem;color:#4ade80;margin-top:2px">👥 ${names}</span>`;
+      html=(myAttend?`✓ Going · ${myAttend.start_time}`:'🏄 I\'m going')+friendLine;
+      btn.innerHTML=html;
+      btn.classList.toggle('going',!!myAttend);
+    } else {
+      btn.textContent=html;
+      btn.classList.toggle('going',!!myAttend);
     }
   });
 }
@@ -5178,6 +5236,18 @@ async function savePhone(){
   }
 })();
 
+// Handle ?join=<base64> — auto-search spot and open attend sheet (from session email)
+;(function(){
+  const params=new URLSearchParams(location.search);
+  const joinParam=params.get('join');
+  if(!joinParam) return;
+  history.replaceState({},'',location.pathname);
+  try{
+    const data=JSON.parse(atob(joinParam));
+    window._pendingJoin=data; // {spot, date, start_time}
+  }catch(e){}
+})();
+
 // Handle ?review=<base64-spot-data> — admin one-click spot approval
 // Sign out any existing session first so the magic link login takes effect
 ;(async function(){
@@ -5368,6 +5438,8 @@ async function initAuth(){
       setTimeout(()=>updateFriendRequestBadge(), 1200);
       // Auto-open pending tab from URL param (e.g. ?tab=friends from email)
       if(window._pendingTab){ const t=window._pendingTab; window._pendingTab=null; setTimeout(()=>{ openProfilePanel(t); },600); }
+      // Auto-search spot and open attend sheet from ?join= param
+      if(window._pendingJoin){ setTimeout(()=>handlePendingJoin(),800); }
       if(pendingNotif){
         const pn=pendingNotif; pendingNotif=null;
         if(pn.type==='spot') addSpotNotif(pn.spot,pn.sessions);
