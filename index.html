@@ -1042,11 +1042,6 @@
         <button class="btn pp-save-btn" id="ppNicknameSaveBtn" onclick="saveNickname()" style="margin-top:2px">Save</button>
         <p class="pp-note">Used when you share a spot with friends.</p>
         <div style="border-top:1px solid var(--border);margin:4px 0"></div>
-        <label class="pp-label">Tide API key <a href="https://www.worldtides.info/developer" target="_blank" rel="noopener" style="color:var(--accent);font-size:.75rem;font-weight:400;margin-left:6px">Get free key ↗</a></label>
-        <input type="text" id="ppTideKeyInput" class="pp-input" placeholder="Paste your WorldTides API key" />
-        <button class="btn pp-save-btn" id="ppTideSaveBtn" onclick="saveTideKey()" style="margin-top:2px">Save</button>
-        <p class="pp-note">Used to show exact high/low tide times. Free at worldtides.info/developer.</p>
-        <div style="border-top:1px solid var(--border);margin:4px 0"></div>
         <div id="ppDigestSection">
           <div class="pp-toggle-row" id="ppDigestRow">
             <div>
@@ -1145,7 +1140,6 @@ let _modalDateStr  = null;
 let _modalDayIdx   = null;
 let cachedHrMap       = null;
 let cachedMarineHrMap = null;
-let cachedTides       = null; // [{dateStr,exactHr,type:'High'|'Low',height}]
 let lastFetchTime = parseInt(localStorage.getItem('kf_lastFetch')||'0',10);
 
 function updateFetchTimestamp(){
@@ -2246,7 +2240,6 @@ async function fetchForecastFromSpot(spot){
     });
     const mP=new URLSearchParams({latitude:spot.lat,longitude:spot.lon,hourly:'wave_height,wave_period,wave_direction',forecast_days:10,timezone:'auto'});
     const marineP=safeFetch(`https://marine-api.open-meteo.com/v1/marine?${mP}`,8000).catch(()=>null);
-    const tideP=fetchTideData(spot.lat,spot.lon);
     cachedWx=await safeFetch(`https://api.open-meteo.com/v1/forecast?${p}`);
     if(cachedWx.error) throw new Error(cachedWx.reason||'API error');
     if(!manualShoreSet){
@@ -2278,7 +2271,6 @@ async function fetchForecastFromSpot(spot){
       });
     });
     buildMarineMap(await marineP);
-    cachedTides=applyTideTimezone(await tideP, cachedWx.timezone||'UTC');
     if(myGen!==_fetchGen) return; // user navigated away — discard results
     lastFetchTime=Date.now(); try{localStorage.setItem('kf_lastFetch',lastFetchTime);}catch(e){}
     renderGrid();
@@ -2725,16 +2717,7 @@ function fmtTideTime(exactHr){
 }
 
 function findTideExtremes(dateStr,srHour,ssHour){
-  // ── Prefer real tide API data ──
-  if(cachedTides){
-    const real=cachedTides
-      .filter(t=>t.dateStr===dateStr&&t.exactHr>=srHour&&t.exactHr<=ssHour)
-      .map(t=>({type:t.type==='High'?'high':'low',exactHr:t.exactHr,v:t.height}))
-      .sort((a,b)=>a.exactHr-b.exactHr);
-    if(real.length) return real;
-    // API has no data for this date (free tier lag) — fall through to centroid
-  }
-  // ── Fallback: wave-height centroid (no tide key set) ──
+  // Wave-height centroid from Open-Meteo Marine
   if(!cachedMarineHrMap||!cachedMarineHrMap.size) return [];
   const all=[];
   for(let hr=0;hr<24;hr++){
@@ -2807,7 +2790,6 @@ async function fetchForecast(query){
     });
     const mP2=new URLSearchParams({latitude,longitude,hourly:'wave_height,wave_period,wave_direction',forecast_days:10,timezone:'auto'});
     const marineP2=safeFetch(`https://marine-api.open-meteo.com/v1/marine?${mP2}`,8000).catch(()=>null);
-    const tideP2=fetchTideData(latitude,longitude);
     cachedWx=await safeFetch(`https://api.open-meteo.com/v1/forecast?${p}`);
     if(cachedWx.error) throw new Error(cachedWx.reason||'API error');
 
@@ -2839,7 +2821,6 @@ async function fetchForecast(query){
     });
 
     buildMarineMap(await marineP2);
-    cachedTides=applyTideTimezone(await tideP2, cachedWx.timezone||'UTC');
     saveLastSpot({name:cachedLoc.name,loc:[cachedLoc.admin1,cachedLoc.country].filter(Boolean).join(', '),lat:cachedLoc.latitude,lon:cachedLoc.longitude,dirs:[...windDirs]});
     lastFetchTime=Date.now(); try{localStorage.setItem('kf_lastFetch',lastFetchTime);}catch(e){}
     renderGrid();
@@ -3857,7 +3838,6 @@ function openProfilePanel(tab){
     document.body.style.overflow='hidden';
     switchPpTab(tab);
     const _p=loadProfile();
-    $('ppTideKeyInput').value=_p.tideKey||'';
     const _ni=$('ppNicknameInput'); if(_ni) _ni.value=_p.nickname||'';
     renderSignInOnboarding();
     updateAuthUI();
@@ -4197,50 +4177,6 @@ function saveNickname(){
   const p=loadProfile(); p.nickname=val; saveProfile(p);
   const btn=$('ppNicknameSaveBtn');
   if(btn){ btn.classList.add('saved'); btn.textContent='✓ Saved'; setTimeout(()=>{ btn.classList.remove('saved'); btn.textContent='Save'; },2000); }
-}
-function loadTideKey(){ return (loadProfile().tideKey||'').trim(); }
-function saveTideKey(){
-  const key=$('ppTideKeyInput').value.trim();
-  const p=loadProfile(); p.tideKey=key; saveProfile(p);
-  const btn=$('ppTideSaveBtn');
-  if(btn){ btn.classList.add('saved'); btn.textContent='✓ Saved'; setTimeout(()=>{ btn.classList.remove('saved'); btn.textContent='Save'; },2000); }
-  showToast(key?'✓ Tide key saved':'Tide key cleared');
-  if(cachedLoc&&key) fetchTideAndRefresh();
-}
-async function fetchTideData(lat,lon){
-  const key=loadTideKey(); if(!key) return null;
-  try{
-    const start=Math.floor(Date.now()/1000);
-    const url=`https://www.worldtides.info/api/v3?extremes&lat=${lat}&lon=${lon}&days=10&start=${start}&key=${key}`;
-    const data=await safeFetch(url,10000);
-    if(data.status!==200||!data.extremes) return null;
-    // Use dt (Unix timestamp seconds) — unambiguous UTC, avoids date-string parsing issues
-    console.log('[Tides raw]', data.extremes.slice(0,4).map(e=>`${e.type} dt=${e.dt} date=${e.date}`).join(' | '));
-    return data.extremes.map(e=>({_ms:e.dt*1000, type:e.type, height:e.height}));
-  }catch(e){ console.warn('Tide API error:',e); return null; }
-}
-function applyTideTimezone(rawTides, tz){
-  if(!rawTides) return null;
-  const safeZone=(()=>{ try{ Intl.DateTimeFormat(undefined,{timeZone:tz}); return tz; }catch{ return 'UTC'; }})();
-  return rawTides.map(t=>{
-    const d=new Date(t._ms);
-    const parts=new Intl.DateTimeFormat('en-CA',{
-      timeZone:safeZone, year:'numeric', month:'2-digit', day:'2-digit',
-      hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false,
-    }).formatToParts(d);
-    const g=type=>parseInt(parts.find(p=>p.type===type).value,10);
-    const dateStr=`${g('year')}-${String(g('month')).padStart(2,'0')}-${String(g('day')).padStart(2,'0')}`;
-    // hour12:false can return 24 for midnight on some engines
-    const exactHr=(g('hour')%24)+g('minute')/60+g('second')/3600;
-    console.log(`[Tides converted] ${t.type} → ${dateStr} ${String(g('hour')%24).padStart(2,'0')}:${String(g('minute')).padStart(2,'0')} (tz=${safeZone})`);
-    return {dateStr, exactHr, type:t.type, height:t.height};
-  });
-}
-async function fetchTideAndRefresh(){
-  if(!cachedLoc||!cachedWx) return;
-  const raw=await fetchTideData(cachedLoc.latitude,cachedLoc.longitude);
-  cachedTides=applyTideTimezone(raw, cachedWx.timezone||'UTC');
-  if(cachedTides) renderGrid();
 }
 // ── AUTH ──
 async function initAuth(){
