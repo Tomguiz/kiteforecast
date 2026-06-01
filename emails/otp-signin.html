@@ -38,10 +38,17 @@
               <!-- Code box -->
               <div style="background-color:#0a0f1e;border:2px solid #38bdf8;border-radius:12px;padding:24px;text-align:center;margin-bottom:28px;">
                 <p style="margin:0 0 12px;font-size:0.75rem;color:#64748b;letter-spacing:0.1em;text-transform:uppercase;">Your sign-in code</p>
-                <div style="background:#38bdf8;border-radius:8px;padding:10px 20px;display:block;width:100%;box-sizing:border-box;">
-                  <p x-apple-data-detectors="false" style="margin:0;font-size:1.6rem;font-weight:900;color:#0a0f1e;letter-spacing:0.25em;font-family:'Courier New',Courier,monospace;white-space:nowrap;text-align:center;-webkit-text-size-adjust:none;">{{ .Token }}</p>
-                </div>
-                <p style="margin:10px 0 0;font-size:0.78rem;color:#64748b;">Tap and hold the code above to copy it</p>
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#38bdf8;border-radius:8px;">
+                  <tr>
+                    <td style="padding:10px 0 10px 16px;vertical-align:middle;width:1%;white-space:nowrap;">
+                      <span style="font-size:0.85rem;font-weight:700;color:rgba(0,0,0,0.35);font-family:'Courier New',Courier,monospace;letter-spacing:0.05em;">KF&#8209;</span>
+                    </td>
+                    <td style="padding:10px 16px 10px 6px;vertical-align:middle;">
+                      <p x-apple-data-detectors="false" style="margin:0;font-size:1.6rem;font-weight:900;color:#0a0f1e;letter-spacing:0.25em;font-family:'Courier New',Courier,monospace;white-space:nowrap;text-align:center;-webkit-text-size-adjust:none;">{{ .Token }}</p>
+                    </td>
+                  </tr>
+                </table>
+                <p style="margin:10px 0 0;font-size:0.78rem;color:#64748b;">Type only the <strong>6 digits</strong> in the app — ignore the KF&#8209; prefix</p>
               </div>
 
               <p style="margin:0;font-size:0.82rem;color:#475569;line-height:1.6;">
