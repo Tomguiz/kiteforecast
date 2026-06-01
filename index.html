@@ -5750,6 +5750,8 @@ async function initAuth(){
           syncFavsFromSupabase(session.user.email).then(()=>renderHintChips());
           syncNotifsFromSupabase(session.user.email).then(()=>{ renderNotifList(); renderHintChips(); });
           updateLastSeen(session.user.email);
+          // Auto-open pending tab (e.g. ?tab=friends from email) even when already logged in
+          if(window._pendingTab){ const t=window._pendingTab; window._pendingTab=null; setTimeout(()=>{ openProfilePanel(t); },800); }
         }
       } else if(event==='INITIAL_SESSION'&&!cachedEmail){
         // No session, never had one — genuinely signed out
