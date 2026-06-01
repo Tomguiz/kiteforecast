@@ -1171,6 +1171,7 @@
       <div class="m-tl-lbl">Wind throughout the day <span id="mTlLegend"></span></div>
       <div class="m-timeline" id="mTimeline"></div>
     </div>
+    <div id="mAttendStatus" style="display:none;padding:10px 16px;background:rgba(34,197,94,.07);border-bottom:1px solid rgba(34,197,94,.15);font-size:.78rem;color:rgba(34,197,94,.9);flex-shrink:0;"></div>
     <div class="m-body" id="mBody"></div>
   </div>
 </div>
@@ -3621,13 +3622,7 @@ function openModal(dateStr,dayIdx){
 
   // Session attendance status bar (shows current state, confirm/cancel is inline under row)
   if(goodHours>=2){
-    const existing=_attendCache[dateStr];
-    const barBg=existing?'rgba(34,197,94,.07)':'rgba(34,197,94,.04)';
-    const barBorder=existing?'rgba(34,197,94,.15)':'rgba(34,197,94,.12)';
-    const barContent=existing
-      ?`✓ You're going · <strong style="color:#4ade80">${existing.start_time}</strong> · <button data-cancel-attend="${dateStr}" style="background:none;border:none;color:#f87171;font-size:.72rem;cursor:pointer;padding:0;margin-left:6px">Cancel attendance</button>`
-      :'🏄 <span style="color:#f59e0b;font-weight:700">Premium:</span> tap any hour row to confirm you\'re going &amp; notify your friends';
-    html+=`<div id="modalAttendBar" style="margin:12px 0 4px;padding:12px 14px;background:${barBg};border:1px solid ${barBorder};border-radius:10px;font-size:.78rem;color:rgba(34,197,94,.8);">${barContent}</div>`;
+    updateModalAttendBar(dateStr);
   }
 
   const mBody=$('mBody');
@@ -3664,6 +3659,7 @@ function openModal(dateStr,dayIdx){
 function closeModal(){
   $('modalOverlay').style.display='none';
   $('mAttendBar').style.display='none';
+  const as=$('mAttendStatus'); if(as) as.style.display='none';
   $('searchInput').blur();
   _attendSessionStart=null; _attendDateStr=null;
   // Restore background scroll position
@@ -4751,15 +4747,13 @@ function selectSessionStart(timeStr, dateStr, rowEl){
 }
 
 function updateModalAttendBar(dateStr){
-  const bar=$('modalAttendBar'); if(!bar) return;
+  const bar=$('mAttendStatus'); if(!bar) return;
   const existing=_attendCache[dateStr];
   if(existing){
-    bar.style.background='rgba(34,197,94,.07)';
-    bar.style.borderColor='rgba(34,197,94,.15)';
+    bar.style.display='block';
     bar.innerHTML=`✓ You're going · <strong style="color:#4ade80">${existing.start_time}</strong> · <button data-cancel-attend="${dateStr}" style="background:none;border:none;color:#f87171;font-size:.72rem;cursor:pointer;padding:0;margin-left:6px">Cancel attendance</button>`;
   } else {
-    bar.style.background='rgba(34,197,94,.04)';
-    bar.style.borderColor='rgba(34,197,94,.12)';
+    bar.style.display='block';
     bar.innerHTML=isPremium()
       ?'🏄 <span style="color:#f59e0b;font-weight:700">Premium:</span> tap any hour row to confirm you\'re going &amp; notify your friends'
       :'👑 <a href="#" onclick="event.preventDefault();openProfilePanel(\'profile\')" style="color:#fbbf24;font-weight:600;text-decoration:none">Upgrade to Premium</a> to track &amp; share your sessions';
