@@ -521,8 +521,11 @@
     .pp-tab {
       background:none; border:none; cursor:pointer;
       font-size:.82rem; font-weight:600; color:var(--gray);
-      padding:10px 16px; border-bottom:2px solid transparent;
+      padding:10px 12px; border-bottom:2px solid transparent;
       transition:color .15s, border-color .15s; white-space:nowrap; flex-shrink:0;
+    }
+    @media(max-width:420px){
+      .pp-tab { font-size:.72rem; padding:10px 8px; }
     }
     .pp-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
     .pp-tab span {
@@ -1520,10 +1523,10 @@ function conditionLabel(kn,dir,code,temp){
     return {label:suffix,cls:'cond-bad'};
   }
   const warm=temp>=13;
-  if(sp>=3&&warm) return {label:'⚡ Perfect',  cls:'cond-perfect'};
-  if(sp>=2&&warm) return {label:'★ Excellent', cls:'cond-excellent'};
-  if(sp>=1&&warm) return {label:'✓ Very good', cls:'cond-vgood'};
-  return             {label:'✓ Good',       cls:'cond-good'};
+  if(sp>=3&&warm) return {label:'⚡ Perfect',   cls:'cond-perfect'};
+  if(sp>=3)       return {label:'⚡ Perfect',   cls:'cond-perfect'};
+  if(sp>=2)       return {label:'✓ Very good', cls:'cond-vgood'};
+  return                 {label:'✓ Good',      cls:'cond-good'};
 }
 
 function rateDay(gh,pk,code,badDir,peakDay){
@@ -5083,7 +5086,8 @@ async function respondFriendRequest(id, status){
 async function removeFriend(id){
   const sb=getSb(); if(!sb) return;
   await sb.from('friendships').delete().eq('id',id);
-  if(_friendsCache) _friendsCache=_friendsCache.filter(r=>r.id!==id);
+  // Force a fresh fetch so any cache inconsistency is resolved
+  _friendsCache=null;
   await renderFriendsPanel();
   showToast('Friend removed.');
 }
