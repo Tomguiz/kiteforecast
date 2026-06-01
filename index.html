@@ -1050,6 +1050,15 @@
           <input type="text" id="suggestName" class="pp-input" placeholder="e.g. Koksijde Beach"/>
         </div>
 
+        <div>
+          <label class="pp-label">Website <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(optional — paste URL to autofill fields)</span></label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="url" id="suggestWebsite" class="pp-input" placeholder="https://…" style="flex:1"/>
+            <button type="button" id="autofillBtn" onclick="autofillFromWebsite()" style="flex-shrink:0;padding:10px 14px;border-radius:10px;border:1.5px solid var(--accent);background:rgba(0,212,255,.1);color:var(--accent);font-size:.78rem;font-weight:700;cursor:pointer;white-space:nowrap">✨ Autofill</button>
+          </div>
+          <div id="autofillStatus" style="font-size:.72rem;color:var(--tdim);margin-top:4px;display:none"></div>
+        </div>
+
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
           <div>
             <label class="pp-label">City / Region <span style="color:#f87171">*</span></label>
@@ -1079,15 +1088,6 @@
         <div>
           <label class="pp-label">School / business name <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(optional)</span></label>
           <input type="text" id="suggestBusiness" class="pp-input" placeholder="e.g. Icarus Kite School"/>
-        </div>
-
-        <div>
-          <label class="pp-label">Website <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(optional)</span></label>
-          <div style="display:flex;gap:8px;align-items:center">
-            <input type="url" id="suggestWebsite" class="pp-input" placeholder="https://…" style="flex:1"/>
-            <button type="button" id="autofillBtn" onclick="autofillFromWebsite()" style="flex-shrink:0;padding:10px 14px;border-radius:10px;border:1.5px solid var(--accent);background:rgba(0,212,255,.1);color:var(--accent);font-size:.78rem;font-weight:700;cursor:pointer;white-space:nowrap">✨ Autofill</button>
-          </div>
-          <div id="autofillStatus" style="font-size:.72rem;color:var(--tdim);margin-top:4px;display:none"></div>
         </div>
 
         <div>
