@@ -2461,15 +2461,20 @@ async function searchOsmSpots(q){
 }
 
 let acActive=-1;
-function renderAC(items){
+function renderAC(items, query=''){
   const dd=$('acDropdown');
-  if(!items.length){dd.innerHTML='';dd.classList.remove('open');acActive=-1;return;}
-  dd.innerHTML=items.map((s,i)=>
+  const q=(query||$('searchInput').value||'').trim();
+  if(!items.length&&q.length<2){dd.innerHTML='';dd.classList.remove('open');acActive=-1;return;}
+  const spotRows=items.map((s,i)=>
     `<div class="ac-item" data-i="${i}"><strong>${s.alias||s.name}</strong><span>${s.alias?s.name+' · ':''  }${s.loc}</span></div>`
   ).join('');
+  const addHint=q.length>=2
+    ? `<div class="ac-item ac-item-add" style="border-top:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:8px;color:var(--accent);opacity:.8" onmousedown="event.preventDefault();showAddSpotFromHome(${JSON.stringify(q)});closeAC()"><span style="font-size:1rem;line-height:1">＋</span><span style="flex:1"><span style="font-weight:600;font-size:.82rem">Add "${q}" as a new spot</span><span style="display:block;font-size:.72rem;color:var(--tdim);margin-top:1px">Not listed? Request it — we'll review and add it</span></span></div>`
+    : '';
+  dd.innerHTML=spotRows+addHint;
   dd.classList.add('open');
   acActive=-1;
-  dd.querySelectorAll('.ac-item').forEach((el,i)=>{
+  dd.querySelectorAll('.ac-item:not(.ac-item-add)').forEach((el,i)=>{
     el.addEventListener('mousedown',e=>{e.preventDefault();fillSpotFromAC(items[i]);});
   });
 }
@@ -2859,7 +2864,7 @@ function goHome(){
   closeAC();
   resetSearch();
 }
-function showAddSpotFromHome(){
+function showAddSpotFromHome(prefill=''){
   // Show the error/suggest state with empty form so user can add their spot directly
   $('errorTitle').textContent='Add your spot';
   $('errorMsg').textContent='Fill in the details below and we\'ll review and add it to the app.';
@@ -2867,7 +2872,7 @@ function showAddSpotFromHome(){
   const sw=$('suggestSpotWrap');
   if(sw){
     sw.style.display='block';
-    $('suggestName').value=''; $('suggestLocation').value=''; $('suggestCountry').value='';
+    $('suggestName').value=prefill; $('suggestLocation').value=''; $('suggestCountry').value='';
     $('suggestCoords').value=''; $('suggestLat').value=''; $('suggestLon').value='';
     $('suggestDirs').value=''; $('suggestBusiness').value=''; $('suggestWebsite').value='';
     if($('suggestWebcam')) $('suggestWebcam').value=''; $('suggestNote').value='';
@@ -2902,7 +2907,7 @@ $('searchInput').addEventListener('input',async e=>{
   // Bail if query changed while waiting
   if($('searchInput').value.trim()!==q) return;
   const local=spotSearch(q);
-  renderAC(local); // show local results immediately
+  renderAC(local, q); // show local results immediately
   acActive=-1;
   if(q.length>=3){
     searchOsmSpots(q).then(osm=>{
@@ -2910,7 +2915,7 @@ $('searchInput').addEventListener('input',async e=>{
       if($('searchInput').value.trim()===q){
         const merged=[...local];
         osm.forEach(o=>{ if(!merged.find(m=>m.name.toLowerCase()===o.name.toLowerCase())) merged.push(o); });
-        renderAC(merged.slice(0,8));
+        renderAC(merged.slice(0,8), q);
       }
     });
   }
