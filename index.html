@@ -5085,8 +5085,12 @@ async function respondFriendRequest(id, status){
 
 async function removeFriend(id){
   const sb=getSb(); if(!sb) return;
-  await sb.from('friendships').delete().eq('id',id);
-  // Force a fresh fetch so any cache inconsistency is resolved
+  const email=_authSession?.user?.email||loadProfile().email;
+  // Delete by both id AND user email to satisfy RLS policies
+  const{error}=await sb.from('friendships').delete()
+    .eq('id',id)
+    .or(`requester.eq.${email},recipient.eq.${email}`);
+  if(error){ console.error('[removeFriend]',error); showToast('Error removing friend: '+error.message); return; }
   _friendsCache=null;
   await renderFriendsPanel();
   showToast('Friend removed.');
