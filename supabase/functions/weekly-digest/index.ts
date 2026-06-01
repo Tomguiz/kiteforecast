@@ -52,6 +52,8 @@ function getGoodSessions(wx: any, spotDirs: number[], spotDays: number[] | null)
     let qh = 0, firstHr: number | null = null
     let sumKn = 0, maxGust = 0
     const dirCounts: Record<number, number> = {}
+    // track qualifying hours in order for best-window computation
+    const qualHours: number[] = []
 
     hourly.time.forEach((t: string, j: number) => {
       if (t.slice(0, 10) !== dateStr) return
@@ -66,16 +68,31 @@ function getGoodSessions(wx: any, spotDirs: number[], spotDays: number[] | null)
         qh++
         sumKn += kn
         if (gust > maxGust) maxGust = gust
-        // bucket direction to nearest 45°
         const bucket = Math.round(((dir % 360) + 360) % 360 / 45) * 45 % 360
         dirCounts[bucket] = (dirCounts[bucket] ?? 0) + 1
+        qualHours.push(hr)
       }
     })
 
     if (qh >= 2) {
       const avgKn = Math.round(sumKn / qh)
-      // dominant direction = most frequent bucket
       const domDir = parseInt(Object.entries(dirCounts).sort((a, b) => b[1] - a[1])[0][0])
+
+      // Best consecutive window: longest run of hours where each step is +1h
+      let bestStart = qualHours[0], bestLen = 1
+      let curStart = qualHours[0], curLen = 1
+      for (let k = 1; k < qualHours.length; k++) {
+        if (qualHours[k] === qualHours[k - 1] + 1) {
+          curLen++
+          if (curLen > bestLen) { bestLen = curLen; bestStart = curStart }
+        } else {
+          curStart = qualHours[k]; curLen = 1
+        }
+      }
+      const bestEnd = bestStart + bestLen
+      const winStart = `${String(bestStart).padStart(2, '0')}h00`
+      const winEnd   = `${String(bestEnd).padStart(2, '0')}h00`
+
       sessions.push({
         date: dateStr,
         date_label: new Date(dateStr + 'T12:00:00').toLocaleDateString('en', { weekday: 'long', day: 'numeric', month: 'long' }),
@@ -86,6 +103,9 @@ function getGoodSessions(wx: any, spotDirs: number[], spotDays: number[] | null)
         max_gust: maxGust,
         dom_dir: compass(domDir),
         dir_arrow: dirArrow(domDir),
+        win_start: winStart,
+        win_end: winEnd,
+        win_hours: bestLen,
       })
     }
   }
@@ -157,30 +177,51 @@ Deno.serve(async (req) => {
       const sessionRows = sf.sessions.map(sess => `
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:10px;background-color:#1a2235;border:1px solid #242d42;border-radius:10px;">
           <tr>
-            <td style="padding:14px 18px;">
+            <td style="padding:14px 18px 10px 18px;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                 <tr>
-                  <!-- Date + start -->
-                  <td style="vertical-align:middle;width:38%;">
+                  <!-- Date -->
+                  <td style="vertical-align:middle;width:50%;">
                     <p style="margin:0;font-family:'Bebas Neue',Arial,sans-serif;font-size:20px;color:#ffffff;letter-spacing:1px;">${sess.day_of_week}</p>
                     <p style="margin:2px 0 0 0;font-size:11px;color:#4a5568;">${sess.date_label}</p>
-                    <p style="margin:4px 0 0 0;font-size:11px;color:#5dd4f0;font-weight:700;">From ${sess.start_time} &middot; ${sess.duration_hours}h</p>
                   </td>
                   <!-- Avg wind -->
-                  <td style="vertical-align:middle;text-align:center;width:20%;">
+                  <td style="vertical-align:middle;text-align:center;width:17%;">
                     <p style="margin:0;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4a5568;">Avg</p>
-                    <p style="margin:3px 0 0 0;font-family:'Bebas Neue',Arial,sans-serif;font-size:24px;color:#5dd4f0;line-height:1;">${sess.avg_kn}<span style="font-size:12px;color:#4a5568;"> kn</span></p>
+                    <p style="margin:3px 0 0 0;font-family:'Bebas Neue',Arial,sans-serif;font-size:22px;color:#5dd4f0;line-height:1;">${sess.avg_kn}<span style="font-size:11px;color:#4a5568;"> kn</span></p>
                   </td>
                   <!-- Gusts -->
-                  <td style="vertical-align:middle;text-align:center;width:20%;">
+                  <td style="vertical-align:middle;text-align:center;width:17%;">
                     <p style="margin:0;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4a5568;">Gusts</p>
-                    <p style="margin:3px 0 0 0;font-family:'Bebas Neue',Arial,sans-serif;font-size:24px;color:#94a3b8;line-height:1;">${sess.max_gust}<span style="font-size:12px;color:#4a5568;"> kn</span></p>
+                    <p style="margin:3px 0 0 0;font-family:'Bebas Neue',Arial,sans-serif;font-size:22px;color:#94a3b8;line-height:1;">${sess.max_gust}<span style="font-size:11px;color:#4a5568;"> kn</span></p>
                   </td>
                   <!-- Direction -->
-                  <td style="vertical-align:middle;text-align:center;width:22%;">
+                  <td style="vertical-align:middle;text-align:center;width:16%;">
                     <p style="margin:0;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4a5568;">Dir</p>
-                    <p style="margin:3px 0 0 0;font-family:'Bebas Neue',Arial,sans-serif;font-size:24px;color:#4ade80;line-height:1;">${sess.dom_dir}</p>
-                    <p style="margin:1px 0 0 0;font-size:14px;color:#4ade80;">${sess.dir_arrow}</p>
+                    <p style="margin:3px 0 0 0;font-family:'Bebas Neue',Arial,sans-serif;font-size:22px;color:#4ade80;line-height:1;">${sess.dom_dir}</p>
+                    <p style="margin:0;font-size:13px;color:#4ade80;">${sess.dir_arrow}</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <!-- Best window bar -->
+          <tr>
+            <td style="padding:0 18px 14px 18px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.2);border-radius:8px;padding:8px 14px;">
+                    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                      <tr>
+                        <td style="vertical-align:middle;">
+                          <span style="font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:rgba(74,222,128,.6);">&#9201; Best window</span>
+                        </td>
+                        <td style="vertical-align:middle;text-align:right;">
+                          <span style="font-family:'Bebas Neue',Arial,sans-serif;font-size:18px;color:#4ade80;letter-spacing:1px;">${sess.win_start} &ndash; ${sess.win_end}</span>
+                          <span style="font-size:11px;color:rgba(74,222,128,.6);margin-left:6px;">${sess.win_hours}h</span>
+                        </td>
+                      </tr>
+                    </table>
                   </td>
                 </tr>
               </table>
