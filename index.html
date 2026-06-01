@@ -1230,14 +1230,6 @@
           </div>
           <button class="btn pp-save-btn" id="ppDigestNowBtn" onclick="sendDigestNow()" style="margin-top:2px">📩 Send me this week's forecast now</button>
         </div>
-        <div style="border-top:1px solid var(--border);margin:12px 0 8px"></div>
-        <div class="pp-toggle-row">
-          <div>
-            <div style="font-size:.82rem;font-weight:600;color:var(--text)">👥 Friends session alerts</div>
-            <div style="font-size:.72rem;color:var(--tdim);margin-top:2px">Email me when a friend confirms they're going kiting</div>
-          </div>
-          <button class="pp-toggle" id="ppFriendSessionToggle" onclick="toggleFriendSessionNotifs()"><span></span></button>
-        </div>
         <div style="border-top:1px solid var(--border);margin:8px 0 4px"></div>
 
         <!-- Premium section (non-premium) -->
@@ -1328,6 +1320,14 @@
       <div class="pp-toggle-row">
         <span class="pp-toggle-label">Enable notifications</span>
         <button class="pp-toggle" id="ppMasterToggle" onclick="toggleMasterNotif()"><span></span></button>
+      </div>
+      <div style="border-top:1px solid var(--border);margin:4px 0"></div>
+      <div class="pp-toggle-row">
+        <div>
+          <div style="font-size:.82rem;font-weight:600;color:var(--text)">👥 Friends session alerts</div>
+          <div style="font-size:.72rem;color:var(--tdim);margin-top:2px">Email me when a friend confirms they're going kiting</div>
+        </div>
+        <button class="pp-toggle" id="ppFriendSessionToggle" onclick="toggleFriendSessionNotifs()"><span></span></button>
       </div>
       <div id="ppNotifList"></div>
       <div style="margin-top:16px;padding:12px 14px;background:rgba(56,189,248,.06);border:1px solid rgba(56,189,248,.15);border-radius:10px;font-size:.75rem;color:var(--gray);line-height:1.6;">
