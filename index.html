@@ -763,21 +763,42 @@
     .stats-year-btn { padding:4px 12px; border-radius:99px; border:1px solid var(--border); font-size:.75rem; color:var(--gray); cursor:pointer; background:transparent; transition:all .15s; }
     .stats-year-btn.active { background:rgba(0,212,255,.12); border-color:rgba(0,212,255,.4); color:var(--accent); font-weight:700; }
     .stats-kpi-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px; }
-    .stats-kpi { background:rgba(255,255,255,.04); border:1px solid var(--border); border-radius:12px; padding:12px 14px; }
-    .stats-kpi-val { font-size:1.5rem; font-weight:800; color:var(--accent); line-height:1; }
-    .stats-kpi-lbl { font-size:.65rem; color:var(--tdim); margin-top:4px; text-transform:uppercase; letter-spacing:.04em; }
-    .stats-section-title { font-size:.72rem; font-weight:700; color:var(--tdim); text-transform:uppercase; letter-spacing:.06em; margin:14px 0 8px; }
-    .stats-bar-row { display:flex; align-items:center; gap:8px; margin-bottom:6px; font-size:.75rem; }
+    .stats-kpi { background:rgba(255,255,255,.04); border:1px solid var(--border); border-radius:14px; padding:14px 16px; position:relative; overflow:hidden; }
+    .stats-kpi-emoji { font-size:1.4rem; margin-bottom:4px; display:block; }
+    .stats-kpi-val { font-size:1.6rem; font-weight:900; color:var(--accent); line-height:1; }
+    .stats-kpi-lbl { font-size:.63rem; color:var(--tdim); margin-top:4px; text-transform:uppercase; letter-spacing:.05em; }
+    .stats-kpi-sub { font-size:.65rem; color:var(--gray); margin-top:3px; }
+    .stats-section-title { font-size:.72rem; font-weight:700; color:var(--tdim); text-transform:uppercase; letter-spacing:.06em; margin:18px 0 10px; display:flex; align-items:center; gap:6px; }
+    .stats-bar-row { display:flex; align-items:center; gap:8px; margin-bottom:7px; font-size:.75rem; }
     .stats-bar-label { width:90px; flex-shrink:0; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .stats-bar-track { flex:1; height:8px; background:rgba(255,255,255,.07); border-radius:99px; overflow:hidden; }
-    .stats-bar-fill { height:100%; border-radius:99px; background:linear-gradient(90deg,#0ea5e9,#38bdf8); transition:width .4s; }
+    .stats-bar-fill { height:100%; border-radius:99px; background:linear-gradient(90deg,#0ea5e9,#38bdf8); transition:width .6s cubic-bezier(.22,1,.36,1); }
     .stats-bar-count { flex-shrink:0; color:var(--gray); font-size:.7rem; min-width:28px; text-align:right; }
     .stats-month-grid { display:grid; grid-template-columns:repeat(12,1fr); gap:3px; margin-bottom:4px; }
     .stats-month-col { display:flex; flex-direction:column; align-items:center; gap:2px; }
-    .stats-month-bar { width:100%; border-radius:3px 3px 0 0; background:rgba(56,189,248,.25); min-height:2px; transition:height .4s; }
+    .stats-month-bar { width:100%; border-radius:3px 3px 0 0; background:rgba(56,189,248,.15); min-height:2px; transition:height .4s; }
     .stats-month-bar.has-sessions { background:linear-gradient(180deg,#38bdf8,#0ea5e9); }
+    .stats-month-bar.current { box-shadow:0 0 8px rgba(56,189,248,.5); }
     .stats-month-lbl { font-size:.52rem; color:var(--tdim); }
-    .stats-best-session { background:rgba(255,255,255,.04); border:1px solid rgba(56,189,248,.2); border-radius:12px; padding:12px 14px; font-size:.78rem; }
+    .stats-best-session { background:linear-gradient(135deg,rgba(56,189,248,.08),rgba(14,165,233,.04)); border:1px solid rgba(56,189,248,.25); border-radius:14px; padding:14px 16px; font-size:.78rem; }
+    .stats-streak-card { background:linear-gradient(135deg,rgba(251,191,36,.1),rgba(245,158,11,.05)); border:1px solid rgba(251,191,36,.25); border-radius:14px; padding:14px 16px; display:flex; align-items:center; gap:14px; margin-bottom:4px; }
+    .stats-streak-num { font-size:2.4rem; font-weight:900; color:#fbbf24; line-height:1; }
+    .stats-streak-label { font-size:.75rem; font-weight:700; color:#fbbf24; }
+    .stats-streak-sub { font-size:.65rem; color:var(--gray); margin-top:2px; }
+    .stats-leaderboard { display:flex; flex-direction:column; gap:6px; }
+    .stats-lb-row { display:flex; align-items:center; gap:10px; padding:10px 12px; background:rgba(255,255,255,.03); border:1px solid var(--border); border-radius:11px; transition:background .15s; }
+    .stats-lb-row.you { background:rgba(56,189,248,.08); border-color:rgba(56,189,248,.3); }
+    .stats-lb-rank { font-size:.8rem; font-weight:900; color:var(--tdim); width:18px; flex-shrink:0; text-align:center; }
+    .stats-lb-rank.gold { color:#fbbf24; }
+    .stats-lb-rank.silver { color:#94a3b8; }
+    .stats-lb-rank.bronze { color:#b45309; }
+    .stats-lb-avatar { width:28px; height:28px; border-radius:50%; background:rgba(56,189,248,.2); display:flex; align-items:center; justify-content:center; font-size:.75rem; font-weight:700; color:#38bdf8; flex-shrink:0; }
+    .stats-lb-name { flex:1; font-size:.8rem; font-weight:600; color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .stats-lb-you-tag { font-size:.6rem; color:#38bdf8; background:rgba(56,189,248,.15); border-radius:4px; padding:1px 5px; margin-left:4px; }
+    .stats-lb-bar-wrap { flex:1; }
+    .stats-lb-bar-track { height:5px; background:rgba(255,255,255,.07); border-radius:99px; overflow:hidden; }
+    .stats-lb-bar-fill { height:100%; border-radius:99px; transition:width .6s cubic-bezier(.22,1,.36,1); }
+    .stats-lb-count { font-size:.75rem; font-weight:700; color:var(--text); flex-shrink:0; min-width:20px; text-align:right; }
     .stats-empty { color:var(--tdim); font-size:.8rem; font-style:italic; text-align:center; padding:24px 0; }
     /* ── Day filter chips ── */
     .pp-day-filter { display:flex; align-items:center; gap:4px; margin-top:6px; flex-wrap:wrap; }
@@ -5964,15 +5985,20 @@ async function renderStats(){
   const email=loadProfile().email; if(!email){el.innerHTML='<div class="stats-empty">No email set</div>';return;}
   const sb=getSb(); if(!sb) return;
 
-  // Fetch all 1h reminders that were genuinely sent (not skipped) for this user's fav spots
-  const favSpots=new Set(loadFavs().map(f=>f.name));
-  const{data:rows,error}=await sb.from('reminders')
-    .select('spot_name,session_date,session_peak_kn,session_min_kn,session_hours,session_rating,session_wind_dir,spot_dirs')
-    .eq('email',email).eq('reminder_hours',1).eq('sent',true).eq('skipped',false).eq('cancelled',false)
-    .order('session_date',{ascending:false});
+  // Fetch sessions + friends in parallel
+  const today=new Date().toISOString().slice(0,10);
+  const thisMonth=today.slice(0,7);
+  const[{data:rows,error},{data:friendships}]=await Promise.all([
+    sb.from('reminders')
+      .select('spot_name,session_date,session_peak_kn,session_min_kn,session_hours,session_rating,session_wind_dir,spot_dirs')
+      .eq('email',email).eq('reminder_hours',1).eq('sent',true).eq('skipped',false).eq('cancelled',false)
+      .order('session_date',{ascending:false}),
+    sb.from('friendships').select('requester,recipient').or(`requester.eq.${email},recipient.eq.${email}`).eq('status','accepted'),
+  ]);
   if(error){el.innerHTML='<div class="stats-empty">Could not load stats</div>';return;}
 
-  // Filter to fav spots only, and respect each spot's day filter
+  // Filter sessions to fav spots + day filter
+  const favSpots=new Set(loadFavs().map(f=>f.name));
   const favs=loadFavs();
   const sessions=(rows||[]).filter(r=>{
     if(!favSpots.has(r.spot_name)) return false;
@@ -5984,11 +6010,9 @@ async function renderStats(){
     return true;
   });
 
-  // Build year list
+  // Year selector
   const years=[...new Set(sessions.map(r=>r.session_date.slice(0,4)))].sort((a,b)=>b-a);
   const filtered=_statsYear==='all'?sessions:sessions.filter(r=>r.session_date.startsWith(_statsYear));
-
-  // Year selector
   const yearBtns=['all',...years].map(y=>`<button class="stats-year-btn${_statsYear===y?' active':''}" onclick="_statsYear='${y}';renderStats()">${y==='all'?'All time':y}</button>`).join('');
 
   if(!filtered.length){
@@ -5996,68 +6020,149 @@ async function renderStats(){
     return;
   }
 
-  // KPIs
+  // ── KPIs ──
   const totalSessions=filtered.length;
   const withPeak=filtered.filter(r=>r.session_peak_kn);
   const avgPeak=withPeak.length?Math.round(withPeak.reduce((s,r)=>s+r.session_peak_kn,0)/withPeak.length):null;
   const maxPeak=withPeak.length?Math.max(...withPeak.map(r=>r.session_peak_kn)):null;
   const withHours=filtered.filter(r=>r.session_hours);
-  const avgHours=withHours.length?(withHours.reduce((s,r)=>s+r.session_hours,0)/withHours.length).toFixed(1):null;
+  const totalHours=withHours.reduce((s,r)=>s+r.session_hours,0);
+  const avgHours=withHours.length?(totalHours/withHours.length).toFixed(1):null;
   const bestSession=withPeak.length?[...withPeak].sort((a,b)=>b.session_peak_kn-a.session_peak_kn)[0]:null;
 
-  // Sessions per spot (ranked)
+  // ── Streak: consecutive months with ≥1 session ──
+  const monthSet=new Set(filtered.map(r=>r.session_date.slice(0,7)));
+  let streak=0;
+  const now=new Date();
+  for(let i=0;i<24;i++){
+    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    if(monthSet.has(key)) streak++;
+    else if(i>0) break; // allow current month to be in-progress
+  }
+
+  // ── Leaderboard: sessions this month vs friends ──
+  const friendEmails=(friendships||[]).map(f=>f.requester===email?f.recipient:f.requester);
+  let leaderboardHTML='';
+  if(friendEmails.length){
+    const{data:friendRows}=await sb.from('reminders')
+      .select('email,session_date')
+      .in('email',friendEmails).eq('reminder_hours',1).eq('sent',true).eq('skipped',false).eq('cancelled',false)
+      .gte('session_date',thisMonth+'-01');
+    const myMonthCount=sessions.filter(r=>r.session_date.startsWith(thisMonth)).length;
+    const friendCounts={};
+    for(const r of friendRows||[]) friendCounts[r.email]=(friendCounts[r.email]||0)+1;
+    // Fetch friend nicknames
+    const{data:profiles}=await sb.from('profiles').select('email,nickname').in('email',friendEmails);
+    const nickMap={}; for(const p of profiles||[]) nickMap[p.email]=p.nickname||p.email.split('@')[0];
+    // Build leaderboard entries
+    const entries=[{email,name:'You',count:myMonthCount,isYou:true},...friendEmails.map(e=>({email:e,name:nickMap[e]||e.split('@')[0],count:friendCounts[e]||0,isYou:false}))];
+    entries.sort((a,b)=>b.count-a.count||a.name.localeCompare(b.name));
+    const maxLbCount=Math.max(...entries.map(e=>e.count),1);
+    const rankIcons=['🥇','🥈','🥉'];
+    const rankClasses=['gold','silver','bronze'];
+    const rows2=entries.map((e,i)=>{
+      const initials=e.name.slice(0,2).toUpperCase();
+      const pct=Math.round(e.count/maxLbCount*100);
+      const barColor=e.isYou?'linear-gradient(90deg,#38bdf8,#0ea5e9)':'linear-gradient(90deg,#64748b,#475569)';
+      return`<div class="stats-lb-row${e.isYou?' you':''}">
+        <div class="stats-lb-rank${i<3?' '+rankClasses[i]:''}">${i<3?rankIcons[i]:i+1}</div>
+        <div class="stats-lb-avatar">${initials}</div>
+        <div class="stats-lb-name">${e.name}${e.isYou?'<span class="stats-lb-you-tag">you</span>':''}</div>
+        <div class="stats-lb-bar-wrap"><div class="stats-lb-bar-track"><div class="stats-lb-bar-fill" style="width:${pct}%;background:${barColor}"></div></div></div>
+        <div class="stats-lb-count">${e.count}</div>
+      </div>`;
+    }).join('');
+    const monthName=new Date(thisMonth+'-15').toLocaleDateString('en',{month:'long'});
+    leaderboardHTML=`<div class="stats-section-title">🏅 ${monthName} leaderboard</div>
+    <div class="stats-leaderboard">${rows2}</div>`;
+  }
+
+  // ── Fun title based on session count ──
+  const titles=[[0,'Landkiter 🏖️'],[3,'Weekend warrior 🌬️'],[10,'Salty regular 🌊'],[20,'Wind addict 💨'],[40,'Session machine ⚡'],[75,'Legend of the kite 🦅']];
+  const title=titles.filter(([n])=>totalSessions>=n).pop()?.[1]||'Landkiter 🏖️';
+  const windPersonality=maxPeak>=30?'Gale seeker 🌪️':maxPeak>=22?'Strong wind lover 💪':maxPeak>=15?'Moderate rider 🌬️':'Light wind cruiser 🍃';
+
+  // ── KPI grid ──
+  const kpiGrid=`<div style="margin-bottom:10px;font-size:.72rem;color:#38bdf8;font-weight:700;letter-spacing:.03em">${title} · ${windPersonality}</div>
+  <div class="stats-kpi-grid">
+    <div class="stats-kpi">
+      <span class="stats-kpi-emoji">🪁</span>
+      <div class="stats-kpi-val">${totalSessions}</div>
+      <div class="stats-kpi-lbl">Sessions</div>
+      <div class="stats-kpi-sub">${totalHours?Math.round(totalHours)+'h on the water':''}</div>
+    </div>
+    <div class="stats-kpi">
+      <span class="stats-kpi-emoji">💨</span>
+      <div class="stats-kpi-val">${maxPeak??'—'}${maxPeak?'kn':''}</div>
+      <div class="stats-kpi-lbl">Best wind day</div>
+      <div class="stats-kpi-sub">${avgPeak?'Avg '+avgPeak+'kn':''}</div>
+    </div>
+    <div class="stats-kpi">
+      <span class="stats-kpi-emoji">⏱️</span>
+      <div class="stats-kpi-val">${avgHours??'—'}${avgHours?'h':''}</div>
+      <div class="stats-kpi-lbl">Avg session</div>
+      <div class="stats-kpi-sub">${totalHours?Math.round(totalHours)+'h total':''}</div>
+    </div>
+    <div class="stats-kpi">
+      <span class="stats-kpi-emoji">🔥</span>
+      <div class="stats-kpi-val">${streak}</div>
+      <div class="stats-kpi-lbl">Month streak</div>
+      <div class="stats-kpi-sub">${streak>=2?'Keep it going!':streak===1?'Started!':'Get on the water'}</div>
+    </div>
+  </div>`;
+
+  // ── Best session card ──
+  const bestCard=bestSession?`<div class="stats-section-title">🏆 Best session</div>
+  <div class="stats-best-session">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
+      <div>
+        <div style="font-weight:700;color:var(--text);font-size:.85rem">${bestSession.spot_name}</div>
+        <div style="color:var(--tdim);font-size:.68rem;margin-top:2px">${new Date(bestSession.session_date+'T12:00:00').toLocaleDateString('en',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</div>
+      </div>
+      ${bestSession.session_peak_kn?`<div style="font-size:1.4rem;font-weight:900;color:#38bdf8;line-height:1">${bestSession.session_peak_kn}<span style="font-size:.7rem;color:var(--tdim);font-weight:400"> kn</span></div>`:''}
+    </div>
+    <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+      ${bestSession.session_hours?`<span style="background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.2);border-radius:6px;padding:3px 8px;font-size:.7rem;color:#38bdf8">⏱ ${bestSession.session_hours}h</span>`:''}
+      ${bestSession.session_wind_dir?`<span style="background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.2);border-radius:6px;padding:3px 8px;font-size:.7rem;color:#38bdf8">🧭 ${bestSession.session_wind_dir}</span>`:''}
+      ${bestSession.session_rating?`<span style="background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.2);border-radius:6px;padding:3px 8px;font-size:.7rem;color:#38bdf8">${bestSession.session_rating}</span>`:''}
+    </div>
+  </div>`:'';
+
+  // ── Sessions by spot ──
   const bySpot={};
   for(const r of filtered){bySpot[r.spot_name]=(bySpot[r.spot_name]||0)+1;}
   const spotRanked=Object.entries(bySpot).sort((a,b)=>b[1]-a[1]);
   const maxSpotCount=spotRanked[0]?.[1]||1;
-
-  // Sessions per month
-  const monthCounts=Array(12).fill(0);
-  for(const r of filtered) monthCounts[parseInt(r.session_date.slice(5,7),10)-1]++;
-  const maxMonth=Math.max(...monthCounts,1);
-  const MONTHS=['J','F','M','A','M','J','J','A','S','O','N','D'];
-
-  // Wind direction distribution
-  const dirCounts={};
-  for(const r of filtered) if(r.session_wind_dir){dirCounts[r.session_wind_dir]=(dirCounts[r.session_wind_dir]||0)+1;}
-  const dirRanked=Object.entries(dirCounts).sort((a,b)=>b[1]-a[1]).slice(0,3);
-
-  const kpiGrid=`<div class="stats-kpi-grid">
-    <div class="stats-kpi"><div class="stats-kpi-val">${totalSessions}</div><div class="stats-kpi-lbl">Sessions</div></div>
-    <div class="stats-kpi"><div class="stats-kpi-val">${avgPeak??'—'}${avgPeak?'kn':''}</div><div class="stats-kpi-lbl">Avg peak wind</div></div>
-    <div class="stats-kpi"><div class="stats-kpi-val">${maxPeak??'—'}${maxPeak?'kn':''}</div><div class="stats-kpi-lbl">Best wind day</div></div>
-    <div class="stats-kpi"><div class="stats-kpi-val">${avgHours??'—'}${avgHours?'h':''}</div><div class="stats-kpi-lbl">Avg session length</div></div>
-  </div>`;
-
-  const spotBars=spotRanked.map(([name,count])=>`<div class="stats-bar-row">
-    <div class="stats-bar-label" title="${name}">${name}</div>
+  const spotBars=spotRanked.map(([name,count],i)=>`<div class="stats-bar-row">
+    <div class="stats-bar-label" title="${name}">${i===0?'⭐ ':''}${name}</div>
     <div class="stats-bar-track"><div class="stats-bar-fill" style="width:${Math.round(count/maxSpotCount*100)}%"></div></div>
     <div class="stats-bar-count">${count}</div>
   </div>`).join('');
 
+  // ── Sessions by month ──
+  const monthCounts=Array(12).fill(0);
+  for(const r of filtered) monthCounts[parseInt(r.session_date.slice(5,7),10)-1]++;
+  const maxMonth=Math.max(...monthCounts,1);
+  const MONTHS=['J','F','M','A','M','J','J','A','S','O','N','D'];
+  const curMonth=new Date().getMonth();
   const monthBars=`<div class="stats-month-grid">${monthCounts.map((c,i)=>{
     const h=Math.max(4,Math.round(c/maxMonth*60));
-    return`<div class="stats-month-col"><div class="stats-month-bar${c?' has-sessions':''}" style="height:${h}px"></div><div class="stats-month-lbl">${MONTHS[i]}</div></div>`;
+    const isCur=(_statsYear==='all'||_statsYear===String(new Date().getFullYear()))&&i===curMonth;
+    return`<div class="stats-month-col"><div class="stats-month-bar${c?' has-sessions':''}${isCur?' current':''}" style="height:${h}px" title="${c} session${c!==1?'s':''}"></div><div class="stats-month-lbl">${MONTHS[i]}</div></div>`;
   }).join('')}</div>`;
 
-  const bestCard=bestSession?`<div class="stats-section-title">🏆 Best session</div>
-  <div class="stats-best-session">
-    <div style="font-weight:700;color:var(--text)">${bestSession.spot_name}</div>
-    <div style="color:var(--tdim);font-size:.7rem;margin:2px 0">${new Date(bestSession.session_date+'T12:00:00').toLocaleDateString('en',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</div>
-    <div style="margin-top:6px;display:flex;gap:12px;flex-wrap:wrap">
-      ${bestSession.session_peak_kn?`<span>💨 <strong>${bestSession.session_peak_kn}kn</strong> peak</span>`:''}
-      ${bestSession.session_hours?`<span>⏱ <strong>${bestSession.session_hours}h</strong></span>`:''}
-      ${bestSession.session_wind_dir?`<span>🧭 <strong>${bestSession.session_wind_dir}</strong></span>`:''}
-    </div>
-    ${bestSession.session_rating?`<div style="margin-top:6px;font-size:.72rem;color:var(--gray)">${bestSession.session_rating}</div>`:''}
-  </div>`:'';
-
-  const dirHTML=dirRanked.length?`<div class="stats-section-title">🧭 Favourite wind directions</div>
-  <div style="display:flex;gap:8px;flex-wrap:wrap">${dirRanked.map(([d,c])=>`<div style="padding:4px 10px;border-radius:99px;background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.2);font-size:.75rem;color:#38bdf8;font-weight:700">${d} <span style="opacity:.6;font-weight:400">${c}×</span></div>`).join('')}</div>`:'';
+  // ── Wind directions ──
+  const dirCounts={};
+  for(const r of filtered) if(r.session_wind_dir){dirCounts[r.session_wind_dir]=(dirCounts[r.session_wind_dir]||0)+1;}
+  const dirRanked=Object.entries(dirCounts).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const dirHTML=dirRanked.length?`<div class="stats-section-title">🧭 Wind directions</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap">${dirRanked.map(([d,c],i)=>`<div style="padding:5px 12px;border-radius:99px;background:rgba(56,189,248,${i===0?.18:.08});border:1px solid rgba(56,189,248,${i===0?.35:.2});font-size:.75rem;color:#38bdf8;font-weight:700">${d} <span style="opacity:.6;font-weight:400">${c}×</span></div>`).join('')}</div>`:'';
 
   el.innerHTML=`
     <div class="stats-year-bar">${yearBtns}</div>
     ${kpiGrid}
+    ${leaderboardHTML}
     ${bestCard}
     <div class="stats-section-title">📍 Sessions by spot</div>
     ${spotBars}
