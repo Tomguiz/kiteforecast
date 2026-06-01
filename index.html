@@ -1045,9 +1045,15 @@
           <input type="text" id="suggestName" class="pp-input" placeholder="e.g. Koksijde Beach"/>
         </div>
 
-        <div>
-          <label class="pp-label">Location <span style="color:#f87171">*</span> <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(city, region, country)</span></label>
-          <input type="text" id="suggestLocation" class="pp-input" placeholder="e.g. Koksijde, West Flanders, Belgium"/>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <div>
+            <label class="pp-label">City / Region <span style="color:#f87171">*</span></label>
+            <input type="text" id="suggestLocation" class="pp-input" placeholder="e.g. Koksijde"/>
+          </div>
+          <div>
+            <label class="pp-label">Country <span style="color:#f87171">*</span></label>
+            <input type="text" id="suggestCountry" class="pp-input" placeholder="e.g. Belgium"/>
+          </div>
         </div>
 
         <div>
@@ -3173,7 +3179,7 @@ async function fetchForecast(query){
       const sw=$('suggestSpotWrap'); if(sw){
         sw.style.display=isPending?'none':'block';
         $('suggestName').value=query;
-        $('suggestLocation').value=''; $('suggestCoords').value=''; $('suggestLat').value=''; $('suggestLon').value='';
+        $('suggestLocation').value=''; $('suggestCountry').value=''; $('suggestCoords').value=''; $('suggestLat').value=''; $('suggestLon').value='';
         $('suggestDirs').value=''; $('suggestBusiness').value=''; $('suggestWebsite').value=''; $('suggestNote').value='';
         const pe=loadProfile().email||_authSession?.user?.email||'';
         if($('suggestEmail')) $('suggestEmail').value=pe;
@@ -4558,6 +4564,7 @@ async function submitSpotSuggestion(){
   const btn=$('suggestSubmitBtn'); if(!btn) return;
   const name     =($('suggestName')?.value||'').trim();
   const location =($('suggestLocation')?.value||'').trim();
+  const country  =($('suggestCountry')?.value||'').trim();
   const lat      =($('suggestLat')?.value||'').trim().replace(',','.');
   const lon      =($('suggestLon')?.value||'').trim().replace(',','.');
   const dirs     =($('suggestDirs')?.value||'').trim();
@@ -4572,7 +4579,8 @@ async function submitSpotSuggestion(){
   // Validate required fields
   const missing=[];
   if(!name)                          missing.push(['suggestName',     'Spot name is required']);
-  if(!location)                      missing.push(['suggestLocation',  'Location is required']);
+  if(!location)                      missing.push(['suggestLocation',  'City is required']);
+  if(!country)                       missing.push(['suggestCountry',   'Country is required']);
   if(!lat||isNaN(parseFloat(lat)))   missing.push(['suggestLat',       'Latitude is required']);
   if(!lon||isNaN(parseFloat(lon)))   missing.push(['suggestLon',       'Longitude is required']);
   if(missing.length){
@@ -4580,14 +4588,15 @@ async function submitSpotSuggestion(){
     showToast('⚠️ '+missing[0][1]);
     return;
   }
-  ['suggestName','suggestLocation','suggestLat','suggestLon'].forEach(id=>{ const el=$(id); if(el) el.style.border=''; });
+  ['suggestName','suggestLocation','suggestCountry','suggestLat','suggestLon'].forEach(id=>{ const el=$(id); if(el) el.style.border=''; });
 
   // Fire-and-forget — never block the UI on network calls
   const sb=getSb();
   if(sb){
     sb.from('spot_suggestions').insert({
       suggested_name: name,
-      location,
+      location: location+(country?', '+country:''),
+      country: country||null,
       lat:  lat  ? parseFloat(lat)  : null,
       lon:  lon  ? parseFloat(lon)  : null,
       note: [dirs&&`Dirs: ${dirs}`, business&&`Business: ${business}`, website&&`Website: ${website}`, note].filter(Boolean).join(' | ')||null,
@@ -5128,7 +5137,7 @@ async function renderAdminPanel(){
           ${s.note?`<div style="font-size:.72rem;color:var(--tdim);margin-top:3px">${s.note}</div>`:''}
           <div style="font-size:.7rem;color:var(--tdim);margin-top:3px">By: ${s.submitted_by||'anonymous'} · ${new Date(s.created_at).toLocaleDateString()}</div>
         </div>
-        <button class="btn pp-save-btn" style="font-size:.72rem;padding:6px 12px;white-space:nowrap" onclick="adminApproveRequest('${s.id}','${s.suggested_name.replace(/'/g,"\\'")}','${s.location||''}','${s.lat||''}','${s.lon||''}')">Approve →</button>
+        <button class="btn pp-save-btn" style="font-size:.72rem;padding:6px 12px;white-space:nowrap" onclick="adminApproveRequest('${s.id}','${s.suggested_name.replace(/'/g,"\\'")}','${s.location||''}','${s.country||''}','${s.lat||''}','${s.lon||''}')">Approve →</button>
       </div>
     </div>`).join('');
 
@@ -5152,7 +5161,7 @@ async function renderAdminPanel(){
     <div id="adminEditForm" style="display:none;margin-top:16px"></div>`;
 }
 
-async function adminApproveRequest(suggId, name, location, lat, lon){
+async function adminApproveRequest(suggId, name, location, country, lat, lon){
   // Mark suggestion reviewed
   const sb=getSb(); if(!sb) return;
   sb.from('spot_suggestions').update({reviewed:true}).eq('id',suggId).then(()=>{}).catch(()=>{});
@@ -5181,6 +5190,7 @@ async function adminApproveRequest(suggId, name, location, lat, lon){
     _lat: lat,
     _lon: lon,
     _loc: location,
+    _country: country,
   };
   window._adminPrefilledNew = prefilledSpot;
   adminOpenSpot(null, prefilledSpot);
@@ -5205,7 +5215,7 @@ async function adminOpenSpot(spotName, prefill){
       </div>
 
       ${isNew?`
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
         <div>
           <label class="pp-label">Latitude</label>
           <input type="number" id="adLat" class="pp-input" value="${s?._lat||''}" placeholder="51.36" step="0.0001"/>
@@ -5214,11 +5224,17 @@ async function adminOpenSpot(spotName, prefill){
           <label class="pp-label">Longitude</label>
           <input type="number" id="adLon" class="pp-input" value="${s?._lon||''}" placeholder="3.31" step="0.0001"/>
         </div>
+      </div>`:''}
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        <div>
+          <label class="pp-label">City / Region</label>
+          <input type="text" id="adCity" class="pp-input" value="${(()=>{const loc=s?._loc||'';return loc.split(',')[0]?.trim()||'';})()}" placeholder="e.g. Knokke-Heist"/>
+        </div>
         <div>
           <label class="pp-label">Country</label>
-          <input type="text" id="adCountry" class="pp-input" placeholder="Belgium"/>
+          <input type="text" id="adCountry" class="pp-input" value="${s?._country||(()=>{const loc=s?._loc||'';const parts=loc.split(',');return parts[parts.length-1]?.trim()||'';})()}" placeholder="e.g. Belgium"/>
         </div>
-      </div>`:''}
+      </div>
 
       <label class="pp-label">Display name <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(shown in spot card header)</span></label>
       <input type="text" id="adDisplayName" class="pp-input" value="${s?.display_name||s?.spot_name||''}" placeholder="e.g. RBSC Duinbergen" style="margin-bottom:10px"/>
@@ -5297,12 +5313,14 @@ async function adminSaveSpotInfo(){
   const isNew=!existingByNewName&&!isRename;
   const lat=parseFloat($('adLat')?.value||'0');
   const lon=parseFloat($('adLon')?.value||'0');
+  const city=($('adCity')?.value||'').trim();
   const country=($('adCountry')?.value||'').trim();
+  const loc=[city,country].filter(Boolean).join(', ');
 
   if(isNew&&(!lat||!lon)){ showToast('Latitude and longitude are required for new spots'); if(btn){btn.disabled=false;btn.textContent='Add spot';} return; }
 
   // For a rename: get coords from existing spot_overrides row
-  let renameLat=lat, renameLon=lon, renameLoc=country;
+  let renameLat=lat, renameLon=lon, renameLoc=loc;
   if(isRename){
     const orig=(_adminSpots||[]).find(x=>x.spot_name===origName);
     const{data:ov}=await sb.from('spot_overrides').select('lat,lon,loc').eq('name',origName).single();
@@ -5343,10 +5361,10 @@ async function adminSaveSpotInfo(){
   // For new spots or renames: persist to spot_overrides
   if((isNew||isRename) && (renameLat||lat) && (renameLon||lon)){
     const{error:oe}=await sb.from('spot_overrides').upsert({
-      name:spotName, loc:renameLoc||country||'', lat:renameLat||lat, lon:renameLon||lon, dirs:[], active:true, added_by:adminNickname
+      name:spotName, loc:renameLoc||loc||'', lat:renameLat||lat, lon:renameLon||lon, dirs:[], active:true, added_by:adminNickname
     },{onConflict:'name'});
     if(oe){ showToast('spot_info saved but spot_overrides failed: '+oe.message); }
-    if(!SPOTS.find(x=>x.name===spotName)) SPOTS.push({name:spotName,loc:renameLoc||country||'',lat:renameLat||lat,lon:renameLon||lon,dirs:[]});
+    if(!SPOTS.find(x=>x.name===spotName)) SPOTS.push({name:spotName,loc:renameLoc||loc||'',lat:renameLat||lat,lon:renameLon||lon,dirs:[]});
   }
 
   showToast(isRename?`✓ Renamed to "${spotName}"`:isNew?'✓ New spot added — visible to all users on next load!':'✓ Spot info saved!');
