@@ -3812,8 +3812,9 @@ async function syncFavsFromSupabase(email){
       dirs:  r.spot_dirs||[],
       days:  r.spot_days||null,
     }));
-    // Only merge local favs if the stored email matches — prevents cross-account contamination
+    // Clear local favs if the signed-in email differs — prevents cross-account contamination
     const storedEmail=loadProfile().email;
+    if(storedEmail&&storedEmail!==email) saveFavs([]);
     const local=storedEmail===email?loadFavs():[];
     // Push any local-only favs up to Supabase (e.g. pre-sync or offline adds)
     const localOnly=local.filter(lf=>!remote.some(rf=>rf.name===lf.name&&rf.lat===lf.lat));
