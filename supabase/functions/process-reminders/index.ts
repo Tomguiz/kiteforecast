@@ -211,6 +211,37 @@ Deno.serve(async () => {
       const windMin         = sample.length ? Math.min(...sample.map(h => h.kn))     : 0
       const consistencyPct  = day.length  ? Math.round(good.length / day.length * 100) : 0
 
+      // ── Calendar links ──
+      // Format: YYYYMMDDTHHMMSS (local, no Z — let calendar app use its own TZ)
+      const fmtCal = (iso: string) => iso.replace(/[-:]/g, '').slice(0, 15)
+      const calStart = fmtCal(sessionStart)
+      // End: add 1h if sessionEnd === sessionStart (single-hour session), else use sessionEnd
+      const calEndIso = sessionEnd && sessionEnd !== sessionStart ? sessionEnd : `${r.session_date}T${String(good.length ? good[good.length-1].hour + 1 : 18).padStart(2,'0')}:00`
+      const calEnd   = fmtCal(calEndIso)
+      const calTitle = encodeURIComponent(`🪁 Kite session — ${r.spot_name}`)
+      const calDesc  = encodeURIComponent(`${peakKn}kn peak · ${goodHours}h of good wind\nForecast: ${r.app_link}`)
+      const calLoc   = encodeURIComponent(`${r.spot_name}, ${r.spot_country}`)
+      const gcal_link = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${calTitle}&dates=${calStart}/${calEnd}&details=${calDesc}&location=${calLoc}`
+
+      // .ics data URI for Apple Calendar / Outlook
+      const uid = `kite-${r.session_date}-${r.spot_name.replace(/\s+/g,'-').toLowerCase()}@kiteforecast`
+      const icsContent = [
+        'BEGIN:VCALENDAR',
+        'VERSION:2.0',
+        'PRODID:-//KiteForecast//EN',
+        'BEGIN:VEVENT',
+        `UID:${uid}`,
+        `DTSTAMP:${fmtCal(new Date().toISOString())}Z`,
+        `DTSTART:${calStart}`,
+        `DTEND:${calEnd}`,
+        `SUMMARY:🪁 Kite session — ${r.spot_name}`,
+        `DESCRIPTION:${peakKn}kn peak · ${goodHours}h of good wind\\nForecast: ${r.app_link}`,
+        `LOCATION:${r.spot_name}\\, ${r.spot_country}`,
+        'END:VEVENT',
+        'END:VCALENDAR',
+      ].join('\r\n')
+      const ics_link = `data:text/calendar;charset=utf-8,${encodeURIComponent(icsContent)}`
+
       const payload = {
         notification_type:  r.notif_type,
         reminder_label:     rh === 1 ? '1 hour before' : `${rh} hours before`,
@@ -223,6 +254,8 @@ Deno.serve(async () => {
         day_of_week:        new Date(r.session_date + 'T12:00:00').toLocaleDateString('en', { weekday: 'long' }),
         date_label:         fmtDateLabel(r.session_date),
         app_link:           r.app_link,
+        gcal_link,
+        ics_link,
         session: {
           start_time:           sessionStart,
           end_time:             sessionEnd,
