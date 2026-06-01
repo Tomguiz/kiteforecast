@@ -2215,11 +2215,11 @@ const SPOTS=[
 function spotSearch(q){
   if(!q||q.length<2) return [];
   const ql=q.toLowerCase();
-  // Also try without trailing 's' for plural/singular tolerance (e.g. "Surfers" → "Surfer")
   const qlS=ql.endsWith('s')?ql.slice(0,-1):null;
   return SPOTS.filter(s=>{
-    const nl=s.name.toLowerCase(); const ll=(s.loc||'').toLowerCase();
-    return nl.includes(ql)||ll.includes(ql)||(qlS&&(nl.includes(qlS)||ll.includes(qlS)));
+    const nl=s.name.toLowerCase(); const ll=(s.loc||'').toLowerCase(); const al=(s.alias||'').toLowerCase();
+    const hit=t=>t.includes(ql)||(qlS&&t.includes(qlS));
+    return hit(nl)||hit(ll)||hit(al);
   }).slice(0,6);
 }
 
@@ -2445,7 +2445,7 @@ function renderAC(items){
   const dd=$('acDropdown');
   if(!items.length){dd.innerHTML='';dd.classList.remove('open');acActive=-1;return;}
   dd.innerHTML=items.map((s,i)=>
-    `<div class="ac-item" data-i="${i}"><strong>${s.name}</strong><span>${s.loc}</span></div>`
+    `<div class="ac-item" data-i="${i}"><strong>${s.alias||s.name}</strong><span>${s.alias?s.name+' · ':''  }${s.loc}</span></div>`
   ).join('');
   dd.classList.add('open');
   acActive=-1;
@@ -3042,13 +3042,25 @@ window._spotsReady=new Promise(r=>{_spotsReadyResolve=r;});
   try{
     const sb=getSb();
     if(sb){
-      const{data}=await sb.from('spot_overrides').select('name,loc,lat,lon,dirs').eq('active',true);
-      if(data?.length){
-        data.forEach(r=>{
-          if(!SPOTS.find(s=>s.name===r.name)){
-            SPOTS.push({name:r.name,loc:r.loc||'',lat:r.lat,lon:r.lon,dirs:r.dirs||[]});
-          }
-        });
+      // Fetch spot_overrides (has coords) AND spot_info (has display/business names) in parallel
+      const[{data:overrides},{data:infos}]=await Promise.all([
+        sb.from('spot_overrides').select('name,loc,lat,lon,dirs').eq('active',true),
+        sb.from('spot_info').select('spot_name,display_name,business_name'),
+      ]);
+      // Build a name-alias map from spot_info so display/business names are searchable
+      const aliasMap={};
+      for(const r of infos||[]){
+        if(r.display_name) aliasMap[r.spot_name]=r.display_name;
+        if(r.business_name) aliasMap[r.spot_name]=aliasMap[r.spot_name]||r.business_name;
+      }
+      // Push spot_overrides into SPOTS, enriched with alias
+      for(const r of overrides||[]){
+        if(!SPOTS.find(s=>s.name===r.name)){
+          SPOTS.push({name:r.name,loc:r.loc||'',lat:r.lat,lon:r.lon,dirs:r.dirs||[],alias:aliasMap[r.name]||null});
+        } else {
+          const s=SPOTS.find(s=>s.name===r.name);
+          if(!s.alias) s.alias=aliasMap[r.name]||null;
+        }
       }
     }
   }catch(e){}
