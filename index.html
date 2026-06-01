@@ -3804,7 +3804,6 @@ async function syncFavsFromSupabase(email){
       .select('spot_name,spot_label,spot_lat,spot_lon,spot_dirs,spot_days')
       .eq('email',email);
     if(error){ console.error('favs sync error',error); return; }
-    const local=loadFavs();
     const remote=(data||[]).map(r=>({
       name:  r.spot_name,
       label: r.spot_label||r.spot_name,
@@ -3813,6 +3812,9 @@ async function syncFavsFromSupabase(email){
       dirs:  r.spot_dirs||[],
       days:  r.spot_days||null,
     }));
+    // Only merge local favs if the stored email matches — prevents cross-account contamination
+    const storedEmail=loadProfile().email;
+    const local=storedEmail===email?loadFavs():[];
     // Push any local-only favs up to Supabase (e.g. pre-sync or offline adds)
     const localOnly=local.filter(lf=>!remote.some(rf=>rf.name===lf.name&&rf.lat===lf.lat));
     for(const fav of localOnly) pushFavToSupabase(email,fav,false);
