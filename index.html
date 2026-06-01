@@ -1017,7 +1017,8 @@
   <div id="hintLegend" class="legend" style="display:none"></div>
   <!-- welcome footer -->
   <div id="welcomeFooter" style="display:block;text-align:center;padding:40px 20px 32px;color:var(--tdim);font-size:.8rem;line-height:2;">
-    <div style="font-size:.85rem;font-weight:500;color:var(--gray);margin-bottom:4px;">Never miss a session again</div>
+    <div style="font-size:.85rem;font-weight:500;color:var(--gray);margin-bottom:8px;">Never miss a session again</div>
+    <button onclick="showAddSpotFromHome()" style="background:rgba(0,212,255,.08);border:1px solid rgba(0,212,255,.2);border-radius:10px;color:var(--accent);font-size:.8rem;font-weight:600;padding:8px 16px;cursor:pointer;margin-bottom:12px">🪁 Your spot not listed? Add it →</button>
     <div>Tichkes Corporation Inc. — All rights reserved</div>
   </div>
 
@@ -1030,9 +1031,9 @@
 
   <!-- error -->
   <div class="state-msg" id="errorState" style="display:none">
-    <div style="font-size:2.5rem;margin-bottom:10px">⚠️</div>
-    <h3 id="errorTitle">Location not found</h3>
-    <p id="errorMsg" style="font-size:.85rem;margin-top:4px">Try a different search term.</p>
+    <div style="font-size:2.5rem;margin-bottom:10px">🔍</div>
+    <h3 id="errorTitle">Spot not found</h3>
+    <p id="errorMsg" style="font-size:.85rem;margin-top:4px">Try a different name — or add it yourself below!</p>
     <div id="spotPendingMsg" style="display:none;margin-top:12px;padding:12px 16px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:12px;font-size:.82rem;color:#fbbf24;text-align:center">
       ⏳ <strong id="spotPendingName"></strong> has been requested and is currently being reviewed by our team. We'll add it to the app soon!
     </div>
@@ -2857,6 +2858,24 @@ let _kiteFactIdx=Math.floor(Math.random()*_kiteFacts.length);
 function goHome(){
   closeAC();
   resetSearch();
+}
+function showAddSpotFromHome(){
+  // Show the error/suggest state with empty form so user can add their spot directly
+  $('errorTitle').textContent='Add your spot';
+  $('errorMsg').textContent='Fill in the details below and we\'ll review and add it to the app.';
+  $('spotPendingMsg').style.display='none';
+  const sw=$('suggestSpotWrap');
+  if(sw){
+    sw.style.display='block';
+    $('suggestName').value=''; $('suggestLocation').value=''; $('suggestCountry').value='';
+    $('suggestCoords').value=''; $('suggestLat').value=''; $('suggestLon').value='';
+    $('suggestDirs').value=''; $('suggestBusiness').value=''; $('suggestWebsite').value='';
+    if($('suggestWebcam')) $('suggestWebcam').value=''; $('suggestNote').value='';
+    const pe=loadProfile().email||_authSession?.user?.email||'';
+    if($('suggestEmail')) $('suggestEmail').value=pe;
+  }
+  showOnly('errorState');
+  sw?.scrollIntoView({behavior:'smooth',block:'start'});
 }
 function logoEasterEgg(){
   showToast(_kiteFacts[_kiteFactIdx % _kiteFacts.length], 7000);
