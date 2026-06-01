@@ -5121,11 +5121,15 @@ async function renderAdminPanel(){
   el.innerHTML='<div style="color:var(--tdim);font-size:.8rem;padding:8px 0">Loading…</div>';
   const sb=getSb(); if(!sb) return;
 
-  const [{data:spotData},{data:suggData}] = await Promise.all([
+  const [{data:spotData},{data:suggData},{data:overrideData}] = await Promise.all([
     sb.from('spot_info').select('*').order('spot_name'),
     sb.from('spot_suggestions').select('*').or('reviewed.eq.false,reviewed.is.null').order('created_at',{ascending:false}),
+    sb.from('spot_overrides').select('name,lat,lon,loc').eq('active',true),
   ]);
   _adminSpots = spotData||[];
+  // Annotate each spot_info with coords from spot_overrides if available
+  const overrideMap={}; for(const o of overrideData||[]) overrideMap[o.name]=o;
+  _adminSpots.forEach(s=>{ const o=overrideMap[s.spot_name]; if(o){s._lat=o.lat;s._lon=o.lon;s._loc=o.loc;s._hasOverride=true;} else{s._hasOverride=false;} });
   const pendingSuggs = suggData||[];
 
   const suggRows = pendingSuggs.map(s=>`
@@ -5214,17 +5218,18 @@ async function adminOpenSpot(spotName, prefill){
         ${!isNew?`<button onclick="adminUnlockRename()" style="font-size:.7rem;padding:6px 10px;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:8px;color:var(--gray);cursor:pointer;white-space:nowrap">✏️ Rename</button>`:''}
       </div>
 
-      ${isNew?`
+      ${(isNew||!s?._hasOverride)?`
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
         <div>
-          <label class="pp-label">Latitude</label>
-          <input type="number" id="adLat" class="pp-input" value="${s?._lat||''}" placeholder="51.36" step="0.0001"/>
+          <label class="pp-label">Latitude${!isNew?' <span style="color:#fbbf24;font-weight:400;text-transform:none;letter-spacing:0">(missing — required to be searchable)</span>':''}</label>
+          <input type="number" id="adLat" class="pp-input" value="${s?._lat||''}" placeholder="51.36" step="0.0001" style="${!isNew?'border-color:rgba(251,191,36,.4)':''}"/>
         </div>
         <div>
           <label class="pp-label">Longitude</label>
-          <input type="number" id="adLon" class="pp-input" value="${s?._lon||''}" placeholder="3.31" step="0.0001"/>
+          <input type="number" id="adLon" class="pp-input" value="${s?._lon||''}" placeholder="3.31" step="0.0001" style="${!isNew?'border-color:rgba(251,191,36,.4)':''}"/>
         </div>
-      </div>`:''}
+      </div>`:`
+      <div style="margin-bottom:10px;font-size:.7rem;color:var(--tdim)">📍 ${s._lat?.toFixed(4)}, ${s._lon?.toFixed(4)} · <span style="color:#4ade80">In search index ✓</span></div>`}
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
         <div>
           <label class="pp-label">City / Region</label>
@@ -5358,8 +5363,9 @@ async function adminSaveSpotInfo(){
   const{error}=await sb.from('spot_info').upsert(row,{onConflict:'spot_name'});
   if(error){ showToast('Error: '+error.message); if(btn){btn.disabled=false;btn.textContent=isNew?'Add spot':'Save changes';} return; }
 
-  // For new spots or renames: persist to spot_overrides
-  if((isNew||isRename) && (renameLat||lat) && (renameLon||lon)){
+  // Persist to spot_overrides for new spots, renames, or existing spots missing an override row
+  const needsOverride=isNew||isRename||!(_adminSpots||[]).find(x=>x.spot_name===spotName)?._hasOverride;
+  if(needsOverride && (renameLat||lat) && (renameLon||lon)){
     const{error:oe}=await sb.from('spot_overrides').upsert({
       name:spotName, loc:renameLoc||loc||'', lat:renameLat||lat, lon:renameLon||lon, dirs:[], active:true, added_by:adminNickname
     },{onConflict:'name'});
