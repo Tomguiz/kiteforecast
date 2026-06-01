@@ -3812,25 +3812,7 @@ async function syncFavsFromSupabase(email){
       dirs:  r.spot_dirs||[],
       days:  r.spot_days||null,
     }));
-    // Supabase is the master. Always overwrite local with remote.
-    // Only exception: new user (remote empty) who added a fav while signed out —
-    // push that local fav up once. But only if local profile email already matches
-    // (i.e. same account, not stale data from another account).
-    const storedEmail=loadProfile().email;
-    const sameAccount=!storedEmail||storedEmail===email;
-    if(remote.length===0){
-      if(sameAccount){
-        // Potentially a new user with one pre-login local fav — push it up
-        const local=loadFavs();
-        for(const fav of local) pushFavToSupabase(email,fav,false);
-      } else {
-        // Different account — wipe stale local favs, start clean
-        saveFavs([]);
-        renderHintChips();
-      }
-      return;
-    }
-    // Remote has data — it wins unconditionally
+    // Supabase is the single source of truth — always overwrite local unconditionally
     saveFavs(remote);
     renderHintChips();
   } finally {
