@@ -546,7 +546,8 @@
     }
     .pp-input:focus { border-color:var(--accent); }
     .pp-save-btn { width:100%; padding:11px; border-radius:10px; font-size:.9rem; transition:background .2s,color .2s,border-color .2s,opacity .2s; }
-    .pp-save-btn.saved { background:transparent; border:1.5px solid var(--accent); color:var(--accent); opacity:.7; cursor:default; }
+    .pp-save-btn.saved { background:transparent; border:1.5px solid var(--border); color:var(--tdim); opacity:.6; cursor:default; }
+    .pp-save-btn.dirty { background:#38bdf8; border-color:#38bdf8; color:#000; opacity:1; cursor:pointer; font-weight:800; box-shadow:0 0 16px rgba(56,189,248,.45); }
     .pp-note { font-size:.72rem; color:var(--tdim); line-height:1.5; }
     .pp-warning {
       background:rgba(234,179,8,.1); border:1px solid rgba(234,179,8,.3);
@@ -4260,6 +4261,14 @@ function openProfilePanel(tab){
     switchPpTab(tab);
     const _p=loadProfile();
     const _ni=$('ppNicknameInput'); if(_ni) _ni.value=_p.nickname||'';
+    // Set save button initial state: dim if nickname already saved, default if not yet set
+    (function(){ const btn=$('ppNicknameSaveBtn'); if(!btn) return;
+      const hasSaved=!!_p.nickname;
+      btn.classList.toggle('saved', hasSaved);
+      btn.classList.remove('dirty');
+      btn.textContent=hasSaved?'✓ Saved':'Save';
+      btn.disabled=hasSaved;
+    })();
     renderSignInOnboarding();
     updateAuthUI();
     renderNotifList();
@@ -5522,7 +5531,14 @@ function openAdminReview(){
 // ─────────────────────────────────────────────────────────────────────────────
 function onNicknameInput(){
   const btn=$('ppNicknameSaveBtn');
-  if(btn){ btn.classList.remove('saved'); btn.textContent='Save'; }
+  if(!btn) return;
+  const current=loadProfile().nickname||'';
+  const val=($('ppNicknameInput')?.value||'').trim();
+  const changed=val&&val!==current;
+  btn.classList.toggle('saved',!changed);
+  btn.classList.toggle('dirty',!!changed);
+  btn.textContent=changed?'Save':'✓ Saved';
+  btn.disabled=!changed;
 }
 
 function showNicknameModal(){
@@ -5591,7 +5607,7 @@ async function saveNickname(fromModal){
   }
 
   const p=loadProfile(); p.nickname=val; saveProfile(p);
-  if(btn){ btn.disabled=false; btn.classList.add('saved'); btn.textContent='✓ Saved'; setTimeout(()=>{ btn.classList.remove('saved'); btn.textContent='Save'; },2000); }
+  if(btn){ btn.disabled=true; btn.classList.remove('dirty'); btn.classList.add('saved'); btn.textContent='✓ Saved'; }
 
   // Dismiss modal if called from it
   if(fromModal){ const m=$('nicknameModal'); if(m) m.remove(); showToast('👋 Welcome, '+val+'!'); }
