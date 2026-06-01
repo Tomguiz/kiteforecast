@@ -54,7 +54,7 @@
       background: linear-gradient(160deg, #070c18 0%, #0b1a35 55%, #070f1f 100%);
       padding: clamp(24px,5vw,44px) 20px clamp(20px,4vw,32px);
       text-align: center; border-bottom: 1px solid var(--border);
-      position: relative; overflow: visible;
+      position: sticky; top: 0; z-index: 300; overflow: visible;
     }
     .hero::before { content:''; position:absolute; inset:0; background:radial-gradient(ellipse at 50% 0%,rgba(0,212,255,.07) 0%,transparent 65%); pointer-events:none; overflow:hidden; border-radius:inherit; }
     .logo { font-size: clamp(1.7rem,5vw,2.4rem); font-weight:800; letter-spacing:-1px; background:linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; margin-top:6px; }
