@@ -5086,10 +5086,9 @@ async function respondFriendRequest(id, status){
 async function removeFriend(id){
   const sb=getSb(); if(!sb) return;
   const email=_authSession?.user?.email||loadProfile().email;
-  const{error}=await sb.from('friendships').delete()
-    .eq('id',id)
-    .or(`requester.eq.${email},recipient.eq.${email}`);
-  if(error){ console.error('[removeFriend]',error); showToast('Error removing friend: '+error.message); return; }
+  const{error,count}=await sb.from('friendships').delete({count:'exact'}).eq('id',id);
+  if(error){ console.error('[removeFriend]',error); showToast('Error: '+error.message); return; }
+  if(count===0){ console.warn('[removeFriend] 0 rows deleted — RLS may be blocking'); showToast('Could not remove — check permissions.'); return; }
   // Remove from cache immediately (don't re-fetch — DB propagation may lag)
   _friendsCache=(_friendsCache||[]).filter(r=>r.id!==id);
   await renderFriendsPanel();
