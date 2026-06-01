@@ -211,36 +211,31 @@ Deno.serve(async () => {
       const windMin         = sample.length ? Math.min(...sample.map(h => h.kn))     : 0
       const consistencyPct  = day.length  ? Math.round(good.length / day.length * 100) : 0
 
-      // ── Calendar links ──
-      // Format: YYYYMMDDTHHMMSS (local, no Z — let calendar app use its own TZ)
+      // ── Calendar block (pre-rendered HTML — avoids Make mangling hrefs) ──
       const fmtCal = (iso: string) => iso.replace(/[-:]/g, '').slice(0, 15)
       const calStart = fmtCal(sessionStart)
-      // End: add 1h if sessionEnd === sessionStart (single-hour session), else use sessionEnd
       const calEndIso = sessionEnd && sessionEnd !== sessionStart ? sessionEnd : `${r.session_date}T${String(good.length ? good[good.length-1].hour + 1 : 18).padStart(2,'0')}:00`
       const calEnd   = fmtCal(calEndIso)
-      const calTitle = encodeURIComponent(`🪁 Kite session — ${r.spot_name}`)
-      const calDesc  = encodeURIComponent(`${peakKn}kn peak · ${goodHours}h of good wind\nForecast: ${r.app_link}`)
-      const calLoc   = encodeURIComponent(`${r.spot_name}, ${r.spot_country}`)
-      const gcal_link = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${calTitle}&dates=${calStart}/${calEnd}&details=${calDesc}&location=${calLoc}`
-
-      // .ics data URI for Apple Calendar / Outlook
-      const uid = `kite-${r.session_date}-${r.spot_name.replace(/\s+/g,'-').toLowerCase()}@kiteforecast`
-      const icsContent = [
-        'BEGIN:VCALENDAR',
-        'VERSION:2.0',
-        'PRODID:-//KiteForecast//EN',
-        'BEGIN:VEVENT',
-        `UID:${uid}`,
-        `DTSTAMP:${fmtCal(new Date().toISOString())}Z`,
-        `DTSTART:${calStart}`,
-        `DTEND:${calEnd}`,
-        `SUMMARY:🪁 Kite session — ${r.spot_name}`,
-        `DESCRIPTION:${peakKn}kn peak · ${goodHours}h of good wind\\nForecast: ${r.app_link}`,
-        `LOCATION:${r.spot_name}\\, ${r.spot_country}`,
-        'END:VEVENT',
-        'END:VCALENDAR',
-      ].join('\r\n')
-      const ics_link = `data:text/calendar;charset=utf-8,${encodeURIComponent(icsContent)}`
+      const startFmt = sessionStart.slice(11, 16)
+      const endFmt   = calEndIso.slice(11, 16)
+      // Use &amp; — this HTML goes directly into email body, not substituted into href by Make
+      const gcalUrl  = `https://calendar.google.com/calendar/render?action=TEMPLATE&amp;text=${encodeURIComponent(`Kite session - ${r.spot_name}`)}&amp;dates=${calStart}/${calEnd}&amp;details=${encodeURIComponent(`${peakKn}kn · ${goodHours}h of good wind. Forecast: ${r.app_link}`)}&amp;location=${encodeURIComponent(r.spot_name)}`
+      const calendar_html = `
+        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+          <tr>
+            <td style="background-color:#0f1520;border:1px solid #1e2535;border-top:none;padding:16px 32px;">
+              <p style="margin:0 0 10px 0;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#4a5568;">&#128197; Block your agenda</p>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td>
+                    <a href="${gcalUrl}" style="display:block;text-align:center;background-color:#1a2235;border:1px solid #242d42;border-radius:8px;padding:11px 14px;font-family:'DM Sans',Arial,sans-serif;font-size:13px;font-weight:700;color:#5dd4f0;text-decoration:none;">&#128197; Add to Google Calendar</a>
+                  </td>
+                </tr>
+              </table>
+              <p style="margin:8px 0 0 0;font-size:11px;color:#4a5568;text-align:center;">&#8220;Kite session &#8212; ${r.spot_name}&#8221; &middot; ${startFmt}&ndash;${endFmt}</p>
+            </td>
+          </tr>
+        </table>`
 
       const payload = {
         notification_type:  r.notif_type,
@@ -254,8 +249,7 @@ Deno.serve(async () => {
         day_of_week:        new Date(r.session_date + 'T12:00:00').toLocaleDateString('en', { weekday: 'long' }),
         date_label:         fmtDateLabel(r.session_date),
         app_link:           r.app_link,
-        gcal_link,
-        ics_link,
+        calendar_html,
         session: {
           start_time:           sessionStart,
           end_time:             sessionEnd,
