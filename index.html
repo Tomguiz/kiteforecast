@@ -1261,17 +1261,6 @@
         <input type="text" id="ppNicknameInput" class="pp-input" placeholder="e.g. TomKite" maxlength="32" oninput="onNicknameInput()" />
         <button class="btn pp-save-btn" id="ppNicknameSaveBtn" onclick="saveNickname(false)" style="margin-top:2px">Save</button>
         <p class="pp-note">Unique username — visible to friends. Letters, numbers, _ . - allowed.</p>
-        <div style="border-top:1px solid var(--border);margin:4px 0"></div>
-        <div id="ppDigestSection">
-          <div class="pp-toggle-row" id="ppDigestRow">
-            <div>
-              <div style="font-size:.82rem;font-weight:600;color:var(--text)">📬 Weekly digest <span id="ppDigestPremiumBadge" style="display:none" class="premium-badge">PREMIUM</span></div>
-              <div style="font-size:.72rem;color:var(--tdim);margin-top:2px">Every Monday — your week's kite sessions at a glance</div>
-            </div>
-            <button class="pp-toggle" id="ppDigestToggle" onclick="toggleDigest()"><span></span></button>
-          </div>
-          <button class="btn pp-save-btn" id="ppDigestNowBtn" onclick="sendDigestNow()" style="margin-top:2px">📩 Send me this week's forecast now</button>
-        </div>
         <div style="border-top:1px solid var(--border);margin:8px 0 4px"></div>
 
         <!-- Premium section (non-premium) -->
@@ -1376,6 +1365,17 @@
         <input type="tel" id="ppPhoneInput" class="pp-input" placeholder="+32478123456" style="margin-bottom:8px"/>
         <button class="btn pp-save-btn" id="ppPhoneSaveBtn" onclick="savePhone()">Save</button>
         <p class="pp-note" style="margin-top:8px">International format e.g. +32478123456. Used only for kite alerts.</p>
+      </div>
+      <div style="border-top:1px solid var(--border);margin:8px 0 12px"></div>
+      <div id="ppDigestSection">
+        <div class="pp-toggle-row" id="ppDigestRow">
+          <div>
+            <div style="font-size:.82rem;font-weight:600;color:var(--text)">📬 Weekly digest <span id="ppDigestPremiumBadge" style="display:none" class="premium-badge">PREMIUM</span></div>
+            <div style="font-size:.72rem;color:var(--tdim);margin-top:2px">Every Monday — your week's kite sessions at a glance</div>
+          </div>
+          <button class="pp-toggle" id="ppDigestToggle" onclick="toggleDigest()"><span></span></button>
+        </div>
+        <button class="btn pp-save-btn" id="ppDigestNowBtn" onclick="sendDigestNow()" style="margin-top:2px">📩 Send me this week's forecast now</button>
       </div>
       <div style="border-top:1px solid var(--border);margin:8px 0 12px"></div>
       <div style="font-size:.7rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--tdim);margin-bottom:8px;">My spot alerts</div>
