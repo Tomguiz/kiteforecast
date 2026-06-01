@@ -6555,12 +6555,12 @@ function dismissInstallBanner(){
   localStorage.setItem('kf_install_dismissed_at', String(Date.now()));
 }
 
-function showToast(msg, duration=5000, color){
+function showToast(msg, duration=4000, color){
   const t=document.createElement('div');
   t.className='pp-toast'; t.textContent=msg;
   if(color) t.style.cssText+=`;background:${color};border-color:${color}40`;
   document.body.appendChild(t);
-  setTimeout(()=>t.remove(),duration);
+  setTimeout(()=>{ t.style.transition='opacity .5s'; t.style.opacity='0'; setTimeout(()=>t.remove(),500); }, duration);
 }
 
 // ── SPOT-LEVEL NOTIF TOGGLE ──
