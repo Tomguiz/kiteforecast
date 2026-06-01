@@ -6201,9 +6201,13 @@ function deleteNotifById(id){
   if(n.type==='spot'){
     // also wipe fromSpot day entries
     saveNotifs(notifs.filter(x=>x.id!==id&&!(x.type==='day'&&x.spotName===n.spotName&&x.fromSpot)));
+    // Cancel in Supabase so sync doesn't resurrect it
+    cancelReminders(n.spotName,null);
   } else {
     // standalone day removal — reuse removeDayNotif logic for fromSpot promotion
     removeDayNotif(n.spotName,n.date);
+    // Cancel in Supabase so sync doesn't resurrect it
+    cancelReminders(n.spotName,n.date);
   }
   renderNotifList();
   updateProfileDot();
