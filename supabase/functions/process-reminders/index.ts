@@ -211,31 +211,37 @@ Deno.serve(async () => {
       const windMin         = sample.length ? Math.min(...sample.map(h => h.kn))     : 0
       const consistencyPct  = day.length  ? Math.round(good.length / day.length * 100) : 0
 
-      // ── Calendar block (pre-rendered HTML — avoids Make mangling hrefs) ──
+      // ── Calendar block — emits a <tr> to slot into the outer email table ──
       const fmtCal = (iso: string) => iso.replace(/[-:]/g, '').slice(0, 15)
       const calStart = fmtCal(sessionStart)
       const calEndIso = sessionEnd && sessionEnd !== sessionStart ? sessionEnd : `${r.session_date}T${String(good.length ? good[good.length-1].hour + 1 : 18).padStart(2,'0')}:00`
       const calEnd   = fmtCal(calEndIso)
       const startFmt = sessionStart.slice(11, 16)
       const endFmt   = calEndIso.slice(11, 16)
-      // Use &amp; — this HTML goes directly into email body, not substituted into href by Make
-      const gcalUrl  = `https://calendar.google.com/calendar/render?action=TEMPLATE&amp;text=${encodeURIComponent(`Kite session - ${r.spot_name}`)}&amp;dates=${calStart}/${calEnd}&amp;details=${encodeURIComponent(`${peakKn}kn · ${goodHours}h of good wind. Forecast: ${r.app_link}`)}&amp;location=${encodeURIComponent(r.spot_name)}`
-      const calendar_html = `
-        <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-          <tr>
-            <td style="background-color:#0f1520;border:1px solid #1e2535;border-top:none;padding:16px 32px;">
-              <p style="margin:0 0 10px 0;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#4a5568;">&#128197; Block your agenda</p>
-              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td>
-                    <a href="${gcalUrl}" style="display:block;text-align:center;background-color:#1a2235;border:1px solid #242d42;border-radius:8px;padding:11px 14px;font-family:'DM Sans',Arial,sans-serif;font-size:13px;font-weight:700;color:#5dd4f0;text-decoration:none;">&#128197; Add to Google Calendar</a>
-                  </td>
-                </tr>
-              </table>
-              <p style="margin:8px 0 0 0;font-size:11px;color:#4a5568;text-align:center;">&#8220;Kite session &#8212; ${r.spot_name}&#8221; &middot; ${startFmt}&ndash;${endFmt}</p>
-            </td>
-          </tr>
-        </table>`
+      const calTitle = encodeURIComponent(`Kite session - ${r.spot_name}`)
+      const calDesc  = encodeURIComponent(`${peakKn}kn · ${goodHours}h of good wind. Forecast: ${r.app_link}`)
+      const calLoc   = encodeURIComponent(r.spot_name)
+      // &amp; because this HTML is injected directly into the email body
+      const gcalUrl  = `https://calendar.google.com/calendar/render?action=TEMPLATE&amp;text=${calTitle}&amp;dates=${calStart}/${calEnd}&amp;details=${calDesc}&amp;location=${calLoc}`
+      // Outlook web calendar link (works in all email clients, no data: URI needed)
+      const outlookUrl = `https://outlook.live.com/calendar/0/deeplink/compose?subject=${calTitle}&startdt=${sessionStart}&enddt=${calEndIso}&location=${calLoc}&body=${calDesc}`
+      const calendar_html = `<tr>
+          <td style="background-color:#0f1520;border:1px solid #1e2535;border-top:none;padding:16px 32px;">
+            <p style="margin:0 0 10px 0;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#4a5568;">&#128197; Block your agenda</p>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr>
+                <td width="49%" style="padding-right:6px;">
+                  <a href="${gcalUrl}" style="display:block;text-align:center;background-color:#1a2235;border:1px solid #242d42;border-radius:8px;padding:11px 14px;font-family:'DM Sans',Arial,sans-serif;font-size:13px;font-weight:700;color:#5dd4f0;text-decoration:none;">&#128197; Google Calendar</a>
+                </td>
+                <td width="2%"></td>
+                <td width="49%" style="padding-left:6px;">
+                  <a href="${outlookUrl}" style="display:block;text-align:center;background-color:#1a2235;border:1px solid #242d42;border-radius:8px;padding:11px 14px;font-family:'DM Sans',Arial,sans-serif;font-size:13px;font-weight:700;color:#94a3b8;text-decoration:none;">&#128197; Apple / Outlook</a>
+                </td>
+              </tr>
+            </table>
+            <p style="margin:8px 0 0 0;font-size:11px;color:#4a5568;text-align:center;">&#8220;Kite session &#8212; ${r.spot_name}&#8221; &middot; ${startFmt}&ndash;${endFmt}</p>
+          </td>
+        </tr>`
 
       const payload = {
         notification_type:  r.notif_type,
