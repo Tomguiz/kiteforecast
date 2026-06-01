@@ -121,6 +121,7 @@ Deno.serve(async (req) => {
     if (!userFavs.length) continue
 
     const spotForecasts = []
+    const debugSpots: any[] = []
     for (const fav of userFavs) {
       const key = `${fav.spot_lat},${fav.spot_lon}`
       if (!wxCache.has(key)) {
@@ -128,8 +129,11 @@ Deno.serve(async (req) => {
         catch { wxCache.set(key, null) }
       }
       const wx = wxCache.get(key)
-      if (!wx) continue
-      const sessions = getGoodSessions(wx, fav.spot_dirs ?? [], fav.spot_days ?? null)
+      if (!wx) { debugSpots.push({ spot: fav.spot_name, error: 'no wx' }); continue }
+      const dirs = fav.spot_dirs ?? []
+      const days = fav.spot_days ?? null
+      const sessions = getGoodSessions(wx, dirs, days)
+      debugSpots.push({ spot: fav.spot_name, dirs, days, sessions_found: sessions.length })
       if (sessions.length) {
         spotForecasts.push({ spot: fav.spot_name, sessions })
       }
@@ -195,6 +199,7 @@ Deno.serve(async (req) => {
       has_sessions: totalSessions > 0,
       spots_html: spotsHtml,
       no_sessions_html: noSessionsHtml,
+      debug_spots: debugSpots,
     }
 
     await fetch(MAKE_WEBHOOK_URL, {
@@ -205,7 +210,7 @@ Deno.serve(async (req) => {
     sent++
   }
 
-  return new Response(JSON.stringify({ sent, total_users: emails.length }), {
+  return new Response(JSON.stringify({ sent, total_users: emails.length, debug: 'check make webhook logs for debug_spots' }), {
     headers: { 'Content-Type': 'application/json', ...CORS },
   })
 })
