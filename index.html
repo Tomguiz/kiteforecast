@@ -1082,7 +1082,11 @@
 
         <div>
           <label class="pp-label">Website <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(optional)</span></label>
-          <input type="url" id="suggestWebsite" class="pp-input" placeholder="https://…"/>
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="url" id="suggestWebsite" class="pp-input" placeholder="https://…" style="flex:1"/>
+            <button type="button" id="autofillBtn" onclick="autofillFromWebsite()" style="flex-shrink:0;padding:10px 14px;border-radius:10px;border:1.5px solid var(--accent);background:rgba(0,212,255,.1);color:var(--accent);font-size:.78rem;font-weight:700;cursor:pointer;white-space:nowrap">✨ Autofill</button>
+          </div>
+          <div id="autofillStatus" style="font-size:.72rem;color:var(--tdim);margin-top:4px;display:none"></div>
         </div>
 
         <div>
@@ -4590,6 +4594,44 @@ function splitCoords(val){
     if(latEl){ latEl.value=nums[0]; latEl.style.border=''; }
     if(lonEl){ lonEl.value=nums[1]; lonEl.style.border=''; }
   }
+}
+
+async function autofillFromWebsite(){
+  const url=($('suggestWebsite')?.value||'').trim();
+  if(!url){ showToast('Paste the website URL first'); return; }
+  const btn=$('autofillBtn'); const status=$('autofillStatus');
+  btn.disabled=true; btn.textContent='⏳ Scanning…';
+  status.style.display='block'; status.textContent='Fetching website and extracting data with AI…';
+  try{
+    const res=await fetch('https://kpwmajtxmcfpakvonimf.supabase.co/functions/v1/spot-autofill',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwd21hanR4bWNmcGFrdm9uaW1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTcyMjYsImV4cCI6MjA5MDczMzIyNn0.QfQuIQbnfVUOApPbOdvCRbNsVdb0SBAwMX-hvioGJmg'},
+      body:JSON.stringify({url}),
+    });
+    const json=await res.json();
+    if(!res.ok||json.error){ status.textContent='⚠️ '+(json.error||'Could not extract data'); btn.disabled=false; btn.textContent='✨ Autofill'; return; }
+    const d=json.data||{};
+    let filled=0;
+    const fill=(id,val)=>{ if(val!=null&&val!==''){ const el=$(id); if(el&&!el.value){ el.value=val; filled++; } } };
+    fill('suggestName',   d.name);
+    fill('suggestLocation',d.city);
+    fill('suggestCountry', d.country);
+    fill('suggestBusiness',d.business);
+    fill('suggestWebcam',  d.webcam);
+    fill('suggestDirs',    d.dirs);
+    if(d.lat!=null&&d.lon!=null){
+      const latEl=$('suggestLat'); const lonEl=$('suggestLon');
+      const coordEl=$('suggestCoords');
+      if(latEl&&!latEl.value){ latEl.value=d.lat; filled++; }
+      if(lonEl&&!lonEl.value){ lonEl.value=d.lon; filled++; }
+      if(coordEl&&!coordEl.value) coordEl.value=d.lat+', '+d.lon;
+    }
+    status.textContent=filled>0?`✅ ${filled} field${filled>1?'s':''} filled in — review and adjust before submitting.`:'⚠️ No data found on this page — fill in manually.';
+    status.style.color=filled>0?'#4ade80':'var(--tdim)';
+  }catch(e){
+    status.textContent='⚠️ Network error — try again.';
+  }
+  btn.disabled=false; btn.textContent='✨ Autofill';
 }
 
 async function submitSpotSuggestion(){
