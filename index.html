@@ -3354,20 +3354,12 @@ function renderGrid(){
   renderSpotInfoCard(loc.name);
   if(_authSession?.user) loadAttendances();
 
-  // ── deep-link: scroll to & highlight the target date card ──
+  // ── deep-link: open the modal for the target date directly ──
   if(window._deepLinkDate){
     const target=window._deepLinkDate;
-    window._deepLinkDate=null; // consume once
-    setTimeout(()=>{
-      const cards=[...grid.children];
-      const idx=daily.time.indexOf(target);
-      if(idx>=0&&cards[idx]){
-        cards[idx].scrollIntoView({behavior:'smooth',block:'center'});
-        cards[idx].style.transition='box-shadow .3s';
-        cards[idx].style.boxShadow='0 0 0 2px var(--accent)';
-        setTimeout(()=>{ cards[idx].style.boxShadow=''; },2200);
-      }
-    },200);
+    window._deepLinkDate=null;
+    const idx=daily.time.indexOf(target);
+    if(idx>=0) setTimeout(()=>openModal(target,idx),200);
   }
 }
 
