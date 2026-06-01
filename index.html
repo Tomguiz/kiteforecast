@@ -2973,6 +2973,7 @@ async function renderSpotInfoCard(spotName) {
         ${noteHTML}
         ${socialHTML}
         ${!info.verified ? `<div style="font-size:.68rem;color:var(--tdim);text-align:center;margin-top:4px;">Owner of this spot? <span style="color:var(--accent);cursor:pointer;" onclick="openClaimFlow()">Claim it to manage your info →</span></div>` : ''}
+        ${info.added_by ? `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:.68rem;color:var(--tdim);text-align:center;">🌍 Spot added by community member <strong style="color:var(--gray)">${info.added_by}</strong></div>` : ''}
       </div>
     </div>`;
 }
@@ -5302,6 +5303,7 @@ async function adminSaveSpotInfo(){
     if(si>=0) SPOTS[si].name=spotName;
   }
 
+  const adminNickname=loadProfile().nickname||email.split('@')[0];
   const row={
     spot_name:       spotName,
     display_name:    ($('adDisplayName')?.value||'').trim()||null,
@@ -5321,6 +5323,7 @@ async function adminSaveSpotInfo(){
     membership_note: ($('adMembershipNote')?.value||'').trim()||null,
     verified:        !!$('adVerified')?.classList.contains('on'),
     updated_at:      new Date().toISOString(),
+    ...(isNew ? {added_by: adminNickname} : {}),
   };
   const{error}=await sb.from('spot_info').upsert(row,{onConflict:'spot_name'});
   if(error){ showToast('Error: '+error.message); if(btn){btn.disabled=false;btn.textContent=isNew?'Add spot':'Save changes';} return; }
@@ -5328,7 +5331,7 @@ async function adminSaveSpotInfo(){
   // For new spots or renames: persist to spot_overrides
   if((isNew||isRename) && (renameLat||lat) && (renameLon||lon)){
     const{error:oe}=await sb.from('spot_overrides').upsert({
-      name:spotName, loc:renameLoc||country||'', lat:renameLat||lat, lon:renameLon||lon, dirs:[], active:true
+      name:spotName, loc:renameLoc||country||'', lat:renameLat||lat, lon:renameLon||lon, dirs:[], active:true, added_by:adminNickname
     },{onConflict:'name'});
     if(oe){ showToast('spot_info saved but spot_overrides failed: '+oe.message); }
     if(!SPOTS.find(x=>x.name===spotName)) SPOTS.push({name:spotName,loc:renameLoc||country||'',lat:renameLat||lat,lon:renameLon||lon,dirs:[]});
