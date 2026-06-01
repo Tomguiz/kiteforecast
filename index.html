@@ -2538,23 +2538,12 @@ function loadFavs(){
     const ls=localStorage.getItem('kf_favs');
     if(ls) return JSON.parse(ls);
   }catch(e){}
-  try{
-    const m=document.cookie.match('(?:^|; )'+FAVS_COOKIE+'=([^;]*)');
-    if(m){
-      const v=JSON.parse(decodeURIComponent(m[1]));
-      try{ localStorage.setItem('kf_favs',JSON.stringify(v)); }catch(e){}
-      return v;
-    }
-  }catch(e){}
   return [];
 }
 function saveFavs(arr){
-  const s=JSON.stringify(arr);
-  try{ localStorage.setItem('kf_favs',s); }catch(e){}
-  try{
-    document.cookie=FAVS_COOKIE+'='+encodeURIComponent(s)
-      +'; max-age='+(COOKIE_DAYS*86400)+'; path=/; SameSite=Lax';
-  }catch(e){}
+  try{ localStorage.setItem('kf_favs',JSON.stringify(arr)); }catch(e){}
+  // Expire the old cookie so it can never resurrect stale data
+  try{ document.cookie=FAVS_COOKIE+'=; max-age=0; path=/; SameSite=Lax'; }catch(e){}
 }
 
 // Per-spot wind direction overrides saved by the user
