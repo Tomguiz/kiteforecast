@@ -5408,6 +5408,7 @@ async function manageSubscription(){
     const{url,error}=await resp.json();
     if(error) throw new Error(error);
     window.open(url,'_blank');
+    setTimeout(()=>{ if(btn){ btn.textContent='Manage subscription → cancel, change card'; btn.disabled=false; } },1500);
   }catch(e){
     showToast('Could not open billing portal: '+e.message);
     if(btn){ btn.textContent='Manage subscription → cancel, change card'; btn.disabled=false; }
@@ -6518,8 +6519,10 @@ setTimeout(updateFetchTimestamp, 0);
 
 // ── AUTO-REFRESH: re-fetch when app comes back to foreground after 30+ min ──
 document.addEventListener('visibilitychange',()=>{
-  if(document.visibilityState==='visible'&&cachedLoc&&lastFetchTime&&Date.now()-lastFetchTime>30*60*1000){
-    refreshForecast();
+  if(document.visibilityState==='visible'){
+    if(cachedLoc&&lastFetchTime&&Date.now()-lastFetchTime>30*60*1000) refreshForecast();
+    const btn=$('ppManageSubBtn');
+    if(btn&&btn.disabled) { btn.textContent='Manage subscription → cancel, change card'; btn.disabled=false; }
   }
 });
 
