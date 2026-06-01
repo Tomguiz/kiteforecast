@@ -904,30 +904,31 @@
       /* each row becomes a 2-line grid */
       .m-row, .m-row.ws {
         display: grid !important;
-        grid-template-columns: 56px 22px auto 1fr auto;
+        grid-template-columns: 52px 22px auto 1fr auto;
         grid-template-rows: auto auto;
         grid-template-areas:
           "time  wx    temp  wind  dir"
-          "time  wave  .     wind  cond";
-        gap: 1px 8px;
-        padding: 9px 14px;
+          "time  wave  .     cond  dir";
+        gap: 2px 6px;
+        padding: 9px 12px;
         min-height: auto;
         align-items: center;
       }
-      .m-row.kite-on       { padding-left:11px; }
+      .m-row.kite-on       { padding-left:9px; }
       .m-row.kite-on:hover { background:rgba(34,197,94,.09); }
 
-      .c-time { grid-area:time; font-size:.88rem; line-height:1.3; align-self:center; }
-      .c-wx   { grid-area:wx;   font-size:1.15rem; line-height:1; align-self:center; }
-      .c-temp { grid-area:temp; font-size:.82rem; align-self:end; }
-      .c-wind { grid-area:wind; align-self:center; justify-self:stretch; height:22px; }
-      .c-wind-val { font-size:1.0rem; }
+      .c-time { grid-area:time; font-size:.85rem; line-height:1.3; align-self:center; }
+      .c-wx   { grid-area:wx;   font-size:1.1rem; line-height:1; align-self:center; }
+      .c-temp { grid-area:temp; font-size:.80rem; align-self:end; }
+      .c-wind { grid-area:wind; align-self:center; justify-self:stretch; height:24px; overflow:visible; }
+      .c-wind-val { font-size:.92rem; }
+      .c-gust-num { display:none; }
       .c-gust { display:none; }
-      .c-wave { display:block; grid-area:wave; font-size:.65rem; font-weight:700; color:#60a5fa; align-self:end; white-space:nowrap; }
+      .c-wave { display:block; grid-area:wave; font-size:.62rem; font-weight:700; color:#60a5fa; align-self:start; white-space:nowrap; }
       .c-dir  { grid-area:dir;  align-self:center; flex-direction:column; align-items:flex-end; gap:1px; }
-      .c-da   { font-size:1.1rem; }
-      .c-dl   { font-size:.72rem; text-align:right; }
-      .c-sp   { grid-area:cond; align-self:start; font-size:.62rem; padding:2px 6px; }
+      .c-da   { font-size:1.0rem; }
+      .c-dl   { font-size:.68rem; text-align:right; }
+      .c-sp   { grid-area:cond; align-self:start; font-size:.60rem; padding:2px 5px; white-space:nowrap; }
     }
   </style>
 </head>
