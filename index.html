@@ -211,8 +211,8 @@
     .cw-kn     { position:absolute; z-index:1; left:8px; top:50%; transform:translateY(-50%); font-size:.9rem; font-weight:800; color:#fff; text-shadow:0 1px 4px rgba(0,0,0,.7); }
     .cw-gust-kn{ position:absolute; z-index:1; right:6px; top:50%; transform:translateY(-50%); font-size:.6rem; color:rgba(255,255,255,.5); font-weight:700; white-space:nowrap; text-shadow:0 1px 3px rgba(0,0,0,.6); }
     .dir-pill  { width:100%; padding:3px 0; border-radius:6px; text-align:center; font-size:.6rem; font-weight:700; letter-spacing:.03em; }
-    .dir-arrow { font-size:.75rem; }
-    @media (max-width:599px) { .dir-label { display:none; } .dir-arrow { font-size:.85rem; } }
+    .dir-mobile { display:none; }
+    @media (max-width:599px) { .dir-desktop { display:none; } .dir-mobile { display:inline; } }
     .dir-side    { background:rgba(34,197,94,.1);  color:#4ade80; border:1px solid rgba(34,197,94,.22); }
     .dir-sideon  { background:rgba(34,197,94,.06); color:#86efac; border:1px solid rgba(34,197,94,.14); }
     .dir-sideoff { background:rgba(249,115,22,.1); color:#fdba74; border:1px solid rgba(249,115,22,.22); }
@@ -3293,7 +3293,7 @@ function renderGrid(){
     let dirPill='';
     if(windDirs.size>0&&domDir!==null){
       const ok=isWindDirOK(domDir);
-      dirPill=`<div class="dir-pill ${ok?'dir-side':'dir-sideoff'}">${ok?'✓':'✗'} <span class="dir-arrow">${dirArrow(domDir)}</span><span class="dir-label"> Wind dir (${compass(domDir)})</span></div>`;
+      dirPill=`<div class="dir-pill ${ok?'dir-side':'dir-sideoff'}">${ok?'✓':'✗'} <span class="dir-desktop">Wind dir (${compass(domDir)} ${dirArrow(domDir)})</span><span class="dir-mobile">Wind dir (${dirArrow(domDir)})</span></div>`;
     }
     let hPill;
     if(goodHours>0){
