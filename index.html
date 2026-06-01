@@ -941,7 +941,7 @@
 
 <!-- ══ HEADER ══ -->
 <header class="hero">
-  <button class="home-btn" onclick="goHome()" title="Home">
+  <button class="home-btn" onclick="logoEasterEgg()" title="Home">
     <img src="logo.png" alt="Tichkes" class="site-logo" onerror="this.style.display='none'">
   </button>
   <button class="profile-btn" onclick="_signinContext='generic';openProfilePanel()" title="Profile &amp; Notifications" id="profileBtn">
@@ -2826,9 +2826,32 @@ function resetSearch(){
   renderHintChips();
   $('searchInput').blur();
 }
+const _kiteFacts=[
+  "🪁 The world record kitesurf jump is 34.8 metres. Your couch is 0.4 metres. Respect the gap.",
+  "💨 A 25-knot wind feels like nothing on land. On the water it's basically a religion.",
+  "🌊 Kitesurfers spend 80% of their time watching the wind app and 20% actually kiting.",
+  "📏 The bigger your kite, the bigger your ego. The smaller your kite, the bigger your ego. It's physics.",
+  "🤙 'The wind was perfect yesterday' is the kitesurf version of 'you should have been here last week'.",
+  "☀️ Kitesurfers have two speeds: rigging in a hurry and scrolling KiteForecast for hours.",
+  "🌍 Dakhla, Tarifa, Cabarete — kitesurfers don't take holidays, they do pilgrimages.",
+  "🏄 A kite session solves 99% of problems. The remaining 1% is a tangled kite line.",
+  "🎯 The optimal kite size is always the one you left at home.",
+  "🔢 Kitesurfers count in knots. Below 15 = sad. 15-20 = hopeful. 20-25 = alive. 25+ = enlightened.",
+  "⛵ Fun fact: sailors invented the kite. Kitesurfers perfected the chaos.",
+  "🪢 Kite lines are 30 metres long. Your attention span after a good session: about the same.",
+  "💸 Kitesurfing: the sport where the gear costs more than your car but you're happier.",
+  "🌬️ Offshore wind, onshore wind, side-shore wind — kitesurfers argue about wind direction like others argue about politics.",
+  "🏆 The best kitesurfer in the world is always whoever you're watching right now.",
+];
+let _kiteFactIdx=Math.floor(Math.random()*_kiteFacts.length);
 function goHome(){
   closeAC();
   resetSearch();
+}
+function logoEasterEgg(){
+  showToast(_kiteFacts[_kiteFactIdx % _kiteFacts.length], 4000);
+  _kiteFactIdx++;
+  goHome();
 }
 async function doSearch(){
   closeAC();
