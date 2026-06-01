@@ -2215,10 +2215,12 @@ const SPOTS=[
 function spotSearch(q){
   if(!q||q.length<2) return [];
   const ql=q.toLowerCase();
-  return SPOTS.filter(s=>
-    s.name.toLowerCase().includes(ql)||
-    s.loc.toLowerCase().includes(ql)
-  ).slice(0,6);
+  // Also try without trailing 's' for plural/singular tolerance (e.g. "Surfers" → "Surfer")
+  const qlS=ql.endsWith('s')?ql.slice(0,-1):null;
+  return SPOTS.filter(s=>{
+    const nl=s.name.toLowerCase(); const ll=(s.loc||'').toLowerCase();
+    return nl.includes(ql)||ll.includes(ql)||(qlS&&(nl.includes(qlS)||ll.includes(qlS)));
+  }).slice(0,6);
 }
 
 let osmSearchCache={};
@@ -5168,14 +5170,18 @@ async function adminOpenSpot(spotName, prefill){
   const s=prefill||(spotName?(_adminSpots||[]).find(x=>x.spot_name===spotName):null);
   el.style.display='block';
   el.scrollIntoView({behavior:'smooth',block:'start'});
+  el.dataset.origSpotName=spotName||'';
 
   const isNew = !spotName;
   el.innerHTML=`
     <div style="background:rgba(0,212,255,.05);border:1px solid rgba(0,212,255,.2);border-radius:12px;padding:16px;">
       <div style="font-size:.85rem;font-weight:700;color:var(--accent);margin-bottom:14px">${isNew?'➕ Add new spot':'✏️ Edit: '+s.spot_name}</div>
 
-      <label class="pp-label">Spot name <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">${isNew?'(unique key — shown in search)':'(key — cannot be changed)'}</span></label>
-      <input type="text" id="adSpotName" class="pp-input" value="${s?.spot_name||''}" placeholder="e.g. Koksijde Beach" style="margin-bottom:10px${isNew?'':';opacity:.55'}" ${isNew?'':'readonly'}/>
+      <label class="pp-label">Spot name <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">${isNew?'(unique key — shown in search)':'(rename via button →)'}</span></label>
+      <div style="display:flex;gap:6px;margin-bottom:10px;align-items:center">
+        <input type="text" id="adSpotName" class="pp-input" value="${s?.spot_name||''}" placeholder="e.g. Koksijde Beach" style="flex:1;margin-bottom:0${isNew?'':';opacity:.65'}" ${isNew?'':'readonly'}/>
+        ${!isNew?`<button onclick="adminUnlockRename()" style="font-size:.7rem;padding:6px 10px;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:8px;color:var(--gray);cursor:pointer;white-space:nowrap">✏️ Rename</button>`:''}
+      </div>
 
       ${isNew?`
       <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
@@ -5246,6 +5252,15 @@ async function adminOpenSpot(spotName, prefill){
     </div>`;
 }
 
+function adminUnlockRename(){
+  const inp=$('adSpotName'); if(!inp) return;
+  inp.removeAttribute('readonly');
+  inp.style.opacity='1';
+  inp.style.borderColor='rgba(251,191,36,.5)';
+  inp.focus();
+  showToast('⚠️ Rename: edit name then Save — old name will be removed.');
+}
+
 async function adminSaveSpotInfo(){
   const sb=getSb(); if(!sb) return;
   if(!loadProfile().isAdmin){ showToast('Access denied'); return; }
@@ -5253,12 +5268,31 @@ async function adminSaveSpotInfo(){
   const spotName=($('adSpotName')?.value||'').trim();
   if(!spotName){ showToast('Spot name is required'); if(btn){btn.disabled=false;btn.textContent='Save';} return; }
 
-  const isNew=!(_adminSpots||[]).find(x=>x.spot_name===spotName);
+  // Detect rename: input was unlocked and the new name differs from any existing spot_name
+  const existingByNewName=(_adminSpots||[]).find(x=>x.spot_name===spotName);
+  // The original name is stored on the form container as data-orig
+  const origName=$('adminEditForm').dataset.origSpotName||spotName;
+  const isRename=!existingByNewName&&!!(_adminSpots||[]).find(x=>x.spot_name===origName)&&origName!==spotName;
+  const isNew=!existingByNewName&&!isRename;
   const lat=parseFloat($('adLat')?.value||'0');
   const lon=parseFloat($('adLon')?.value||'0');
   const country=($('adCountry')?.value||'').trim();
 
   if(isNew&&(!lat||!lon)){ showToast('Latitude and longitude are required for new spots'); if(btn){btn.disabled=false;btn.textContent='Add spot';} return; }
+
+  // For a rename: get coords from existing spot_overrides row
+  let renameLat=lat, renameLon=lon, renameLoc=country;
+  if(isRename){
+    const orig=(_adminSpots||[]).find(x=>x.spot_name===origName);
+    const{data:ov}=await sb.from('spot_overrides').select('lat,lon,loc').eq('name',origName).single();
+    renameLat=ov?.lat||lat; renameLon=ov?.lon||lon; renameLoc=ov?.loc||country;
+    // Delete old rows
+    await sb.from('spot_info').delete().eq('spot_name',origName);
+    await sb.from('spot_overrides').delete().eq('name',origName);
+    // Update in-memory SPOTS
+    const si=SPOTS.findIndex(x=>x.name===origName);
+    if(si>=0) SPOTS[si].name=spotName;
+  }
 
   const row={
     spot_name:       spotName,
@@ -5283,17 +5317,16 @@ async function adminSaveSpotInfo(){
   const{error}=await sb.from('spot_info').upsert(row,{onConflict:'spot_name'});
   if(error){ showToast('Error: '+error.message); if(btn){btn.disabled=false;btn.textContent=isNew?'Add spot':'Save changes';} return; }
 
-  // For new spots: persist to spot_overrides so it loads for all users on next page load
-  if(isNew && lat && lon){
+  // For new spots or renames: persist to spot_overrides
+  if((isNew||isRename) && (renameLat||lat) && (renameLon||lon)){
     const{error:oe}=await sb.from('spot_overrides').upsert({
-      name:spotName, loc:country||'', lat, lon, dirs:[], active:true
+      name:spotName, loc:renameLoc||country||'', lat:renameLat||lat, lon:renameLon||lon, dirs:[], active:true
     },{onConflict:'name'});
     if(oe){ showToast('spot_info saved but spot_overrides failed: '+oe.message); }
-    // Also inject into in-memory SPOTS for immediate use in this session
-    if(!SPOTS.find(x=>x.name===spotName)) SPOTS.push({name:spotName,loc:country||'',lat,lon,dirs:[]});
+    if(!SPOTS.find(x=>x.name===spotName)) SPOTS.push({name:spotName,loc:renameLoc||country||'',lat:renameLat||lat,lon:renameLon||lon,dirs:[]});
   }
 
-  showToast(isNew?'✓ New spot added — visible to all users on next load!':'✓ Spot info saved!');
+  showToast(isRename?`✓ Renamed to "${spotName}"`:isNew?'✓ New spot added — visible to all users on next load!':'✓ Spot info saved!');
   $('adminEditForm').style.display='none';
   renderAdminPanel();
   if(cachedLoc?.name===spotName) renderSpotInfoCard(spotName);
