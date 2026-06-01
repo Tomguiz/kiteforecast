@@ -3812,20 +3812,26 @@ async function syncFavsFromSupabase(email){
       dirs:  r.spot_dirs||[],
       days:  r.spot_days||null,
     }));
-    // Clear local favs if the signed-in email differs — prevents cross-account contamination
+    // Supabase is the master. Always overwrite local with remote.
+    // Only exception: new user (remote empty) who added a fav while signed out —
+    // push that local fav up once. But only if local profile email already matches
+    // (i.e. same account, not stale data from another account).
     const storedEmail=loadProfile().email;
-    if(storedEmail&&storedEmail!==email) saveFavs([]);
-    const local=storedEmail===email?loadFavs():[];
-    // Push any local-only favs up to Supabase (e.g. pre-sync or offline adds)
-    const localOnly=local.filter(lf=>!remote.some(rf=>rf.name===lf.name&&rf.lat===lf.lat));
-    for(const fav of localOnly) pushFavToSupabase(email,fav,false);
-    // Merge: Supabase remote + local-only additions
-    let merged=[...remote,...localOnly];
-    // Enforce free plan limit — keep only the first spot if not premium
-    if(!isPremium()&&merged.length>FREE_FAV_LIMIT){
-      merged=merged.slice(0,FREE_FAV_LIMIT);
+    const sameAccount=!storedEmail||storedEmail===email;
+    if(remote.length===0){
+      if(sameAccount){
+        // Potentially a new user with one pre-login local fav — push it up
+        const local=loadFavs();
+        for(const fav of local) pushFavToSupabase(email,fav,false);
+      } else {
+        // Different account — wipe stale local favs, start clean
+        saveFavs([]);
+        renderHintChips();
+      }
+      return;
     }
-    saveFavs(merged);
+    // Remote has data — it wins unconditionally
+    saveFavs(remote);
     renderHintChips();
   } finally {
     _syncFavsInFlight=false;
