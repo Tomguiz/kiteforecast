@@ -4724,6 +4724,7 @@ async function submitSpotSuggestion(){
 
 function selectSessionStart(timeStr, dateStr, rowEl){
   if(!_authSession?.user){ showToast('Sign in to confirm attendance'); _signinContext='generic'; openProfilePanel(); return; }
+  if(!isPremium()){ showToast('👑 Session tracking is a Premium feature'); openProfilePanel('profile'); return; }
 
   const attendBar=$('mAttendBar');
   const attendLabel=$('mAttendLabel');
@@ -4755,7 +4756,9 @@ function updateModalAttendBar(dateStr){
   } else {
     bar.style.background='rgba(34,197,94,.04)';
     bar.style.borderColor='rgba(34,197,94,.12)';
-    bar.innerHTML='🏄 Tap any hour row to set your session start time';
+    bar.innerHTML=isPremium()
+      ?'🏄 Tap any hour row to set your session start time'
+      :'👑 <a href="#" onclick="event.preventDefault();openProfilePanel(\'profile\')" style="color:#fbbf24;font-weight:600;text-decoration:none">Upgrade to Premium</a> to track &amp; share your sessions';
   }
 }
 
@@ -4919,6 +4922,7 @@ async function loadAttendances(){
 
 function openAttendSheet(dateStr, dayIdx, spotName, lat, lon){
   if(!_authSession?.user){ showToast('Sign in to confirm attendance'); _signinContext='generic'; openProfilePanel(); return; }
+  if(!isPremium()){ showToast('👑 Session tracking is a Premium feature'); openProfilePanel('profile'); return; }
   if($('attendSheet')) return;
 
   const existing=_attendCache[dateStr];
