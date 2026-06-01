@@ -5086,18 +5086,28 @@ async function respondFriendRequest(id, status){
 async function removeFriend(id){
   const sb=getSb(); if(!sb) return;
   const email=_authSession?.user?.email||loadProfile().email;
-  // Find the friendship row in cache to get both emails
+  // Find the row in cache to get both parties' emails
   const row=(_friendsCache||[]).find(r=>r.id===id);
+  console.log('[removeFriend] id=',id,'row=',row,'email=',email,'cache=',_friendsCache);
   if(!row){ showToast('Could not find friendship — refresh and try again.'); return; }
   const other=row.requester===email?row.recipient:row.requester;
-  // Delete matching either direction — avoids UUID casting issues and RLS id-matching
-  const{error,count}=await sb.from('friendships').delete({count:'exact'})
-    .or(`and(requester.eq.${email},recipient.eq.${other}),and(requester.eq.${other},recipient.eq.${email})`);
-  if(error){ console.error('[removeFriend]',error); showToast('Error: '+error.message); return; }
-  if(count===0){ showToast('Could not remove — check permissions.'); return; }
-  _friendsCache=(_friendsCache||[]).filter(r=>r.id!==id);
-  await renderFriendsPanel();
-  showToast('Friend removed.');
+  // Delete using individual eq filters chained — one direction at a time
+  let res=await sb.from('friendships').delete({count:'exact'})
+    .eq('requester',email).eq('recipient',other);
+  console.log('[removeFriend] attempt1 count=',res.count,'error=',res.error);
+  if(!res.error && res.count>0){
+    _friendsCache=(_friendsCache||[]).filter(r=>r.id!==id);
+    await renderFriendsPanel(); showToast('Friend removed.'); return;
+  }
+  // Try other direction
+  res=await sb.from('friendships').delete({count:'exact'})
+    .eq('requester',other).eq('recipient',email);
+  console.log('[removeFriend] attempt2 count=',res.count,'error=',res.error);
+  if(!res.error && res.count>0){
+    _friendsCache=(_friendsCache||[]).filter(r=>r.id!==id);
+    await renderFriendsPanel(); showToast('Friend removed.'); return;
+  }
+  showToast('Could not remove — check permissions.');
 }
 
 async function cancelFriendRequest(id){
