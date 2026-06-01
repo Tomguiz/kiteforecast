@@ -661,7 +661,7 @@
     /* notif list items */
     .pp-notif-item {
       display:flex; align-items:center; gap:10px;
-      padding:10px 12px; background:var(--card); border:1px solid var(--border);
+      background:var(--card); border:1px solid var(--border);
       border-radius:10px;
     }
     .pp-notif-info { flex:1; min-width:0; }
@@ -1264,22 +1264,6 @@
             </div>
             <button id="ppManageSubBtn" onclick="manageSubscription()" style="width:100%;padding:10px;background:transparent;border:1px solid rgba(245,158,11,.35);border-radius:8px;font-size:.78rem;font-weight:600;color:#f59e0b;cursor:pointer;transition:background .15s;" onmouseover="this.style.background='rgba(245,158,11,.1)'" onmouseout="this.style.background='transparent'">Manage subscription → cancel, change card</button>
           </div>
-          <div style="border-top:1px solid var(--border);margin:16px 0"></div>
-          <div style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:12px;padding:14px 16px;">
-            <div class="pp-toggle-row" style="margin-bottom:0">
-              <div>
-                <div style="font-size:.85rem;font-weight:600;color:var(--text)">📱 SMS alerts <span class="premium-badge">PREMIUM</span></div>
-                <div style="font-size:.73rem;color:var(--tdim);margin-top:3px">Text message 1h before your session</div>
-              </div>
-              <button class="pp-toggle" id="ppSmsToggle" onclick="toggleSms()"><span></span></button>
-            </div>
-            <div id="ppPhoneSection" style="display:none;margin-top:14px;border-top:1px solid var(--border);padding-top:14px;">
-              <label class="pp-label">Phone number</label>
-              <input type="tel" id="ppPhoneInput" class="pp-input" placeholder="+32478123456" style="margin-bottom:8px"/>
-              <button class="btn pp-save-btn" id="ppPhoneSaveBtn" onclick="savePhone()">Save</button>
-              <p class="pp-note" style="margin-top:8px">International format e.g. +32478123456. Used only for kite alerts.</p>
-            </div>
-          </div>
         </div>
 
         <div style="border-top:1px solid var(--border);margin:8px 0 4px"></div>
@@ -1329,6 +1313,21 @@
         </div>
         <button class="pp-toggle" id="ppFriendSessionToggle" onclick="toggleFriendSessionNotifs()"><span></span></button>
       </div>
+      <div style="border-top:1px solid var(--border);margin:4px 0"></div>
+      <div class="pp-toggle-row" style="margin-bottom:0">
+        <div>
+          <div style="font-size:.82rem;font-weight:600;color:var(--text)">📱 SMS alerts <span class="premium-badge">PREMIUM</span></div>
+          <div style="font-size:.72rem;color:var(--tdim);margin-top:2px">Text message 1h before your session</div>
+        </div>
+        <button class="pp-toggle" id="ppSmsToggle" onclick="toggleSms()"><span></span></button>
+      </div>
+      <div id="ppPhoneSection" style="display:none;padding:10px 0 4px 0;">
+        <label class="pp-label">Phone number</label>
+        <input type="tel" id="ppPhoneInput" class="pp-input" placeholder="+32478123456" style="margin-bottom:8px"/>
+        <button class="btn pp-save-btn" id="ppPhoneSaveBtn" onclick="savePhone()">Save</button>
+        <p class="pp-note" style="margin-top:8px">International format e.g. +32478123456. Used only for kite alerts.</p>
+      </div>
+      <div style="border-top:1px solid var(--border);margin:8px 0 4px"></div>
       <div id="ppNotifList"></div>
       <div style="margin-top:16px;padding:12px 14px;background:rgba(56,189,248,.06);border:1px solid rgba(56,189,248,.15);border-radius:10px;font-size:.75rem;color:var(--gray);line-height:1.6;">
         <div style="font-weight:700;color:var(--text);margin-bottom:6px;">📬 How notifications work</div>
@@ -6181,16 +6180,26 @@ async function renderNotifList(){
       ?`<div class="pp-day-filter"><span class="pp-day-filter-label">Days:</span>${dayChips}</div>`
       :'';
 
-    return `<div class="pp-notif-item" style="flex-direction:column;align-items:stretch;">
-      <div style="display:flex;align-items:center;gap:10px;">
-        <div class="pp-notif-info">
+    // Summary line: upcoming confirmed session dates
+    const upcomingDates=confirmedDates.length
+      ? confirmedDates.slice(0,3).map(d=>new Date(d+'T12:00:00').toLocaleDateString('en',{weekday:'short',month:'short',day:'numeric'})).join(' · ')
+      : monitoringDates.length ? `Monitoring ${monitoringDates.length} day${monitoringDates.length>1?'s':''}`
+      : 'No sessions forecast yet';
+
+    const uid='notif-'+n.id.replace(/[^a-z0-9]/gi,'');
+    return `<div class="pp-notif-item" style="flex-direction:column;align-items:stretch;padding:0;overflow:hidden;">
+      <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;" onclick="(function(el){var b=el.closest('.pp-notif-item').querySelector('.pp-notif-body');var open=b.style.display==='none'||!b.style.display;b.style.display=open?'block':'none';el.querySelector('.pp-notif-chevron').style.transform=open?'rotate(180deg)':'rotate(0deg)';})(this)">
+        <div class="pp-notif-info" style="flex:1;min-width:0;">
           <div class="pp-notif-spot">🔔 ${n.spotName}</div>
-          <div class="pp-notif-day">${n.type==='spot'?'All sessions':n.label}</div>
+          <div class="pp-notif-day" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${upcomingDates}</div>
         </div>
-        <button class="pp-notif-del" onclick="deleteNotifById('${n.id}')">🗑 Remove</button>
+        <span class="pp-notif-chevron" style="font-size:.7rem;color:var(--tdim);flex-shrink:0;transition:transform .2s;">▼</span>
+        <button class="pp-notif-del" onclick="event.stopPropagation();deleteNotifById('${n.id}')">🗑</button>
       </div>
-      ${dayFilterHTML}
-      ${scheduleHTML}
+      <div class="pp-notif-body" style="display:none;padding:0 12px 10px;border-top:1px solid var(--border);">
+        ${dayFilterHTML}
+        ${scheduleHTML}
+      </div>
     </div>`;
   }).join('');
 }
