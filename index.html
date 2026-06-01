@@ -5233,11 +5233,11 @@ async function adminOpenSpot(spotName, prefill){
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
         <div>
           <label class="pp-label">City / Region</label>
-          <input type="text" id="adCity" class="pp-input" value="${(()=>{const loc=s?._loc||'';return loc.split(',')[0]?.trim()||'';})()}" placeholder="e.g. Knokke-Heist"/>
+          <input type="text" id="adCity" class="pp-input" value="${s?.city||(()=>{const loc=s?._loc||'';return loc.split(',')[0]?.trim()||'';})()}" placeholder="e.g. Knokke-Heist"/>
         </div>
         <div>
           <label class="pp-label">Country</label>
-          <input type="text" id="adCountry" class="pp-input" value="${s?._country||(()=>{const loc=s?._loc||'';const parts=loc.split(',');return parts[parts.length-1]?.trim()||'';})()}" placeholder="e.g. Belgium"/>
+          <input type="text" id="adCountry" class="pp-input" value="${s?.country||s?._country||(()=>{const loc=s?._loc||'';const parts=loc.split(',');return parts[parts.length-1]?.trim()||'';})()}" placeholder="e.g. Belgium"/>
         </div>
       </div>
 
@@ -5316,8 +5316,10 @@ async function adminSaveSpotInfo(){
   const origName=$('adminEditForm').dataset.origSpotName||spotName;
   const isRename=!existingByNewName&&!!(_adminSpots||[]).find(x=>x.spot_name===origName)&&origName!==spotName;
   const isNew=!existingByNewName&&!isRename;
-  const lat=parseFloat($('adLat')?.value||'0');
-  const lon=parseFloat($('adLon')?.value||'0');
+  const latRaw=($('adLat')?.value||'').trim();
+  const lonRaw=($('adLon')?.value||'').trim();
+  const lat=latRaw?parseFloat(latRaw):null;
+  const lon=lonRaw?parseFloat(lonRaw):null;
   const city=($('adCity')?.value||'').trim();
   const country=($('adCountry')?.value||'').trim();
   const loc=[city,country].filter(Boolean).join(', ');
@@ -5358,19 +5360,26 @@ async function adminSaveSpotInfo(){
     membership_note: ($('adMembershipNote')?.value||'').trim()||null,
     verified:        !!$('adVerified')?.classList.contains('on'),
     updated_at:      new Date().toISOString(),
+    city:            city||null,
+    country:         country||null,
     ...(isNew ? {added_by: adminNickname} : {}),
   };
   const{error}=await sb.from('spot_info').upsert(row,{onConflict:'spot_name'});
   if(error){ showToast('Error: '+error.message); if(btn){btn.disabled=false;btn.textContent=isNew?'Add spot':'Save changes';} return; }
 
-  // Persist to spot_overrides for new spots, renames, or existing spots missing an override row
-  const needsOverride=isNew||isRename||!(_adminSpots||[]).find(x=>x.spot_name===spotName)?._hasOverride;
-  if(needsOverride && (renameLat||lat) && (renameLon||lon)){
+  // Persist to spot_overrides: always upsert so loc/country stays in sync
+  const existingSpot=(_adminSpots||[]).find(x=>x.spot_name===spotName);
+  const finalLat=renameLat||lat||existingSpot?._lat||null;
+  const finalLon=renameLon||lon||existingSpot?._lon||null;
+  const finalLoc=renameLoc||loc||existingSpot?._loc||'';
+  if(finalLat&&finalLon){
     const{error:oe}=await sb.from('spot_overrides').upsert({
-      name:spotName, loc:renameLoc||loc||'', lat:renameLat||lat, lon:renameLon||lon, dirs:[], active:true, added_by:adminNickname
+      name:spotName, loc:finalLoc, lat:finalLat, lon:finalLon, dirs:[], active:true, added_by:adminNickname
     },{onConflict:'name'});
     if(oe){ showToast('spot_info saved but spot_overrides failed: '+oe.message); }
-    if(!SPOTS.find(x=>x.name===spotName)) SPOTS.push({name:spotName,loc:renameLoc||loc||'',lat:renameLat||lat,lon:renameLon||lon,dirs:[]});
+    const si=SPOTS.findIndex(x=>x.name===spotName);
+    if(si>=0){SPOTS[si].loc=finalLoc;}
+    else{SPOTS.push({name:spotName,loc:finalLoc,lat:finalLat,lon:finalLon,dirs:[]});}
   }
 
   showToast(isRename?`✓ Renamed to "${spotName}"`:isNew?'✓ New spot added — visible to all users on next load!':'✓ Spot info saved!');
