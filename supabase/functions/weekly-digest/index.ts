@@ -155,6 +155,20 @@ Deno.serve(async (req) => {
     const userFavs = favsByEmail.get(email) ?? []
     if (!userFavs.length) continue
 
+    const APP_BASE = 'https://tomguiz.github.io/kiteforecast/'
+
+    // Generate a magic link for a given redirect URL, falling back to the plain URL
+    async function magicLink(redirectTo: string): Promise<string> {
+      try {
+        const { data, error } = await supabase.auth.admin.generateLink({
+          type: 'magiclink', email,
+          options: { redirectTo },
+        })
+        if (!error && data?.properties?.action_link) return data.properties.action_link
+      } catch { /* fall through */ }
+      return redirectTo
+    }
+
     const spotForecasts = []
     for (const fav of userFavs) {
       const key = `${fav.spot_lat},${fav.spot_lon}`
@@ -165,16 +179,30 @@ Deno.serve(async (req) => {
       const wx = wxCache.get(key)
       if (!wx) continue
       const sessions = getGoodSessions(wx, fav.spot_dirs ?? [], fav.spot_days ?? null)
-      if (sessions.length) {
-        spotForecasts.push({ spot: fav.spot_name, sessions })
+      // Attach per-session magic links
+      const sessionsWithLinks = await Promise.all(sessions.map(async sess => {
+        const forecastUrl = `${APP_BASE}?spot=${encodeURIComponent(fav.spot_name)}&date=${sess.date}`
+        const joinPayload = btoa(JSON.stringify({ spot: fav.spot_name, date: sess.date, start_time: sess.win_start.replace('h00', ':00') }))
+        const joinUrl = `${APP_BASE}?join=${joinPayload}`
+        return {
+          ...sess,
+          forecast_link: await magicLink(forecastUrl),
+          join_link:     await magicLink(joinUrl),
+        }
+      }))
+      if (sessionsWithLinks.length) {
+        spotForecasts.push({ spot: fav.spot_name, sessions: sessionsWithLinks })
       }
     }
 
     const totalSessions = spotForecasts.reduce((s, sf) => s + sf.sessions.length, 0)
     const weekStart = new Date().toLocaleDateString('en', { day: 'numeric', month: 'long', year: 'numeric' })
 
+    // Magic link for the main CTA (app home)
+    const homeLink = await magicLink(APP_BASE)
+
     const spotsHtml = spotForecasts.slice(0, 10).map(sf => {
-      const sessionRows = sf.sessions.map(sess => `
+      const sessionRows = sf.sessions.map((sess: any) => `
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:10px;background-color:#1a2235;border:1px solid #242d42;border-radius:10px;">
           <tr>
             <td style="padding:14px 18px 10px 18px;">
@@ -207,7 +235,7 @@ Deno.serve(async (req) => {
           </tr>
           <!-- Best window bar -->
           <tr>
-            <td style="padding:0 18px 14px 18px;">
+            <td style="padding:0 18px 10px 18px;">
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
                 <tr>
                   <td style="background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.2);border-radius:8px;padding:8px 14px;">
@@ -222,6 +250,21 @@ Deno.serve(async (req) => {
                         </td>
                       </tr>
                     </table>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <!-- Session CTAs -->
+          <tr>
+            <td style="padding:0 18px 14px 18px;">
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td style="width:50%;padding-right:5px;">
+                    <a href="${sess.forecast_link}" style="display:block;text-align:center;background:rgba(93,212,240,.12);border:1px solid rgba(93,212,240,.3);border-radius:8px;padding:9px 12px;font-family:'DM Sans',Arial,sans-serif;font-size:12px;font-weight:700;color:#5dd4f0;text-decoration:none;">&#128202; View forecast</a>
+                  </td>
+                  <td style="width:50%;padding-left:5px;">
+                    <a href="${sess.join_link}" style="display:block;text-align:center;background:rgba(74,222,128,.12);border:1px solid rgba(74,222,128,.3);border-radius:8px;padding:9px 12px;font-family:'DM Sans',Arial,sans-serif;font-size:12px;font-weight:700;color:#4ade80;text-decoration:none;">&#127689; I&rsquo;m going!</a>
                   </td>
                 </tr>
               </table>
@@ -260,6 +303,7 @@ Deno.serve(async (req) => {
       has_sessions: totalSessions > 0,
       spots_html: spotsHtml,
       no_sessions_html: noSessionsHtml,
+      home_link: homeLink,
     }
 
     await fetch(MAKE_WEBHOOK_URL, {
