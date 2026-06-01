@@ -2833,9 +2833,13 @@ async function doSearch(){
   if(match){ pickSpot(match); return; }
   await fetchForecast(q);
 }
-$('searchInput').addEventListener('input',e=>{
+$('searchInput').addEventListener('input',async e=>{
   acSelectedSpot=null;
   const q=e.target.value.trim();
+  // Wait for DB spots to load before searching (resolves in <500ms on first load)
+  await window._spotsReady;
+  // Bail if query changed while waiting
+  if($('searchInput').value.trim()!==q) return;
   const local=spotSearch(q);
   renderAC(local); // show local results immediately
   acActive=-1;
@@ -3030,6 +3034,9 @@ document.addEventListener('click',function(e){
   if(e.target.closest('#favBtn')){e.stopPropagation();toggleFavorite();return;}
 });
 // Load admin-added spots from DB and merge into SPOTS before anything else runs
+// Store a promise so search can await it if it fires before the fetch completes
+let _spotsReadyResolve;
+window._spotsReady=new Promise(r=>{_spotsReadyResolve=r;});
 (async()=>{
   try{
     const sb=getSb();
@@ -3044,6 +3051,7 @@ document.addEventListener('click',function(e){
       }
     }
   }catch(e){}
+  _spotsReadyResolve();
   renderHintChips();
   $('hintLegend').innerHTML=buildLegendHTML();
   $('resultsLegend').innerHTML=buildLegendHTML();
