@@ -1302,8 +1302,14 @@
     </div>
     <div id="ppPanelNotifs" class="pp-body" style="display:none">
       <div class="pp-toggle-row">
-        <span class="pp-toggle-label">Enable notifications</span>
+        <div>
+          <span class="pp-toggle-label">Enable email reminders</span>
+          <div style="font-size:.72rem;color:var(--tdim);margin-top:2px">72h · 48h · 24h · 6h alerts before each kite session</div>
+        </div>
         <button class="pp-toggle" id="ppMasterToggle" onclick="toggleMasterNotif()"><span></span></button>
+      </div>
+      <div id="ppMasterOffNote" style="display:none;margin:2px 0 4px;padding:8px 12px;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);border-radius:8px;font-size:.75rem;color:#fca5a5;line-height:1.5;">
+        🔕 Email reminders are paused — you won't receive any session alerts until you turn this back on. Friends and digest emails are unaffected.
       </div>
       <div style="border-top:1px solid var(--border);margin:4px 0"></div>
       <div class="pp-toggle-row">
@@ -5965,7 +5971,9 @@ function toggleMasterNotif(){
   const p=loadProfile();
   p.notifsEnabled=!notifMasterEnabled();
   saveProfile(p);
-  $('ppMasterToggle').classList.toggle('on',p.notifsEnabled!==false);
+  const on=p.notifsEnabled!==false;
+  $('ppMasterToggle').classList.toggle('on',on);
+  const note=$('ppMasterOffNote'); if(note) note.style.display=on?'none':'block';
 }
 let _statsYear='all'; // 'all' or a 4-digit year string
 async function renderStats(){
@@ -6084,7 +6092,9 @@ async function renderNotifList(){
   const countEl=$('ppNotifCount');
   if(visible.length>0){countEl.style.display='inline-flex';countEl.textContent=visible.length;}
   else{countEl.style.display='none';}
-  $('ppMasterToggle').className='pp-toggle'+(notifMasterEnabled()?' on':'');
+  const _masterOn=notifMasterEnabled();
+  $('ppMasterToggle').className='pp-toggle'+(_masterOn?' on':'');
+  const _offNote=$('ppMasterOffNote'); if(_offNote) _offNote.style.display=_masterOn?'none':'block';
   const list=$('ppNotifList');
   if(!signedIn){list.innerHTML='<div class="pp-empty">Sign in to manage your notifications</div>';return;}
   if(!visible.length){list.innerHTML='<div class="pp-empty">No active notifications</div>';return;}
