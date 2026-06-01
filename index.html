@@ -2469,7 +2469,7 @@ function renderAC(items, query=''){
     `<div class="ac-item" data-i="${i}"><strong>${s.alias||s.name}</strong><span>${s.alias?s.name+' · ':''  }${s.loc}</span></div>`
   ).join('');
   const addHint=q.length>=2
-    ? `<div class="ac-item ac-item-add" style="border-top:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:8px;color:var(--accent);opacity:.8" onmousedown="event.preventDefault();showAddSpotFromHome(${JSON.stringify(q)});closeAC()"><span style="font-size:1rem;line-height:1">＋</span><span style="flex:1"><span style="font-weight:600;font-size:.82rem">Add "${q}" as a new spot</span><span style="display:block;font-size:.72rem;color:var(--tdim);margin-top:1px">Not listed? Request it — we'll review and add it</span></span></div>`
+    ? `<div class="ac-item ac-item-add" style="border-top:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:8px;color:var(--accent);opacity:.8"><span style="font-size:1rem;line-height:1">＋</span><span style="flex:1"><span style="font-weight:600;font-size:.82rem">Add "${q}" as a new spot</span><span style="display:block;font-size:.72rem;color:var(--tdim);margin-top:1px">Not listed? Request it — we'll review and add it</span></span></div>`
     : '';
   dd.innerHTML=spotRows+addHint;
   dd.classList.add('open');
@@ -2477,6 +2477,8 @@ function renderAC(items, query=''){
   dd.querySelectorAll('.ac-item:not(.ac-item-add)').forEach((el,i)=>{
     el.addEventListener('mousedown',e=>{e.preventDefault();fillSpotFromAC(items[i]);});
   });
+  const addEl=dd.querySelector('.ac-item-add');
+  if(addEl) addEl.addEventListener('mousedown',e=>{e.preventDefault();closeAC();showAddSpotFromHome(q);});
 }
 function closeAC(){$('acDropdown').innerHTML='';$('acDropdown').classList.remove('open');acActive=-1;}
 // Called from autocomplete dropdown — fills input only, waits for Search
