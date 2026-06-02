@@ -691,7 +691,8 @@
     .pp-notif-pill { display:inline-block; padding:1px 6px; border-radius:4px; font-size:.65rem; font-weight:700; background:rgba(56,189,248,.12); color:#38bdf8; border:1px solid rgba(56,189,248,.2); }
     .pp-notif-pill.sent { background:rgba(100,116,139,.1); color:var(--tdim); border-color:rgba(100,116,139,.2); text-decoration:line-through; }
     /* ── Premium ── */
-    .premium-badge { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:99px; background:linear-gradient(135deg,#f59e0b,#d97706); color:#000; font-size:.65rem; font-weight:800; letter-spacing:.05em; vertical-align:middle; margin-left:6px; }
+    .premium-badge { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:99px; background:linear-gradient(135deg,#f59e0b,#d97706); color:#000; font-size:.65rem; font-weight:800; letter-spacing:.05em; vertical-align:middle; margin-left:6px; position:relative; }
+    .premium-badge::before { content:'👑'; font-size:.55rem; position:absolute; top:-7px; right:-4px; line-height:1; }
     .premium-card { background:linear-gradient(135deg,rgba(245,158,11,.1),rgba(217,119,6,.06)); border:1px solid rgba(245,158,11,.3); border-radius:12px; padding:16px; }
     .btn-premium { display:block; width:100%; padding:13px; background:linear-gradient(135deg,#f59e0b,#d97706); color:#000; border:none; border-radius:9px; font-size:.88rem; font-weight:800; cursor:pointer; text-align:center; letter-spacing:.03em; transition:opacity .15s; margin-top:10px; }
     .btn-premium:hover { opacity:.9; }
@@ -1427,7 +1428,7 @@
       <div class="notif-card">
         <div class="notif-row">
           <div class="notif-info">
-            <div class="notif-title">📱 SMS alerts <span class="premium-badge">PREMIUM</span><span id="ppSmsCheck" class="notif-active-pill" style="display:none">✓ Active</span></div>
+            <div class="notif-title">📱 SMS alerts <span class="premium-badge">PREMIUM</span></div>
             <div class="notif-sub">Text message 1h before your session</div>
           </div>
           <button class="pp-toggle" id="ppSmsToggle" onclick="toggleSms()"><span></span></button>
@@ -1444,7 +1445,7 @@
       <div id="ppDigestSection" class="notif-card">
         <div class="notif-row" id="ppDigestRow">
           <div class="notif-info">
-            <div class="notif-title">📬 Weekly digest <span id="ppDigestPremiumBadge" style="display:none" class="premium-badge">PREMIUM</span><span id="ppDigestCheck" class="notif-active-pill" style="display:none">✓ Active</span></div>
+            <div class="notif-title">📬 Weekly digest <span id="ppDigestPremiumBadge" style="display:none" class="premium-badge">PREMIUM</span></div>
             <div class="notif-sub">Every Monday — your week's kite sessions at a glance</div>
           </div>
           <button class="pp-toggle" id="ppDigestToggle" onclick="toggleDigest()"><span></span></button>
@@ -5684,7 +5685,6 @@ function updatePremiumUI(){
     const phoneSection=$('ppPhoneSection');
     if(phoneSection) phoneSection.style.display=p.smsEnabled?'block':'none';
     const phoneInput=$('ppPhoneInput'); if(phoneInput) phoneInput.value=p.phoneNumber||'';
-    const smsCheck=$('ppSmsCheck'); if(smsCheck) smsCheck.style.display=p.smsEnabled?'inline-flex':'none';
   }
   // Gate weekly digest — visible but locked for non-premium
   const digestToggle=$('ppDigestToggle');
@@ -5704,8 +5704,6 @@ function updatePremiumUI(){
     digestNowBtn.onclick=premium?sendDigestNow:()=>{ showToast('⚡ Premium only — upgrade to unlock the weekly digest', 4000, '#f59e0b'); openProfilePanel('profile'); };
   }
   if(digestBadge) digestBadge.style.display='inline-flex';
-  const digestCheck=$('ppDigestCheck');
-  if(digestCheck) digestCheck.style.display=(premium&&loadProfile().digestEnabled)?'inline-flex':'none';
   if(digestRow) digestRow.title=premium?'':'Upgrade to Premium to unlock';
   updateUpgradeModal();
   // Refresh profile button crown
@@ -5798,7 +5796,6 @@ async function toggleSms(){
   const phoneSection=$('ppPhoneSection');
   if(phoneSection) phoneSection.style.display=p.smsEnabled?'block':'none';
   $('ppSmsToggle').classList.toggle('on',!!p.smsEnabled);
-  const smsCheck=$('ppSmsCheck'); if(smsCheck) smsCheck.style.display=p.smsEnabled?'inline-flex':'none';
 }
 
 async function savePhone(){
@@ -6391,8 +6388,6 @@ async function toggleDigest(){
   p.digestEnabled=!p.digestEnabled;
   saveProfile(p);
   $('ppDigestToggle').classList.toggle('on',!!p.digestEnabled);
-  const digestCheck=$('ppDigestCheck');
-  if(digestCheck) digestCheck.style.display=p.digestEnabled?'inline-flex':'none';
   const sb=getSb(); if(!sb||!p.email) return;
   await sb.from('profiles').upsert({email:p.email,digest_enabled:!!p.digestEnabled},{onConflict:'email'});
 }
