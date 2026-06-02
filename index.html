@@ -347,14 +347,14 @@
 
     .modal {
       background:var(--surface); border:1px solid var(--border);
-      width:100%; max-width:760px; max-height:95vh;
+      width:100%; max-width:760px; max-height:min(95vh,95dvh);
       display:flex; flex-direction:column;
       animation:mSlideUp .22s cubic-bezier(.22,.68,0,1.2);
       overflow:hidden;
       /* rounded on desktop, rounded-top on mobile */
       border-radius:20px;
     }
-    @media (max-width:599px) { .modal { border-radius:20px 20px 0 0; max-height:92vh; border-bottom:none; } }
+    @media (max-width:599px) { .modal { border-radius:20px 20px 0 0; max-height:calc(100dvh - 60px); border-bottom:none; } }
 
     /* modal header */
     .m-hdr {
@@ -500,7 +500,7 @@
     }
     @media (max-width:599px) {
       #profileOverlay { align-items:flex-end; }
-      #profilePanel { width:100%; border-radius:20px 20px 0 0; max-height:85vh; }
+      #profilePanel { width:100%; border-radius:20px 20px 0 0; max-height:min(85vh,85dvh); }
     }
     #profilePanel {
       background:var(--surface); border-left:1px solid var(--border);
