@@ -23,7 +23,7 @@
       const SB_URL='https://kpwmajtxmcfpakvonimf.supabase.co';
       const SB_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwd21hanR4bWNmcGFrdm9uaW1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTcyMjYsImV4cCI6MjA5MDczMzIyNn0.QfQuIQbnfVUOApPbOdvCRbNsVdb0SBAwMX-hvioGJmg';
       return window.supabase.createClient(SB_URL, SB_ANON, {
-        auth:{ persistSession:true, autoRefreshToken:true, detectSessionInUrl:true, storageKey:'kf-auth' }
+        auth:{ persistSession:true, autoRefreshToken:true, detectSessionInUrl:true, storageKey:'kf-auth', flowType:'implicit' }
       });
     }catch(e){ return null; }
   })();
@@ -3854,6 +3854,7 @@ function getSb(){
         detectSessionInUrl:true,
         storageKey:        'kf-auth',
         storage:           kfStorage,
+        flowType:          'implicit',
       }
     });
   }
