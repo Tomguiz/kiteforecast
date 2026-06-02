@@ -1389,12 +1389,22 @@
         🔕 Email reminders are paused — you won't receive any session alerts until you turn this back on. Friends and digest emails are unaffected.
       </div>
       <div style="border-top:1px solid var(--border);margin:4px 0"></div>
-      <div class="pp-toggle-row">
-        <div>
-          <div style="font-size:.82rem;font-weight:600;color:var(--text)">👥 Friends session alerts</div>
-          <div style="font-size:.72rem;color:var(--tdim);margin-top:2px">Email me when a friend confirms they're going kiting</div>
+      <div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;margin:4px 0">
+        <div style="padding:10px 14px 8px;font-size:.7rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--tdim);background:rgba(255,255,255,.02)">👥 Friends session alerts</div>
+        <div class="pp-toggle-row" style="padding:8px 14px;margin:0;border-top:1px solid var(--border)">
+          <div>
+            <div style="font-size:.8rem;font-weight:600;color:var(--text)">Receive</div>
+            <div style="font-size:.72rem;color:var(--tdim);margin-top:1px">Email me when a friend confirms they're going kiting</div>
+          </div>
+          <button class="pp-toggle" id="ppFriendSessionToggle" onclick="toggleFriendSessionNotifs()"><span></span></button>
         </div>
-        <button class="pp-toggle" id="ppFriendSessionToggle" onclick="toggleFriendSessionNotifs()"><span></span></button>
+        <div class="pp-toggle-row" style="padding:8px 14px;margin:0;border-top:1px solid var(--border)">
+          <div>
+            <div style="font-size:.8rem;font-weight:600;color:var(--text)">Send</div>
+            <div style="font-size:.72rem;color:var(--tdim);margin-top:1px">Notify my friends when I confirm a session</div>
+          </div>
+          <button class="pp-toggle" id="ppNotifyFriendsToggle" onclick="toggleNotifyFriends()"><span></span></button>
+        </div>
       </div>
       <div style="border-top:1px solid var(--border);margin:4px 0"></div>
       <div class="pp-toggle-row" style="margin-bottom:0">
@@ -3967,6 +3977,8 @@ async function updateLastSeen(email){
     if(digestEl) digestEl.classList.toggle('on',!!p.digestEnabled);
     const fst=$('ppFriendSessionToggle');
     if(fst) fst.classList.toggle('on', p.friendSessionNotifs!==false);
+    const nft=$('ppNotifyFriendsToggle');
+    if(nft) nft.classList.toggle('on', p.notifyFriendsOnConfirm!==false);
   }
 }
 
@@ -5063,13 +5075,9 @@ function openAttendSheet(dateStr, dayIdx, spotName, lat, lon){
           </select>
         </div>
       </div>
-      <input type="text" id="attendNote" class="pp-input" placeholder="Add a note… (optional)" maxlength="100" value="${existing?.note||''}" style="margin-bottom:14px"/>
-      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:16px;user-select:none" onclick="toggleAttendNotify(this)">
-        <div id="attendNotifyToggle" class="toggle-btn${loadProfile().friendSessionNotifs===false?'':' on'}" style="flex-shrink:0"></div>
-        <span style="font-size:.82rem;color:#94a3b8">Notify my friends by email</span>
-      </label>
+      <input type="text" id="attendNote" class="pp-input" placeholder="Add a note… (optional)" maxlength="100" value="${existing?.note||''}" style="margin-bottom:16px"/>
       <button onclick="confirmAttendance('${dateStr}','${spotName}',${lat},${lon})" class="btn pp-save-btn" style="width:100%;font-size:.95rem">
-        ${existing?'Update session':'Confirm'}
+        ${existing?'Update session':'Confirm — notify my friends'}
       </button>
       ${existing?`<button onclick="cancelAttendance('${dateStr}')" style="width:100%;margin-top:8px;background:none;border:none;color:#f87171;font-size:.8rem;cursor:pointer;padding:6px">Cancel my attendance</button>`:''}
     </div>`;
@@ -5081,10 +5089,6 @@ function closeAttendSheet(){
   const el=$('attendSheet'); if(el) el.remove();
 }
 
-function toggleAttendNotify(label){
-  const tog=$('attendNotifyToggle'); if(!tog) return;
-  tog.classList.toggle('on');
-}
 
 async function confirmAttendance(dateStr, spotName, lat, lon, startTimeOverride){
   const sb=getSb(); const email=_authSession?.user?.email||loadProfile().email;
@@ -5105,11 +5109,11 @@ async function confirmAttendance(dateStr, spotName, lat, lon, startTimeOverride)
   const btn=$(`going-${dateStr}`)||document.getElementById(`going-${dateStr}`);
   if(btn){ btn.classList.add('going'); btn.textContent=`✓ Going · ${startTime}`; }
 
-  const notifyFriends=$('attendNotifyToggle')?.classList.contains('on')??true;
+  const notifyFriends=loadProfile().notifyFriendsOnConfirm!==false;
   closeAttendSheet();
   showToast(`✓ Session confirmed · ${startTime} · ${durationH}h`);
 
-  // Notify friends — fire and forget (only if toggle is on)
+  // Notify friends — fire and forget (only if global send preference is on)
   if(notifyFriends){
     fetch('https://kpwmajtxmcfpakvonimf.supabase.co/functions/v1/session-attend-notify',{
       method:'POST',
@@ -5694,7 +5698,7 @@ function updatePremiumUI(){
 
 async function syncPremiumFromSupabase(email){
   const sb=getSb(); if(!sb||!email) return;
-  const{data,error}=await sb.from('profiles').select('is_premium,sms_enabled,phone_number,is_admin,nickname,friend_session_notifs,avatar_url').eq('email',email).single();
+  const{data,error}=await sb.from('profiles').select('is_premium,sms_enabled,phone_number,is_admin,nickname,friend_session_notifs,notify_friends_on_confirm,avatar_url').eq('email',email).single();
   if(error) console.warn('syncPremium error:',error.message);
   const p=loadProfile();
   if(data){
@@ -5706,9 +5710,13 @@ async function syncPremiumFromSupabase(email){
     if(data.avatar_url) p.avatar_url=data.avatar_url;
     if(data.friend_session_notifs!==null&&data.friend_session_notifs!==undefined)
       p.friendSessionNotifs=data.friend_session_notifs!==false;
+    if(data.notify_friends_on_confirm!==null&&data.notify_friends_on_confirm!==undefined)
+      p.notifyFriendsOnConfirm=data.notify_friends_on_confirm!==false;
     saveProfile(p);
     const fst=$('ppFriendSessionToggle');
     if(fst) fst.classList.toggle('on', p.friendSessionNotifs!==false);
+    const nft=$('ppNotifyFriendsToggle');
+    if(nft) nft.classList.toggle('on', p.notifyFriendsOnConfirm!==false);
   }
   updatePremiumUI();
   const adminTab=$('ppTabAdmin');
@@ -6360,12 +6368,21 @@ async function toggleDigest(){
 }
 async function toggleFriendSessionNotifs(){
   const p=loadProfile();
-  p.friendSessionNotifs = p.friendSessionNotifs===false ? true : false; // default true
+  p.friendSessionNotifs = p.friendSessionNotifs===false ? true : false;
   saveProfile(p);
   $('ppFriendSessionToggle').classList.toggle('on', p.friendSessionNotifs!==false);
   const sb=getSb(); if(!sb||!p.email) return;
   await sb.from('profiles').upsert({email:p.email, friend_session_notifs:p.friendSessionNotifs!==false},{onConflict:'email'});
-  showToast(p.friendSessionNotifs===false ? 'Friend session alerts off' : 'Friend session alerts on');
+  showToast(p.friendSessionNotifs===false ? 'Friends receive alerts: off' : 'Friends receive alerts: on');
+}
+async function toggleNotifyFriends(){
+  const p=loadProfile();
+  p.notifyFriendsOnConfirm = p.notifyFriendsOnConfirm===false ? true : false;
+  saveProfile(p);
+  $('ppNotifyFriendsToggle').classList.toggle('on', p.notifyFriendsOnConfirm!==false);
+  const sb=getSb(); if(!sb||!p.email) return;
+  await sb.from('profiles').upsert({email:p.email, notify_friends_on_confirm:p.notifyFriendsOnConfirm!==false},{onConflict:'email'});
+  showToast(p.notifyFriendsOnConfirm===false ? 'Friends send alerts: off' : 'Friends send alerts: on');
 }
 
 function toggleMasterNotif(){
