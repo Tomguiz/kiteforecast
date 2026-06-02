@@ -893,6 +893,7 @@
       #mBadgeExtra { display:none; }
       #mBadgeExtra.open { display:contents; }
       #mBadgeMore { display:inline-block; top:8px; right:8px; }
+      #mTideRow { display:none; }
       .m-tl-wrap { padding:10px 12px 8px; }
       .m-sun-row { padding:5px 14px; }
 
@@ -3584,15 +3585,17 @@ function openModal(dateStr,dayIdx){
     <span class="rating-badge ${rating.cls}" style="width:auto;padding:5px 14px">${rating.label}</span>
     ${win?`<span class="m-badge green">🪁 ${win}</span>`:''}
     ${peakKn>0?`<span class="m-badge accent">Avg ${peakKn} kn</span>`:''}
-    <button id="mBadgeMore" onclick="(function(b){var x=$('mBadgeExtra');var open=x.classList.toggle('open');b.textContent=open?'▲ Less':'▼ More';})(this)">▼ More</button>
+    <button id="mBadgeMore" onclick="(function(b){var x=$('mBadgeExtra');var open=x.classList.toggle('open');var tr=$('mTideRow');if(tr)tr.style.display=open?'flex':'none';b.textContent=open?'▲ Less':'▼ More';})(this)">▼ More</button>
     <span id="mBadgeExtra">
     ${maxGust>0?`<span class="m-badge">Gusts ${maxGust} kn</span>`:''}
     ${domDir!==null?`<span class="m-badge">${isWindDirOK(domDir)?'✓':'✗'} ${compass(domDir)}</span>`:''}
     <span class="m-badge">🌡 avg ${avgTemp}°C</span>
     <span class="m-badge">🌅 ${srTime} · 🌇 ${ssTime}</span>
     ${swellBadge}
+    </span>
+    <div id="mTideRow" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
     ${isPremium()?fmtTideBadges(cachedTideExtremes,dateStr):'<span class="m-badge" style="cursor:pointer;background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.4);color:#f59e0b;" onclick="showUpgradeModal()">🌊 Tide times · <strong>Upgrade to Premium ↗</strong></span>'}
-    </span>`;
+    </div>`;
 
   // timeline
   const maxKn=Math.max(30,...hours.map(h=>h.kn));
