@@ -3865,7 +3865,13 @@ async function syncNotifsFromSupabase(email){
     const age=new Date(ln.createdAt||0).getTime();
     return age>cutoff;
   });
-  const merged=[...synced,...localOnly];
+  // Final dedup before saving — prevents stale localStorage duplicates persisting
+  const _mergedSeen=new Set();
+  const merged=[...synced,...localOnly].filter(n=>{
+    const key=n.type+'|'+n.spotName+'|'+(n.date||'');
+    if(_mergedSeen.has(key)) return false;
+    _mergedSeen.add(key); return true;
+  });
   saveNotifs(merged);
   renderNotifList();
   renderHintChips();
@@ -6412,7 +6418,14 @@ async function renderStats(){
 async function renderNotifList(){
   const signedIn=!!_authSession?.user;
   const allNotifs=signedIn?loadNotifs():[];
-  const visible=allNotifs.filter(n=>n.type==='spot'||(n.type==='day'&&!n.fromSpot));
+  // Deduplicate: keep first occurrence of each spot+type+date combo
+  const _visibleSeen=new Set();
+  const visible=allNotifs.filter(n=>{
+    if(n.type!=='spot'&&!(n.type==='day'&&!n.fromSpot)) return false;
+    const key=n.type+'|'+n.spotName+'|'+(n.date||'');
+    if(_visibleSeen.has(key)) return false;
+    _visibleSeen.add(key); return true;
+  });
   const countEl=$('ppNotifCount');
   if(visible.length>0){countEl.style.display='inline-flex';countEl.textContent=visible.length;}
   else{countEl.style.display='none';}
