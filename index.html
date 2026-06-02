@@ -5865,7 +5865,8 @@ async function uploadAvatar(input){
   const status=$('ppAvatarStatus'); if(status) status.textContent='Uploading…';
   try{
     const ext=file.name.split('.').pop()||'jpg';
-    const path=`${email.replace(/[^a-z0-9]/gi,'_')}/avatar.${ext}`;
+    const uid=_authSession.user.id;
+    const path=`${uid}/avatar.${ext}`;
     const{error:upErr}=await sb.storage.from('avatars').upload(path,file,{upsert:true,contentType:file.type});
     if(upErr) throw upErr;
     const{data:{publicUrl}}=sb.storage.from('avatars').getPublicUrl(path);
