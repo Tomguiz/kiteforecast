@@ -5613,7 +5613,7 @@ async function checkShowMySpotTab(){
   const email=loadProfile().email||_authSession.user.email;
   const{data}=await sb.from('spot_claims').select('id').eq('email',email).limit(1);
   const tab=$('ppTabMySpot');
-  if(tab) tab.style.display=(data&&data.length)||cachedLoc?'inline-flex':'none';
+  if(tab) tab.style.display=(data&&data.length)?'inline-flex':'none';
 }
 
 // ── PREMIUM ──────────────────────────────────────────────────────────────────
@@ -5691,7 +5691,7 @@ async function syncPremiumFromSupabase(email){
   if(p.isAdmin && window._pendingReviewSpot) openAdminReview();
   // Scroll hint: show arrow indicator on tabs if overflow
   const tabsEl=document.querySelector('.pp-tabs');
-  if(tabsEl) tabsEl.classList.add('has-scroll');
+  if(tabsEl) tabsEl.classList.toggle('has-scroll', tabsEl.scrollWidth>tabsEl.clientWidth);
 }
 
 async function startCheckout(){
