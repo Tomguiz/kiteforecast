@@ -537,7 +537,8 @@
       transition:border-color .15s,color .15s; flex-shrink:0;
     }
     .pp-close:hover { border-color:var(--accent); color:var(--accent); }
-    .pp-body { padding:16px 16px 40px; overflow-y:auto; flex:1; display:flex; flex-direction:column; gap:8px; }
+    .pp-body { padding:16px 16px 40px; overflow-y:auto; flex:1; display:block; }
+    .pp-body > * + * { margin-top:8px; }
     .pp-label { font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--gray); }
     .pp-input {
       width:100%; padding:11px 14px; border-radius:10px;
@@ -647,11 +648,10 @@
     .pp-toggle-row { display:flex; align-items:center; justify-content:space-between; padding:4px 0; }
     .pp-toggle-label { font-size:.85rem; color:var(--text); font-weight:600; }
     /* Notification cards */
-    .notif-card { border:1px solid var(--border); border-radius:12px; overflow:hidden; background:var(--surface); }
+    .notif-card { border:1px solid var(--border); border-radius:12px; overflow:hidden; background:var(--surface); flex-shrink:0; }
     .notif-card-header { padding:9px 14px 8px; font-size:.65rem; font-weight:700; letter-spacing:.07em; text-transform:uppercase; color:var(--tdim); border-bottom:1px solid var(--border); }
-    .notif-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:13px 14px; }
+    .notif-row { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:13px 14px; flex-shrink:0; }
     .notif-row + .notif-row { border-top:1px solid var(--border); }
-    .notif-row-border { border-top:1px solid var(--border); }
     .notif-info { flex:1; min-width:0; }
     .notif-title { font-size:.82rem; font-weight:600; color:var(--text); display:flex; align-items:center; flex-wrap:wrap; gap:5px; line-height:1.3; }
     .notif-sub { font-size:.71rem; color:var(--tdim); margin-top:3px; line-height:1.4; }
