@@ -5060,9 +5060,13 @@ function openAttendSheet(dateStr, dayIdx, spotName, lat, lon){
           </select>
         </div>
       </div>
-      <input type="text" id="attendNote" class="pp-input" placeholder="Add a note… (optional)" maxlength="100" value="${existing?.note||''}" style="margin-bottom:16px"/>
+      <input type="text" id="attendNote" class="pp-input" placeholder="Add a note… (optional)" maxlength="100" value="${existing?.note||''}" style="margin-bottom:14px"/>
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;margin-bottom:16px;user-select:none" onclick="toggleAttendNotify(this)">
+        <div id="attendNotifyToggle" class="toggle-btn${loadProfile().friendSessionNotifs===false?'':' on'}" style="flex-shrink:0"></div>
+        <span style="font-size:.82rem;color:#94a3b8">Notify my friends by email</span>
+      </label>
       <button onclick="confirmAttendance('${dateStr}','${spotName}',${lat},${lon})" class="btn pp-save-btn" style="width:100%;font-size:.95rem">
-        ${existing?'Update session':'Confirm — notify my friends'}
+        ${existing?'Update session':'Confirm'}
       </button>
       ${existing?`<button onclick="cancelAttendance('${dateStr}')" style="width:100%;margin-top:8px;background:none;border:none;color:#f87171;font-size:.8rem;cursor:pointer;padding:6px">Cancel my attendance</button>`:''}
     </div>`;
@@ -5072,6 +5076,11 @@ function openAttendSheet(dateStr, dayIdx, spotName, lat, lon){
 
 function closeAttendSheet(){
   const el=$('attendSheet'); if(el) el.remove();
+}
+
+function toggleAttendNotify(label){
+  const tog=$('attendNotifyToggle'); if(!tog) return;
+  tog.classList.toggle('on');
 }
 
 async function confirmAttendance(dateStr, spotName, lat, lon, startTimeOverride){
@@ -5093,15 +5102,18 @@ async function confirmAttendance(dateStr, spotName, lat, lon, startTimeOverride)
   const btn=$(`going-${dateStr}`)||document.getElementById(`going-${dateStr}`);
   if(btn){ btn.classList.add('going'); btn.textContent=`✓ Going · ${startTime}`; }
 
+  const notifyFriends=$('attendNotifyToggle')?.classList.contains('on')??true;
   closeAttendSheet();
   showToast(`✓ Session confirmed · ${startTime} · ${durationH}h`);
 
-  // Notify friends — fire and forget
-  fetch('https://kpwmajtxmcfpakvonimf.supabase.co/functions/v1/session-attend-notify',{
-    method:'POST',
-    headers:{'Content-Type':'application/json','Authorization':'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwd21hanR4bWNmcGFrdm9uaW1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTcyMjYsImV4cCI6MjA5MDczMzIyNn0.QfQuIQbnfVUOApPbOdvCRbNsVdb0SBAwMX-hvioGJmg'},
-    body:JSON.stringify({email,nickname,spot_name:spotName,session_date:dateStr,start_time:startTime,duration_h:durationH,note:note||''}),
-  }).catch(()=>{});
+  // Notify friends — fire and forget (only if toggle is on)
+  if(notifyFriends){
+    fetch('https://kpwmajtxmcfpakvonimf.supabase.co/functions/v1/session-attend-notify',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwd21hanR4bWNmcGFrdm9uaW1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTcyMjYsImV4cCI6MjA5MDczMzIyNn0.QfQuIQbnfVUOApPbOdvCRbNsVdb0SBAwMX-hvioGJmg'},
+      body:JSON.stringify({email,nickname,spot_name:spotName,session_date:dateStr,start_time:startTime,duration_h:durationH,note:note||''}),
+    }).catch(()=>{});
+  }
 }
 
 async function cancelAttendance(dateStr){
