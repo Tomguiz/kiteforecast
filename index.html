@@ -6401,6 +6401,47 @@ let _statsYear='all'; // 'all' or a 4-digit year string
 async function renderStats(){
   const el=$('ppStatsContent');
   if(!_authSession?.user){el.innerHTML='<div class="stats-empty">Sign in to see your session stats</div>';return;}
+  if(!isPremium()){
+    el.innerHTML=`
+    <div style="position:relative;overflow:hidden;border-radius:14px">
+      <!-- Blurred mock -->
+      <div style="filter:blur(5px) brightness(.6);pointer-events:none;user-select:none;padding:4px 0 12px">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+          ${['🪁','💨','⏱️','🔥'].map((e,i)=>{
+            const vals=['12','28 kn','2.4h','3']; const lbls=['Sessions','Best wind','Avg session','Month streak'];
+            return`<div style="background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:12px;padding:14px 12px;text-align:center">
+              <div style="font-size:1.3rem;margin-bottom:6px">${e}</div>
+              <div style="font-size:1.5rem;font-weight:800;color:#f1f5f9">${vals[i]}</div>
+              <div style="font-size:.68rem;color:#64748b;margin-top:3px;text-transform:uppercase;letter-spacing:.05em">${lbls[i]}</div>
+            </div>`;
+          }).join('')}
+        </div>
+        <div style="background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:12px;padding:14px">
+          <div style="font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">🏅 June leaderboard</div>
+          ${[['🥇','Maxou','8'],['🥈','You','6'],['🥉','Kite_Addict','4']].map(([medal,name,n])=>`
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+              <span style="font-size:.9rem">${medal}</span>
+              <div style="flex:1;background:rgba(255,255,255,.06);border-radius:99px;height:8px;overflow:hidden">
+                <div style="height:100%;width:${Math.round(n/8*100)}%;background:${name==='You'?'linear-gradient(90deg,#38bdf8,#0ea5e9)':'#475569'};border-radius:99px"></div>
+              </div>
+              <span style="font-size:.72rem;color:#94a3b8;min-width:20px;text-align:right">${n}</span>
+            </div>`).join('')}
+        </div>
+        <div style="background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:12px;padding:14px;margin-top:10px">
+          <div style="font-size:.7rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">🏆 Best session</div>
+          <div style="font-size:.82rem;color:#94a3b8">📍 Koksijde · Jun 14 · 28 kn · 3h</div>
+        </div>
+      </div>
+      <!-- Overlay CTA -->
+      <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center">
+        <div style="font-size:1.6rem;margin-bottom:10px">📊</div>
+        <div style="font-size:1rem;font-weight:800;color:#f1f5f9;margin-bottom:6px;letter-spacing:-.01em">Your kite story, in numbers</div>
+        <div style="font-size:.78rem;color:#94a3b8;line-height:1.55;margin-bottom:18px">Sessions logged · wind records · streaks<br>and a leaderboard vs your crew</div>
+        <button onclick="showUpgradeModal()" style="background:linear-gradient(135deg,#f59e0b,#d97706);border:none;border-radius:10px;padding:11px 24px;font-size:.85rem;font-weight:800;color:#000;cursor:pointer;letter-spacing:.01em">⚡ Go Premium — unlock stats</button>
+      </div>
+    </div>`;
+    return;
+  }
   el.innerHTML='<div class="stats-empty">Loading…</div>';
   const email=loadProfile().email; if(!email){el.innerHTML='<div class="stats-empty">No email set</div>';return;}
   const sb=getSb(); if(!sb) return;
