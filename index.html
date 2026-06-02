@@ -3220,7 +3220,7 @@ function fmtTideBadges(extremes, dateStr) {
   return filtered.map(t => {
     const icon = t.type === 'high' ? '🌊 ↑' : '🌊 ↓';
     const label = t.type === 'high' ? 'High' : 'Low';
-    const h = t.height != null ? ` ${t.height}m` : '';
+    const h = t.height != null ? ` ${Math.abs(t.height)}m` : '';
     return `<span class="m-badge tide-${t.type}">${icon} ${t.time}${h} ${label}</span>`;
   }).join('');
 }
@@ -3641,7 +3641,11 @@ function openModal(dateStr,dayIdx){
       const confirmBtn=e.target.closest('[data-attend-confirm]');
       if(confirmBtn){ e.stopPropagation(); confirmSessionFromModal(confirmBtn.dataset.attendDate, confirmBtn.dataset.attendConfirm); return; }
       const cancelBtn=e.target.closest('[data-attend-cancel]');
-      if(cancelBtn){ e.stopPropagation(); selectSessionStart(cancelBtn.dataset.attendCancel, cancelBtn.dataset.attendDate, null); return; }
+      if(cancelBtn){ e.stopPropagation();
+        const cd=cancelBtn.dataset.attendDate;
+        if(_attendCache[cd]) cancelAttendance(cd);
+        else selectSessionStart(cancelBtn.dataset.attendCancel, cd, null);
+        return; }
       const cancelAttendBtn=e.target.closest('[data-cancel-attend]');
       if(cancelAttendBtn){ e.stopPropagation(); cancelAttendance(cancelAttendBtn.dataset.cancelAttend); return; }
       const row=e.target.closest('.modal-hour-row');
