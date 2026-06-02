@@ -647,7 +647,7 @@
     .pp-toggle-row { display:flex; align-items:center; justify-content:space-between; padding:4px 0; }
     .pp-toggle-label { font-size:.85rem; color:var(--text); font-weight:600; }
     .pp-toggle {
-      background:var(--border); border:none; cursor:pointer;
+      background:#334155; border:none; cursor:pointer;
       width:44px; height:24px; border-radius:99px; padding:0;
       position:relative; transition:background .2s; flex-shrink:0;
     }
@@ -5665,16 +5665,16 @@ function updatePremiumUI(){
   const digestBadge=$('ppDigestPremiumBadge');
   const digestRow=$('ppDigestRow');
   if(digestToggle){
-    digestToggle.disabled=!premium;
-    digestToggle.style.opacity=premium?'':'0.4';
-    digestToggle.style.cursor=premium?'':'not-allowed';
-    digestToggle.onclick=premium?toggleDigest:()=>showToast('⚡ Premium only — upgrade to unlock the weekly digest', 4000, '#f59e0b');
+    digestToggle.disabled=false;
+    digestToggle.style.opacity='';
+    digestToggle.style.cursor='';
+    digestToggle.onclick=premium?toggleDigest:()=>{ showToast('⚡ Premium only — upgrade to unlock the weekly digest', 4000, '#f59e0b'); openProfilePanel('profile'); };
   }
   if(digestNowBtn){
     digestNowBtn.disabled=!premium;
     digestNowBtn.style.opacity=premium?'':'0.4';
     digestNowBtn.style.cursor=premium?'':'not-allowed';
-    digestNowBtn.onclick=premium?sendDigestNow:()=>showToast('⚡ Premium only — upgrade to unlock the weekly digest', 4000, '#f59e0b');
+    digestNowBtn.onclick=premium?sendDigestNow:()=>{ showToast('⚡ Premium only — upgrade to unlock the weekly digest', 4000, '#f59e0b'); openProfilePanel('profile'); };
   }
   if(digestBadge) digestBadge.style.display='inline-flex';
   const digestCheck=$('ppDigestCheck');
