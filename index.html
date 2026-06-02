@@ -1419,7 +1419,7 @@
         </div>
         <div class="notif-row">
           <div class="notif-info">
-            <div class="notif-title">Send</div>
+            <div class="notif-title">Send <span id="ppNotifyFriendsBadge" class="premium-badge">PREMIUM</span></div>
             <div class="notif-sub">Notify my friends when I confirm a session</div>
           </div>
           <button class="pp-toggle" id="ppNotifyFriendsToggle" onclick="toggleNotifyFriends()"><span></span></button>
@@ -5139,7 +5139,7 @@ async function confirmAttendance(dateStr, spotName, lat, lon, startTimeOverride)
   const btn=$(`going-${dateStr}`)||document.getElementById(`going-${dateStr}`);
   if(btn){ btn.classList.add('going'); btn.textContent=`✓ Going · ${startTime}`; }
 
-  const notifyFriends=loadProfile().notifyFriendsOnConfirm!==false;
+  const notifyFriends=isPremium()&&loadProfile().notifyFriendsOnConfirm!==false;
   closeAttendSheet();
   showToast(`✓ Session confirmed · ${startTime} · ${durationH}h`);
 
@@ -5707,6 +5707,14 @@ function updatePremiumUI(){
   }
   if(digestBadge) digestBadge.style.display='inline-flex';
   if(digestRow) digestRow.title=premium?'':'Upgrade to Premium to unlock';
+  // Gate "Send" notify-friends toggle behind premium
+  const notifyFriendsToggle=$('ppNotifyFriendsToggle');
+  const notifyFriendsBadge=$('ppNotifyFriendsBadge');
+  if(notifyFriendsToggle){
+    notifyFriendsToggle.onclick=premium?toggleNotifyFriends:()=>{ showToast('⚡ Premium only — upgrade to notify friends when you hit the water', 4000, '#f59e0b'); openProfilePanel('profile'); };
+    notifyFriendsToggle.style.opacity=premium?'':'0.4';
+  }
+  if(notifyFriendsBadge) notifyFriendsBadge.style.cssText=premium?'display:inline-flex':'display:inline-flex;background:rgba(100,116,139,.25);background-image:none;color:#94a3b8';
   updateUpgradeModal();
   // Refresh profile button crown
   const btn=$('profileBtn');
@@ -6403,6 +6411,7 @@ async function toggleFriendSessionNotifs(){
   showToast(p.friendSessionNotifs===false ? 'Friends receive alerts: off' : 'Friends receive alerts: on');
 }
 async function toggleNotifyFriends(){
+  if(!isPremium()){ showToast('⚡ Premium only — upgrade to notify friends when you hit the water', 4000, '#f59e0b'); openProfilePanel('profile'); return; }
   const p=loadProfile();
   p.notifyFriendsOnConfirm = p.notifyFriendsOnConfirm===false ? true : false;
   saveProfile(p);
