@@ -3138,13 +3138,10 @@ function shareSpot(){
 const APP_URL='https://tomguiz.github.io/kiteforecast/';
 function shareAppLink(){
   const title='🪁 KiteForecast — Never miss a session again';
-  const text=`🪁 KiteForecast — the kitesurf forecast app I use to plan my sessions.
-
-✅ 10-day hourly wind forecast for any spot
+  const text=`🪁 KiteForecast — Never miss a session again
+✅ 10-day hourly wind forecast on your favorite spots
 🔔 Email alerts 72h, 24h & 1h before your session
-📍 Save your favourite spots, synced across devices
-🏄 See when your crew hits the water
-💸 Free — no app to install, works in your browser
+🏄 See when your crew plans to hit the water
 
 `;
   if(navigator.share){
@@ -3154,7 +3151,7 @@ function shareAppLink(){
   }
 }
 function copyAppLink(){
-  const txt=`🪁 KiteForecast — Never miss a session again\n\n✅ 10-day hourly wind forecast\n🔔 Alerts 72h, 24h & 1h before your session\n📍 Save your spots, synced across devices\n💸 Free — no app to install\n\n${APP_URL}`;
+  const txt=`🪁 KiteForecast — Never miss a session again\n✅ 10-day hourly wind forecast on your favorite spots\n🔔 Email alerts 72h, 24h & 1h before your session\n🏄 See when your crew plans to hit the water\n\n${APP_URL}`;
   navigator.clipboard.writeText(txt).then(()=>showToast('🔗 Link copied!')).catch(()=>showToast(APP_URL));
 }
 let _qrGenerated=false;
