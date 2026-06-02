@@ -5724,7 +5724,7 @@ function updatePremiumUI(){
 
 async function syncPremiumFromSupabase(email){
   const sb=getSb(); if(!sb||!email) return;
-  const{data,error}=await sb.from('profiles').select('is_premium,sms_enabled,phone_number,is_admin,nickname,friend_session_notifs,notify_friends_on_confirm,avatar_url').eq('email',email).single();
+  const{data,error}=await sb.from('profiles').select('is_premium,sms_enabled,phone_number,is_admin,nickname,friend_session_notifs,avatar_url').eq('email',email).single();
   console.log('[syncPremium] email=',email,'data=',data,'error=',error?.message);
   const p=loadProfile();
   if(data){
@@ -6409,9 +6409,8 @@ async function toggleNotifyFriends(){
   p.notifyFriendsOnConfirm = p.notifyFriendsOnConfirm===false ? true : false;
   saveProfile(p);
   $('ppNotifyFriendsToggle').classList.toggle('on', p.notifyFriendsOnConfirm!==false);
-  const sb=getSb(); if(!sb||!p.email) return;
-  await sb.from('profiles').upsert({email:p.email, notify_friends_on_confirm:p.notifyFriendsOnConfirm!==false},{onConflict:'email'});
   showToast(p.notifyFriendsOnConfirm===false ? 'Friends send alerts: off' : 'Friends send alerts: on');
+  // Persisted locally only until notify_friends_on_confirm column is added to profiles table in Supabase
 }
 
 function toggleMasterNotif(){
