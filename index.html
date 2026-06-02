@@ -1378,18 +1378,19 @@
       <div id="ppStatsContent"></div>
     </div>
     <div id="ppPanelNotifs" class="pp-body" style="display:none">
-      <div class="pp-toggle-row">
-        <div>
-          <span class="pp-toggle-label">Enable email reminders</span>
-          <div style="font-size:.72rem;color:var(--tdim);margin-top:2px">72h · 48h · 24h · 6h alerts before each kite session</div>
+      <div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;margin:0 0 8px">
+        <div class="pp-toggle-row" style="padding:14px 14px;margin:0">
+          <div>
+            <div style="font-size:.82rem;font-weight:600;color:var(--text)">📧 Email reminders</div>
+            <div style="font-size:.72rem;color:var(--tdim);margin-top:4px">72h · 48h · 24h · 6h alerts before each kite session</div>
+          </div>
+          <button class="pp-toggle" id="ppMasterToggle" onclick="toggleMasterNotif()"><span></span></button>
         </div>
-        <button class="pp-toggle" id="ppMasterToggle" onclick="toggleMasterNotif()"><span></span></button>
       </div>
-      <div id="ppMasterOffNote" style="display:none;margin:2px 0 4px;padding:8px 12px;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);border-radius:8px;font-size:.75rem;color:#fca5a5;line-height:1.5;">
+      <div id="ppMasterOffNote" style="display:none;margin:0 0 8px;padding:10px 12px;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);border-radius:10px;font-size:.75rem;color:#fca5a5;line-height:1.5;">
         🔕 Email reminders are paused — you won't receive any session alerts until you turn this back on. Friends and digest emails are unaffected.
       </div>
-      <div style="border-top:1px solid var(--border);margin:4px 0"></div>
-      <div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;margin:4px 0">
+      <div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;margin:0 0 8px">
         <div style="padding:10px 14px 8px;font-size:.7rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--tdim);background:rgba(255,255,255,.02)">👥 Friends session alerts</div>
         <div class="pp-toggle-row" style="padding:8px 14px;margin:0;border-top:1px solid var(--border)">
           <div>
@@ -1406,30 +1407,32 @@
           <button class="pp-toggle" id="ppNotifyFriendsToggle" onclick="toggleNotifyFriends()"><span></span></button>
         </div>
       </div>
-      <div style="border-top:1px solid var(--border);margin:4px 0"></div>
-      <div class="pp-toggle-row" style="margin-bottom:0">
-        <div>
-          <div style="font-size:.82rem;font-weight:600;color:var(--text);display:flex;align-items:center;gap:6px">📱 SMS alerts <span class="premium-badge">PREMIUM</span><span id="ppSmsCheck" style="display:none;align-items:center;gap:3px;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.35);color:#4ade80;font-size:.62rem;font-weight:700;border-radius:99px;padding:1px 7px;letter-spacing:.03em">✓ Active</span></div>
-          <div style="font-size:.72rem;color:var(--tdim);margin-top:2px">Text message 1h before your session</div>
+      <div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;margin:8px 0">
+        <div class="pp-toggle-row" style="padding:14px 14px;margin:0">
+          <div>
+            <div style="font-size:.82rem;font-weight:600;color:var(--text);display:flex;align-items:center;gap:6px">📱 SMS alerts <span class="premium-badge">PREMIUM</span><span id="ppSmsCheck" style="display:none;align-items:center;gap:3px;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.35);color:#4ade80;font-size:.62rem;font-weight:700;border-radius:99px;padding:1px 7px;letter-spacing:.03em">✓ Active</span></div>
+            <div style="font-size:.72rem;color:var(--tdim);margin-top:4px">Text message 1h before your session</div>
+          </div>
+          <button class="pp-toggle" id="ppSmsToggle" onclick="toggleSms()"><span></span></button>
         </div>
-        <button class="pp-toggle" id="ppSmsToggle" onclick="toggleSms()"><span></span></button>
+        <div id="ppPhoneSection" style="display:none;padding:0 14px 14px;">
+          <label class="pp-label">Phone number</label>
+          <input type="tel" id="ppPhoneInput" class="pp-input" placeholder="+32478123456" style="margin-bottom:8px"/>
+          <button class="btn pp-save-btn" id="ppPhoneSaveBtn" onclick="savePhone()">Save</button>
+          <p class="pp-note" style="margin-top:8px">International format e.g. +32478123456. Used only for kite alerts.</p>
+        </div>
       </div>
-      <div id="ppPhoneSection" style="display:none;padding:10px 0 4px 0;">
-        <label class="pp-label">Phone number</label>
-        <input type="tel" id="ppPhoneInput" class="pp-input" placeholder="+32478123456" style="margin-bottom:8px"/>
-        <button class="btn pp-save-btn" id="ppPhoneSaveBtn" onclick="savePhone()">Save</button>
-        <p class="pp-note" style="margin-top:8px">International format e.g. +32478123456. Used only for kite alerts.</p>
-      </div>
-      <div style="border-top:1px solid var(--border);margin:8px 0 12px"></div>
-      <div id="ppDigestSection">
-        <div class="pp-toggle-row" id="ppDigestRow">
+      <div id="ppDigestSection" style="border:1px solid var(--border);border-radius:12px;overflow:hidden;margin:8px 0">
+        <div class="pp-toggle-row" id="ppDigestRow" style="padding:14px 14px;margin:0">
           <div>
             <div style="font-size:.82rem;font-weight:600;color:var(--text);display:flex;align-items:center;gap:6px">📬 Weekly digest <span id="ppDigestPremiumBadge" style="display:none" class="premium-badge">PREMIUM</span><span id="ppDigestCheck" style="display:none;align-items:center;gap:3px;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.35);color:#4ade80;font-size:.62rem;font-weight:700;border-radius:99px;padding:1px 7px;letter-spacing:.03em">✓ Active</span></div>
-            <div style="font-size:.72rem;color:var(--tdim);margin-top:2px">Every Monday — your week's kite sessions at a glance</div>
+            <div style="font-size:.72rem;color:var(--tdim);margin-top:4px">Every Monday — your week's kite sessions at a glance</div>
           </div>
           <button class="pp-toggle" id="ppDigestToggle" onclick="toggleDigest()"><span></span></button>
         </div>
-        <button class="btn pp-save-btn" id="ppDigestNowBtn" onclick="sendDigestNow()" style="margin-top:2px">📩 Send me this week's forecast now</button>
+        <div style="padding:0 14px 14px">
+          <button class="btn pp-save-btn" id="ppDigestNowBtn" onclick="sendDigestNow()" style="width:100%">📩 Send me this week's forecast now</button>
+        </div>
       </div>
       <div style="border-top:1px solid var(--border);margin:8px 0 12px"></div>
       <div style="font-size:.7rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--tdim);margin-bottom:8px;">My spot alerts</div>
