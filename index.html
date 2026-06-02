@@ -462,7 +462,7 @@
     .c-dl   { font-size:.76rem; font-weight:600; color:var(--gray); }
     .c-sp   { padding:3px 6px; border-radius:5px; font-size:.6rem; font-weight:700; white-space:nowrap; }
     .c-right { display:contents; } /* desktop: c-dir + c-sp each become grid children */
-    .c-mgust { position:relative; z-index:1; font-size:.60rem; font-weight:700; color:rgba(255,255,255,.42); padding-left:4px; white-space:nowrap; } /* inline gust on all screen sizes */
+    .c-mgust { position:absolute; z-index:2; right:6px; top:50%; transform:translateY(-50%); font-size:.60rem; font-weight:700; color:rgba(255,255,255,.55); white-space:nowrap; pointer-events:none; }
     /* condition badge levels */
     .cond-bad      { background:rgba(239,68,68,.18);  color:#f87171; border:1px solid rgba(239,68,68,.3); }
     .cond-good     { background:rgba(34,197,94,.12);  color:#86efac; border:1px solid rgba(34,197,94,.25); }
@@ -3705,7 +3705,6 @@ function openModal(dateStr,dayIdx){
       <div class="c-wind">
         <div class="c-wind-bar" style="width:${barPct}%;background:${barCol}"></div>
         <div class="c-gust-bar" style="left:${barPct}%;width:${gustExt}%;background:${barCol}"></div>
-        ${showGust?`<span class="c-gust-num" style="left:${gustNumLeft}%">↑${h.gustKn}</span>`:''}
         <span class="c-wind-val" style="color:${barCol}">${h.kn}</span>
         <span class="c-wind-kn">kn</span>
         ${showGust?`<span class="c-mgust">↑${h.gustKn}</span>`:''}
