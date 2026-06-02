@@ -1104,8 +1104,8 @@
         </div>
 
         <div>
-          <label class="pp-label">Your email <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(optional — so we can follow up)</span></label>
-          <input type="email" id="suggestEmail" class="pp-input" placeholder="you@example.com"/>
+          <label class="pp-label">Your email</label>
+          <input type="email" id="suggestEmail" class="pp-input" placeholder="you@example.com" readonly style="opacity:.7;cursor:default;"/>
         </div>
 
         <div>
@@ -4706,7 +4706,7 @@ async function submitSpotSuggestion(){
   const profile = loadProfile();
   const profileEmail = profile.email||_authSession?.user?.email||'';
   const profileName  = profile.nickname||profile.email?.split('@')[0]||'';
-  const contactEmail =($('suggestEmail')?.value||'').trim() || profileEmail;
+  const contactEmail = profileEmail || ($('suggestEmail')?.value||'').trim();
 
   // Validate required fields
   const missing=[];
