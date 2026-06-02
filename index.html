@@ -4819,7 +4819,7 @@ async function submitSpotSuggestion(){
 
 function selectSessionStart(timeStr, dateStr, rowEl){
   if(!_authSession?.user){ showToast('Sign in to confirm attendance'); _signinContext='generic'; openProfilePanel(); return; }
-  if(!isPremium()){ setTimeout(()=>showToast('👑 Session tracking is a Premium feature — upgrade to confirm sessions and notify your friends'), 800); openProfilePanel('profile'); return; }
+  if(!isPremium()){ setTimeout(()=>showToast('⚡ Premium only — upgrade to confirm sessions & notify your friends', 4000, '#f59e0b'), 800); openProfilePanel('profile'); return; }
 
   const attendBar=$('mAttendBar');
   const attendLabel=$('mAttendLabel');
@@ -5015,7 +5015,7 @@ async function loadAttendances(){
 
 function openAttendSheet(dateStr, dayIdx, spotName, lat, lon){
   if(!_authSession?.user){ showToast('Sign in to confirm attendance'); _signinContext='generic'; openProfilePanel(); return; }
-  if(!isPremium()){ showToast('👑 Session tracking is a Premium feature'); openProfilePanel('profile'); return; }
+  if(!isPremium()){ showToast('⚡ Premium only — upgrade to confirm sessions & notify your friends', 4000, '#f59e0b'); openProfilePanel('profile'); return; }
   if($('attendSheet')) return;
 
   const existing=_attendCache[dateStr];
@@ -5641,13 +5641,13 @@ function updatePremiumUI(){
     digestToggle.disabled=!premium;
     digestToggle.style.opacity=premium?'':'0.4';
     digestToggle.style.cursor=premium?'':'not-allowed';
-    digestToggle.onclick=premium?toggleDigest:()=>showToast('👑 Weekly digest is a Premium feature');
+    digestToggle.onclick=premium?toggleDigest:()=>showToast('⚡ Premium only — upgrade to unlock the weekly digest', 4000, '#f59e0b');
   }
   if(digestNowBtn){
     digestNowBtn.disabled=!premium;
     digestNowBtn.style.opacity=premium?'':'0.4';
     digestNowBtn.style.cursor=premium?'':'not-allowed';
-    digestNowBtn.onclick=premium?sendDigestNow:()=>showToast('👑 Weekly digest is a Premium feature');
+    digestNowBtn.onclick=premium?sendDigestNow:()=>showToast('⚡ Premium only — upgrade to unlock the weekly digest', 4000, '#f59e0b');
   }
   if(digestBadge) digestBadge.style.display=premium?'none':'inline-flex';
   if(digestRow) digestRow.title=premium?'':'Upgrade to Premium to unlock';
@@ -5731,7 +5731,7 @@ async function manageSubscription(){
 }
 
 async function toggleSms(){
-  if(!isPremium()){ showToast('SMS alerts are a Premium feature'); return; }
+  if(!isPremium()){ showToast('⚡ Premium only — upgrade to unlock SMS alerts', 4000, '#f59e0b'); return; }
   const p=loadProfile(); p.smsEnabled=!p.smsEnabled; saveProfile(p);
   const sb=getSb();
   if(sb) await sb.from('profiles').upsert({email:p.email,sms_enabled:p.smsEnabled},{onConflict:'email'});
@@ -6305,7 +6305,7 @@ function updateEmailWarning(){
   if(emptyState) emptyState.style.display=loggedIn?'none':'block';
 }
 async function sendDigestNow(){
-  if(!isPremium()){ showToast('👑 Weekly digest is a Premium feature'); return; }
+  if(!isPremium()){ showToast('⚡ Premium only — upgrade to unlock the weekly digest', 4000, '#f59e0b'); return; }
   const btn=$('ppDigestNowBtn'); if(!btn) return;
   btn.disabled=true; btn.textContent='Sending…';
   try{
@@ -6320,7 +6320,7 @@ async function sendDigestNow(){
   setTimeout(()=>{ btn.disabled=false; btn.textContent='📩 Send me this week\'s forecast now'; },4000);
 }
 async function toggleDigest(){
-  if(!isPremium()){ showToast('👑 Weekly digest is a Premium feature'); return; }
+  if(!isPremium()){ showToast('⚡ Premium only — upgrade to unlock the weekly digest', 4000, '#f59e0b'); return; }
   const p=loadProfile();
   p.digestEnabled=!p.digestEnabled;
   saveProfile(p);
@@ -6822,7 +6822,7 @@ function dismissInstallBanner(){
 function showToast(msg, duration=4000, color){
   const t=document.createElement('div');
   t.className='pp-toast'; t.textContent=msg;
-  if(color) t.style.cssText+=`;background:${color};border-color:${color}40`;
+  if(color) t.style.cssText+=`;background:${color};border-color:${color}40;color:#000;font-weight:700;`;
   document.body.appendChild(t);
   setTimeout(()=>{ t.style.transition='opacity .5s'; t.style.opacity='0'; setTimeout(()=>t.remove(),500); }, duration);
 }
