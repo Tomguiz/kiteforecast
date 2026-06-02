@@ -14,6 +14,7 @@
   <meta name="apple-mobile-web-app-title" content="KiteForecast" />
   <meta name="theme-color" content="#0a0f1e" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
   <script>
   // Eagerly init Supabase client so detectSessionInUrl catches #access_token before anything strips the hash
   window._sbEarlyInit=(function(){
@@ -1321,6 +1322,25 @@
               <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.15);border-radius:8px;padding:8px 10px;color:var(--gray);">🎯 Priority support</div>
             </div>
             <button id="ppManageSubBtn" onclick="manageSubscription()" style="width:100%;padding:10px;background:transparent;border:1px solid rgba(245,158,11,.35);border-radius:8px;font-size:.78rem;font-weight:600;color:#f59e0b;cursor:pointer;transition:background .15s;" onmouseover="this.style.background='rgba(245,158,11,.1)'" onmouseout="this.style.background='transparent'">Manage subscription → cancel, change card</button>
+          </div>
+        </div>
+
+        <!-- Share card -->
+        <div style="border-top:1px solid var(--border);margin:8px 0 4px"></div>
+        <div style="padding:14px;background:rgba(56,189,248,.05);border:1px solid rgba(56,189,248,.15);border-radius:12px;">
+          <div style="font-size:.82rem;font-weight:700;color:var(--text);margin-bottom:4px;">🪁 Share KiteForecast</div>
+          <div style="font-size:.72rem;color:var(--tdim);margin-bottom:12px;">Invite your kite crew — free forecasts &amp; wind alerts</div>
+          <div style="display:flex;align-items:center;gap:14px;">
+            <div id="ppShareQR" style="flex-shrink:0;background:#fff;border-radius:8px;padding:6px;width:80px;height:80px;display:flex;align-items:center;justify-content:center;"></div>
+            <div style="flex:1;display:flex;flex-direction:column;gap:8px;">
+              <button onclick="shareAppLink()" style="width:100%;padding:10px;border-radius:9px;background:#38bdf8;border:none;color:#000;font-size:.82rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
+                Share with friends
+              </button>
+              <button onclick="copyAppLink()" style="width:100%;padding:8px;border-radius:9px;background:none;border:1.5px solid var(--border);color:var(--tdim);font-size:.78rem;cursor:pointer;">
+                📋 Copy link
+              </button>
+            </div>
           </div>
         </div>
 
@@ -3113,6 +3133,28 @@ function shareSpot(){
   }
 }
 
+// ── Share app link ──
+const APP_URL='https://tomguiz.github.io/kiteforecast/';
+function shareAppLink(){
+  const text='🪁 KiteForecast — free 10-day kitesurf forecasts & wind alerts for your spots!';
+  if(navigator.share){
+    navigator.share({title:'KiteForecast',text,url:APP_URL}).catch(()=>{});
+  } else {
+    navigator.clipboard.writeText(APP_URL).then(()=>showToast('🔗 Link copied!')).catch(()=>{});
+  }
+}
+function copyAppLink(){
+  navigator.clipboard.writeText(APP_URL).then(()=>showToast('🔗 Link copied!')).catch(()=>showToast(APP_URL));
+}
+let _qrGenerated=false;
+function initShareQR(){
+  if(_qrGenerated) return;
+  const el=$('ppShareQR'); if(!el||typeof QRCode==='undefined') return;
+  el.innerHTML='';
+  new QRCode(el,{text:APP_URL,width:68,height:68,colorDark:'#0a0f1e',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M});
+  _qrGenerated=true;
+}
+
 // ── Share banner: show when ?share=1 and not signed in ──
 function updateShareBanner(){
   const params=new URLSearchParams(location.search);
@@ -4423,6 +4465,7 @@ function openProfilePanel(tab){
     updateAuthUI();
     renderNotifList();
     updateProfileDot();
+    setTimeout(initShareQR, 50);
     // Sync in background on every open so cross-device changes appear immediately
     const email=_authSession?.user?.email||loadProfile().email;
     if(email) syncAllFromSupabase(email).then(()=>{ renderNotifList(); updateProfileDot(); });
