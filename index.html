@@ -4538,7 +4538,7 @@ function switchPpTab(tab){
   if($('ppTabAdmin'))   $('ppTabAdmin').classList.toggle('active',tab==='admin');
   if($('ppTabFriends')) $('ppTabFriends').classList.toggle('active',tab==='friends');
   $('ppPanelProfile').style.display=tab==='profile'?'flex':'none';
-  $('ppPanelNotifs').style.display=tab==='notifs'?'flex':'none';
+  $('ppPanelNotifs').style.display=tab==='notifs'?'block':'none';
   $('ppPanelStats').style.display=tab==='stats'?'flex':'none';
   $('ppPanelMySpot').style.display=tab==='myspot'?'flex':'none';
   if($('ppPanelAdmin'))   $('ppPanelAdmin').style.display=tab==='admin'?'flex':'none';
