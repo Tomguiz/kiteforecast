@@ -4002,12 +4002,24 @@ async function recheckSpotSubscription(){
 }
 
 // ── SCHEDULED REMINDERS (Supabase backend) ──
+// Convert a local datetime string (no tz) from Open-Meteo to UTC ms, using
+// the utc_offset_seconds from the forecast response to avoid browser/locale bugs.
+function localForecastToUtcMs(localStr){
+  const utcOffset=(cachedWx?.utc_offset_seconds??null);
+  // Parse the string as if it were UTC, then subtract the spot's offset
+  // so we get true UTC. e.g. "2026-06-02T17:00" at UTC+2 → 15:00 UTC
+  const naiveMs=new Date(localStr.replace(' ','T')+'Z').getTime();
+  if(utcOffset!==null) return naiveMs-utcOffset*1000;
+  // Fallback: let browser parse as local time (may be wrong cross-device)
+  return new Date(localStr.replace(' ','T')).getTime();
+}
+
 async function scheduleReminders(spot,sessInfo,notifType){
   const p=loadProfile();
   if(!p.email) return;
   const sb=getSb(); if(!sb) return;
   const sessionDate=sessInfo.sessionStart.slice(0,10);
-  const sessionMs=new Date(sessInfo.sessionStart).getTime();
+  const sessionMs=localForecastToUtcMs(sessInfo.sessionStart);
   const now=Date.now();
   const knownSpot=SPOTS.find(s=>s.name===spot.name);
   const spotCity=knownSpot?.loc?knownSpot.loc.split(', ').slice(0,-1).join(', '):'';
@@ -4795,7 +4807,7 @@ async function confirmSessionFromModal(dateStr, startTime){
         const sunrise=daily.sunrise[dayIdx];
         const sunset=daily.sunset[dayIdx];
         const{good,peakKn,domDir,day}=buildDay(dateStr,sunrise,sunset);
-        // Use user's confirmed start time — override the forecast window start
+        // Use user's confirmed start time — local time from Open-Meteo timezone
         const sessionStart=dateStr+'T'+startTime+':00';
         // End time = confirmed start + duration of good window (capped at sunset)
         const goodAfterStart=good.filter(h=>h.tStr>=sessionStart);
@@ -4818,7 +4830,7 @@ async function confirmSessionFromModal(dateStr, startTime){
         // Already has day notif — just update the send_at times to match confirmed start
         const sb=getSb(); const email=_authSession?.user?.email||loadProfile().email;
         if(sb&&email){
-          const sessionMs=new Date(dateStr+'T'+startTime+':00').getTime();
+          const sessionMs=localForecastToUtcMs(dateStr+'T'+startTime+':00');
           const now=Date.now();
           for(const h of [72,48,24,6,1]){
             const send_at=new Date(sessionMs-h*3600*1000).toISOString();
