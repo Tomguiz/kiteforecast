@@ -100,7 +100,6 @@
     @media (max-width:599px) {
       .btn-map { display:none !important; }
       #mapBtnMobileWrap { display:block; }
-      body.spot-loaded #searchBtn { display:none; }
       .btn-map-mobile { display:inline-flex; align-items:center; gap:7px; padding:11px 22px; border-radius:12px; border:1.5px solid var(--border); background:transparent; color:var(--gray); font-weight:600; font-size:.93rem; cursor:pointer; transition:border-color .2s,color .2s; white-space:nowrap; margin:18px auto 0; }
       .btn-map-mobile:hover { border-color:var(--accent); color:var(--accent); }
       /* Sticky compact header when viewing a spot */
@@ -967,7 +966,6 @@
       <input type="text" id="searchInput" placeholder="Spot name, beach or city…" autocomplete="off" />
       <div class="autocomplete" id="acDropdown"></div>
     </div>
-    <button class="btn" id="searchBtn" onclick="doSearch()">Search</button>
     <button class="btn-map" id="mapBtn" onclick="openSpotsMap()" title="Show all kite spots on map"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:5px"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Map</button>
     <button class="btn-reset" id="resetBtn" style="display:none" onclick="resetSearch()">← Back</button>
   </div>
@@ -2528,12 +2526,10 @@ function renderAC(items, query=''){
   if(addEl) addEl.addEventListener('mousedown',e=>{e.preventDefault();closeAC();showAddSpotFromHome(q);});
 }
 function closeAC(){$('acDropdown').innerHTML='';$('acDropdown').classList.remove('open');acActive=-1;}
-// Called from autocomplete dropdown — fills input only, waits for Search
 let acSelectedSpot=null;
 function fillSpotFromAC(spot){
-  $('searchInput').value=spot.name;
-  acSelectedSpot=spot;
   closeAC();
+  pickSpot(spot);
 }
 // Called from chips, favs, recent — always fetches immediately
 function pickSpot(spot){
