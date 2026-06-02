@@ -2310,7 +2310,7 @@ async function fetchChipQualDays(spot){
     const dirs=new Set(userDirs||(spot.dirs&&spot.dirs.length?spot.dirs:[]));
     const isDirOK=d=>{ if(!dirs.size) return true; for(const sd of dirs) if(angleDiff(d,sd)<=22.5) return true; return false; };
     let qualDays=0;
-    let bestDateStr=null, bestPeakKn=0, bestStartHr=null, nextDateStr=null, nextStartHr=null;
+    let bestDateStr=null, bestPeakKn=0, bestStartHr=null, nextDateStr=null, nextStartHr=null, nextPeakKn=0;
     wx.daily.time.forEach((dateStr,i)=>{
       const srH=parseInt(wx.daily.sunrise[i].slice(11,13),10);
       const ssH=parseInt(wx.daily.sunset[i].slice(11,13),10);
@@ -2326,7 +2326,7 @@ async function fetchChipQualDays(spot){
       });
       if(qh>=2){
         qualDays++;
-        if(!nextDateStr){ nextDateStr=dateStr; nextStartHr=firstGoodHr; }
+        if(!nextDateStr){ nextDateStr=dateStr; nextStartHr=firstGoodHr; nextPeakKn=dayPeak; }
         if(dayPeak>bestPeakKn){ bestPeakKn=dayPeak; bestDateStr=dateStr; bestStartHr=firstGoodHr; }
       }
     });
@@ -2352,8 +2352,8 @@ async function fetchChipQualDays(spot){
       const domDir=domDirN?['N','NE','E','SE','S','SW','W','NW'][Math.round((Math.atan2(domDirSum[0],domDirSum[1])*180/Math.PI+360)%360/45)%8]:null;
       days10.push({dateStr,qh,peakKn:dayPeak,startHr:firstGoodHr,dir:domDir});
     });
-    chipBestCache[key]=bestDateStr?{dateStr:bestDateStr,peakKn:bestPeakKn,startHr:bestStartHr,nextDateStr,nextStartHr,spotName:spot.name,spot,days10}:null;
-    if(!bestDateStr) chipBestCache[key]={dateStr:null,peakKn:0,startHr:null,nextDateStr:null,nextStartHr:null,spotName:spot.name,spot,days10};
+    chipBestCache[key]=bestDateStr?{dateStr:bestDateStr,peakKn:bestPeakKn,startHr:bestStartHr,nextDateStr,nextStartHr,nextPeakKn,spotName:spot.name,spot,days10}:null;
+    if(!bestDateStr) chipBestCache[key]={dateStr:null,peakKn:0,startHr:null,nextDateStr:null,nextStartHr:null,nextPeakKn:0,spotName:spot.name,spot,days10};
     return qualDays;
   }catch{ chipFxCache[key]=null; chipBestCache[key]=null; return null; }
 }
@@ -2418,12 +2418,12 @@ function updateBestWindowBar(){
     <span>🏆 Best:</span><span class="bw-spot">${best.spotName}</span><span>·</span><span>${bestLabel}${bestTime?' · '+bestTime:''}</span><span>·</span><span>${best.peakKn}kn</span>
   </div>`;
   const nextPill=nextLabel?`<div class="best-window-bar bw-pill" id="bwNext">
-    <span>⏭ Next:</span><span class="bw-spot">${next.spotName}</span><span>·</span><span>${nextLabel}${nextTime?' · '+nextTime:''}</span>
+    <span>⏭ Next:</span><span class="bw-spot">${next.spotName}</span><span>·</span><span>${nextLabel}${nextTime?' · '+nextTime:''}</span><span>·</span><span>${next.nextPeakKn}kn</span>
   </div>`:'';
 
   bar.innerHTML=`<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;width:100%;padding:2px 0;">${bestPill}${nextPill}</div>`;
-  bar.querySelector('#bwBest').addEventListener('click',()=>pickSpot(best.spot));
-  if(nextLabel) bar.querySelector('#bwNext').addEventListener('click',()=>pickSpot(next.spot));
+  bar.querySelector('#bwBest').addEventListener('click',()=>pickSpotAndOpenDay(best.spot,best.dateStr));
+  if(nextLabel) bar.querySelector('#bwNext').addEventListener('click',()=>pickSpotAndOpenDay(next.spot,next.nextDateStr));
   renderCompareBar();
 }
 
@@ -2543,6 +2543,10 @@ function pickSpot(spot){
   addRecentSpot(spot);
   saveLastSpot(spot);
   fetchForecastFromSpot(spot);
+}
+function pickSpotAndOpenDay(spot,dateStr){
+  window._deepLinkDate=dateStr;
+  pickSpot(spot);
 }
 
 async function fetchForecastFromSpot(spot){
