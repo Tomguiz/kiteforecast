@@ -646,6 +646,15 @@
     /* master toggle */
     .pp-toggle-row { display:flex; align-items:center; justify-content:space-between; padding:4px 0; }
     .pp-toggle-label { font-size:.85rem; color:var(--text); font-weight:600; }
+    /* Notification cards */
+    .notif-card { border:1px solid var(--border); border-radius:14px; overflow:hidden; }
+    .notif-card-header { padding:10px 16px 8px; font-size:.68rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--tdim); background:rgba(255,255,255,.025); border-bottom:1px solid var(--border); }
+    .notif-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px 16px; }
+    .notif-row-border { border-top:1px solid var(--border); }
+    .notif-info { flex:1; min-width:0; }
+    .notif-title { font-size:.84rem; font-weight:600; color:var(--text); display:flex; align-items:center; flex-wrap:wrap; gap:6px; }
+    .notif-sub { font-size:.72rem; color:var(--tdim); margin-top:4px; line-height:1.45; }
+    .notif-active-pill { display:inline-flex; align-items:center; gap:3px; background:rgba(34,197,94,.15); border:1px solid rgba(34,197,94,.3); color:#4ade80; font-size:.62rem; font-weight:700; border-radius:99px; padding:2px 8px; letter-spacing:.03em; }
     .pp-toggle {
       background:#334155; border:none; cursor:pointer;
       width:44px; height:24px; border-radius:99px; padding:0;
@@ -1378,72 +1387,84 @@
       <div id="ppStatsContent"></div>
     </div>
     <div id="ppPanelNotifs" class="pp-body" style="display:none">
-      <div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;margin:0 0 8px">
-        <div class="pp-toggle-row" style="padding:14px 14px;margin:0">
-          <div>
-            <div style="font-size:.82rem;font-weight:600;color:var(--text)">📧 Email reminders</div>
-            <div style="font-size:.72rem;color:var(--tdim);margin-top:4px">72h · 48h · 24h · 6h alerts before each kite session</div>
+
+      <!-- Email reminders -->
+      <div class="notif-card">
+        <div class="notif-row">
+          <div class="notif-info">
+            <div class="notif-title">📧 Email reminders</div>
+            <div class="notif-sub">72h · 48h · 24h · 6h alerts before each kite session</div>
           </div>
           <button class="pp-toggle" id="ppMasterToggle" onclick="toggleMasterNotif()"><span></span></button>
         </div>
       </div>
-      <div id="ppMasterOffNote" style="display:none;margin:0 0 8px;padding:10px 12px;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);border-radius:10px;font-size:.75rem;color:#fca5a5;line-height:1.5;">
-        🔕 Email reminders are paused — you won't receive any session alerts until you turn this back on. Friends and digest emails are unaffected.
+      <div id="ppMasterOffNote" style="display:none;margin:6px 0;padding:10px 14px;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);border-radius:10px;font-size:.75rem;color:#fca5a5;line-height:1.5;">
+        🔕 Reminders paused — friends &amp; digest emails are unaffected.
       </div>
-      <div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;margin:0 0 8px">
-        <div style="padding:10px 14px 8px;font-size:.7rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--tdim);background:rgba(255,255,255,.02)">👥 Friends session alerts</div>
-        <div class="pp-toggle-row" style="padding:8px 14px;margin:0;border-top:1px solid var(--border)">
-          <div>
-            <div style="font-size:.8rem;font-weight:600;color:var(--text)">Receive</div>
-            <div style="font-size:.72rem;color:var(--tdim);margin-top:1px">Email me when a friend confirms they're going kiting</div>
+
+      <!-- Friends session alerts -->
+      <div class="notif-card" style="margin-top:8px">
+        <div class="notif-card-header">👥 Friends session alerts</div>
+        <div class="notif-row notif-row-border">
+          <div class="notif-info">
+            <div class="notif-title">Receive</div>
+            <div class="notif-sub">Email me when a friend confirms they're going kiting</div>
           </div>
           <button class="pp-toggle" id="ppFriendSessionToggle" onclick="toggleFriendSessionNotifs()"><span></span></button>
         </div>
-        <div class="pp-toggle-row" style="padding:8px 14px;margin:0;border-top:1px solid var(--border)">
-          <div>
-            <div style="font-size:.8rem;font-weight:600;color:var(--text)">Send</div>
-            <div style="font-size:.72rem;color:var(--tdim);margin-top:1px">Notify my friends when I confirm a session</div>
+        <div class="notif-row notif-row-border">
+          <div class="notif-info">
+            <div class="notif-title">Send</div>
+            <div class="notif-sub">Notify my friends when I confirm a session</div>
           </div>
           <button class="pp-toggle" id="ppNotifyFriendsToggle" onclick="toggleNotifyFriends()"><span></span></button>
         </div>
       </div>
-      <div style="border:1px solid var(--border);border-radius:12px;overflow:hidden;margin:8px 0">
-        <div class="pp-toggle-row" style="padding:14px 14px;margin:0">
-          <div>
-            <div style="font-size:.82rem;font-weight:600;color:var(--text);display:flex;align-items:center;gap:6px">📱 SMS alerts <span class="premium-badge">PREMIUM</span><span id="ppSmsCheck" style="display:none;align-items:center;gap:3px;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.35);color:#4ade80;font-size:.62rem;font-weight:700;border-radius:99px;padding:1px 7px;letter-spacing:.03em">✓ Active</span></div>
-            <div style="font-size:.72rem;color:var(--tdim);margin-top:4px">Text message 1h before your session</div>
+
+      <!-- SMS alerts -->
+      <div class="notif-card" style="margin-top:8px">
+        <div class="notif-row">
+          <div class="notif-info">
+            <div class="notif-title">📱 SMS alerts <span class="premium-badge">PREMIUM</span><span id="ppSmsCheck" class="notif-active-pill" style="display:none">✓ Active</span></div>
+            <div class="notif-sub">Text message 1h before your session</div>
           </div>
           <button class="pp-toggle" id="ppSmsToggle" onclick="toggleSms()"><span></span></button>
         </div>
-        <div id="ppPhoneSection" style="display:none;padding:0 14px 14px;">
+        <div id="ppPhoneSection" style="display:none;padding:0 16px 16px">
           <label class="pp-label">Phone number</label>
           <input type="tel" id="ppPhoneInput" class="pp-input" placeholder="+32478123456" style="margin-bottom:8px"/>
           <button class="btn pp-save-btn" id="ppPhoneSaveBtn" onclick="savePhone()">Save</button>
-          <p class="pp-note" style="margin-top:8px">International format e.g. +32478123456. Used only for kite alerts.</p>
+          <p class="pp-note" style="margin-top:6px">International format e.g. +32478123456. Used only for kite alerts.</p>
         </div>
       </div>
-      <div id="ppDigestSection" style="border:1px solid var(--border);border-radius:12px;overflow:hidden;margin:8px 0">
-        <div class="pp-toggle-row" id="ppDigestRow" style="padding:14px 14px;margin:0">
-          <div>
-            <div style="font-size:.82rem;font-weight:600;color:var(--text);display:flex;align-items:center;gap:6px">📬 Weekly digest <span id="ppDigestPremiumBadge" style="display:none" class="premium-badge">PREMIUM</span><span id="ppDigestCheck" style="display:none;align-items:center;gap:3px;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.35);color:#4ade80;font-size:.62rem;font-weight:700;border-radius:99px;padding:1px 7px;letter-spacing:.03em">✓ Active</span></div>
-            <div style="font-size:.72rem;color:var(--tdim);margin-top:4px">Every Monday — your week's kite sessions at a glance</div>
+
+      <!-- Weekly digest -->
+      <div id="ppDigestSection" class="notif-card" style="margin-top:8px">
+        <div class="notif-row" id="ppDigestRow">
+          <div class="notif-info">
+            <div class="notif-title">📬 Weekly digest <span id="ppDigestPremiumBadge" style="display:none" class="premium-badge">PREMIUM</span><span id="ppDigestCheck" class="notif-active-pill" style="display:none">✓ Active</span></div>
+            <div class="notif-sub">Every Monday — your week's kite sessions at a glance</div>
           </div>
           <button class="pp-toggle" id="ppDigestToggle" onclick="toggleDigest()"><span></span></button>
         </div>
-        <div style="padding:0 14px 14px">
+        <div style="padding:0 16px 16px">
           <button class="btn pp-save-btn" id="ppDigestNowBtn" onclick="sendDigestNow()" style="width:100%">📩 Send me this week's forecast now</button>
         </div>
       </div>
-      <div style="border-top:1px solid var(--border);margin:8px 0 12px"></div>
-      <div style="font-size:.7rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--tdim);margin-bottom:8px;">My spot alerts</div>
+
+      <!-- My spot alerts -->
+      <div style="margin-top:20px;margin-bottom:8px;font-size:.68rem;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--tdim)">My spot alerts</div>
       <div id="ppNotifList"></div>
-      <div style="margin-top:16px;padding:12px 14px;background:rgba(56,189,248,.06);border:1px solid rgba(56,189,248,.15);border-radius:10px;font-size:.75rem;color:var(--gray);line-height:1.6;">
-        <div style="font-weight:700;color:var(--text);margin-bottom:6px;">📬 How notifications work</div>
-        <div style="margin-bottom:4px;">⏰ You get up to <strong style="color:var(--text);">4 alerts</strong> per session: <strong style="color:var(--text);">72h · 48h · 24h · 6h</strong> before.</div>
-        <div style="margin-bottom:4px;">✅ The <strong style="color:var(--text);">72h alert</strong> is only sent if the forecast looks good.</div>
-        <div style="margin-bottom:4px;">🔄 If the 72h was sent, you'll keep receiving updates — even if the forecast worsens — so you always know the latest.</div>
-        <div>⚡ If a session looks good at the last minute, you'll still get notified.</div>
+
+      <!-- How it works -->
+      <div style="margin-top:16px;padding:14px 16px;background:rgba(56,189,248,.05);border:1px solid rgba(56,189,248,.12);border-radius:12px;font-size:.75rem;color:var(--gray);line-height:1.65;">
+        <div style="font-weight:700;color:var(--text);margin-bottom:8px;">📬 How notifications work</div>
+        <div style="margin-bottom:5px;">⏰ Up to <strong style="color:var(--text);">4 alerts</strong> per session: <strong style="color:var(--text);">72h · 48h · 24h · 6h</strong> before.</div>
+        <div style="margin-bottom:5px;">✅ The <strong style="color:var(--text);">72h alert</strong> is only sent if the forecast looks good.</div>
+        <div style="margin-bottom:5px;">🔄 You'll keep receiving updates even if the forecast worsens.</div>
+        <div>⚡ Last-minute good sessions still trigger an alert.</div>
       </div>
+
     </div>
   </div>
 </div>
