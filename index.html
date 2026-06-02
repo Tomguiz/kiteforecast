@@ -4538,12 +4538,12 @@ function switchPpTab(tab){
   $('ppTabMySpot').classList.toggle('active',tab==='myspot');
   if($('ppTabAdmin'))   $('ppTabAdmin').classList.toggle('active',tab==='admin');
   if($('ppTabFriends')) $('ppTabFriends').classList.toggle('active',tab==='friends');
-  $('ppPanelProfile').style.display=tab==='profile'?'flex':'none';
+  $('ppPanelProfile').style.display=tab==='profile'?'block':'none';
   $('ppPanelNotifs').style.display=tab==='notifs'?'block':'none';
   $('ppPanelStats').style.display=tab==='stats'?'block':'none';
-  $('ppPanelMySpot').style.display=tab==='myspot'?'flex':'none';
-  if($('ppPanelAdmin'))   $('ppPanelAdmin').style.display=tab==='admin'?'flex':'none';
-  if($('ppPanelFriends')) $('ppPanelFriends').style.display=tab==='friends'?'flex':'none';
+  $('ppPanelMySpot').style.display=tab==='myspot'?'block':'none';
+  if($('ppPanelAdmin'))   $('ppPanelAdmin').style.display=tab==='admin'?'block':'none';
+  if($('ppPanelFriends')) $('ppPanelFriends').style.display=tab==='friends'?'block':'none';
   if(tab==='notifs')  renderNotifList();
   if(tab==='stats')   renderStats();
   if(tab==='myspot')  renderMySpot();
