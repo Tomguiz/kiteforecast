@@ -465,6 +465,8 @@
     .c-da   { font-size:.95rem; line-height:1; display:inline-block; }
     .c-dl   { font-size:.76rem; font-weight:600; color:var(--gray); }
     .c-sp   { padding:3px 6px; border-radius:5px; font-size:.6rem; font-weight:700; white-space:nowrap; }
+    .c-right { display:contents; } /* desktop: c-dir + c-sp each become grid children */
+    .c-mgust { display:none; }     /* mobile-only inline gust text */
     /* condition badge levels */
     .cond-bad      { background:rgba(239,68,68,.18);  color:#f87171; border:1px solid rgba(239,68,68,.3); }
     .cond-good     { background:rgba(34,197,94,.12);  color:#86efac; border:1px solid rgba(34,197,94,.25); }
@@ -901,15 +903,13 @@
       /* hide table header — labels unnecessary in card layout */
       .m-thead { display:none; }
 
-      /* each row becomes a 2-line grid */
+      /* single-row grid on mobile */
       .m-row, .m-row.ws {
         display: grid !important;
-        grid-template-columns: 52px 22px auto 1fr auto;
-        grid-template-rows: auto auto;
-        grid-template-areas:
-          "time  wx    temp  wind  dir"
-          "time  wave  .     cond  dir";
-        gap: 2px 6px;
+        grid-template-columns: 50px 20px 36px 1fr auto;
+        grid-template-rows: auto;
+        grid-template-areas: "time wx temp wind right";
+        gap: 0 5px;
         padding: 9px 12px;
         min-height: auto;
         align-items: center;
@@ -917,18 +917,25 @@
       .m-row.kite-on       { padding-left:9px; }
       .m-row.kite-on:hover { background:rgba(34,197,94,.09); }
 
-      .c-time { grid-area:time; font-size:.85rem; line-height:1.3; align-self:center; }
-      .c-wx   { grid-area:wx;   font-size:1.1rem; line-height:1; align-self:center; }
-      .c-temp { grid-area:temp; font-size:.80rem; align-self:end; }
-      .c-wind { grid-area:wind; align-self:center; justify-self:stretch; height:24px; overflow:visible; }
-      .c-wind-val { font-size:.92rem; }
+      .c-time { grid-area:time; font-size:.82rem; line-height:1.2; align-self:center; white-space:nowrap; }
+      .c-wx   { grid-area:wx;   font-size:1.05rem; line-height:1; align-self:center; }
+      .c-temp { grid-area:temp; font-size:.78rem; align-self:center; white-space:nowrap; }
+      /* wind cell: bar + inline gust text */
+      .c-wind { grid-area:wind; align-self:center; justify-self:stretch; height:26px; overflow:visible; }
+      .c-wind-val { font-size:.88rem; }
+      .c-wind-kn  { font-size:.58rem; }
       .c-gust-num { display:none; }
+      /* inline gust shown after wind value */
+      .c-mgust { position:relative; z-index:1; font-size:.60rem; font-weight:700; color:rgba(255,255,255,.45); padding-left:5px; white-space:nowrap; }
+      /* hide wave + desktop gust — removed from flow */
+      .c-wave { display:none !important; }
       .c-gust { display:none; }
-      .c-wave { display:block; grid-area:wave; font-size:.62rem; font-weight:700; color:#60a5fa; align-self:start; white-space:nowrap; }
-      .c-dir  { grid-area:dir;  align-self:center; flex-direction:column; align-items:flex-end; gap:1px; }
-      .c-da   { font-size:1.0rem; }
-      .c-dl   { font-size:.68rem; text-align:right; }
-      .c-sp   { grid-area:cond; align-self:start; font-size:.60rem; padding:2px 5px; white-space:nowrap; }
+      /* right column wrapper: condition badge on top, direction below */
+      .c-right { display:flex !important; grid-area:right; flex-direction:column; align-items:flex-end; justify-content:center; gap:3px; }
+      .c-dir  { display:flex; flex-direction:column; align-items:flex-end; gap:0; }
+      .c-da   { font-size:.95rem; line-height:1; }
+      .c-dl   { font-size:.63rem; text-align:right; }
+      .c-sp   { font-size:.58rem; padding:2px 5px; white-space:nowrap; }
     }
   </style>
 </head>
@@ -3593,13 +3600,16 @@ function openModal(dateStr,dayIdx){
         ${showGust?`<span class="c-gust-num" style="left:${gustNumLeft}%">↑${h.gustKn}</span>`:''}
         <span class="c-wind-val" style="color:${barCol}">${h.kn}</span>
         <span class="c-wind-kn">kn</span>
+        ${showGust?`<span class="c-mgust">↑${h.gustKn}</span>`:''}
       </div>
       <div class="c-wave">🌊 ${waveTxt}</div>
-      <div class="c-dir">
-        <span class="c-da" style="transform:rotate(${(h.dir+180)%360}deg)">↑</span>
-        <span class="c-dl">${compass(h.dir)}<span style="font-size:.65rem;color:var(--tdim);font-weight:400"> ${h.dir}°</span></span>
+      <div class="c-right">
+        <div class="c-dir">
+          <span class="c-da" style="transform:rotate(${(h.dir+180)%360}deg)">↑</span>
+          <span class="c-dl">${compass(h.dir)}<span style="font-size:.65rem;color:var(--tdim);font-weight:400"> ${h.dir}°</span></span>
+        </div>
+        ${lastCol}
       </div>
-      ${lastCol}
     </div>
     ${isSelected?`<div id="inlineAttendBar-${timeStr}" style="margin:0 0 2px;padding:10px 14px;background:rgba(34,197,94,.1);border-left:3px solid #4ade80;border-radius:0 0 8px 8px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
       <div style="font-size:.82rem;color:#f1f5f9;font-weight:600">🏄 Starting at <strong style="color:#4ade80">${timeStr}</strong></div>
