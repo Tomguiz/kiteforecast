@@ -1265,6 +1265,23 @@
         </div>
         <p class="pp-note" style="margin:0">Notifications &amp; favourites stay in sync across all your devices.</p>
         <div style="border-top:1px solid var(--border);margin:4px 0"></div>
+
+        <!-- Profile picture -->
+        <div style="display:flex;align-items:center;gap:14px;padding:4px 0 8px">
+          <div style="position:relative;flex-shrink:0">
+            <div id="ppAvatarPreview" style="width:64px;height:64px;border-radius:50%;background:rgba(56,189,248,.15);border:2px solid rgba(56,189,248,.3);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:1.5rem;cursor:pointer;" onclick="$('ppAvatarInput').click()" title="Change photo">
+              <span id="ppAvatarInitials" style="font-weight:700;color:#38bdf8"></span>
+            </div>
+            <button onclick="$('ppAvatarInput').click()" style="position:absolute;bottom:-2px;right:-2px;width:22px;height:22px;border-radius:50%;background:#38bdf8;border:2px solid var(--surface);color:#000;font-size:.7rem;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0" title="Upload photo">✎</button>
+          </div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:.78rem;font-weight:600;color:var(--text);margin-bottom:4px">Profile photo</div>
+            <button onclick="$('ppAvatarInput').click()" style="background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.25);border-radius:8px;color:#38bdf8;font-size:.72rem;font-weight:600;padding:5px 12px;cursor:pointer">Upload photo</button>
+            <span id="ppAvatarStatus" style="font-size:.7rem;color:var(--tdim);margin-left:8px"></span>
+          </div>
+        </div>
+        <input type="file" id="ppAvatarInput" accept="image/*" style="display:none" onchange="uploadAvatar(this)"/>
+        <div style="border-top:1px solid var(--border);margin:4px 0"></div>
         <label class="pp-label">Nickname <span style="color:#f87171;font-weight:400;text-transform:none;letter-spacing:0">* required</span></label>
         <input type="text" id="ppNicknameInput" class="pp-input" placeholder="e.g. TomKite" maxlength="32" oninput="onNicknameInput()" />
         <button class="btn pp-save-btn" id="ppNicknameSaveBtn" onclick="saveNickname(false)" style="margin-top:2px">Save</button>
@@ -5605,7 +5622,7 @@ function updatePremiumUI(){
 
 async function syncPremiumFromSupabase(email){
   const sb=getSb(); if(!sb||!email) return;
-  const{data,error}=await sb.from('profiles').select('is_premium,sms_enabled,phone_number,is_admin,nickname,friend_session_notifs').eq('email',email).single();
+  const{data,error}=await sb.from('profiles').select('is_premium,sms_enabled,phone_number,is_admin,nickname,friend_session_notifs,avatar_url').eq('email',email).single();
   if(error) console.warn('syncPremium error:',error.message);
   const p=loadProfile();
   if(data){
@@ -5614,6 +5631,7 @@ async function syncPremiumFromSupabase(email){
     p.phoneNumber=data.phone_number||'';
     p.isAdmin=!!data.is_admin;
     if(data.nickname) p.nickname=data.nickname;
+    if(data.avatar_url) p.avatar_url=data.avatar_url;
     if(data.friend_session_notifs!==null&&data.friend_session_notifs!==undefined)
       p.friendSessionNotifs=data.friend_session_notifs!==false;
     saveProfile(p);
@@ -5836,6 +5854,45 @@ async function checkNicknameRequired(){
     if(mi && firstWord && !mi.value) mi.value=firstWord;
   }, 150);
 }
+async function uploadAvatar(input){
+  const file=input.files?.[0]; if(!file) return;
+  if(file.size>3*1024*1024){ showToast('Image must be under 3 MB'); return; }
+  const sb=getSb(); const email=_authSession?.user?.email; if(!sb||!email) return;
+  const status=$('ppAvatarStatus'); if(status) status.textContent='Uploading…';
+  try{
+    const ext=file.name.split('.').pop()||'jpg';
+    const path=`${email.replace(/[^a-z0-9]/gi,'_')}/avatar.${ext}`;
+    const{error:upErr}=await sb.storage.from('avatars').upload(path,file,{upsert:true,contentType:file.type});
+    if(upErr) throw upErr;
+    const{data:{publicUrl}}=sb.storage.from('avatars').getPublicUrl(path);
+    // Cache-bust so the browser reloads the new image
+    const url=publicUrl+'?t='+Date.now();
+    await sb.from('profiles').upsert({email,avatar_url:url},{onConflict:'email'});
+    // Update local profile
+    const p=loadProfile(); p.avatar_url=url; saveProfile(p);
+    if(status) status.textContent='Saved ✓';
+    setTimeout(()=>{ if(status) status.textContent=''; },3000);
+    // Re-render avatar preview and profile button
+    _setAvatarPreview(url);
+    updateProfileUI();
+  } catch(e){
+    console.error('Avatar upload failed',e);
+    if(status) status.textContent='Upload failed';
+    showToast('Upload failed — try again');
+  }
+  input.value='';
+}
+
+function _setAvatarPreview(url){
+  const preview=$('ppAvatarPreview'); if(!preview) return;
+  if(url){
+    preview.innerHTML=`<img src="${url}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" onerror="this.parentNode.innerHTML='<span id=ppAvatarInitials style=font-weight:700;color:#38bdf8>'+getInitials(_authSession?.user?.email||'')+'</span>'">`;
+  } else {
+    const initials=getInitials(_authSession?.user?.email||'');
+    preview.innerHTML=`<span id="ppAvatarInitials" style="font-weight:700;color:#38bdf8">${initials}</span>`;
+  }
+}
+
 async function saveNickname(fromModal){
   const inputId = fromModal ? 'modalNicknameInput' : 'ppNicknameInput';
   const btnId   = fromModal ? 'modalNicknameSaveBtn' : 'ppNicknameSaveBtn';
@@ -6143,14 +6200,18 @@ function updateAuthUI(){
     const digestEl=$('ppDigestToggle'); if(digestEl) digestEl.classList.toggle('on',!!p.digestEnabled);
     // Show premium crown in the signed-in card
     const signedInCard=$('ppSignedInCard');
-    const avatarUrl=_authSession.user.user_metadata?.avatar_url||_authSession.user.user_metadata?.picture||'';
-    const displayName=_authSession.user.user_metadata?.full_name||_authSession.user.user_metadata?.name||'';
+    // Profile avatar: prefer user-uploaded, fall back to OAuth provider avatar
+    const avatarUrl=p.avatar_url||_authSession.user.user_metadata?.avatar_url||_authSession.user.user_metadata?.picture||'';
+    const displayName=p.nickname||_authSession.user.user_metadata?.full_name||_authSession.user.user_metadata?.name||'';
     const avatarHtml=avatarUrl
       ?`<img src="${avatarUrl}" alt="" style="width:40px;height:40px;border-radius:50%;object-fit:cover;flex-shrink:0;border:2px solid rgba(255,255,255,.15);" onerror="this.style.display='none'">`
       :`<span style="font-size:1.3rem;line-height:1;flex-shrink:0">${isPremium()?'👑':'✅'}</span>`;
     if(signedInCard) signedInCard.innerHTML=isPremium()
       ?`${avatarHtml}<div style="flex:1;min-width:0">${displayName?`<p style="margin:0 0 1px;font-size:.85rem;font-weight:700;color:#f59e0b;">${displayName} 👑</p>`:'<p style="margin:0 0 1px;font-size:.85rem;font-weight:700;color:#f59e0b;">Premium</p>'}<p id="ppLoggedEmail" style="margin:0;font-size:.78rem;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_authSession.user.email}</p></div>`
       :`${avatarHtml}<div style="flex:1;min-width:0">${displayName?`<p style="margin:0 0 1px;font-size:.85rem;font-weight:700;color:#f1f5f9;">${displayName}</p>`:'<p style="margin:0 0 1px;font-size:.85rem;font-weight:700;color:#f1f5f9;">Signed in</p>'}<p id="ppLoggedEmail" style="margin:0;font-size:.78rem;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_authSession.user.email}</p></div>`;
+    // Populate avatar upload preview widget
+    _setAvatarPreview(avatarUrl);
+    const initEl=$('ppAvatarInitials'); if(initEl&&!avatarUrl) initEl.textContent=getInitials(_authSession.user.email);
   }
   // Hide tabs for unauthenticated users
   const tabs=document.querySelector('.pp-tabs');
@@ -6158,7 +6219,7 @@ function updateAuthUI(){
   // Update profile button
   const btn=$('profileBtn');
   if(loggedIn){
-    const avatarUrl=_authSession.user.user_metadata?.avatar_url||_authSession.user.user_metadata?.picture||'';
+    const avatarUrl=loadProfile().avatar_url||_authSession.user.user_metadata?.avatar_url||_authSession.user.user_metadata?.picture||'';
     const initials=getInitials(_authSession.user.email);
     btn.classList.add('logged-in');
     const crownBadge=isPremium()?`<span style="position:absolute;top:-8px;left:-8px;font-size:20px;line-height:1;filter:drop-shadow(0 1px 3px rgba(0,0,0,.6));">👑</span>`:'';
