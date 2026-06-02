@@ -5872,7 +5872,7 @@ async function uploadAvatar(input){
     if(status) status.textContent='Saved ✓';
     setTimeout(()=>{ if(status) status.textContent=''; },3000);
     _setAvatarPreview(dataUrl);
-    updateProfileUI();
+    updateAuthUI();
   } catch(e){
     const msg=e?.message||e?.error_description||JSON.stringify(e)||'unknown';
     console.error('Avatar upload failed',e);
