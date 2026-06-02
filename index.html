@@ -6500,13 +6500,21 @@ async function renderStats(){
 async function renderNotifList(){
   const signedIn=!!_authSession?.user;
   const allNotifs=signedIn?loadNotifs():[];
-  // Deduplicate: keep first occurrence of each spot+type+date combo
-  const _visibleSeen=new Set();
+  // Deduplicate: one card per spot (for spot-type), one per spot+date (for day-type)
+  const _visibleSpots=new Set();
+  const _visibleDays=new Set();
   const visible=allNotifs.filter(n=>{
-    if(n.type!=='spot'&&!(n.type==='day'&&!n.fromSpot)) return false;
-    const key=n.type+'|'+n.spotName+'|'+(n.date||'');
-    if(_visibleSeen.has(key)) return false;
-    _visibleSeen.add(key); return true;
+    if(n.type==='spot'){
+      const k=(n.spotName||'').trim().toLowerCase();
+      if(_visibleSpots.has(k)) return false;
+      _visibleSpots.add(k); return true;
+    }
+    if(n.type==='day'&&!n.fromSpot){
+      const k=(n.spotName||'').trim().toLowerCase()+'|'+(n.date||'');
+      if(_visibleDays.has(k)) return false;
+      _visibleDays.add(k); return true;
+    }
+    return false;
   });
   const countEl=$('ppNotifCount');
   if(visible.length>0){countEl.style.display='inline-flex';countEl.textContent=visible.length;}
