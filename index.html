@@ -3989,7 +3989,7 @@ async function syncNotifsFromSupabase(email){
   renderNotifList();
   renderHintChips();
   updateProfileDot();
-  if(synced.length) showToast(`✓ ${synced.length} notification${synced.length>1?'s':''} synced`);
+  // Sync is silent — no toast
   } finally { _syncNotifsInFlight=false; }
 }
 
