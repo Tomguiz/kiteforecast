@@ -6042,6 +6042,7 @@ async function initAuth(){
     if(event==='SIGNED_IN'||event==='TOKEN_REFRESHED'||event==='INITIAL_SESSION'){
       if(session){
         _authSession=session;
+        const _prevEmail=loadProfile().email; // capture before overwriting
         const p=loadProfile(); p.email=session.user.email; saveProfile(p);
         updateAuthUI(); updateProfileDot(); renderHintChips();
         // Sync favs + notifs on session restore
@@ -6062,11 +6063,11 @@ async function initAuth(){
 
     if(event==='SIGNED_IN'&&session?.user?.email){
       const email=session.user.email;
-      const p=loadProfile();
-      const isNew=email!==p.email;
+      const isNew=email!==_prevEmail;
       if(isNew){
-        // Clear stale avatar from previous account before rendering
+        // Clear stale profile (avatar, nickname) from previous account before rendering
         const fresh={}; fresh.email=email; saveProfile(fresh);
+        updateAuthUI(); // re-render immediately with blank state before Supabase loads
         await syncAllFromSupabase(email);
         renderHintChips();
         renderNotifList();
