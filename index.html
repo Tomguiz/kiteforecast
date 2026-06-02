@@ -1413,7 +1413,7 @@
       <div id="ppDigestSection">
         <div class="pp-toggle-row" id="ppDigestRow">
           <div>
-            <div style="font-size:.82rem;font-weight:600;color:var(--text)">📬 Weekly digest <span id="ppDigestPremiumBadge" style="display:none" class="premium-badge">PREMIUM</span></div>
+            <div style="font-size:.82rem;font-weight:600;color:var(--text);display:flex;align-items:center;gap:6px">📬 Weekly digest <span id="ppDigestPremiumBadge" style="display:none" class="premium-badge">PREMIUM</span><span id="ppDigestCheck" style="display:none;background:#22c55e;color:#fff;font-size:.65rem;font-weight:800;border-radius:50%;width:16px;height:16px;line-height:16px;text-align:center;flex-shrink:0">✓</span></div>
             <div style="font-size:.72rem;color:var(--tdim);margin-top:2px">Every Monday — your week's kite sessions at a glance</div>
           </div>
           <button class="pp-toggle" id="ppDigestToggle" onclick="toggleDigest()"><span></span></button>
@@ -5668,7 +5668,9 @@ function updatePremiumUI(){
     digestNowBtn.style.cursor=premium?'':'not-allowed';
     digestNowBtn.onclick=premium?sendDigestNow:()=>showToast('⚡ Premium only — upgrade to unlock the weekly digest', 4000, '#f59e0b');
   }
-  if(digestBadge) digestBadge.style.display=premium?'none':'inline-flex';
+  if(digestBadge) digestBadge.style.display='inline-flex';
+  const digestCheck=$('ppDigestCheck');
+  if(digestCheck) digestCheck.style.display=(premium&&loadProfile().digestEnabled)?'inline-flex':'none';
   if(digestRow) digestRow.title=premium?'':'Upgrade to Premium to unlock';
   updateUpgradeModal();
   // Refresh profile button crown
@@ -6346,6 +6348,8 @@ async function toggleDigest(){
   p.digestEnabled=!p.digestEnabled;
   saveProfile(p);
   $('ppDigestToggle').classList.toggle('on',!!p.digestEnabled);
+  const digestCheck=$('ppDigestCheck');
+  if(digestCheck) digestCheck.style.display=p.digestEnabled?'inline-flex':'none';
   const sb=getSb(); if(!sb||!p.email) return;
   await sb.from('profiles').upsert({email:p.email,digest_enabled:!!p.digestEnabled},{onConflict:'email'});
 }
