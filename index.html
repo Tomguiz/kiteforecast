@@ -5724,7 +5724,7 @@ function updatePremiumUI(){
 async function syncPremiumFromSupabase(email){
   const sb=getSb(); if(!sb||!email) return;
   const{data,error}=await sb.from('profiles').select('is_premium,sms_enabled,phone_number,is_admin,nickname,friend_session_notifs,notify_friends_on_confirm,avatar_url').eq('email',email).single();
-  if(error) console.warn('syncPremium error:',error.message);
+  console.log('[syncPremium] email=',email,'data=',data,'error=',error?.message);
   const p=loadProfile();
   if(data){
     p.isPremium=!!data.is_premium;
