@@ -6,7 +6,7 @@
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
-  <title>KiteForecast — 10-Day Kitesurf Conditions</title>
+  <title>KiteForecast — Never miss a session again</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="apple-touch-icon" href="logo.png" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -3137,11 +3137,10 @@ function shareSpot(){
 // ── Share app link ──
 const APP_URL='https://tomguiz.github.io/kiteforecast/';
 function shareAppLink(){
-  const title='🪁 KiteForecast — Never miss a session again';
-  const text=`🪁 KiteForecast — Never miss a session again
-✅ 10-day hourly wind forecast on your favorite spots
+  const title='KiteForecast — Never miss a session again';
+  const text=`✅ 10-day hourly wind forecast for your favorite spots
 🔔 Email alerts 72h, 24h & 1h before your session
-🏄 See when your crew plans to hit the water
+🏄 Know when your crew plans to hit the water
 
 `;
   if(navigator.share){
@@ -3151,7 +3150,7 @@ function shareAppLink(){
   }
 }
 function copyAppLink(){
-  const txt=`🪁 KiteForecast — Never miss a session again\n✅ 10-day hourly wind forecast on your favorite spots\n🔔 Email alerts 72h, 24h & 1h before your session\n🏄 See when your crew plans to hit the water\n\n${APP_URL}`;
+  const txt=`✅ 10-day hourly wind forecast for your favorite spots\n🔔 Email alerts 72h, 24h & 1h before your session\n🏄 Know when your crew plans to hit the water\n\n${APP_URL}`;
   navigator.clipboard.writeText(txt).then(()=>showToast('🔗 Link copied!')).catch(()=>showToast(APP_URL));
 }
 let _qrGenerated=false;

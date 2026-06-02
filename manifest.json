@@ -1,7 +1,7 @@
 {
   "name": "KiteForecast",
   "short_name": "KiteForecast",
-  "description": "10-day kitesurf session forecast & alerts",
+  "description": "Never miss a session again — 10-day kitesurf forecast & wind alerts",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#0a0f1e",
