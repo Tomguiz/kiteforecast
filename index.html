@@ -2893,7 +2893,7 @@ function showAddSpotFromHome(prefill=''){
     if($('suggestEmail')) $('suggestEmail').value=pe;
   }
   showOnly('errorState');
-  sw?.scrollIntoView({behavior:'smooth',block:'start'});
+  window.scrollTo({top:0,behavior:'smooth'});
 }
 function logoEasterEgg(){
   showToast(_kiteFacts[_kiteFactIdx % _kiteFacts.length], 7000);
