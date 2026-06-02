@@ -3873,9 +3873,13 @@ async function syncNotifsFromSupabase(email){
   }
   // Supabase is source of truth. Keep local-only entries created in the last 60s
   // (race-condition safety: user just set a notif that hasn't reached Supabase yet).
+  // Any spot that Supabase knows about is fully replaced — drop ALL local entries for it.
+  const syncedSpots=new Set(synced.map(n=>n.spotName));
   const local=loadNotifs();
   const cutoff=Date.now()-60000;
   const localOnly=local.filter(ln=>{
+    // If Supabase returned any entry for this spot, discard local entirely
+    if(syncedSpots.has(ln.spotName)) return false;
     const alreadySynced=synced.some(sn=>sn.spotName===ln.spotName&&sn.type===ln.type&&(sn.date||null)===(ln.date||null));
     if(alreadySynced) return false;
     // Keep if created within the last 60s (not yet in Supabase)
