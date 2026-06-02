@@ -1399,7 +1399,7 @@
       <div style="border-top:1px solid var(--border);margin:4px 0"></div>
       <div class="pp-toggle-row" style="margin-bottom:0">
         <div>
-          <div style="font-size:.82rem;font-weight:600;color:var(--text)">📱 SMS alerts <span class="premium-badge">PREMIUM</span></div>
+          <div style="font-size:.82rem;font-weight:600;color:var(--text);display:flex;align-items:center;gap:6px">📱 SMS alerts <span class="premium-badge">PREMIUM</span><span id="ppSmsCheck" style="display:none;align-items:center;gap:3px;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.35);color:#4ade80;font-size:.62rem;font-weight:700;border-radius:99px;padding:1px 7px;letter-spacing:.03em">✓ Active</span></div>
           <div style="font-size:.72rem;color:var(--tdim);margin-top:2px">Text message 1h before your session</div>
         </div>
         <button class="pp-toggle" id="ppSmsToggle" onclick="toggleSms()"><span></span></button>
@@ -1414,7 +1414,7 @@
       <div id="ppDigestSection">
         <div class="pp-toggle-row" id="ppDigestRow">
           <div>
-            <div style="font-size:.82rem;font-weight:600;color:var(--text);display:flex;align-items:center;gap:6px">📬 Weekly digest <span id="ppDigestPremiumBadge" style="display:none" class="premium-badge">PREMIUM</span><span id="ppDigestCheck" style="display:none;background:#22c55e;color:#fff;font-size:.65rem;font-weight:800;border-radius:50%;width:16px;height:16px;line-height:16px;text-align:center;flex-shrink:0">✓</span></div>
+            <div style="font-size:.82rem;font-weight:600;color:var(--text);display:flex;align-items:center;gap:6px">📬 Weekly digest <span id="ppDigestPremiumBadge" style="display:none" class="premium-badge">PREMIUM</span><span id="ppDigestCheck" style="display:none;align-items:center;gap:3px;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.35);color:#4ade80;font-size:.62rem;font-weight:700;border-radius:99px;padding:1px 7px;letter-spacing:.03em">✓ Active</span></div>
             <div style="font-size:.72rem;color:var(--tdim);margin-top:2px">Every Monday — your week's kite sessions at a glance</div>
           </div>
           <button class="pp-toggle" id="ppDigestToggle" onclick="toggleDigest()"><span></span></button>
@@ -5653,6 +5653,7 @@ function updatePremiumUI(){
     const phoneSection=$('ppPhoneSection');
     if(phoneSection) phoneSection.style.display=p.smsEnabled?'block':'none';
     const phoneInput=$('ppPhoneInput'); if(phoneInput) phoneInput.value=p.phoneNumber||'';
+    const smsCheck=$('ppSmsCheck'); if(smsCheck) smsCheck.style.display=p.smsEnabled?'inline-flex':'none';
   }
   // Gate weekly digest — visible but locked for non-premium
   const digestToggle=$('ppDigestToggle');
@@ -5762,6 +5763,7 @@ async function toggleSms(){
   const phoneSection=$('ppPhoneSection');
   if(phoneSection) phoneSection.style.display=p.smsEnabled?'block':'none';
   $('ppSmsToggle').classList.toggle('on',!!p.smsEnabled);
+  const smsCheck=$('ppSmsCheck'); if(smsCheck) smsCheck.style.display=p.smsEnabled?'inline-flex':'none';
 }
 
 async function savePhone(){
