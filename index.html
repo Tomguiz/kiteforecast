@@ -6631,8 +6631,8 @@ async function renderNotifList(){
           <div class="pp-notif-spot">🔔 ${n.spotName}</div>
           <div class="pp-notif-day" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${upcomingDates}</div>
         </div>
-        <span class="pp-notif-chevron" style="font-size:.7rem;color:var(--tdim);flex-shrink:0;transition:transform .2s;">▼</span>
-        <button class="pp-notif-del" onclick="event.stopPropagation();deleteNotifById('${n.id}')">🗑</button>
+        <span class="pp-notif-chevron" style="font-size:.7rem;color:var(--tdim);flex-shrink:0;transition:transform .2s;margin-right:12px;">▼</span>
+        <button class="pp-notif-del" onclick="event.stopPropagation();confirmDeleteNotif(this,'${n.id}')">🗑</button>
       </div>
       <div class="pp-notif-body" style="display:none;padding:0 12px 10px;border-top:1px solid var(--border);">
         ${dayFilterHTML}
@@ -6640,6 +6640,23 @@ async function renderNotifList(){
       </div>
     </div>`;
   }).join('');
+}
+function confirmDeleteNotif(btn,id){
+  if(btn.dataset.confirming){
+    deleteNotifById(id);
+  } else {
+    btn.dataset.confirming='1';
+    btn.textContent='Delete?';
+    btn.style.cssText+='border-color:#ef4444;color:#f87171;background:rgba(239,68,68,.12);';
+    // Auto-reset after 3s if user doesn't confirm
+    setTimeout(()=>{
+      if(btn.dataset.confirming){
+        delete btn.dataset.confirming;
+        btn.textContent='🗑';
+        btn.style.borderColor=''; btn.style.color=''; btn.style.background='';
+      }
+    },3000);
+  }
 }
 function deleteNotifById(id){
   const notifs=loadNotifs();
