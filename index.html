@@ -268,21 +268,15 @@
     .hints p { font-size:.88rem; line-height:1.6; }
     .hints .examples { display:flex; flex-wrap:wrap; justify-content:center; gap:7px; margin-top:14px; }
     /* 3-step instruction cards */
-    .hint-steps { display:flex; gap:10px; justify-content:center; margin-bottom:18px; flex-wrap:wrap; }
+    .hint-steps { display:flex; flex-direction:column; align-items:stretch; gap:8px; justify-content:center; margin-bottom:18px; max-width:420px; margin-left:auto; margin-right:auto; }
     .hint-step {
-      background:var(--card); border:1px solid var(--border); border-radius:12px;
-      padding:12px 16px; display:flex; flex-direction:column; align-items:center; gap:4px;
-      flex:1; min-width:130px; max-width:200px; text-align:center;
+      display:flex; flex-direction:row; align-items:flex-start; gap:12px;
+      text-align:left; min-width:0;
     }
-    .hint-step-icon { font-size:1.5rem; line-height:1; margin-bottom:2px; }
-    .hint-step strong { font-size:.8rem; color:var(--text); display:block; }
-    .hint-step span { font-size:.71rem; color:var(--tdim); line-height:1.4; }
-    @media (max-width:480px){
-      .hint-steps { flex-direction:column; align-items:stretch; }
-      .hint-step { flex-direction:row; text-align:left; min-width:0; max-width:none; gap:10px; align-items:flex-start; }
-      .hint-step-icon { font-size:1.3rem; flex-shrink:0; margin-top:2px; margin-bottom:0; }
-      .hint-step > div { flex:1; }
-    }
+    .hint-step-icon { font-size:1.4rem; line-height:1; flex-shrink:0; margin-top:2px; }
+    .hint-step strong { font-size:.82rem; color:var(--text); display:block; margin-bottom:2px; }
+    .hint-step span { font-size:.72rem; color:var(--tdim); line-height:1.4; }
+    .hint-step > div { flex:1; }
     /* best window bar */
     .best-window-bar {
       display:flex; align-items:center; gap:6px; justify-content:center;
@@ -983,20 +977,27 @@
   <!-- hint state -->
   <div class="hints" id="hintState">
     <div class="hint-steps" id="hintSteps">
-      <div class="hint-step">
-        <span class="hint-step-icon">📍</span>
-        <strong>Find your spot</strong>
-        <span>Search any beach or city</span>
+      <div style="font-size:1.05rem;font-weight:700;color:var(--text);margin-bottom:14px;letter-spacing:-.01em;">Get started in 3 steps</div>
+      <div class="hint-step" onclick="$('searchInput').focus()" style="cursor:pointer;border:1.5px solid rgba(56,189,248,.25);background:rgba(56,189,248,.06);border-radius:12px;padding:10px 14px;transition:border-color .2s;" onmouseover="this.style.borderColor='rgba(56,189,248,.55)'" onmouseout="this.style.borderColor='rgba(56,189,248,.25)'">
+        <span class="hint-step-icon">🔍</span>
+        <div>
+          <strong>Search for your kite spot</strong>
+          <span>Type a beach, city or spot name above</span>
+        </div>
       </div>
-      <div class="hint-step">
-        <span class="hint-step-icon">📊</span>
-        <strong>Check the wind</strong>
-        <span>10-day detailed forecast</span>
+      <div class="hint-step" style="border:1.5px solid rgba(251,191,36,.2);background:rgba(251,191,36,.04);border-radius:12px;padding:10px 14px;">
+        <span class="hint-step-icon">⭐</span>
+        <div>
+          <strong>Star it as a favourite</strong>
+          <span>Sign in free — we'll track it for you across devices</span>
+        </div>
       </div>
-      <div class="hint-step">
+      <div class="hint-step" style="border:1.5px solid rgba(74,222,128,.15);background:rgba(74,222,128,.04);border-radius:12px;padding:10px 14px;">
         <span class="hint-step-icon">🔔</span>
-        <strong>Get notified</strong>
-        <span>72h, 48h, 24h and 1h before</span>
+        <div>
+          <strong>Get wind alerts</strong>
+          <span>Email reminders 72h, 24h &amp; 1h before your session</span>
+        </div>
       </div>
     </div>
     <div id="bestWindowBar" style="display:none"></div>
