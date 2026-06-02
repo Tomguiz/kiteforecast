@@ -5881,9 +5881,10 @@ async function uploadAvatar(input){
     _setAvatarPreview(url);
     updateProfileUI();
   } catch(e){
+    const msg=e?.message||e?.error_description||JSON.stringify(e)||'unknown';
     console.error('Avatar upload failed',e);
     if(status) status.textContent='Upload failed';
-    showToast('Upload failed — try again');
+    showToast('Upload failed: '+msg.slice(0,80));
   }
   input.value='';
 }
