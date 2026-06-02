@@ -691,8 +691,9 @@
     .pp-notif-pill { display:inline-block; padding:1px 6px; border-radius:4px; font-size:.65rem; font-weight:700; background:rgba(56,189,248,.12); color:#38bdf8; border:1px solid rgba(56,189,248,.2); }
     .pp-notif-pill.sent { background:rgba(100,116,139,.1); color:var(--tdim); border-color:rgba(100,116,139,.2); text-decoration:line-through; }
     /* ── Premium ── */
-    .premium-badge { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:99px; background:linear-gradient(135deg,#f59e0b,#d97706); color:#000; font-size:.65rem; font-weight:800; letter-spacing:.05em; vertical-align:middle; margin-left:6px; position:relative; }
+    .premium-badge { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:99px; background:linear-gradient(135deg,#f59e0b,#d97706); color:#000; font-size:.65rem; font-weight:800; letter-spacing:.05em; vertical-align:middle; margin-left:6px; position:relative; cursor:pointer; }
     .premium-badge::before { content:'👑'; font-size:.55rem; position:absolute; top:-7px; right:-4px; line-height:1; }
+    .premium-badge.no-crown::before { display:none; }
     .premium-card { background:linear-gradient(135deg,rgba(245,158,11,.1),rgba(217,119,6,.06)); border:1px solid rgba(245,158,11,.3); border-radius:12px; padding:16px; }
     .btn-premium { display:block; width:100%; padding:13px; background:linear-gradient(135deg,#f59e0b,#d97706); color:#000; border:none; border-radius:9px; font-size:.88rem; font-weight:800; cursor:pointer; text-align:center; letter-spacing:.03em; transition:opacity .15s; margin-top:10px; }
     .btn-premium:hover { opacity:.9; }
@@ -4555,9 +4556,12 @@ function switchPpTab(tab){
 }
 function onEmailEdit(){}
 function showUpgradeModal(){
-  const m=$('upgradeModal'); if(!m) return;
-  m.style.display='block';
-  m.scrollIntoView({behavior:'smooth',block:'center'});
+  openProfilePanel('profile');
+  setTimeout(()=>{
+    const m=$('ppPremiumUpgrade'); if(!m) return;
+    m.style.display='block';
+    m.scrollIntoView({behavior:'smooth',block:'start'});
+  }, 120);
 }
 let _upgradeModalDismissed=false;
 function updateUpgradeModal(){
@@ -5681,6 +5685,11 @@ function updatePremiumUI(){
   const premium=isPremium();
   const upgradeEl=$('ppPremiumUpgrade'); if(upgradeEl) upgradeEl.style.display=premium?'none':'block';
   const activeEl=$('ppPremiumActive');   if(activeEl)  activeEl.style.display=premium?'block':'none';
+  // Make all premium badges clickable → open upgrade CTA for non-premium
+  document.querySelectorAll('.premium-badge').forEach(b=>{
+    b.onclick=premium?null:()=>showUpgradeModal();
+    b.title=premium?'':'Upgrade to Premium';
+  });
   if(premium){
     const p=loadProfile();
     const smsEl=$('ppSmsToggle'); if(smsEl) smsEl.classList.toggle('on',!!p.smsEnabled);
@@ -5714,7 +5723,10 @@ function updatePremiumUI(){
     notifyFriendsToggle.onclick=premium?toggleNotifyFriends:()=>{ showToast('⚡ Premium only — upgrade to notify friends when you hit the water', 4000, '#f59e0b'); openProfilePanel('profile'); };
     notifyFriendsToggle.style.opacity=premium?'':'0.4';
   }
-  if(notifyFriendsBadge) notifyFriendsBadge.style.cssText=premium?'display:inline-flex':'display:inline-flex;background:rgba(100,116,139,.25);background-image:none;color:#94a3b8';
+  if(notifyFriendsBadge){
+    notifyFriendsBadge.style.cssText=premium?'display:inline-flex':'display:inline-flex;background:rgba(100,116,139,.25);background-image:none;color:#94a3b8';
+    notifyFriendsBadge.classList.toggle('no-crown',!premium);
+  }
   updateUpgradeModal();
   // Refresh profile button crown
   const btn=$('profileBtn');
