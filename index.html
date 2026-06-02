@@ -452,8 +452,8 @@
     .c-wind { position:relative; display:flex; align-items:center; height:26px; border-radius:4px; overflow:hidden; background:rgba(255,255,255,.03); }
     .c-wind-bar  { position:absolute; left:0; top:0; bottom:0; border-radius:4px; opacity:.35; }
     .c-gust-bar  { position:absolute; top:0; bottom:0; border-radius:0 4px 4px 0; opacity:.14; }
-    .c-wind-val  { position:relative; z-index:1; font-size:.88rem; font-weight:800; white-space:nowrap; padding-left:7px; }
-    .c-wind-kn   { position:relative; z-index:1; font-size:.62rem; color:rgba(255,255,255,.45); margin-left:2px; }
+    .c-wind-val  { position:absolute; z-index:2; font-size:.84rem; font-weight:800; white-space:nowrap; transform:translateX(-100%); padding-right:6px; top:50%; transform:translate(-100%,-50%); display:flex; align-items:baseline; gap:2px; }
+    .c-wind-kn   { font-size:.56rem; color:rgba(255,255,255,.55); font-weight:600; }
     .c-gust-num  { display:none; } /* replaced by inline c-mgust */
     .c-gust { font-size:.74rem; color:#94a3b8; font-weight:600; white-space:nowrap; }
     .c-wave { font-size:.76rem; font-weight:600; color:#60a5fa; white-space:nowrap; text-align:right; }
@@ -3705,8 +3705,7 @@ function openModal(dateStr,dayIdx){
       <div class="c-wind">
         <div class="c-wind-bar" style="width:${barPct}%;background:${barCol}"></div>
         <div class="c-gust-bar" style="left:${barPct}%;width:${gustExt}%;background:${barCol}"></div>
-        <span class="c-wind-val" style="color:${barCol}">${h.kn}</span>
-        <span class="c-wind-kn">kn</span>
+        <span class="c-wind-val" style="left:${barPct}%;color:${barCol}">${h.kn}<span class="c-wind-kn">kn</span></span>
         ${showGust?`<span class="c-mgust">↑${h.gustKn}</span>`:''}
       </div>
       <div class="c-wave">🌊 ${waveTxt}</div>
