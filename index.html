@@ -5860,25 +5860,18 @@ async function checkNicknameRequired(){
 }
 async function uploadAvatar(input){
   const file=input.files?.[0]; if(!file) return;
-  if(file.size>3*1024*1024){ showToast('Image must be under 3 MB'); return; }
+  if(file.size>2*1024*1024){ showToast('Image must be under 2 MB'); return; }
   const sb=getSb(); const email=_authSession?.user?.email; if(!sb||!email) return;
-  const status=$('ppAvatarStatus'); if(status) status.textContent='Uploading…';
+  const status=$('ppAvatarStatus'); if(status) status.textContent='Processing…';
   try{
-    const ext=file.name.split('.').pop()||'jpg';
-    const uid=_authSession.user.id;
-    const path=`${uid}/avatar.${ext}`;
-    const{error:upErr}=await sb.storage.from('avatars').upload(path,file,{upsert:true,contentType:file.type});
-    if(upErr) throw upErr;
-    const{data:{publicUrl}}=sb.storage.from('avatars').getPublicUrl(path);
-    // Cache-bust so the browser reloads the new image
-    const url=publicUrl+'?t='+Date.now();
-    await sb.from('profiles').upsert({email,avatar_url:url},{onConflict:'email'});
-    // Update local profile
-    const p=loadProfile(); p.avatar_url=url; saveProfile(p);
+    // Resize + compress to JPEG via canvas, then store as data URL in profiles table
+    const dataUrl=await _resizeImageToDataUrl(file,256,256);
+    const{error:dbErr}=await sb.from('profiles').upsert({email,avatar_url:dataUrl},{onConflict:'email'});
+    if(dbErr) throw dbErr;
+    const p=loadProfile(); p.avatar_url=dataUrl; saveProfile(p);
     if(status) status.textContent='Saved ✓';
     setTimeout(()=>{ if(status) status.textContent=''; },3000);
-    // Re-render avatar preview and profile button
-    _setAvatarPreview(url);
+    _setAvatarPreview(dataUrl);
     updateProfileUI();
   } catch(e){
     const msg=e?.message||e?.error_description||JSON.stringify(e)||'unknown';
@@ -5887,6 +5880,28 @@ async function uploadAvatar(input){
     showToast('Upload failed: '+msg.slice(0,80));
   }
   input.value='';
+}
+
+function _resizeImageToDataUrl(file,maxW,maxH){
+  return new Promise((resolve,reject)=>{
+    const img=new Image();
+    const url=URL.createObjectURL(file);
+    img.onload=()=>{
+      URL.revokeObjectURL(url);
+      let w=img.width,h=img.height;
+      if(w>maxW||h>maxH){
+        const ratio=Math.min(maxW/w,maxH/h);
+        w=Math.round(w*ratio); h=Math.round(h*ratio);
+      }
+      const canvas=document.createElement('canvas');
+      canvas.width=w; canvas.height=h;
+      const ctx=canvas.getContext('2d');
+      ctx.drawImage(img,0,0,w,h);
+      resolve(canvas.toDataURL('image/jpeg',0.82));
+    };
+    img.onerror=reject;
+    img.src=url;
+  });
 }
 
 function _setAvatarPreview(url){
