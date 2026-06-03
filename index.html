@@ -2556,10 +2556,13 @@ function renderAC(items, query=''){
   const spotRows=items.map((s,i)=>
     `<div class="ac-item" data-i="${i}"><strong>${s.alias||s.name}</strong><span>${s.alias?s.name+' · ':''  }${s.loc}</span></div>`
   ).join('');
-  const addHint=q.length>=2
+  // Show pending spots that match the query
+  const pendingMatches=q.length>=2?getPendingSpots().filter(p=>p.nameLower.includes(q.toLowerCase())):[];
+  const pendingRows=pendingMatches.map(p=>`<div class="ac-item" style="border-top:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:8px;opacity:.75;cursor:default"><span style="font-size:.85rem">⏳</span><span style="flex:1"><span style="font-weight:600;font-size:.82rem;color:#fbbf24">${p.name}</span><span style="display:block;font-size:.72rem;color:var(--tdim);margin-top:1px">Requested — under review by the team</span></span></div>`).join('');
+  const addHint=q.length>=2&&!pendingMatches.some(p=>p.nameLower===q.toLowerCase())
     ? `<div class="ac-item ac-item-add" style="border-top:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:8px;color:var(--accent);opacity:.8"><span style="font-size:1rem;line-height:1">＋</span><span style="flex:1"><span style="font-weight:600;font-size:.82rem">Add "${q}" as a new spot</span><span style="display:block;font-size:.72rem;color:var(--tdim);margin-top:1px">Not listed? Request it — we'll review and add it</span></span></div>`
     : '';
-  dd.innerHTML=spotRows+addHint;
+  dd.innerHTML=spotRows+pendingRows+addHint;
   dd.classList.add('open');
   acActive=-1;
   dd.querySelectorAll('.ac-item:not(.ac-item-add)').forEach((el,i)=>{
@@ -4748,10 +4751,13 @@ function showSpotPendingMsg(spotName){
   nameEl.textContent=spotName;
 }
 
+function getPendingSpots(){
+  try{ return JSON.parse(localStorage.getItem('kf_pendingSpots')||'[]'); }catch(e){ return []; }
+}
 function checkSpotPending(query){
   try{
-    const pending=JSON.parse(sessionStorage.getItem('pendingSpots')||'[]');
-    if(pending.includes(query.toLowerCase())){
+    const pending=getPendingSpots();
+    if(pending.some(p=>p.nameLower===query.toLowerCase())){
       showSpotPendingMsg(query);
       return true;
     }
@@ -4860,8 +4866,8 @@ async function submitSpotSuggestion(){
     body: JSON.stringify({ name, location, lat, lon, dirs, business, website, webcam, note, contact_email: contactEmail, contact_name: profileName||'—' }),
   }).catch(()=>{});
 
-  // Remember submitted spot name so we can show "pending review" on next search
-  try{ const pending=JSON.parse(sessionStorage.getItem('pendingSpots')||'[]'); pending.push(name.toLowerCase()); sessionStorage.setItem('pendingSpots',JSON.stringify([...new Set(pending)])); }catch(e){}
+  // Remember submitted spot name persistently so "pending review" shows on future visits
+  try{ const pending=JSON.parse(localStorage.getItem('kf_pendingSpots')||'[]'); pending.push({name,nameLower:name.toLowerCase()}); localStorage.setItem('kf_pendingSpots',JSON.stringify([...new Map(pending.map(p=>[p.nameLower,p])).values()])); }catch(e){}
 
   showToast('🙌 Spot request sent! We\'ll review and add it soon.');
   btn.disabled=false; btn.textContent='Send spot request →';
@@ -5416,7 +5422,7 @@ async function renderAdminPanel(){
           ${s.note?`<div style="font-size:.72rem;color:var(--tdim);margin-top:3px">${s.note}</div>`:''}
           <div style="font-size:.7rem;color:var(--tdim);margin-top:3px">By: ${s.submitted_by||'anonymous'} · ${new Date(s.created_at).toLocaleDateString()}</div>
         </div>
-        <button class="btn pp-save-btn" style="font-size:.72rem;padding:6px 12px;white-space:nowrap" onclick="adminApproveRequest('${s.id}','${s.suggested_name.replace(/'/g,"\\'")}','${s.location||''}','${s.country||''}','${s.lat||''}','${s.lon||''}')">Approve →</button>
+        <button class="btn pp-save-btn" style="font-size:.72rem;padding:6px 12px;white-space:nowrap" onclick="adminApproveRequest('${s.id}',${JSON.stringify(s)})">Review &amp; add →</button>
       </div>
     </div>`).join('');
 
@@ -5440,38 +5446,35 @@ async function renderAdminPanel(){
     <div id="adminEditForm" style="display:none;margin-top:16px"></div>`;
 }
 
-async function adminApproveRequest(suggId, name, location, country, lat, lon){
-  // Mark suggestion reviewed
+async function adminApproveRequest(suggId, sugg){
   const sb=getSb(); if(!sb) return;
-  sb.from('spot_suggestions').update({reviewed:true}).eq('id',suggId).then(()=>{}).catch(()=>{});
-  // Open new-spot form pre-filled
-  _adminSpots = _adminSpots||[];
+  // Parse note field: "Dirs: SW, W | Business: X | Website: Y | Webcam: Z | ..."
+  const note = sugg.note||'';
+  const parseNote = (key) => { const m=note.match(new RegExp(key+':\\s*([^|]+)')); return m?m[1].trim():''; };
+  const dirs     = parseNote('Dirs');
+  const business = parseNote('Business');
+  const website  = parseNote('Website');
+  const webcam   = parseNote('Webcam');
+  const freeNote = note.replace(/Dirs:[^|]+\|?/g,'').replace(/Business:[^|]+\|?/g,'').replace(/Website:[^|]+\|?/g,'').replace(/Webcam:[^|]+\|?/g,'').replace(/\|/g,'').trim();
+
   const prefilledSpot = {
     _isPreview: true,
-    spot_name: name,
-    display_name: name,
-    business_name: '',
-    website: '',
-    description: '',
-    contact_name: '',
-    phone: '',
-    phone_public: false,
-    email: '',
-    email_public: false,
-    address: location||'',
-    livecam_url: '',
-    lesson_url: '',
-    gear_url: '',
-    instagram_url: '',
-    facebook_url: '',
-    membership_note: '',
+    spot_name: sugg.suggested_name||'',
+    display_name: sugg.suggested_name||'',
+    business_name: business,
+    website: website,
+    livecam_url: webcam,
+    description: freeNote,
+    address: sugg.location||'',
     verified: false,
-    _lat: lat,
-    _lon: lon,
-    _loc: location,
-    _country: country,
+    _lat: sugg.lat||'',
+    _lon: sugg.lon||'',
+    _loc: sugg.location||'',
+    _country: sugg.country||'',
+    _dirs: dirs,
+    _suggId: suggId,
+    _submittedBy: sugg.submitted_by||'',
   };
-  window._adminPrefilledNew = prefilledSpot;
   adminOpenSpot(null, prefilledSpot);
 }
 
@@ -5481,10 +5484,13 @@ async function adminOpenSpot(spotName, prefill){
   el.style.display='block';
   el.scrollIntoView({behavior:'smooth',block:'start'});
   el.dataset.origSpotName=spotName||'';
+  el.dataset.suggId=s?._suggId||'';
 
   const isNew = !spotName;
+  const suggBanner=s?._suggId?`<div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:10px 14px;font-size:.78rem;color:#fbbf24;margin-bottom:14px">📥 Spot request from <strong>${s._submittedBy||'a user'}</strong> — review, adjust if needed, then save.</div>`:'';
   el.innerHTML=`
     <div style="background:rgba(0,212,255,.05);border:1px solid rgba(0,212,255,.2);border-radius:12px;padding:16px;">
+      ${suggBanner}
       <div style="font-size:.85rem;font-weight:700;color:var(--accent);margin-bottom:14px">${isNew?'➕ Add new spot':'✏️ Edit: '+s.spot_name}</div>
 
       <label class="pp-label">Spot name <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">${isNew?'(unique key — shown in search)':'(rename via button →)'}</span></label>
@@ -5553,6 +5559,9 @@ async function adminOpenSpot(spotName, prefill){
 
       <label class="pp-label">Description</label>
       <textarea id="adDesc" class="pp-input" rows="3" placeholder="Describe the spot…" style="margin-bottom:10px;resize:vertical;min-height:72px;font-family:inherit;font-size:.85rem">${s?.description||''}</textarea>
+
+      <label class="pp-label">Wind directions <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(comma-separated, e.g. SW, W, NW)</span></label>
+      <input type="text" id="adDirs" class="pp-input" value="${s?._dirs||s?.dirs?.join(', ')||''}" placeholder="SW, W, NW" style="margin-bottom:10px"/>
 
       <label class="pp-label">Membership / access note</label>
       <input type="text" id="adMembershipNote" class="pp-input" value="${s?.membership_note||''}" placeholder="e.g. Day pass €15 incl. insurance" style="margin-bottom:10px"/>
@@ -5655,6 +5664,17 @@ async function adminSaveSpotInfo(){
     const si=SPOTS.findIndex(x=>x.name===spotName);
     if(si>=0){SPOTS[si].loc=finalLoc;}
     else{SPOTS.push({name:spotName,loc:finalLoc,lat:finalLat,lon:finalLon,dirs:[]});}
+  }
+
+  // Mark suggestion as reviewed if this save came from approving a request
+  const suggId=$('adminEditForm').dataset.suggId;
+  if(suggId) sb.from('spot_suggestions').update({reviewed:true}).eq('id',suggId).catch(()=>{});
+
+  // Save wind dirs to spot_overrides
+  const dirsRaw=($('adDirs')?.value||'').trim();
+  const dirsArr=dirsRaw?dirsRaw.split(/[\s,]+/).map(d=>d.trim().toUpperCase()).filter(Boolean):[];
+  if(finalLat&&finalLon&&dirsArr.length){
+    sb.from('spot_overrides').upsert({name:spotName,dirs:dirsArr},{onConflict:'name'}).catch(()=>{});
   }
 
   showToast(isRename?`✓ Renamed to "${spotName}"`:isNew?'✓ New spot added — visible to all users on next load!':'✓ Spot info saved!');

@@ -55,6 +55,7 @@ Deno.serve(async (req) => {
     submitted_at:      new Date().toLocaleString('en', { dateStyle: 'full', timeStyle: 'short' }),
     maps_link:         lat && lon ? `https://maps.google.com/?q=${lat},${lon}` : '—',
     review_link,
+    review_instruction: 'Click the link below — you will be auto-logged in and the form will be pre-filled with all details. Review, adjust if needed, then click Save.',
   }
 
   await fetch(MAKE_WEBHOOK_URL, {
