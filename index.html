@@ -393,6 +393,7 @@
       cursor:pointer; white-space:nowrap;
       position:absolute; top:10px; right:12px;
     }
+    #mTideRow { display:flex; }
     .m-badge.accent    { color:var(--accent); border-color:rgba(0,212,255,.28); background:rgba(0,212,255,.05); }
     .m-badge.green     { color:#4ade80; border-color:rgba(34,197,94,.28); background:rgba(34,197,94,.05); }
     .m-badge.tide-high { color:#38bdf8; border-color:rgba(56,189,248,.28); background:rgba(56,189,248,.06); }
@@ -3636,7 +3637,7 @@ function openModal(dateStr,dayIdx){
     <span class="m-badge">🌅 ${srTime} · 🌇 ${ssTime}</span>
     ${swellBadge}
     </span>
-    <div id="mTideRow" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+    <div id="mTideRow" style="flex-wrap:wrap;gap:6px;margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
     ${isPremium()?fmtTideBadges(cachedTideExtremes,dateStr):'<span class="m-badge" style="cursor:pointer;background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.4);color:#f59e0b;" onclick="showUpgradeModal()">🌊 Tide times · <strong>Upgrade to Premium ↗</strong></span>'}
     </div>`;
 
