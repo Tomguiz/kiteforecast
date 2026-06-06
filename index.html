@@ -943,6 +943,9 @@
       box-shadow:0 8px 32px rgba(0,0,0,.7);
     }
 
+    /* strip is mobile-only */
+    @media (min-width:600px) { #tenDayStrip { display:none !important; } }
+
     /* wind dirs mobile toggle row (hidden on desktop) */
     #windDirsMobileToggle { display:none; }
     @media (max-width:599px) {
@@ -3010,6 +3013,8 @@ function pickFav(f){
 function removeFav(f){
   const favs=loadFavs().filter(x=>!(x.name===f.name&&x.lat===f.lat));
   saveFavs(favs);
+  // also remove any spot-level notifications for this spot
+  saveNotifs(loadNotifs().filter(n=>!(n.type==='spot'&&n.spotName===f.name)));
   const email=_authSession?.user?.email;
   if(email) pushFavToSupabase(email,f,true);
   _compareOpen=false;
