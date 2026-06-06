@@ -193,9 +193,11 @@
     }
     .tds-col:hover { background:rgba(255,255,255,.06); }
     .tds-col.tds-now { background:rgba(0,212,255,.07); }
-    .tds-bar-wrap { width:100%; height:90px; display:flex; align-items:flex-end; }
-    .tds-bar { width:78%; margin:0 auto; border-radius:4px 4px 0 0; min-height:3px; transition:opacity .15s; }
+    .tds-bar-wrap { width:100%; height:90px; position:relative; }
+    .tds-bar { position:absolute; bottom:0; left:10%; width:80%; border-radius:4px 4px 0 0; min-height:3px; transition:opacity .15s; }
+    .tds-gust-bar { border-radius:0; } /* gust sits on top of sustained bar */
     .tds-col:hover .tds-bar { opacity:.75; }
+    .tds-kn-lbl { position:absolute; bottom:2px; left:0; right:0; text-align:center; font-size:.58rem; font-weight:800; color:rgba(255,255,255,.85); line-height:1; pointer-events:none; z-index:1; }
     .tds-lbl { font-size:.6rem; font-weight:700; color:var(--tdim); white-space:nowrap; text-transform:uppercase; line-height:1.2; }
     .tds-num { font-size:.68rem; font-weight:800; color:var(--text); line-height:1; }
     .tds-col.tds-now .tds-lbl { color:var(--accent); }
@@ -3709,16 +3711,26 @@ function renderGrid(){
       const {goodHours:gh,peakKn}=buildDay(dateStr,daily.sunrise[i],daily.sunset[i]);
       const hasSession=gh>=2;
       const kn=hasSession?peakKn:0;
-      // scale: 15kn = floor (tiny stub), 45kn = full height; below 15 = no bar
+      const gustKn=toKnotsR(daily.windgusts_10m_max[i])||0;
+      // scale: 15kn = floor, 45kn = full height; below 15 = no bar
       const clampedKn=Math.min(kn,MAX_KN);
+      const clampedGust=Math.min(gustKn,MAX_KN);
       const pct=hasSession&&kn>=MIN_KN?Math.max(4,Math.round((clampedKn-MIN_KN)/RANGE*100)):0;
+      const gustPct=hasSession&&gustKn>kn&&gustKn>=MIN_KN?Math.round((clampedGust-MIN_KN)/RANGE*100):0;
+      const gustExt=Math.max(0,gustPct-pct);
       const col=kn>MAX_KN?'#ef4444':hasSession?windBarColor(kn):'transparent';
+      const gustCol=col==='transparent'?'transparent':'rgba(255,255,255,.15)';
+      const knLabel=hasSession&&kn>0?`<div class="tds-kn-lbl">${kn}</div>`:'';
       const isNow=dateStr===localStr;
       const {short}=fmtDate(dateStr);
       const lbl=isNow?'Now':(short==='Today'||short==='Tomorrow')?new Date(dateStr+'T12:00:00').toLocaleDateString('en',{weekday:'short'}):short;
       const dayNum=dateStr.slice(8).replace(/^0/,'');
-      return `<div class="tds-col${isNow?' tds-now':''}" onclick="openModal('${dateStr}',${i})" title="${kn?kn+'kn · ':''} ${gh}h qualifying">
-        <div class="tds-bar-wrap"><div class="tds-bar" style="height:${pct}%;background:${col}"></div></div>
+      return `<div class="tds-col${isNow?' tds-now':''}" onclick="openModal('${dateStr}',${i})" title="${kn?kn+'kn':''} ${gustKn?'↑'+gustKn+'kn gust':''} · ${gh}h qualifying">
+        <div class="tds-bar-wrap">
+          ${knLabel}
+          <div class="tds-bar" style="height:${pct}%;background:${col}"></div>
+          ${gustExt>0?`<div class="tds-bar tds-gust-bar" style="height:${gustExt}%;bottom:${pct}%;background:${gustCol}"></div>`:''}
+        </div>
         <div class="tds-num">${dayNum}</div>
         <div class="tds-lbl">${lbl}</div>
       </div>`;
