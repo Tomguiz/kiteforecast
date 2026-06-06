@@ -3690,17 +3690,20 @@ function renderGrid(){
   // ── summary strip ──
   const strip=$('tenDayStrip');
   if(strip){
-    const MIN_KN=15, MAX_KN=45;
-    const RANGE=MAX_KN-MIN_KN; // 30kn usable range
+    const MIN_KN=10, MAX_KN=45;
+    const RANGE=MAX_KN-MIN_KN; // 35kn usable range
     const BAR_H=90; // px — must match .tds-bar-wrap height in CSS
     const now2=new Date();
     const pad2=n=>String(n).padStart(2,'0');
     const localStr=`${now2.getFullYear()}-${pad2(now2.getMonth()+1)}-${pad2(now2.getDate())}`;
 
-    // gridlines + y-axis labels at 25 / 35 / 45 kn; 15kn is the floor label
-    const yLevels=[{kn:45,top:0},{kn:35,top:Math.round((1-(35-MIN_KN)/RANGE)*BAR_H)},{kn:25,top:Math.round((1-(25-MIN_KN)/RANGE)*BAR_H)},{kn:'kn',top:BAR_H}];
-    $('tdsYAxis').innerHTML=yLevels.map(l=>`<div class="tds-y-lbl" style="top:${l.top}px">${l.kn}</div>`).join('');
-    $('tdsGrid').innerHTML=[25,35,45].map(kn=>{
+    // y-axis labels and gridlines at 20 / 30 / 40 kn; 45 at top, kn unit at bottom
+    const knTop=kn=>Math.round((1-(kn-MIN_KN)/RANGE)*BAR_H);
+    $('tdsYAxis').innerHTML=
+      `<div class="tds-y-lbl" style="top:0px">45</div>`+
+      [40,30,20].map(kn=>`<div class="tds-y-lbl" style="top:${knTop(kn)}px">${kn}</div>`).join('')+
+      `<div class="tds-y-lbl" style="top:${BAR_H}px">kn</div>`;
+    $('tdsGrid').innerHTML=[20,30,40].map(kn=>{
       const btm=Math.round((kn-MIN_KN)/RANGE*BAR_H);
       return `<div class="tds-gridline" style="bottom:${btm}px"></div>`;
     }).join('');
@@ -3710,22 +3713,25 @@ function renderGrid(){
       const hasSession=gh>=2;
       const kn=hasSession?peakKn:0;
       const gustKn=toKnotsR(daily.windgusts_10m_max[i])||0;
-      // scale: 15kn = floor, 45kn = full height; below 15 = no bar
+      // sustained bar: only for qualifying sessions
       const clampedKn=Math.min(kn,MAX_KN);
+      const pct=hasSession&&kn>=MIN_KN?Math.round((clampedKn-MIN_KN)/RANGE*100):0;
+      // gust bar: always shown when gust >= MIN_KN, even on non-qualifying days
       const clampedGust=Math.min(gustKn,MAX_KN);
-      const pct=hasSession&&kn>=MIN_KN?Math.max(4,Math.round((clampedKn-MIN_KN)/RANGE*100)):0;
-      const gustPct=hasSession&&gustKn>kn&&gustKn>=MIN_KN?Math.round((clampedGust-MIN_KN)/RANGE*100):0;
+      const gustPct=gustKn>=MIN_KN?Math.round((clampedGust-MIN_KN)/RANGE*100):0;
       const gustExt=Math.max(0,gustPct-pct);
       const col=kn>MAX_KN?'#ef4444':hasSession?windBarColor(kn):'transparent';
-      const gustCol=col==='transparent'?'transparent':'rgba(255,255,255,.15)';
+      // gust bar: dimmed version of sustained color, or grey when no qualifying session
+      const gustCol=hasSession?'rgba(255,255,255,.22)':'rgba(148,163,184,.28)';
       const knLabel=hasSession&&kn>0?`<div class="tds-kn-lbl">${kn}</div>`:'';
+      const gustLabel=!hasSession&&gustKn>=MIN_KN?`<div class="tds-kn-lbl" style="color:rgba(148,163,184,.7)">↑${gustKn}</div>`:'';
       const isNow=dateStr===localStr;
       const {short}=fmtDate(dateStr);
       const lbl=isNow?'Now':(short==='Today'||short==='Tomorrow')?new Date(dateStr+'T12:00:00').toLocaleDateString('en',{weekday:'short'}):short;
       const dayNum=dateStr.slice(8).replace(/^0/,'');
       return `<div class="tds-col${isNow?' tds-now':''}" onclick="openModal('${dateStr}',${i})" title="${kn?kn+'kn':''} ${gustKn?'↑'+gustKn+'kn gust':''} · ${gh}h qualifying">
         <div class="tds-bar-wrap">
-          ${knLabel}
+          ${knLabel}${gustLabel}
           <div class="tds-bar" style="height:${pct}%;background:${col}"></div>
           ${gustExt>0?`<div class="tds-bar tds-gust-bar" style="height:${gustExt}%;bottom:${pct}%;background:${gustCol}"></div>`:''}
         </div>
