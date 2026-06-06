@@ -6221,11 +6221,19 @@ async function saveNickname(fromModal){
   const email=_authSession?.user?.email||loadProfile().email;
   const sb=getSb();
   if(sb && email){
-    // Check uniqueness
-    const{data:existing}=await sb.from('profiles').select('email').eq('nickname',val).neq('email',email).maybeSingle();
-    if(existing){ showToast('❌ Nickname already taken — try another'); if(btn){ btn.disabled=false; btn.textContent='Save'; } return; }
-    // Upsert nickname
-    await sb.from('profiles').upsert({email, nickname:val},{onConflict:'email'});
+    // Fast head-only count check (no row data returned) then upsert
+    const {count}=await sb.from('profiles').select('email',{count:'exact',head:true}).eq('nickname',val).neq('email',email);
+    if((count??0)>0){
+      showToast('❌ Nickname already taken — try another');
+      if(btn){ btn.disabled=false; btn.textContent=fromModal?'Continue →':'Save'; }
+      return;
+    }
+    const {error}=await sb.from('profiles').upsert({email, nickname:val},{onConflict:'email'});
+    if(error){
+      showToast('❌ Could not save — try again');
+      if(btn){ btn.disabled=false; btn.textContent=fromModal?'Continue →':'Save'; }
+      return;
+    }
   }
 
   const p=loadProfile(); p.nickname=val; saveProfile(p);
