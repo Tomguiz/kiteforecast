@@ -3651,14 +3651,16 @@ function openModal(dateStr,dayIdx){
 
   // timeline
   const maxKn=Math.max(30,...hours.map(h=>h.kn));
+  const tlQualSet=new Set(hours.filter(h=>h.qualifying).map(h=>h.hour));
   $('mTimeline').innerHTML=hours.map(h=>{
+    const validSession=h.qualifying&&(tlQualSet.has(h.hour-1)||tlQualSet.has(h.hour+1));
     const pct=Math.max(4,Math.round(h.kn/maxKn*100));
-    const col=h.qualifying?speedBg(h.kn):h.type==='rain'?'rgba(96,165,250,.35)':h.type==='lightdir'?'rgba(234,179,8,.38)':'rgba(100,116,139,.18)';
+    const col=validSession?speedBg(h.kn):h.type==='rain'?'rgba(96,165,250,.35)':h.type==='lightdir'?'rgba(234,179,8,.38)':'rgba(100,116,139,.18)';
     const isSr=h.tStr.slice(0,16)===sunrise.slice(0,16);
     const isSs=h.tStr.slice(0,16)===sunset.slice(0,16);
     const tlCls=isSr?'sr':isSs?'ss':'';
     const tlTxt=isSr?'☀':isSs?'🌇':(h.hour%6===0?String(h.hour).padStart(2,'0'):'');
-    return `<div class="m-tl-col ${h.inDay?'':'night'}" title="${h.tStr.slice(11,16)} ${h.kn}kn ${compass(h.dir)}${h.qualifying?' ✓':''}">
+    return `<div class="m-tl-col ${h.inDay?'':'night'}" title="${h.tStr.slice(11,16)} ${h.kn}kn ${compass(h.dir)}${validSession?' ✓':''}">
       <div class="m-tl-bar" style="height:${pct}%;background:${col}"></div>
       <div class="m-tl-time ${tlCls}">${tlTxt}</div>
     </div>`;
