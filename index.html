@@ -202,6 +202,7 @@
     .hb-good     { background:#bef264; height:70%; }
     .hb-lightdir { background:rgba(234,179,8,.45); height:50%; }
     .hb-light    { background:rgba(100,116,139,.18); height:30%; }
+    .hb-empty    { height:0; }
     .hour-axis { display:flex; justify-content:space-between; margin-top:2px; padding:0 1px; }
     .hour-axis span { font-size:.48rem; color:var(--tdim); opacity:.55; font-weight:500; line-height:1; }
 
@@ -3461,7 +3462,10 @@ function buildDay(dateStr,sunrise,sunset){
   const sample=good.length?good:day;
   const domDir=sample.length?circMean(sample.map(h=>h.dir)):null;
   const hasBadDir=day.some(h=>h.type==='lightdir');
-  return{hours,day,good,goodHours:good.length,peakKn,peakDayKn,domDir,hasBadDir};
+  // only count qualifying hours that are part of a 2+ consecutive (by clock hour) run
+  const qualSet=new Set(good.map(h=>h.hour));
+  const goodHours=good.filter(h=>(qualSet.has(h.hour-1)||qualSet.has(h.hour+1))).length;
+  return{hours,day,good,goodHours,peakKn,peakDayKn,domDir,hasBadDir};
 }
 
 // ══════════════════════════════════
@@ -3515,9 +3519,13 @@ function renderGrid(){
     const _ssH=parseInt(daily.sunset[i].slice(11,13),10);
     const tideLine='';
 
-    const barHTML=day.map(h=>{
+    // only show qualifying bars when part of a 2+ consecutive (by clock hour) run
+    const qualHourSet=new Set(day.filter(h=>h.qualifying).map(h=>h.hour));
+    const inValidRun=day.map(h=>h.qualifying&&(qualHourSet.has(h.hour-1)||qualHourSet.has(h.hour+1)));
+    const barHTML=day.map((h,idx)=>{
       const cls={perfect:'hb-perfect',verygood:'hb-verygood',good:'hb-good',lightdir:'hb-lightdir',light:'hb-light'}[h.type]||'hb-light';
-      return `<div class="hb ${cls}" title="${h.tStr.slice(11,16)} · ${h.kn}kn · ${compass(h.dir)} ${h.dir}°"></div>`;
+      const showBar=inValidRun[idx];
+      return `<div class="hb ${showBar?cls:'hb-empty'}" title="${h.tStr.slice(11,16)} · ${h.kn}kn · ${compass(h.dir)} ${h.dir}°"></div>`;
     }).join('');
 
     let dirPill='';
