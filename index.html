@@ -1658,15 +1658,16 @@ function isWindDirOK(deg){
 }
 function updateShoreHint(){
   const hint=$('shoreHint'), hintM=$('shoreHintMobile'), lbl=$('windDirsMobileLabel');
+  const latLon=cachedLoc?` · ${cachedLoc.latitude.toFixed(2)}°, ${cachedLoc.longitude.toFixed(2)}°`:'';
   if(windDirs.size===0){
-    if(hint) hint.textContent='Select good wind directions for this spot';
+    if(hint) hint.textContent='Select good wind directions for this spot'+latLon;
     if(hintM) hintM.textContent='';
     if(lbl) lbl.textContent='—';
     return;
   }
   const dirs=[...windDirs].sort((a,b)=>a-b).map(d=>compass(d)).join(' / ');
-  if(hint) hint.textContent=`Good winds: ${dirs}`;
-  if(hintM) hintM.textContent=`Good winds: ${dirs}`;
+  if(hint) hint.textContent=`${dirs}${latLon}`;
+  if(hintM) hintM.textContent=dirs;
   if(lbl) lbl.textContent=dirs;
 }
 function toggleWindDirsMobile(){
@@ -2719,14 +2720,12 @@ async function fetchForecastFromSpot(spot){
       const userDirs=loadUserDirsForSpot(spot.name);
       if(userDirs&&userDirs.length>0){
         setWindDirs(userDirs);
-        if($('shoreHint')) $('shoreHint').textContent=`Your saved directions · click to change`;
       } else if(spot.dirs&&spot.dirs.length>0){
         setWindDirs(spot.dirs);
-        if($('shoreHint')) $('shoreHint').textContent=`Known good directions · you can override`;
       } else if(spot._osm){
         // OSM spot — try auto-detect
         const detected=await autoDetectShore(spot.lat,spot.lon).catch(()=>null);
-        if(detected!==null){ setWindDirs([snapTo8(detected)]); if($('shoreHint')) $('shoreHint').textContent=`Auto-detected · you can override`; }
+        if(detected!==null) setWindDirs([snapTo8(detected)]);
       }
     }
     cachedHrMap=new Map();
@@ -3038,7 +3037,7 @@ function resetSearch(){
   cachedWx=null; cachedLoc=null; cachedHrMap=new Map(); cachedTideExtremes=null;
   windDirs=new Set(); manualShoreSet=false;
   document.querySelectorAll('.s-btn').forEach(b=>b.classList.remove('active'));
-  $('shoreHint').textContent='Select good wind directions for this spot';
+  updateShoreHint();
   renderHintChips();
   $('searchInput').blur();
 }
@@ -3506,7 +3505,6 @@ async function fetchForecast(query){
       const detected=await shorePromise.catch(()=>null);
       if(detected!==null){
         setWindDirs([snapTo8(detected)]);
-        $('shoreHint').textContent=`Auto-detected from coastline · you can override`;
       }
     }
 
@@ -3600,7 +3598,7 @@ function renderGrid(){
     :`<span style="${qdCls};font-size:.8rem;font-weight:700;margin-left:10px">${qualDaysCount} of ${totalDays} days rideable</span>`;
   $('locName').innerHTML=`${loc.name}${loc.admin1&&loc.admin1!==loc.name?', '+loc.admin1:''}<a class="map-link" href="${mapsUrl}" target="_blank" rel="noopener" title="Open in Google Maps"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Maps</a><button class="notif-btn${hasSpotNotif(loc.name)?' active':''}" id="notifBtn" title="Get notified">${bellSVG(16)}</button><button class="fav-btn${isFav?' active':''}" id="favBtn" title="${isFav?'Remove from favourites':'Add to favourites'}">${isFav?'★':'☆'}</button><button class="share-btn" id="shareBtn" onclick="shareSpot()" title="Share this spot"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></button><button class="share-btn" id="claimBtn" onclick="openClaimFlow()" title="Claim this spot as owner" style="margin-left:4px;font-size:.7rem;padding:4px 8px;white-space:nowrap">🏴 Claim</button>${qdLabel}`;
 
-  $('locSub').textContent=`${loc.country} · ${loc.latitude.toFixed(2)}°, ${loc.longitude.toFixed(2)}°`+(windDirs.size>0?` · Winds: ${[...windDirs].sort((a,b)=>a-b).map(d=>compass(d)).join('/')}`:'');
+  $('locSub').textContent=`${loc.country}`;
   $('locHdr').style.display='block';
   $('shoreBar').classList.add('visible');
   $('resetBtn').style.display='inline-flex';
