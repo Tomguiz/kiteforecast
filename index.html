@@ -168,10 +168,12 @@
     }
     /* fixed y-axis */
     #tdsYAxis {
-      flex-shrink:0; width:30px; display:flex; flex-direction:column-reverse;
-      justify-content:space-between; padding-bottom:32px; padding-top:2px;
+      flex-shrink:0; width:30px; position:relative; height:90px; align-self:flex-start; margin-bottom:32px;
     }
-    .tds-y-lbl { font-size:.52rem; font-weight:700; color:var(--tdim); text-align:right; padding-right:5px; line-height:1; }
+    .tds-y-lbl {
+      position:absolute; right:5px; font-size:.52rem; font-weight:700;
+      color:var(--tdim); text-align:right; line-height:1; transform:translateY(-50%);
+    }
     /* scrollable chart */
     #tdsChart {
       flex:1; position:relative; min-width:0;
@@ -939,6 +941,24 @@
       box-shadow:0 8px 32px rgba(0,0,0,.7);
     }
 
+    /* wind dirs mobile toggle row (hidden on desktop) */
+    #windDirsMobileToggle { display:none; }
+    @media (max-width:599px) {
+      #shoreBar { display:none !important; }
+      #windDirsMobileToggle {
+        display:flex; align-items:center; gap:6px; flex-wrap:wrap;
+        margin-top:6px; font-size:.72rem; color:var(--tdim); cursor:pointer;
+      }
+      #windDirsMobileToggle .wdmt-dirs { color:var(--accent); font-weight:700; }
+      #windDirsMobileToggle .wdmt-chevron { font-size:.65rem; color:var(--tdim); transition:transform .2s; margin-left:2px; }
+      #windDirsMobileToggle.open .wdmt-chevron { transform:rotate(180deg); }
+      #shoreBarMobile {
+        display:none; margin-top:8px; padding:10px 12px;
+        background:var(--surface); border:1px solid var(--border); border-radius:10px;
+      }
+      #shoreBarMobile.open { display:block; }
+    }
+
     /* ── MOBILE: 2-line card layout per hour ── */
     @media (max-width:599px) {
       .m-hdr     { padding:14px 14px 10px; }
@@ -1179,6 +1199,25 @@
     <div class="loc-hdr" id="locHdr">
       <h2 id="locName"></h2>
       <p  id="locSub"></p>
+      <!-- mobile-only: inline wind dirs toggle -->
+      <div id="windDirsMobileToggle" onclick="toggleWindDirsMobile()">
+        <span>Wind dirs:</span>
+        <span class="wdmt-dirs" id="windDirsMobileLabel">—</span>
+        <span class="wdmt-chevron">▼</span>
+      </div>
+      <div id="shoreBarMobile">
+        <div class="shore-btns" id="shoreBtnsMobile">
+          <button class="s-btn" data-deg="0"   onclick="toggleWindDir(this);syncShoreBtns()">N</button>
+          <button class="s-btn" data-deg="45"  onclick="toggleWindDir(this);syncShoreBtns()">NE</button>
+          <button class="s-btn" data-deg="90"  onclick="toggleWindDir(this);syncShoreBtns()">E</button>
+          <button class="s-btn" data-deg="135" onclick="toggleWindDir(this);syncShoreBtns()">SE</button>
+          <button class="s-btn" data-deg="180" onclick="toggleWindDir(this);syncShoreBtns()">S</button>
+          <button class="s-btn" data-deg="225" onclick="toggleWindDir(this);syncShoreBtns()">SW</button>
+          <button class="s-btn" data-deg="270" onclick="toggleWindDir(this);syncShoreBtns()">W</button>
+          <button class="s-btn" data-deg="315" onclick="toggleWindDir(this);syncShoreBtns()">NW</button>
+        </div>
+        <span class="shore-hint" id="shoreHintMobile" style="display:block;margin-top:6px;font-size:.7rem;color:var(--tdim)"></span>
+      </div>
     </div>
 
     <!-- compact shore direction picker -->
@@ -1200,13 +1239,7 @@
     <div id="spotInfoCard"></div>
 
     <div id="tenDayStrip" style="display:none">
-      <div id="tdsYAxis">
-        <div class="tds-y-lbl">kn</div>
-        <div class="tds-y-lbl">15</div>
-        <div class="tds-y-lbl">25</div>
-        <div class="tds-y-lbl">35</div>
-        <div class="tds-y-lbl">45</div>
-      </div>
+      <div id="tdsYAxis"></div>
       <div id="tdsChart">
         <div id="tdsGrid"></div>
         <div id="tdsCols"></div>
@@ -1622,12 +1655,28 @@ function isWindDirOK(deg){
   return false;
 }
 function updateShoreHint(){
+  const hint=$('shoreHint'), hintM=$('shoreHintMobile'), lbl=$('windDirsMobileLabel');
   if(windDirs.size===0){
-    $('shoreHint').textContent='Select good wind directions for this spot';
+    if(hint) hint.textContent='Select good wind directions for this spot';
+    if(hintM) hintM.textContent='';
+    if(lbl) lbl.textContent='—';
     return;
   }
-  const dirs=[...windDirs].sort((a,b)=>a-b).map(d=>compass(d)).join(', ');
-  $('shoreHint').textContent=`Good winds: ${dirs}`;
+  const dirs=[...windDirs].sort((a,b)=>a-b).map(d=>compass(d)).join(' / ');
+  if(hint) hint.textContent=`Good winds: ${dirs}`;
+  if(hintM) hintM.textContent=`Good winds: ${dirs}`;
+  if(lbl) lbl.textContent=dirs;
+}
+function toggleWindDirsMobile(){
+  const tog=$('windDirsMobileToggle'), panel=$('shoreBarMobile');
+  if(!tog||!panel) return;
+  const open=panel.classList.toggle('open');
+  tog.classList.toggle('open', open);
+}
+function syncShoreBtns(){
+  // keep mobile btn set active state in sync (desktop .s-btn is already handled by toggleWindDir)
+  document.querySelectorAll('#shoreBtnsMobile .s-btn').forEach(b=>b.classList.toggle('active',windDirs.has(Number(b.dataset.deg))));
+  updateShoreHint();
 }
 
 function speedTier(kn){
@@ -2668,14 +2717,14 @@ async function fetchForecastFromSpot(spot){
       const userDirs=loadUserDirsForSpot(spot.name);
       if(userDirs&&userDirs.length>0){
         setWindDirs(userDirs);
-        $('shoreHint').textContent=`Your saved directions · click to change`;
+        if($('shoreHint')) $('shoreHint').textContent=`Your saved directions · click to change`;
       } else if(spot.dirs&&spot.dirs.length>0){
         setWindDirs(spot.dirs);
-        $('shoreHint').textContent=`Known good directions · you can override`;
+        if($('shoreHint')) $('shoreHint').textContent=`Known good directions · you can override`;
       } else if(spot._osm){
         // OSM spot — try auto-detect
         const detected=await autoDetectShore(spot.lat,spot.lon).catch(()=>null);
-        if(detected!==null){ setWindDirs([snapTo8(detected)]); $('shoreHint').textContent=`Auto-detected · you can override`; }
+        if(detected!==null){ setWindDirs([snapTo8(detected)]); if($('shoreHint')) $('shoreHint').textContent=`Auto-detected · you can override`; }
       }
     }
     cachedHrMap=new Map();
@@ -3442,9 +3491,9 @@ async function fetchForecast(query){
       latitude,longitude,
       hourly:['temperature_2m','weather_code','windspeed_10m','winddirection_10m','windgusts_10m'].join(','),
       daily:['weather_code','temperature_2m_max','temperature_2m_min','windgusts_10m_max','sunrise','sunset'].join(','),
-      forecast_days:10, timezone:'auto', windspeed_unit:'ms',
+      forecast_days:16, timezone:'auto', windspeed_unit:'ms',
     });
-    const mP2=new URLSearchParams({latitude,longitude,hourly:'wave_height,wave_period,wave_direction',forecast_days:10,timezone:'auto'});
+    const mP2=new URLSearchParams({latitude,longitude,hourly:'wave_height,wave_period,wave_direction',forecast_days:16,timezone:'auto'});
     const marineP2=safeFetch(`https://marine-api.open-meteo.com/v1/marine?${mP2}`,8000).catch(()=>null);
     const tidesP2=isPremium()?fetchStormglassTides(latitude,longitude):Promise.resolve(null);
     cachedWx=await safeFetch(`https://api.open-meteo.com/v1/forecast?${p}`);
@@ -3638,18 +3687,21 @@ function renderGrid(){
     grid.appendChild(card);
   });
 
-  // ── 10-day summary strip ──
+  // ── summary strip ──
   const strip=$('tenDayStrip');
   if(strip){
-    const MAX_KN=45;
+    const MIN_KN=15, MAX_KN=45;
+    const RANGE=MAX_KN-MIN_KN; // 30kn usable range
     const BAR_H=90; // px — must match .tds-bar-wrap height in CSS
     const now2=new Date();
     const pad2=n=>String(n).padStart(2,'0');
     const localStr=`${now2.getFullYear()}-${pad2(now2.getMonth()+1)}-${pad2(now2.getDate())}`;
 
-    // gridlines at 15 / 25 / 35 kn, positioned from bottom of bar area
-    $('tdsGrid').innerHTML=[15,25,35].map(kn=>{
-      const btm=Math.round(kn/MAX_KN*BAR_H);
+    // gridlines + y-axis labels at 25 / 35 / 45 kn; 15kn is the floor label
+    const yLevels=[{kn:45,top:0},{kn:35,top:Math.round((1-(35-MIN_KN)/RANGE)*BAR_H)},{kn:25,top:Math.round((1-(25-MIN_KN)/RANGE)*BAR_H)},{kn:'kn',top:BAR_H}];
+    $('tdsYAxis').innerHTML=yLevels.map(l=>`<div class="tds-y-lbl" style="top:${l.top}px">${l.kn}</div>`).join('');
+    $('tdsGrid').innerHTML=[25,35,45].map(kn=>{
+      const btm=Math.round((kn-MIN_KN)/RANGE*BAR_H);
       return `<div class="tds-gridline" style="bottom:${btm}px"></div>`;
     }).join('');
 
@@ -3657,7 +3709,9 @@ function renderGrid(){
       const {goodHours:gh,peakKn}=buildDay(dateStr,daily.sunrise[i],daily.sunset[i]);
       const hasSession=gh>=2;
       const kn=hasSession?peakKn:0;
-      const pct=hasSession?Math.max(4,Math.round(Math.min(kn,MAX_KN)/MAX_KN*100)):0;
+      // scale: 15kn = floor (tiny stub), 45kn = full height; below 15 = no bar
+      const clampedKn=Math.min(kn,MAX_KN);
+      const pct=hasSession&&kn>=MIN_KN?Math.max(4,Math.round((clampedKn-MIN_KN)/RANGE*100)):0;
       const col=kn>MAX_KN?'#ef4444':hasSession?windBarColor(kn):'transparent';
       const isNow=dateStr===localStr;
       const {short}=fmtDate(dateStr);
