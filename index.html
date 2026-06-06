@@ -162,24 +162,42 @@
 
     /* ── FORECAST GRID ── */
     #tenDayStrip {
-      display:flex; gap:4px; align-items:flex-end;
-      margin:12px 0 10px; padding:14px 14px 10px;
+      margin:12px 0 10px;
       background:var(--card); border:1px solid var(--border); border-radius:14px;
+      overflow:hidden; display:flex; padding:12px 8px 10px 0;
     }
+    /* fixed y-axis */
+    #tdsYAxis {
+      flex-shrink:0; width:30px; display:flex; flex-direction:column-reverse;
+      justify-content:space-between; padding-bottom:32px; padding-top:2px;
+    }
+    .tds-y-lbl { font-size:.52rem; font-weight:700; color:var(--tdim); text-align:right; padding-right:5px; line-height:1; }
+    /* scrollable chart */
+    #tdsChart {
+      flex:1; position:relative; min-width:0;
+      overflow-x:auto; -webkit-overflow-scrolling:touch;
+    }
+    #tdsChart::-webkit-scrollbar { height:3px; }
+    #tdsChart::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+    /* gridlines drawn behind cols */
+    #tdsGrid { position:absolute; top:0; left:0; right:0; height:90px; pointer-events:none; }
+    .tds-gridline { position:absolute; left:0; right:0; border-top:1px dashed rgba(148,163,184,.15); }
+    /* columns */
+    #tdsCols { display:flex; align-items:flex-end; gap:3px; padding:0 4px; }
     .tds-col {
-      flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end;
-      gap:4px; cursor:pointer; padding:6px 2px 6px; border-radius:8px;
-      transition:background .15s;
+      flex-shrink:0; width:44px; display:flex; flex-direction:column; align-items:center;
+      justify-content:flex-end; gap:3px; cursor:pointer; padding:4px 2px 6px;
+      border-radius:8px; transition:background .15s;
     }
     .tds-col:hover { background:rgba(255,255,255,.06); }
-    .tds-col.today { background:rgba(0,212,255,.07); }
-    .tds-bar-wrap { width:100%; height:60px; display:flex; align-items:flex-end; }
-    .tds-bar { width:100%; border-radius:4px 4px 0 0; min-height:3px; transition:opacity .15s; }
-    .tds-col:hover .tds-bar { opacity:.8; }
-    .tds-lbl { font-size:.65rem; font-weight:700; color:var(--tdim); white-space:nowrap; text-transform:uppercase; line-height:1.2; }
-    .tds-num { font-size:.72rem; font-weight:800; color:var(--text); line-height:1; }
-    .tds-col.today .tds-lbl { color:var(--accent); }
-    .tds-col.today .tds-num { color:var(--accent); }
+    .tds-col.tds-now { background:rgba(0,212,255,.07); }
+    .tds-bar-wrap { width:100%; height:90px; display:flex; align-items:flex-end; }
+    .tds-bar { width:78%; margin:0 auto; border-radius:4px 4px 0 0; min-height:3px; transition:opacity .15s; }
+    .tds-col:hover .tds-bar { opacity:.75; }
+    .tds-lbl { font-size:.6rem; font-weight:700; color:var(--tdim); white-space:nowrap; text-transform:uppercase; line-height:1.2; }
+    .tds-num { font-size:.68rem; font-weight:800; color:var(--text); line-height:1; }
+    .tds-col.tds-now .tds-lbl { color:var(--accent); }
+    .tds-col.tds-now .tds-num { color:var(--accent); }
 
     .forecast-grid {
       display: grid;
@@ -1181,7 +1199,19 @@
 
     <div id="spotInfoCard"></div>
 
-    <div id="tenDayStrip" style="display:none"></div>
+    <div id="tenDayStrip" style="display:none">
+      <div id="tdsYAxis">
+        <div class="tds-y-lbl">kn</div>
+        <div class="tds-y-lbl">15</div>
+        <div class="tds-y-lbl">25</div>
+        <div class="tds-y-lbl">35</div>
+        <div class="tds-y-lbl">45</div>
+      </div>
+      <div id="tdsChart">
+        <div id="tdsGrid"></div>
+        <div id="tdsCols"></div>
+      </div>
+    </div>
 
     <div class="forecast-grid" id="forecastGrid"></div>
 
@@ -3611,22 +3641,35 @@ function renderGrid(){
   // ── 10-day summary strip ──
   const strip=$('tenDayStrip');
   if(strip){
-    const maxStripHours=Math.max(2,...daily.time.map((_,i)=>buildDay(daily.time[i],daily.sunrise[i],daily.sunset[i]).goodHours));
-    const todayStr=new Date().toISOString().slice(0,10);
-    strip.innerHTML=daily.time.map((dateStr,i)=>{
+    const MAX_KN=45;
+    const BAR_H=90; // px — must match .tds-bar-wrap height in CSS
+    const now2=new Date();
+    const pad2=n=>String(n).padStart(2,'0');
+    const localStr=`${now2.getFullYear()}-${pad2(now2.getMonth()+1)}-${pad2(now2.getDate())}`;
+
+    // gridlines at 15 / 25 / 35 kn, positioned from bottom of bar area
+    $('tdsGrid').innerHTML=[15,25,35].map(kn=>{
+      const btm=Math.round(kn/MAX_KN*BAR_H);
+      return `<div class="tds-gridline" style="bottom:${btm}px"></div>`;
+    }).join('');
+
+    $('tdsCols').innerHTML=daily.time.map((dateStr,i)=>{
       const {goodHours:gh,peakKn}=buildDay(dateStr,daily.sunrise[i],daily.sunset[i]);
       const hasSession=gh>=2;
-      const pct=hasSession?Math.max(8,Math.round(gh/maxStripHours*100)):0;
-      const col=hasSession?windBarColor(peakKn):'transparent';
+      const kn=hasSession?peakKn:0;
+      const pct=hasSession?Math.max(4,Math.round(Math.min(kn,MAX_KN)/MAX_KN*100)):0;
+      const col=kn>MAX_KN?'#ef4444':hasSession?windBarColor(kn):'transparent';
+      const isNow=dateStr===localStr;
       const {short}=fmtDate(dateStr);
-      const isToday=dateStr===todayStr;
+      const lbl=isNow?'Now':(short==='Today'||short==='Tomorrow')?new Date(dateStr+'T12:00:00').toLocaleDateString('en',{weekday:'short'}):short;
       const dayNum=dateStr.slice(8).replace(/^0/,'');
-      return `<div class="tds-col${isToday?' today':''}" onclick="openModal('${dateStr}',${i})" title="${dateStr}: ${gh}h qualifying">
+      return `<div class="tds-col${isNow?' tds-now':''}" onclick="openModal('${dateStr}',${i})" title="${kn?kn+'kn · ':''} ${gh}h qualifying">
         <div class="tds-bar-wrap"><div class="tds-bar" style="height:${pct}%;background:${col}"></div></div>
         <div class="tds-num">${dayNum}</div>
-        <div class="tds-lbl">${short}</div>
+        <div class="tds-lbl">${lbl}</div>
       </div>`;
     }).join('');
+
     strip.style.display='flex';
   }
 
