@@ -197,7 +197,7 @@
     .tds-bar { position:absolute; bottom:0; left:10%; width:80%; border-radius:4px 4px 0 0; min-height:3px; transition:opacity .15s; }
     .tds-gust-bar { border-radius:0; } /* gust sits on top of sustained bar */
     .tds-col:hover .tds-bar { opacity:.75; }
-    .tds-kn-lbl { position:absolute; bottom:2px; left:0; right:0; text-align:center; font-size:.58rem; font-weight:800; color:rgba(255,255,255,.85); line-height:1; pointer-events:none; z-index:1; }
+    .tds-kn-lbl { position:absolute; bottom:2px; left:0; right:0; text-align:center; font-size:.58rem; font-weight:800; color:#000; line-height:1; pointer-events:none; z-index:1; }
     .tds-lbl { font-size:.6rem; font-weight:700; color:var(--tdim); white-space:nowrap; text-transform:uppercase; line-height:1.2; }
     .tds-num { font-size:.68rem; font-weight:800; color:var(--text); line-height:1; }
     .tds-col.tds-now .tds-lbl { color:var(--accent); }
@@ -3690,21 +3690,21 @@ function renderGrid(){
   // ── summary strip ──
   const strip=$('tenDayStrip');
   if(strip){
-    const MIN_KN=10, MAX_KN=45;
-    const RANGE=MAX_KN-MIN_KN; // 35kn usable range
+    const MIN_KN=0, MAX_KN=45;
+    const RANGE=MAX_KN-MIN_KN;
     const BAR_H=90; // px — must match .tds-bar-wrap height in CSS
     const now2=new Date();
     const pad2=n=>String(n).padStart(2,'0');
     const localStr=`${now2.getFullYear()}-${pad2(now2.getMonth()+1)}-${pad2(now2.getDate())}`;
 
-    // y-axis labels and gridlines at 20 / 30 / 40 kn; 45 at top, kn unit at bottom
-    const knTop=kn=>Math.round((1-(kn-MIN_KN)/RANGE)*BAR_H);
+    // y-axis labels and gridlines at 15 / 25 / 35 kn
+    const knTop=kn=>Math.round((1-kn/MAX_KN)*BAR_H);
     $('tdsYAxis').innerHTML=
       `<div class="tds-y-lbl" style="top:0px">45</div>`+
-      [40,30,20].map(kn=>`<div class="tds-y-lbl" style="top:${knTop(kn)}px">${kn}</div>`).join('')+
+      [35,25,15].map(kn=>`<div class="tds-y-lbl" style="top:${knTop(kn)}px">${kn}</div>`).join('')+
       `<div class="tds-y-lbl" style="top:${BAR_H}px">kn</div>`;
-    $('tdsGrid').innerHTML=[20,30,40].map(kn=>{
-      const btm=Math.round((kn-MIN_KN)/RANGE*BAR_H);
+    $('tdsGrid').innerHTML=[15,25,35].map(kn=>{
+      const btm=Math.round(kn/MAX_KN*BAR_H);
       return `<div class="tds-gridline" style="bottom:${btm}px"></div>`;
     }).join('');
 
@@ -3712,28 +3712,22 @@ function renderGrid(){
       const {goodHours:gh,peakKn}=buildDay(dateStr,daily.sunrise[i],daily.sunset[i]);
       const hasSession=gh>=2;
       const kn=hasSession?peakKn:0;
-      const gustKn=toKnotsR(daily.windgusts_10m_max[i])||0;
-      // sustained bar: only for qualifying sessions
-      const clampedKn=Math.min(kn,MAX_KN);
-      const pct=hasSession&&kn>=MIN_KN?Math.round((clampedKn-MIN_KN)/RANGE*100):0;
-      // gust bar: always shown when gust >= MIN_KN, even on non-qualifying days
-      const clampedGust=Math.min(gustKn,MAX_KN);
-      const gustPct=gustKn>=MIN_KN?Math.round((clampedGust-MIN_KN)/RANGE*100):0;
+      const gustKn=hasSession?(toKnotsR(daily.windgusts_10m_max[i])||0):0;
+      // both bars only shown for qualifying sessions
+      const pct=hasSession?Math.round(Math.min(kn,MAX_KN)/MAX_KN*100):0;
+      const gustPct=hasSession&&gustKn>kn?Math.round(Math.min(gustKn,MAX_KN)/MAX_KN*100):0;
       const gustExt=Math.max(0,gustPct-pct);
       const col=kn>MAX_KN?'#ef4444':hasSession?windBarColor(kn):'transparent';
-      // gust bar: dimmed version of sustained color, or grey when no qualifying session
-      const gustCol=hasSession?'rgba(255,255,255,.22)':'rgba(148,163,184,.28)';
       const knLabel=hasSession&&kn>0?`<div class="tds-kn-lbl">${kn}</div>`:'';
-      const gustLabel=!hasSession&&gustKn>=MIN_KN?`<div class="tds-kn-lbl" style="color:rgba(148,163,184,.7)">↑${gustKn}</div>`:'';
       const isNow=dateStr===localStr;
       const {short}=fmtDate(dateStr);
       const lbl=isNow?'Now':(short==='Today'||short==='Tomorrow')?new Date(dateStr+'T12:00:00').toLocaleDateString('en',{weekday:'short'}):short;
       const dayNum=dateStr.slice(8).replace(/^0/,'');
       return `<div class="tds-col${isNow?' tds-now':''}" onclick="openModal('${dateStr}',${i})" title="${kn?kn+'kn':''} ${gustKn?'↑'+gustKn+'kn gust':''} · ${gh}h qualifying">
         <div class="tds-bar-wrap">
-          ${knLabel}${gustLabel}
+          ${knLabel}
           <div class="tds-bar" style="height:${pct}%;background:${col}"></div>
-          ${gustExt>0?`<div class="tds-bar tds-gust-bar" style="height:${gustExt}%;bottom:${pct}%;background:${gustCol}"></div>`:''}
+          ${gustExt>0?`<div class="tds-bar tds-gust-bar" style="height:${gustExt}%;bottom:${pct}%;background:rgba(255,255,255,.2)"></div>`:''}
         </div>
         <div class="tds-num">${dayNum}</div>
         <div class="tds-lbl">${lbl}</div>
