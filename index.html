@@ -4236,8 +4236,12 @@ async function syncFavsFromSupabase(email){
       dirs:  r.spot_dirs||[],
       days:  r.spot_days||null,
     }));
-    // Supabase is the single source of truth — always overwrite local unconditionally
-    saveFavs(remote);
+    const local=loadFavs();
+    const localKeys=new Set(local.map(f=>`${f.lat},${f.lon}`));
+    // Any spot in Supabase but not in local was removed by the user — push that deletion back
+    const orphans=remote.filter(f=>!localKeys.has(`${f.lat},${f.lon}`));
+    for(const f of orphans) pushFavToSupabase(email,f,true);
+    // Local is authoritative — don't overwrite it; just clean up Supabase orphans above
     renderHintChips();
   } finally {
     _syncFavsInFlight=false;
@@ -4248,9 +4252,14 @@ async function pushFavToSupabase(email,fav,remove=false){
   if(!email) return;
   const sb=getSb(); if(!sb) return;
   if(remove){
+    // Delete by lat+lon as primary key (name may have whitespace/case drift)
     const{error}=await sb.from('favourites').delete()
-      .eq('email',email).eq('spot_name',fav.name);
-    if(error) console.error('[favs] delete error',error);
+      .eq('email',email).eq('spot_lat',fav.lat).eq('spot_lon',fav.lon);
+    if(error){
+      console.error('[favs] delete by coords error',error);
+      // Fallback: try by name
+      await sb.from('favourites').delete().eq('email',email).eq('spot_name',fav.name);
+    }
   } else {
     // Try insert first; if conflict (already exists) do an update
     const row={
