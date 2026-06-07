@@ -1226,6 +1226,7 @@
         <h2 id="mTitle"></h2>
         <div class="m-sub" id="mSub"></div>
       </div>
+      <button class="fav-btn m-notif-btn" id="mFavBtn" onclick="toggleFavorite();updateModalFavBtn()" title="Add to favourites" style="display:none">☆</button>
       <button class="notif-btn m-notif-btn" id="mNotifBtn" onclick="toggleModalDayNotif()" title="Get notified for this day"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path class="bell-fill" d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></button>
       <button class="m-close" onclick="closeModal()">✕ Close</button>
     </div>
@@ -3716,6 +3717,7 @@ function openModal(dateStr,dayIdx){
   $('mTitle').textContent=full;
   const mBell=$('mNotifBtn');
   if(mBell) mBell.className='notif-btn m-notif-btn'+(hasDayNotif(loc.name,dateStr)?' active':'');
+  updateModalFavBtn();
   $('mSub').innerHTML=`${loc.name}${loc.admin1?', '+loc.admin1:''} · ${loc.country}`
     +(windDirs.size>0?` · Good: <strong style="color:var(--accent)">${[...windDirs].sort((a,b)=>a-b).map(d=>compass(d)).join(' / ')}</strong>`:'');
 
@@ -3898,6 +3900,13 @@ function closeModal(){
   document.body.style.top='';
   document.body.style.width='';
   window.scrollTo(0,scrollY);
+}
+function updateModalFavBtn(){
+  const btn=$('mFavBtn'); if(!btn||!cachedLoc) return;
+  const isFav=isFavSpot(cachedLoc.name);
+  btn.style.display=isFav?'none':'inline-flex';
+  btn.textContent=isFav?'★':'☆';
+  btn.classList.toggle('active', isFav);
 }
 function toggleModalDayNotif(){
   if(!_modalDateStr||!cachedLoc) return;
@@ -7214,8 +7223,8 @@ function toggleDayNotif(e,dateStr,dayIdx){
     showToast('🔕 Notification removed');
   } else {
     if(!isFavSpot(loc.name)){
-      showToast('★ Add this spot to your favourites first');
-      const favBtn=$('favBtn'); if(favBtn){ favBtn.style.animation='none'; favBtn.offsetHeight; favBtn.style.animation='pulse .4s 2'; }
+      showToast('★ Add this spot to your favourites first', 4000, '#f87171');
+      const favBtn=$('favBtn')||$('mFavBtn'); if(favBtn){ favBtn.style.animation='none'; favBtn.offsetHeight; favBtn.style.animation='pulse .4s 2'; }
       return;
     }
     addDayNotif(spot,dateStr,sessInfo);
