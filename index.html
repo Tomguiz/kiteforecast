@@ -153,11 +153,17 @@
     .shore-hint { font-size:.72rem; color:var(--tdim); }
 
     /* ── FORECAST GRID ── */
+    #tenDayStripWrap { margin:24px 0 20px; }
+    .tds-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; padding:0 2px; }
+    .tds-title { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--gray); }
+    .tds-swipe-hint { font-size:.68rem; color:var(--tdim); display:flex; align-items:center; gap:4px; }
+    .tds-swipe-hint::after { content:'→'; font-size:.8rem; animation:tds-nudge 1.8s ease-in-out infinite; display:inline-block; }
+    @keyframes tds-nudge { 0%,100%{transform:translateX(0)} 50%{transform:translateX(4px)} }
     #tenDayStrip {
-      margin:24px 0 20px;
       background:var(--card); border:1px solid var(--border); border-radius:14px;
       overflow:hidden; display:flex; padding:12px 8px 10px 0;
     }
+    .tds-gust-kn-lbl { position:absolute; top:3px; left:0; right:0; text-align:center; font-size:.52rem; font-weight:800; color:rgba(255,255,255,.7); line-height:1; pointer-events:none; }
     /* fixed y-axis */
     #tdsYAxis {
       flex-shrink:0; width:30px; position:relative; height:90px; align-self:flex-start; margin-bottom:32px;
@@ -187,7 +193,7 @@
     .tds-col.tds-now { background:rgba(0,212,255,.07); }
     .tds-bar-wrap { width:100%; height:90px; position:relative; }
     .tds-bar { position:absolute; bottom:0; left:10%; width:80%; border-radius:4px 4px 0 0; min-height:3px; transition:opacity .15s; }
-    .tds-gust-bar { border-radius:0; } /* gust sits on top of sustained bar */
+    .tds-gust-bar { border-radius:0; position:relative; } /* gust sits on top of sustained bar */
     .tds-col:hover .tds-bar { opacity:.75; }
     .tds-kn-lbl { position:absolute; bottom:2px; left:0; right:0; text-align:center; font-size:.58rem; font-weight:800; color:#000; line-height:1; pointer-events:none; z-index:1; }
     .tds-lbl { font-size:.6rem; font-weight:700; color:var(--tdim); white-space:nowrap; text-transform:uppercase; line-height:1.2; }
@@ -941,7 +947,7 @@
     }
 
     /* strip is mobile-only */
-    @media (min-width:600px) { #tenDayStrip { display:none !important; } }
+    @media (min-width:600px) { #tenDayStripWrap { display:none !important; } }
 
     /* strip is mobile-only (already declared below) */
 
@@ -1206,11 +1212,17 @@
 
     <div id="spotInfoCard"></div>
 
-    <div id="tenDayStrip" style="display:none">
-      <div id="tdsYAxis"></div>
-      <div id="tdsChart">
-        <div id="tdsGrid"></div>
-        <div id="tdsCols"></div>
+    <div id="tenDayStripWrap" style="display:none">
+      <div class="tds-header">
+        <span class="tds-title">16-day overview</span>
+        <span class="tds-swipe-hint">swipe → for more</span>
+      </div>
+      <div id="tenDayStrip">
+        <div id="tdsYAxis"></div>
+        <div id="tdsChart">
+          <div id="tdsGrid"></div>
+          <div id="tdsCols"></div>
+        </div>
       </div>
     </div>
 
@@ -3659,7 +3671,7 @@ function renderGrid(){
   });
 
   // ── summary strip ──
-  const strip=$('tenDayStrip');
+  const strip=$('tenDayStrip'), stripWrap=$('tenDayStripWrap');
   if(strip){
     const MIN_KN=0, MAX_KN=45;
     const RANGE=MAX_KN-MIN_KN;
@@ -3690,6 +3702,7 @@ function renderGrid(){
       const gustExt=Math.max(0,gustPct-pct);
       const col=kn>MAX_KN?'#ef4444':hasSession?windBarColor(kn):'transparent';
       const knLabel=hasSession&&kn>0?`<div class="tds-kn-lbl">${kn}</div>`:'';
+      const gustLabel=hasSession&&gustExt>0&&gustKn>=kn+7?`<div class="tds-gust-kn-lbl">↑${gustKn}</div>`:'';
       const isNow=dateStr===localStr;
       const {short}=fmtDate(dateStr);
       const lbl=isNow?'Now':(short==='Today'||short==='Tomorrow')?new Date(dateStr+'T12:00:00').toLocaleDateString('en',{weekday:'short'}):short;
@@ -3698,7 +3711,7 @@ function renderGrid(){
         <div class="tds-bar-wrap">
           ${knLabel}
           <div class="tds-bar" style="height:${pct}%;background:${col}"></div>
-          ${gustExt>0?`<div class="tds-bar tds-gust-bar" style="height:${gustExt}%;bottom:${pct}%;background:rgba(255,255,255,.2)"></div>`:''}
+          ${gustExt>0?`<div class="tds-bar tds-gust-bar" style="height:${gustExt}%;bottom:${pct}%;background:rgba(255,255,255,.2)">${gustLabel}</div>`:''}
         </div>
         <div class="tds-num">${dayNum}</div>
         <div class="tds-lbl">${lbl}</div>
@@ -3706,6 +3719,7 @@ function renderGrid(){
     }).join('');
 
     strip.style.display='flex';
+    if(stripWrap) stripWrap.style.display='block';
   }
 
   // ── last fetch timestamp ──
