@@ -3098,15 +3098,14 @@ async function renderSpotInfoCard(spotName) {
   const info = await fetchSpotInfo(spotName);
 
   if(!info) {
-    // Unclaimed state — always show a teaser to drive claim conversions
     el.innerHTML = `
       <div class="spot-info-card">
-        <div class="spot-info-header" onclick="_spotInfoOpen=!_spotInfoOpen;this.querySelector('.spot-info-chevron').classList.toggle('open',_spotInfoOpen);this.nextElementSibling.style.display=_spotInfoOpen?'flex':'none'">
+        <div class="spot-info-header" onclick="_spotInfoOpen=!_spotInfoOpen;this.nextElementSibling.style.display=_spotInfoOpen?'flex':'none';this.querySelector('.sic-claim-btn').style.display=_spotInfoOpen?'none':'inline-flex'">
           <div style="flex:1">
             <div class="spot-info-title">📍 Spot info &amp; bookings</div>
             <div class="spot-info-subtitle">Lessons · Gear rental · Contact</div>
           </div>
-          <svg class="spot-info-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+          <button class="sic-claim-btn spot-info-open-btn" onclick="event.stopPropagation();_spotInfoOpen=true;this.closest('.spot-info-card').querySelector('.spot-info-unclaimed').style.display='flex';this.style.display='none'">🏴 Claim this spot</button>
         </div>
         <div class="spot-info-unclaimed" style="display:none">
           <div class="spot-info-unclaimed-icon">🏴</div>
@@ -3118,9 +3117,9 @@ async function renderSpotInfoCard(spotName) {
     return;
   }
 
-  const verifiedBadge = info.verified
-    ? `<span class="spot-info-badge verified">✓ Verified</span>`
-    : `<span class="spot-info-badge unverified">⚠️ Unverified info</span>`;
+  const unclaimedBadge = !info.verified
+    ? `<span class="spot-info-badge unverified">⚠️ Unclaimed spot</span>`
+    : '';
 
   const ytId = youtubeId(info.livecam_url);
   const webcamBtn = info.livecam_url
@@ -3167,15 +3166,14 @@ async function renderSpotInfoCard(spotName) {
 
   el.innerHTML = `
     <div class="spot-info-card">
-      <div class="spot-info-header" onclick="_spotInfoOpen=!_spotInfoOpen;this.querySelector('.spot-info-chevron').classList.toggle('open',_spotInfoOpen);this.querySelector('.spot-info-chevron').style.display=_spotInfoOpen?'block':'none';this.nextElementSibling.style.display=_spotInfoOpen?'flex':'none';this.querySelector('.spot-info-open-btn').style.display=_spotInfoOpen?'none':'inline-flex'">
+      <div class="spot-info-header" onclick="_spotInfoOpen=!_spotInfoOpen;this.nextElementSibling.style.display=_spotInfoOpen?'flex':'none';this.querySelector('.spot-info-open-btn').textContent=_spotInfoOpen?'▲ Less':'More details ↓'">
         <div style="flex:1">
-          <div class="spot-info-title">📍 ${info.display_name || info.business_name || spotName}</div>
+          <div class="spot-info-title">📍 Spot info &amp; bookings</div>
           <div class="spot-info-subtitle">Lessons · Gear rental · Contact${info.livecam_url ? ' · <span style="display:inline-flex;align-items:center;gap:4px;color:#f87171;font-weight:700"><span class="webcam-dot" style="width:5px;height:5px"></span>Live cam</span>' : ''}</div>
         </div>
-        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
-          ${verifiedBadge}
-          <span class="spot-info-open-btn">See spot info <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg></span>
-          <svg class="spot-info-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="display:none"><polyline points="6 9 12 15 18 9"/></svg>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
+          ${unclaimedBadge}
+          <span class="spot-info-open-btn">More details ↓</span>
         </div>
       </div>
       <div class="spot-info-body" style="display:none">
@@ -3184,7 +3182,7 @@ async function renderSpotInfoCard(spotName) {
         ${descHTML}
         ${noteHTML}
         ${socialHTML}
-        ${!info.verified ? `<div style="font-size:.68rem;color:var(--tdim);text-align:center;margin-top:4px;">Owner of this spot? <span style="color:var(--accent);cursor:pointer;" onclick="openClaimFlow()">Claim it to manage your info →</span></div>` : ''}
+        ${!info.verified ? `<div style="font-size:.68rem;color:var(--tdim);text-align:center;margin-top:4px;">Owner of this spot? <span style="color:var(--accent);cursor:pointer;" onclick="openClaimFlow()">Claim it to manage and verify your info →</span></div>` : ''}
         ${info.added_by ? `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:.68rem;color:var(--tdim);text-align:center;">🌍 Spot added by community member <strong style="color:var(--gray)">${info.added_by}</strong></div>` : ''}
       </div>
     </div>`;
@@ -3545,7 +3543,7 @@ function renderGrid(){
   // Line 1: name + maps icon
   $('locName').innerHTML=`${loc.name}${loc.admin1&&loc.admin1!==loc.name?', '+loc.admin1:''}<a class="map-link" href="${mapsUrl}" target="_blank" rel="noopener" title="Open in Google Maps"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Maps</a>`;
   // Line 2: country + icons + sessions
-  $('locSub').innerHTML=`<span style="color:var(--tdim);font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em">${loc.country}</span><button class="fav-btn${isFav?' active':''}" id="favBtn" title="${isFav?'Remove from favourites':'Add to favourites'}">${isFav?'★':'☆'}</button><button class="notif-btn${hasSpotNotif(loc.name)?' active':''}" id="notifBtn" title="Get notified">${bellSVG(16)}</button><button class="share-btn" id="shareBtn" onclick="shareSpot()" title="Share this spot"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></button><button class="share-btn" id="claimBtn" onclick="openClaimFlow()" title="Claim this spot as owner" style="font-size:.7rem;padding:4px 8px;white-space:nowrap">🏴 Claim</button>${qdLabel}`;
+  $('locSub').innerHTML=`<span style="color:var(--tdim);font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em">${loc.country}</span><button class="fav-btn${isFav?' active':''}" id="favBtn" title="${isFav?'Remove from favourites':'Add to favourites'}">${isFav?'★':'☆'}</button><button class="notif-btn${hasSpotNotif(loc.name)?' active':''}" id="notifBtn" title="Get notified">${bellSVG(16)}</button><button class="share-btn" id="shareBtn" onclick="shareSpot()" title="Share this spot"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></button>${qdLabel}`;
   $('locHdr').style.display='block';
   $('resetBtn').style.display='inline-flex';
   document.body.classList.add('spot-loaded');
