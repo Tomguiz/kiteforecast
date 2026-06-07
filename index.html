@@ -1807,7 +1807,11 @@ async function autoDetectShore(lat,lon){
 // ══════════════════════════════════
 //  SHORE PICKER
 // ══════════════════════════════════
+let _windDirToggleLock=false;
 function toggleWindDir(btn){
+  // Prevent double-fire from touchstart+click on mobile
+  if(_windDirToggleLock) return;
+  _windDirToggleLock=true; setTimeout(()=>_windDirToggleLock=false, 350);
   btn.blur();
   const deg=Number(btn.dataset.deg);
   manualShoreSet=true;
