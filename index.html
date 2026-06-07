@@ -1029,7 +1029,7 @@
 <!-- ══ API ERROR BANNER ══ -->
 <div id="apiErrorBanner" style="display:none;background:rgba(239,68,68,.1);border-top:1px solid rgba(239,68,68,.3);border-bottom:1px solid rgba(239,68,68,.3);padding:12px 20px;text-align:center;">
   <span style="color:#f87171;font-size:.88rem;font-weight:500;">⚠️ Could not load forecast data — please check your connection.</span>
-  <button onclick="location.reload()" style="margin-left:12px;padding:5px 14px;border-radius:8px;border:1.5px solid #f87171;background:transparent;color:#f87171;font-size:.82rem;font-weight:700;cursor:pointer;">↺ Reload</button>
+  <button onclick="reloadForecast()" style="margin-left:12px;padding:5px 14px;border-radius:8px;border:1.5px solid #f87171;background:transparent;color:#f87171;font-size:.82rem;font-weight:700;cursor:pointer;">↺ Reload</button>
 </div>
 
 <!-- ══ MAIN ══ -->
@@ -2823,6 +2823,19 @@ function toggleFavorite(){
   }catch(err){ console.error('toggleFavorite error:',err); showToast('Error: '+err.message); }
 }
 
+function reloadForecast(){
+  $('apiErrorBanner').style.display='none';
+  if(cachedLoc){
+    // Re-fetch the currently open spot
+    const loc=cachedLoc;
+    pickSpot({name:loc.name,lat:loc.latitude,lon:loc.longitude,dirs:[...windDirs]});
+  } else {
+    // Home screen — clear chip cache and retry all chip fetches
+    Object.keys(chipFxCache).forEach(k=>delete chipFxCache[k]);
+    Object.keys(chipBestCache).forEach(k=>delete chipBestCache[k]);
+    renderHintChips();
+  }
+}
 function setChipDayBadge(el,n){
   if(n===null){
     el.remove();
