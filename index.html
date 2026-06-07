@@ -6265,7 +6265,10 @@ async function initAuth(){
       const isNew=email!==_prevEmail;
       if(isNew){
         // Clear stale profile (avatar, nickname) from previous account before rendering
-        const fresh={}; fresh.email=email; saveProfile(fresh);
+        const fresh={email}; saveProfile(fresh);
+        // Force profile button to initials immediately so old avatar is never visible
+        const _btn=$('profileBtn');
+        if(_btn) _btn.innerHTML=`<span class="profile-btn-initials">${getInitials(email)}</span><span class="profile-btn-dot" id="profileDot"></span>`;
         updateAuthUI(); // re-render immediately with blank state before Supabase loads
         await syncAllFromSupabase(email);
         renderHintChips();
@@ -6393,6 +6396,8 @@ async function signOut(){
   delete p.smsEnabled;
   delete p.phoneNumber;
   delete p.digestEnabled;
+  delete p.avatar_url;
+  delete p.nickname;
   saveProfile(p);
   localStorage.removeItem('kf_notifs');
   updateAuthUI(); updateProfileDot(); renderNotifList(); renderHintChips();
