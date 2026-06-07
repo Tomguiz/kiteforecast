@@ -4239,11 +4239,15 @@ async function syncFavsFromSupabase(email){
       days:  r.spot_days||null,
     }));
     const local=loadFavs();
-    const localKeys=new Set(local.map(f=>`${f.lat},${f.lon}`));
-    // Any spot in Supabase but not in local was removed by the user — push that deletion back
-    const orphans=remote.filter(f=>!localKeys.has(`${f.lat},${f.lon}`));
-    for(const f of orphans) pushFavToSupabase(email,f,true);
-    // Local is authoritative — don't overwrite it; just clean up Supabase orphans above
+    if(local.length===0){
+      // Empty local = fresh install / cleared storage — restore from Supabase
+      saveFavs(remote);
+    } else {
+      // Local has data: any Supabase row not in local was removed by the user — delete it
+      const localKeys=new Set(local.map(f=>`${f.lat},${f.lon}`));
+      const orphans=remote.filter(f=>!localKeys.has(`${f.lat},${f.lon}`));
+      for(const f of orphans) pushFavToSupabase(email,f,true);
+    }
     renderHintChips();
   } finally {
     _syncFavsInFlight=false;
