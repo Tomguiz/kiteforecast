@@ -1080,7 +1080,7 @@
   <!-- welcome footer -->
   <div id="welcomeFooter" style="display:block;text-align:center;padding:40px 20px 32px;color:var(--tdim);font-size:.8rem;line-height:2;">
     <div style="font-size:.85rem;font-weight:500;color:var(--gray);margin-bottom:8px;">Never miss a session again</div>
-    <button onclick="showAddSpotFromHome()" style="background:rgba(0,212,255,.08);border:1px solid rgba(0,212,255,.2);border-radius:10px;color:var(--accent);font-size:.8rem;font-weight:600;padding:8px 16px;cursor:pointer;margin-bottom:12px">🪁 Your spot not listed? Add it →</button>
+    <button onclick="showAddSpotFromHome()" style="background:rgba(0,212,255,.08);border:1px solid rgba(0,212,255,.2);border-radius:10px;color:var(--accent);font-size:.8rem;font-weight:600;padding:8px 16px;cursor:pointer;margin-bottom:12px">🪁 Your spot is not listed? Add it →</button>
     <div>Tichkes Corporation Inc. — All rights reserved</div>
   </div>
 
@@ -2496,22 +2496,25 @@ function updateBestWindowBar(){
     return;
   }
 
-  const{short:bestLabel}=fmtDate(best.dateStr);
-  const bestTime=best.startHr!==null?String(best.startHr).padStart(2,'0')+'h00':'';
   const isSameSession=next&&next.nextDateStr===best.dateStr&&next.spotName===best.spotName;
-  const nextLabel=next&&!isSameSession&&next.nextDateStr?fmtDate(next.nextDateStr).short:null;
-  const nextTime=next&&next.nextStartHr!==null?String(next.nextStartHr).padStart(2,'0')+'h00':'';
 
-  const bestPill=`<div class="best-window-bar bw-pill" id="bwBest">
+  // Always show Next (earliest session). Only show Best separately when it differs from Next.
+  const nextLabel=next&&next.nextDateStr?fmtDate(next.nextDateStr).short:null;
+  const nextTime=next&&next.nextStartHr!==null?String(next.nextStartHr).padStart(2,'0')+'h00':'';
+  const showBest=!isSameSession;
+  const bestLabel=fmtDate(best.dateStr).short;
+  const bestTime=best.startHr!==null?String(best.startHr).padStart(2,'0')+'h00':'';
+
+  const bestPill=showBest?`<div class="best-window-bar bw-pill" id="bwBest">
     <span>🏆 Best:</span><span class="bw-spot">${best.spotName}</span><span>·</span><span>${bestLabel}${bestTime?' · '+bestTime:''}</span><span>·</span><span>${best.peakKn}kn</span>
-  </div>`;
+  </div>`:'';
   const nextPill=nextLabel?`<div class="best-window-bar bw-pill" id="bwNext">
     <span>⏭ Next:</span><span class="bw-spot">${next.spotName}</span><span>·</span><span>${nextLabel}${nextTime?' · '+nextTime:''}</span><span>·</span><span>${next.nextPeakKn}kn</span>
   </div>`:'';
 
-  bar.innerHTML=`<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;width:100%;padding:2px 0;">${bestPill}${nextPill}</div>`;
-  bar.querySelector('#bwBest').addEventListener('click',()=>pickSpotAndOpenDay(best.spot,best.dateStr));
+  bar.innerHTML=`<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;width:100%;padding:2px 0;">${nextPill}${bestPill}</div>`;
   if(nextLabel) bar.querySelector('#bwNext').addEventListener('click',()=>pickSpotAndOpenDay(next.spot,next.nextDateStr));
+  if(showBest) bar.querySelector('#bwBest').addEventListener('click',()=>pickSpotAndOpenDay(best.spot,best.dateStr));
   renderCompareBar();
 }
 
