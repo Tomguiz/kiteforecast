@@ -128,24 +128,14 @@
     main { max-width:1140px; margin:0 auto; padding:20px 14px 60px; }
 
     /* ── LOCATION HEADER ── */
-    .loc-hdr { text-align:center; margin-bottom:16px; display:none; }
-    .loc-hdr h2 { font-size:clamp(1.1rem,2.5vw,1.3rem); font-weight:700; }
-    .loc-hdr p  { color:var(--gray); font-size:.83rem; margin-top:3px; }
+    .loc-hdr { text-align:center; margin-bottom:12px; display:none; }
+    .loc-hdr h2 { font-size:clamp(1.1rem,2.5vw,1.3rem); font-weight:700; margin:0 0 4px; }
+    .loc-hdr p  { font-size:.78rem; margin:0 0 10px; display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:4px; }
+    /* line 3: wind dirs row */
+    .loc-wind-dirs { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:8px; padding:8px 0 4px; }
 
-    /* ── SHORE DIRECTION PICKER (compact, in results) ── */
-    .shore-bar {
-      display: none;
-      align-items: center;
-      gap: 10px;
-      flex-wrap: wrap;
-      justify-content: center;
-      margin-bottom: 18px;
-      padding: 10px 14px;
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-    }
-    .shore-bar.visible { display: flex; }
+    /* ── SHORE DIRECTION PICKER ── */
+    .shore-bar { display:none; } /* legacy — replaced by loc-wind-dirs */
     .shore-bar-label { font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--gray); white-space:nowrap; }
     .shore-btns { display:flex; gap:4px; flex-wrap:wrap; justify-content:center; }
     .s-btn {
@@ -946,23 +936,7 @@
     /* strip is mobile-only */
     @media (min-width:600px) { #tenDayStrip { display:none !important; } }
 
-    /* wind dirs mobile toggle row (hidden on desktop) */
-    #windDirsMobileToggle { display:none; }
-    @media (max-width:599px) {
-      #shoreBar { display:none !important; }
-      #windDirsMobileToggle {
-        display:flex; align-items:center; gap:6px; flex-wrap:wrap;
-        margin-top:6px; font-size:.72rem; color:var(--tdim); cursor:pointer;
-      }
-      #windDirsMobileToggle .wdmt-dirs { color:var(--accent); font-weight:700; }
-      #windDirsMobileToggle .wdmt-chevron { font-size:.65rem; color:var(--tdim); transition:transform .2s; margin-left:2px; }
-      #windDirsMobileToggle.open .wdmt-chevron { transform:rotate(180deg); }
-      #shoreBarMobile {
-        display:none; margin-top:8px; padding:10px 12px;
-        background:var(--surface); border:1px solid var(--border); border-radius:10px;
-      }
-      #shoreBarMobile.open { display:block; }
-    }
+    /* strip is mobile-only (already declared below) */
 
     /* ── MOBILE: 2-line card layout per hour ── */
     @media (max-width:599px) {
@@ -1202,43 +1176,25 @@
   <!-- results -->
   <div id="results" style="display:none">
     <div class="loc-hdr" id="locHdr">
+      <!-- Line 1: spot name + maps -->
       <h2 id="locName"></h2>
-      <p  id="locSub"></p>
-      <!-- mobile-only: inline wind dirs toggle -->
-      <div id="windDirsMobileToggle" onclick="toggleWindDirsMobile()">
-        <span>Wind dirs:</span>
-        <span class="wdmt-dirs" id="windDirsMobileLabel">—</span>
-        <span class="wdmt-chevron">▼</span>
-      </div>
-      <div id="shoreBarMobile">
-        <div class="shore-btns" id="shoreBtnsMobile">
-          <button class="s-btn" data-deg="0"   onclick="toggleWindDir(this);syncShoreBtns()">N</button>
-          <button class="s-btn" data-deg="45"  onclick="toggleWindDir(this);syncShoreBtns()">NE</button>
-          <button class="s-btn" data-deg="90"  onclick="toggleWindDir(this);syncShoreBtns()">E</button>
-          <button class="s-btn" data-deg="135" onclick="toggleWindDir(this);syncShoreBtns()">SE</button>
-          <button class="s-btn" data-deg="180" onclick="toggleWindDir(this);syncShoreBtns()">S</button>
-          <button class="s-btn" data-deg="225" onclick="toggleWindDir(this);syncShoreBtns()">SW</button>
-          <button class="s-btn" data-deg="270" onclick="toggleWindDir(this);syncShoreBtns()">W</button>
-          <button class="s-btn" data-deg="315" onclick="toggleWindDir(this);syncShoreBtns()">NW</button>
+      <!-- Line 2: country + action icons + sessions count -->
+      <p id="locSub"></p>
+      <!-- Line 3: wind dirs (always visible, no expand) -->
+      <div class="loc-wind-dirs" id="locWindDirs">
+        <span class="shore-bar-label">Good wind dirs →</span>
+        <div class="shore-btns" id="shoreBtns">
+          <button class="s-btn" data-deg="0"   onclick="toggleWindDir(this)">N</button>
+          <button class="s-btn" data-deg="45"  onclick="toggleWindDir(this)">NE</button>
+          <button class="s-btn" data-deg="90"  onclick="toggleWindDir(this)">E</button>
+          <button class="s-btn" data-deg="135" onclick="toggleWindDir(this)">SE</button>
+          <button class="s-btn" data-deg="180" onclick="toggleWindDir(this)">S</button>
+          <button class="s-btn" data-deg="225" onclick="toggleWindDir(this)">SW</button>
+          <button class="s-btn" data-deg="270" onclick="toggleWindDir(this)">W</button>
+          <button class="s-btn" data-deg="315" onclick="toggleWindDir(this)">NW</button>
         </div>
-        <span class="shore-hint" id="shoreHintMobile" style="display:block;margin-top:6px;font-size:.7rem;color:var(--tdim)"></span>
+        <span class="shore-hint" id="shoreHint"></span>
       </div>
-    </div>
-
-    <!-- compact shore direction picker -->
-    <div class="shore-bar" id="shoreBar">
-      <span class="shore-bar-label">Good wind dirs →</span>
-      <div class="shore-btns" id="shoreBtns">
-        <button class="s-btn" data-deg="0"   onclick="toggleWindDir(this)">N</button>
-        <button class="s-btn" data-deg="45"  onclick="toggleWindDir(this)">NE</button>
-        <button class="s-btn" data-deg="90"  onclick="toggleWindDir(this)">E</button>
-        <button class="s-btn" data-deg="135" onclick="toggleWindDir(this)">SE</button>
-        <button class="s-btn" data-deg="180" onclick="toggleWindDir(this)">S</button>
-        <button class="s-btn" data-deg="225" onclick="toggleWindDir(this)">SW</button>
-        <button class="s-btn" data-deg="270" onclick="toggleWindDir(this)">W</button>
-        <button class="s-btn" data-deg="315" onclick="toggleWindDir(this)">NW</button>
-      </div>
-      <span class="shore-hint" id="shoreHint">Select good wind directions for this spot</span>
     </div>
 
     <div id="spotInfoCard"></div>
@@ -1660,29 +1616,10 @@ function isWindDirOK(deg){
   return false;
 }
 function updateShoreHint(){
-  const hint=$('shoreHint'), hintM=$('shoreHintMobile'), lbl=$('windDirsMobileLabel');
-  const latLon=cachedLoc?` · ${cachedLoc.latitude.toFixed(2)}°, ${cachedLoc.longitude.toFixed(2)}°`:'';
-  if(windDirs.size===0){
-    if(hint) hint.textContent='Select good wind directions for this spot'+latLon;
-    if(hintM) hintM.textContent='';
-    if(lbl) lbl.textContent='—';
-    return;
-  }
-  const dirs=[...windDirs].sort((a,b)=>a-b).map(d=>compass(d)).join(' / ');
-  if(hint) hint.textContent=`${dirs}${latLon}`;
-  if(hintM) hintM.textContent=dirs;
-  if(lbl) lbl.textContent=dirs;
-}
-function toggleWindDirsMobile(){
-  const tog=$('windDirsMobileToggle'), panel=$('shoreBarMobile');
-  if(!tog||!panel) return;
-  const open=panel.classList.toggle('open');
-  tog.classList.toggle('open', open);
-}
-function syncShoreBtns(){
-  // keep mobile btn set active state in sync (desktop .s-btn is already handled by toggleWindDir)
-  document.querySelectorAll('#shoreBtnsMobile .s-btn').forEach(b=>b.classList.toggle('active',windDirs.has(Number(b.dataset.deg))));
-  updateShoreHint();
+  const hint=$('shoreHint');
+  if(!hint) return;
+  if(windDirs.size===0){ hint.textContent=''; return; }
+  hint.textContent=[...windDirs].sort((a,b)=>a-b).map(d=>compass(d)).join(' / ');
 }
 
 function speedTier(kn){
@@ -3601,11 +3538,11 @@ function renderGrid(){
   const qdLabel=qualDaysCount===0
     ?`<span style="${qdCls};font-size:.8rem;font-weight:700;margin-left:10px">No sessions in ${totalDays} days</span>`
     :`<span style="${qdCls};font-size:.8rem;font-weight:700;margin-left:10px">${qualDaysCount} of ${totalDays} days rideable</span>`;
-  $('locName').innerHTML=`${loc.name}${loc.admin1&&loc.admin1!==loc.name?', '+loc.admin1:''}<a class="map-link" href="${mapsUrl}" target="_blank" rel="noopener" title="Open in Google Maps"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Maps</a><button class="notif-btn${hasSpotNotif(loc.name)?' active':''}" id="notifBtn" title="Get notified">${bellSVG(16)}</button><button class="fav-btn${isFav?' active':''}" id="favBtn" title="${isFav?'Remove from favourites':'Add to favourites'}">${isFav?'★':'☆'}</button><button class="share-btn" id="shareBtn" onclick="shareSpot()" title="Share this spot"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></button><button class="share-btn" id="claimBtn" onclick="openClaimFlow()" title="Claim this spot as owner" style="margin-left:4px;font-size:.7rem;padding:4px 8px;white-space:nowrap">🏴 Claim</button>${qdLabel}`;
-
-  $('locSub').textContent=`${loc.country}`;
+  // Line 1: name + maps icon
+  $('locName').innerHTML=`${loc.name}${loc.admin1&&loc.admin1!==loc.name?', '+loc.admin1:''}<a class="map-link" href="${mapsUrl}" target="_blank" rel="noopener" title="Open in Google Maps"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Maps</a>`;
+  // Line 2: country + icons + sessions
+  $('locSub').innerHTML=`<span style="color:var(--tdim);font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em">${loc.country}</span><button class="fav-btn${isFav?' active':''}" id="favBtn" title="${isFav?'Remove from favourites':'Add to favourites'}">${isFav?'★':'☆'}</button><button class="notif-btn${hasSpotNotif(loc.name)?' active':''}" id="notifBtn" title="Get notified">${bellSVG(16)}</button><button class="share-btn" id="shareBtn" onclick="shareSpot()" title="Share this spot"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></button><button class="share-btn" id="claimBtn" onclick="openClaimFlow()" title="Claim this spot as owner" style="font-size:.7rem;padding:4px 8px;white-space:nowrap">🏴 Claim</button>${qdLabel}`;
   $('locHdr').style.display='block';
-  $('shoreBar').classList.add('visible');
   $('resetBtn').style.display='inline-flex';
   document.body.classList.add('spot-loaded');
   checkShowMySpotTab();
