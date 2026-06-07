@@ -3799,7 +3799,7 @@ function openModal(dateStr,dayIdx){
     const tempCol=h.temp<=8?'#7dd3fc':h.temp>=28?'#f97316':'var(--text)';
     const gustPct=windBarPct(h.gustKn);
     const gustExt=Math.max(0,gustPct-barPct);
-    const showGust=h.gustKn>h.kn; // show whenever gusts exceed sustained
+    const showGust=h.gustKn>=h.kn+7; // only show when gap is large enough to avoid overlap
     const waveRaw=cachedMarineHrMap?cachedMarineHrMap.get(h.tStr.slice(0,13)):null;
     const waveTxt=waveRaw!=null?waveRaw.h.toFixed(1)+'m':'—';
 
