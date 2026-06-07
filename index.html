@@ -134,7 +134,19 @@
     .loc-hdr h2 { font-size:clamp(1.1rem,2.5vw,1.3rem); font-weight:700; margin:0 0 4px; }
     .loc-hdr p  { font-size:.78rem; margin:0 0 10px; display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:4px; }
     /* line 3: wind dirs row */
-    .loc-wind-dirs { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:8px; padding:8px 0 4px; }
+    .loc-wind-dirs { padding:6px 0 2px; }
+    .lwd-panel { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:8px; padding:6px 0 2px; }
+    .lwd-toggle { display:none; }
+    .lwd-desktop-label { display:inline; }
+    @media (max-width:599px) {
+      .lwd-toggle { display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer; padding:6px 0 4px; }
+      .lwd-toggle-dirs { color:var(--accent); font-size:.72rem; font-weight:700; flex:1; text-align:center; }
+      .lwd-chevron { font-size:.6rem; color:var(--tdim); transition:transform .2s; }
+      .lwd-toggle.open .lwd-chevron { transform:rotate(180deg); }
+      .lwd-panel { display:none; padding-bottom:6px; }
+      .lwd-panel.open { display:flex; }
+      .lwd-desktop-label { display:none; }
+    }
 
     /* ── SHORE DIRECTION PICKER ── */
     .shore-bar { display:none; } /* legacy — replaced by loc-wind-dirs */
@@ -1193,20 +1205,29 @@
       <h2 id="locName"></h2>
       <!-- Line 2: country + action icons + sessions count -->
       <p id="locSub"></p>
-      <!-- Line 3: wind dirs (always visible, no expand) -->
+      <!-- Line 3: wind dirs — collapsible on mobile -->
       <div class="loc-wind-dirs" id="locWindDirs">
-        <span class="shore-bar-label">Good wind dirs →</span>
-        <div class="shore-btns" id="shoreBtns">
-          <button class="s-btn" data-deg="0"   onclick="toggleWindDir(this)">N</button>
-          <button class="s-btn" data-deg="45"  onclick="toggleWindDir(this)">NE</button>
-          <button class="s-btn" data-deg="90"  onclick="toggleWindDir(this)">E</button>
-          <button class="s-btn" data-deg="135" onclick="toggleWindDir(this)">SE</button>
-          <button class="s-btn" data-deg="180" onclick="toggleWindDir(this)">S</button>
-          <button class="s-btn" data-deg="225" onclick="toggleWindDir(this)">SW</button>
-          <button class="s-btn" data-deg="270" onclick="toggleWindDir(this)">W</button>
-          <button class="s-btn" data-deg="315" onclick="toggleWindDir(this)">NW</button>
+        <!-- mobile toggle row (hidden on desktop) -->
+        <div class="lwd-toggle" id="lwdToggle" onclick="toggleWindDirsPanel()">
+          <span class="shore-bar-label">Good wind dirs</span>
+          <span class="lwd-toggle-dirs" id="lwdToggleDirs">—</span>
+          <span class="lwd-chevron" id="lwdChevron">▼</span>
         </div>
-        <span class="shore-hint" id="shoreHint"></span>
+        <!-- buttons panel -->
+        <div class="lwd-panel" id="lwdPanel">
+          <span class="shore-bar-label lwd-desktop-label">Good wind dirs →</span>
+          <div class="shore-btns" id="shoreBtns">
+            <button class="s-btn" data-deg="0"   onclick="toggleWindDir(this)">N</button>
+            <button class="s-btn" data-deg="45"  onclick="toggleWindDir(this)">NE</button>
+            <button class="s-btn" data-deg="90"  onclick="toggleWindDir(this)">E</button>
+            <button class="s-btn" data-deg="135" onclick="toggleWindDir(this)">SE</button>
+            <button class="s-btn" data-deg="180" onclick="toggleWindDir(this)">S</button>
+            <button class="s-btn" data-deg="225" onclick="toggleWindDir(this)">SW</button>
+            <button class="s-btn" data-deg="270" onclick="toggleWindDir(this)">W</button>
+            <button class="s-btn" data-deg="315" onclick="toggleWindDir(this)">NW</button>
+          </div>
+          <span class="shore-hint" id="shoreHint"></span>
+        </div>
       </div>
     </div>
 
@@ -1641,9 +1662,15 @@ function isWindDirOK(deg){
 }
 function updateShoreHint(){
   const hint=$('shoreHint');
-  if(!hint) return;
-  if(windDirs.size===0){ hint.textContent=''; return; }
-  hint.textContent=[...windDirs].sort((a,b)=>a-b).map(d=>compass(d)).join(' / ');
+  const dirs=windDirs.size>0?[...windDirs].sort((a,b)=>a-b).map(d=>compass(d)).join(' / '):'—';
+  if(hint) hint.textContent=windDirs.size>0?dirs:'';
+  const lbl=$('lwdToggleDirs'); if(lbl) lbl.textContent=dirs;
+}
+function toggleWindDirsPanel(){
+  const tog=$('lwdToggle'), panel=$('lwdPanel');
+  if(!tog||!panel) return;
+  const open=panel.classList.toggle('open');
+  tog.classList.toggle('open', open);
 }
 
 function speedTier(kn){
