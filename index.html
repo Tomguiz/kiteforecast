@@ -1790,12 +1790,12 @@ function toggleWindDir(btn){
   manualShoreSet=true;
   if(windDirs.has(deg)){
     windDirs.delete(deg);
-    btn.classList.remove('active');
     if(windDirs.size===0) manualShoreSet=false;
   } else {
     windDirs.add(deg);
-    btn.classList.add('active');
   }
+  // sync all buttons (not just the clicked one) to avoid stale active states
+  document.querySelectorAll('.s-btn').forEach(b=>b.classList.toggle('active',windDirs.has(Number(b.dataset.deg))));
   updateShoreHint();
   if(cachedWx&&cachedHrMap) renderGrid();
   // persist user override and invalidate chip cache so home screen updates
