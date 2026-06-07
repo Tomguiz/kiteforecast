@@ -2894,6 +2894,9 @@ function setChipDayBadge(el,n){
 function renderHintChips(){
   const signedIn=!!_authSession?.user;
   const favs=signedIn?loadFavs():[];
+  // Evict cache entries for spots no longer in favs so they can't appear in Best/Next pills
+  const favKeySet=new Set(favs.map(f=>`${f.lat},${f.lon}`));
+  Object.keys(chipBestCache).forEach(k=>{ if(!favKeySet.has(k)){ delete chipBestCache[k]; delete chipFxCache[k]; } });
   const wrap=$('hintChips');
   wrap.innerHTML='';
 
