@@ -120,6 +120,8 @@
         display: none;
       }
     }
+    #resetBtn { display:none; }
+    body.spot-loaded #resetBtn { display:inline-flex; }
     .btn-reset:hover { border-color:var(--accent); color:var(--accent); }
     .map-link { display:inline-flex; align-items:center; gap:4px; color:var(--accent); text-decoration:none; font-size:.82rem; opacity:.85; vertical-align:middle; margin-left:8px; transition:opacity .2s; }
     .map-link:hover { opacity:1; }
@@ -1016,7 +1018,7 @@
       <div class="autocomplete" id="acDropdown"></div>
     </div>
     <button class="btn-map" id="mapBtn" onclick="openSpotsMap()" title="Show all kite spots on map"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:5px"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Map</button>
-    <button class="btn-reset" id="resetBtn" style="display:none" onclick="resetSearch()">← Back</button>
+    <button class="btn-reset" id="resetBtn" onclick="resetSearch()">← Back</button>
   </div>
 </header>
 
@@ -2979,7 +2981,6 @@ function resetSearch(){
   $('locHdr').style.display='none';
   $('shoreBar').classList.remove('visible');
   $('apiErrorBanner').style.display='none';
-  $('resetBtn').style.display='none';
   $('searchInput').value='';
   cachedWx=null; cachedLoc=null; cachedHrMap=new Map(); cachedTideExtremes=null;
   windDirs=new Set(); manualShoreSet=false;
@@ -3549,7 +3550,6 @@ function renderGrid(){
   // Line 2: maps + icons + sessions
   $('locSub').innerHTML=`<a class="map-link" href="${mapsUrl}" target="_blank" rel="noopener" title="Open in Google Maps"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Maps</a><button class="fav-btn${isFav?' active':''}" id="favBtn" title="${isFav?'Remove from favourites':'Add to favourites'}">${isFav?'★':'☆'}</button><button class="notif-btn${hasSpotNotif(loc.name)?' active':''}" id="notifBtn" title="Get notified">${bellSVG(16)}</button><button class="share-btn" id="shareBtn" onclick="shareSpot()" title="Share this spot"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></button>${qdLabel}`;
   $('locHdr').style.display='block';
-  $('resetBtn').style.display='inline-flex';
   document.body.classList.add('spot-loaded');
   checkShowMySpotTab();
 
