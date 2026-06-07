@@ -175,7 +175,7 @@
       background:var(--card); border:1px solid var(--border); border-radius:14px;
       overflow:hidden; display:flex; padding:12px 8px 10px 0;
     }
-    .tds-gust-kn-lbl { position:absolute; top:3px; left:0; right:0; text-align:center; font-size:.52rem; font-weight:800; color:rgba(255,255,255,.85); line-height:1; pointer-events:none; }
+    .tds-gust-kn-lbl { position:absolute; top:3px; left:0; right:0; text-align:center; font-size:.52rem; font-weight:800; color:#fff; line-height:1; pointer-events:none; text-shadow:0 1px 2px rgba(0,0,0,.6); }
     /* fixed y-axis */
     #tdsYAxis {
       flex-shrink:0; width:30px; position:relative; height:90px; align-self:flex-start; margin-bottom:32px;
@@ -3744,7 +3744,7 @@ function renderGrid(){
       return `<div class="tds-col${isNow?' tds-now':''}" onclick="openModal('${dateStr}',${i})" title="${kn?kn+'kn':''} ${gustKn?'↑'+gustKn+'kn gust':''} · ${gh}h qualifying">
         <div class="tds-bar-wrap">
           <div class="tds-bar" style="height:${pct}%;background:${col}">${knLabel}</div>
-          ${gustExt>0?`<div class="tds-bar tds-gust-bar" style="height:${gustExt}%;bottom:${pct}%;background:rgba(255,255,255,.2)">${gustLabel}</div>`:''}
+          ${gustExt>0?`<div class="tds-bar tds-gust-bar" style="height:${gustExt}%;bottom:${pct}%;background:rgba(255,255,255,.28)">${gustLabel}</div>`:''}
         </div>
         <div class="tds-num">${dayNum}</div>
         <div class="tds-lbl">${lbl}</div>
