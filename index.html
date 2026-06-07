@@ -175,7 +175,7 @@
       background:var(--card); border:1px solid var(--border); border-radius:14px;
       overflow:hidden; display:flex; padding:12px 8px 10px 0;
     }
-    .tds-gust-kn-lbl { position:absolute; top:3px; left:0; right:0; text-align:center; font-size:.52rem; font-weight:800; color:rgba(255,255,255,.7); line-height:1; pointer-events:none; }
+    .tds-gust-kn-lbl { position:absolute; top:3px; left:0; right:0; text-align:center; font-size:.52rem; font-weight:800; color:rgba(255,255,255,.85); line-height:1; pointer-events:none; }
     /* fixed y-axis */
     #tdsYAxis {
       flex-shrink:0; width:30px; position:relative; height:90px; align-self:flex-start; margin-bottom:32px;
@@ -207,7 +207,7 @@
     .tds-bar { position:absolute; bottom:0; left:10%; width:80%; border-radius:4px 4px 0 0; min-height:3px; transition:opacity .15s; }
     .tds-gust-bar { border-radius:0; position:relative; } /* gust sits on top of sustained bar */
     .tds-col:hover .tds-bar { opacity:.75; }
-    .tds-kn-lbl { position:absolute; bottom:2px; left:0; right:0; text-align:center; font-size:.58rem; font-weight:800; color:#000; line-height:1; pointer-events:none; z-index:1; }
+    .tds-kn-lbl { position:absolute; bottom:3px; left:0; right:0; text-align:center; font-size:.58rem; font-weight:800; color:#000; line-height:1; pointer-events:none; z-index:1; }
     .tds-lbl { font-size:.6rem; font-weight:700; color:var(--tdim); white-space:nowrap; text-transform:uppercase; line-height:1.2; }
     .tds-num { font-size:.68rem; font-weight:800; color:var(--text); line-height:1; }
     .tds-col.tds-now .tds-lbl { color:var(--accent); }
@@ -3733,15 +3733,14 @@ function renderGrid(){
       const gustExt=Math.max(0,gustPct-pct);
       const col=kn>MAX_KN?'#ef4444':hasSession?windBarColor(kn):'transparent';
       const knLabel=hasSession&&kn>0?`<div class="tds-kn-lbl">${kn}</div>`:'';
-      const gustLabel=hasSession&&gustExt>0&&gustKn>=kn+7?`<div class="tds-gust-kn-lbl">↑${gustKn}</div>`:'';
+      const gustLabel=hasSession&&gustExt>0&&gustKn>kn?`<div class="tds-gust-kn-lbl">↑${gustKn}</div>`:'';
       const isNow=dateStr===localStr;
       const {short}=fmtDate(dateStr);
       const lbl=isNow?'Now':(short==='Today'||short==='Tomorrow')?new Date(dateStr+'T12:00:00').toLocaleDateString('en',{weekday:'short'}):short;
       const dayNum=dateStr.slice(8).replace(/^0/,'');
       return `<div class="tds-col${isNow?' tds-now':''}" onclick="openModal('${dateStr}',${i})" title="${kn?kn+'kn':''} ${gustKn?'↑'+gustKn+'kn gust':''} · ${gh}h qualifying">
         <div class="tds-bar-wrap">
-          ${knLabel}
-          <div class="tds-bar" style="height:${pct}%;background:${col}"></div>
+          <div class="tds-bar" style="height:${pct}%;background:${col}">${knLabel}</div>
           ${gustExt>0?`<div class="tds-bar tds-gust-bar" style="height:${gustExt}%;bottom:${pct}%;background:rgba(255,255,255,.2)">${gustLabel}</div>`:''}
         </div>
         <div class="tds-num">${dayNum}</div>
