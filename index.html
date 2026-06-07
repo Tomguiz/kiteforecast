@@ -3318,6 +3318,8 @@ window._spotsReady=new Promise(r=>{_spotsReadyResolve=r;});
   $('hintLegend').innerHTML=buildLegendHTML();
   $('resultsLegend').innerHTML=buildLegendHTML();
 })();
+// Clear search bar on every page load (browser may restore previous value)
+if($('searchInput')) $('searchInput').value='';
 initAuth();
 initInstallBanner();
 updateShareBanner();
