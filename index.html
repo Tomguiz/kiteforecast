@@ -3050,7 +3050,7 @@ function resetSearch(){
   showOnly('hintState');
   document.body.classList.remove('spot-loaded');
   $('locHdr').style.display='none';
-  $('shoreBar').classList.remove('visible');
+  const _sb=$('shoreBar'); if(_sb) _sb.classList.remove('visible');
   $('apiErrorBanner').style.display='none';
   $('searchInput').value='';
   requestAnimationFrame(()=>{ if($('searchInput')) $('searchInput').value=''; });
