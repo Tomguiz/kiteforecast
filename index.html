@@ -7239,7 +7239,7 @@ function toggleSpotNotif(){
     } else {
       if(!isFavSpot(loc.name)){
         showToast('★ Add this spot to your favourites first', 4000, '#ef4444');
-        const favBtn=$('favBtn'); if(favBtn){ favBtn.style.animation='none'; favBtn.offsetHeight; favBtn.style.animation='pulse .4s 2'; }
+        const favBtn=$('mFavBtn')||$('favBtn'); if(favBtn){ favBtn.style.animation='none'; favBtn.offsetHeight; favBtn.style.animation='pulse .4s 2'; }
         return;
       }
       addSpotNotif({name:loc.name,lat:loc.latitude,lon:loc.longitude},getQualSessions());
@@ -7326,7 +7326,7 @@ function toggleDayNotif(e,dateStr,dayIdx){
     showToast('🔕 Notification removed');
   } else {
     if(!isFavSpot(loc.name)){
-      showToast('★ Add this spot to your favourites first', 4000, '#f87171');
+      showToast('★ Add this spot to your favourites first', 4000, '#ef4444');
       const favBtn=$('favBtn')||$('mFavBtn'); if(favBtn){ favBtn.style.animation='none'; favBtn.offsetHeight; favBtn.style.animation='pulse .4s 2'; }
       return;
     }
