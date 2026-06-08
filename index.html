@@ -6012,9 +6012,9 @@ async function startCheckout(){
       headers:{'Content-Type':'application/json','Authorization':'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwd21hanR4bWNmcGFrdm9uaW1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTcyMjYsImV4cCI6MjA5MDczMzIyNn0.QfQuIQbnfVUOApPbOdvCRbNsVdb0SBAwMX-hvioGJmg'},
       body:JSON.stringify({email,success_url:location.origin+location.pathname+'?premium=success',cancel_url:location.origin+location.pathname+'?premium=cancelled'}),
     });
-    const{url}=await resp.json();
-    if(url) location.href=url;
-    else throw new Error('No URL');
+    const data=await resp.json();
+    if(data.url) location.href=data.url;
+    else throw new Error(data.error||'No checkout URL returned');
   }catch(e){ showToast('Error starting checkout: '+e.message); btn.disabled=false; btn.textContent='Upgrade to Premium →'; }
 }
 
