@@ -2852,7 +2852,7 @@ function toggleFavorite(){
     favs.splice(idx,1);
   } else {
     if(!isPremium()&&favs.length>=FREE_FAV_LIMIT){
-      showToast(`⭐ ${loc.name} couldn't be added — free plan is limited to 1 spot.`);
+      showToast(`⭐ ${loc.name} couldn't be added — free plan is limited to 1 spot.`, 4000, '#f87171');
       goHome();
       setTimeout(()=>showUpgradeModal(), 80);
       return;
