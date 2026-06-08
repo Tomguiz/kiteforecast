@@ -2896,6 +2896,8 @@ function setChipDayBadge(el,n){
 }
 
 function renderHintChips(){
+  // Always clear search bar when rendering home screen chips
+  const _si=$('searchInput'); if(_si&&!cachedLoc) _si.value='';
   const signedIn=!!_authSession?.user;
   const favs=signedIn?loadFavs():[];
   // Evict cache entries for spots no longer in favs so they can't appear in Best/Next pills
@@ -3383,8 +3385,10 @@ window._spotsReady=new Promise(r=>{_spotsReadyResolve=r;});
   $('hintLegend').innerHTML=buildLegendHTML();
   $('resultsLegend').innerHTML=buildLegendHTML();
 })();
-// Clear search bar on every page load (browser may restore previous value)
+// Clear search bar on every page load / PWA resume (browser may restore previous value)
 if($('searchInput')) $('searchInput').value='';
+window.addEventListener('pageshow', ()=>{ if(!cachedLoc&&$('searchInput')) $('searchInput').value=''; });
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible'&&!cachedLoc&&$('searchInput')) $('searchInput').value=''; });
 initAuth();
 initInstallBanner();
 updateShareBanner();
@@ -4227,9 +4231,9 @@ async function syncAllFromSupabase(email){
 let _syncFavsInFlight=false;
 async function syncFavsFromSupabase(email){
   if(!email||_syncFavsInFlight) return;
+  const sb=getSb(); if(!sb) return;
   _syncFavsInFlight=true;
   try{
-    const sb=getSb(); if(!sb) return;
     const {data,error}=await sb
       .from('favourites')
       .select('spot_name,spot_label,spot_lat,spot_lon,spot_dirs,spot_days')
