@@ -1485,18 +1485,21 @@
     </div>
     <div id="ppPanelNotifs" class="pp-body" style="display:none">
 
-      <!-- Email reminders -->
+      <!-- Email reminders + My spot alerts (combined card) -->
       <div class="notif-card">
-        <div class="notif-row">
+        <div class="notif-row" style="padding-bottom:10px;border-bottom:1px solid var(--border)">
           <div class="notif-info">
             <div class="notif-title">📧 Email reminders</div>
-            <div class="notif-sub">72h · 48h · 24h · 6h alerts before each kite session</div>
+            <div class="notif-sub">72h · 48h · 24h · 6h before each session</div>
           </div>
           <button class="pp-toggle" id="ppMasterToggle" onclick="toggleMasterNotif()"><span></span></button>
         </div>
-      </div>
-      <div id="ppMasterOffNote" style="display:none;margin:6px 0;padding:10px 14px;background:rgba(248,113,113,.08);border:1px solid rgba(248,113,113,.2);border-radius:10px;font-size:.75rem;color:#fca5a5;line-height:1.5;">
-        🔕 Reminders paused — friends &amp; digest emails are unaffected.
+        <div id="ppMasterOffNote" style="display:none;padding:8px 0 4px;font-size:.72rem;color:#fca5a5;line-height:1.5;">
+          🔕 Reminders paused for all spots.
+        </div>
+        <!-- Spot alerts list lives inside this card -->
+        <div style="padding-top:6px;font-size:.62rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--tdim);padding-bottom:4px">My spot alerts</div>
+        <div id="ppNotifList"></div>
       </div>
 
       <!-- Friends session alerts -->
@@ -1551,12 +1554,8 @@
         </div>
       </div>
 
-      <!-- My spot alerts -->
-      <div style="padding-top:8px;margin-bottom:6px;font-size:.65rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--tdim)">My spot alerts</div>
-      <div id="ppNotifList"></div>
-
       <!-- How it works -->
-      <div style="margin-top:16px;padding:14px 16px;background:rgba(56,189,248,.05);border:1px solid rgba(56,189,248,.12);border-radius:12px;font-size:.75rem;color:var(--gray);line-height:1.65;">
+      <div style="margin-top:4px;padding:14px 16px;background:rgba(56,189,248,.05);border:1px solid rgba(56,189,248,.12);border-radius:12px;font-size:.75rem;color:var(--gray);line-height:1.65;">
         <div style="font-weight:700;color:var(--text);margin-bottom:8px;">📬 How notifications work</div>
         <div style="margin-bottom:5px;">⏰ Up to <strong style="color:var(--text);">4 alerts</strong> per session: <strong style="color:var(--text);">72h · 48h · 24h · 6h</strong> before.</div>
         <div style="margin-bottom:5px;">✅ The <strong style="color:var(--text);">72h alert</strong> is only sent if the forecast looks good.</div>
@@ -6949,6 +6948,8 @@ async function renderNotifList(){
   $('ppMasterToggle').className='pp-toggle'+(_masterOn?' on':'');
   const _offNote=$('ppMasterOffNote'); if(_offNote) _offNote.style.display=_masterOn?'none':'block';
   const list=$('ppNotifList');
+  list.style.opacity=_masterOn?'1':'0.4';
+  list.style.pointerEvents=_masterOn?'':'none';
   if(!signedIn){list.innerHTML='<div class="pp-empty">Sign in to manage your notifications</div>';return;}
   if(!visible.length){list.innerHTML='<div class="pp-empty">No active notifications</div>';return;}
 
