@@ -2513,8 +2513,10 @@ function updateBestWindowBar(){
 
   if(!hasFavs){ bar.style.display='none'; return; }
 
-  // Identify which fav keys have loaded vs still pending
+  // Evict any cache entries that don't belong to current favs
   const favKeys=favs.map(f=>`${f.lat},${f.lon}`);
+  const favKeySet=new Set(favKeys);
+  Object.keys(chipBestCache).forEach(k=>{ if(!favKeySet.has(k)){ delete chipBestCache[k]; delete chipFxCache[k]; } });
   const loadedKeys=favKeys.filter(k=>k in chipBestCache);
   const allLoaded=loadedKeys.length===favKeys.length;
 
@@ -2582,6 +2584,9 @@ function renderCompareBar(){
   const el=$('compareBar'); if(!el) return;
   const favs=loadFavs();
   if(!_authSession?.user||favs.length<2){ el.style.display='none'; return; }
+  // Evict non-fav cache entries before building compare table
+  const _favKeySet=new Set(favs.map(f=>`${f.lat},${f.lon}`));
+  Object.keys(chipBestCache).forEach(k=>{ if(!_favKeySet.has(k)){ delete chipBestCache[k]; delete chipFxCache[k]; } });
   const loadedEntries=favs.map(f=>chipBestCache[`${f.lat},${f.lon}`]).filter(Boolean);
   if(loadedEntries.length<2){ el.style.display='none'; return; }
   el.style.display='block';
@@ -4258,14 +4263,11 @@ async function pushFavToSupabase(email,fav,remove=false){
   if(!email) return;
   const sb=getSb(); if(!sb) return;
   if(remove){
-    // Delete by lat+lon as primary key (name may have whitespace/case drift)
-    const{error}=await sb.from('favourites').delete()
-      .eq('email',email).eq('spot_lat',fav.lat).eq('spot_lon',fav.lon);
-    if(error){
-      console.error('[favs] delete by coords error',error);
-      // Fallback: try by name
-      await sb.from('favourites').delete().eq('email',email).eq('spot_name',fav.name);
-    }
+    // Delete by both coords and name to handle any drift between the two
+    await Promise.all([
+      sb.from('favourites').delete().eq('email',email).eq('spot_lat',fav.lat).eq('spot_lon',fav.lon),
+      sb.from('favourites').delete().eq('email',email).eq('spot_name',fav.name),
+    ]);
   } else {
     // Try insert first; if conflict (already exists) do an update
     const row={
