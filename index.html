@@ -3053,6 +3053,7 @@ function resetSearch(){
   $('shoreBar').classList.remove('visible');
   $('apiErrorBanner').style.display='none';
   $('searchInput').value='';
+  requestAnimationFrame(()=>{ if($('searchInput')) $('searchInput').value=''; });
   cachedWx=null; cachedLoc=null; cachedHrMap=new Map(); cachedTideExtremes=null;
   windDirs=new Set(); manualShoreSet=false;
   document.querySelectorAll('.s-btn').forEach(b=>b.classList.remove('active'));
@@ -4243,14 +4244,15 @@ async function syncFavsFromSupabase(email){
       days:  r.spot_days||null,
     }));
     const local=loadFavs();
-    if(local.length===0){
-      // Empty local = fresh install / cleared storage — restore from Supabase
+    const localKeys=new Set(local.map(f=>`${f.lat},${f.lon}`));
+    // Spots in Supabase but not in local = user removed them; delete from Supabase
+    const orphans=remote.filter(f=>!localKeys.has(`${f.lat},${f.lon}`));
+    if(orphans.length){
+      await Promise.all(orphans.map(f=>pushFavToSupabase(email,f,true)));
+    }
+    if(local.length===0&&orphans.length===0){
+      // Genuinely empty local (fresh install) — restore from Supabase
       saveFavs(remote);
-    } else {
-      // Local has data: any Supabase row not in local was removed by the user — delete it
-      const localKeys=new Set(local.map(f=>`${f.lat},${f.lon}`));
-      const orphans=remote.filter(f=>!localKeys.has(`${f.lat},${f.lon}`));
-      for(const f of orphans) pushFavToSupabase(email,f,true);
     }
     renderHintChips();
   } finally {
