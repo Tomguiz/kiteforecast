@@ -1374,27 +1374,26 @@
         <p class="pp-note" style="margin:0">Notifications &amp; favourites stay in sync across all your devices.</p>
         <div style="border-top:1px solid var(--border);margin:4px 0"></div>
 
-        <!-- Profile picture -->
-        <div style="display:flex;align-items:center;gap:14px;padding:4px 0 8px">
+        <!-- Profile picture + nickname in one compact row -->
+        <div style="display:flex;align-items:center;gap:12px;padding:6px 0 10px">
           <div style="position:relative;flex-shrink:0">
-            <div id="ppAvatarPreview" style="width:64px;height:64px;border-radius:50%;background:rgba(56,189,248,.15);border:2px solid rgba(56,189,248,.3);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:1.5rem;cursor:pointer;" onclick="$('ppAvatarInput').click()" title="Change photo">
+            <div id="ppAvatarPreview" style="width:52px;height:52px;border-radius:50%;background:rgba(56,189,248,.15);border:2px solid rgba(56,189,248,.3);overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:1.2rem;cursor:pointer;" onclick="$('ppAvatarInput').click()" title="Change photo">
               <span id="ppAvatarInitials" style="font-weight:700;color:#38bdf8"></span>
             </div>
-            <button onclick="$('ppAvatarInput').click()" style="position:absolute;bottom:-2px;right:-2px;width:22px;height:22px;border-radius:50%;background:#38bdf8;border:2px solid var(--surface);color:#000;font-size:.7rem;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0" title="Upload photo">✎</button>
+            <button onclick="$('ppAvatarInput').click()" style="position:absolute;bottom:-2px;right:-2px;width:18px;height:18px;border-radius:50%;background:#38bdf8;border:2px solid var(--surface);color:#000;font-size:.6rem;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0" title="Upload photo">✎</button>
           </div>
-          <div style="flex:1;min-width:0">
-            <div style="font-size:.78rem;font-weight:600;color:var(--text);margin-bottom:4px">Profile photo</div>
-            <button onclick="$('ppAvatarInput').click()" style="background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.25);border-radius:8px;color:#38bdf8;font-size:.72rem;font-weight:600;padding:5px 12px;cursor:pointer">Upload photo</button>
-            <span id="ppAvatarStatus" style="font-size:.7rem;color:var(--tdim);margin-left:8px"></span>
+          <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:5px;">
+            <label class="pp-label" style="margin:0">Nickname <span style="color:#f87171;font-weight:400;text-transform:none;letter-spacing:0">* required</span></label>
+            <div style="display:flex;gap:6px;align-items:center">
+              <input type="text" id="ppNicknameInput" class="pp-input" placeholder="e.g. TomKite" maxlength="32" oninput="onNicknameInput()" style="margin:0;flex:1"/>
+              <button class="btn pp-save-btn" id="ppNicknameSaveBtn" onclick="saveNickname(false)" style="margin:0;white-space:nowrap;flex-shrink:0">Save</button>
+            </div>
+            <span id="ppAvatarStatus" style="font-size:.65rem;color:var(--tdim)"></span>
           </div>
         </div>
         <input type="file" id="ppAvatarInput" accept="image/*" style="display:none" onchange="uploadAvatar(this)"/>
-        <div style="border-top:1px solid var(--border);margin:4px 0"></div>
-        <label class="pp-label">Nickname <span style="color:#f87171;font-weight:400;text-transform:none;letter-spacing:0">* required</span></label>
-        <input type="text" id="ppNicknameInput" class="pp-input" placeholder="e.g. TomKite" maxlength="32" oninput="onNicknameInput()" />
-        <button class="btn pp-save-btn" id="ppNicknameSaveBtn" onclick="saveNickname(false)" style="margin-top:2px">Save</button>
-        <p class="pp-note">Unique username — visible to friends. Letters, numbers, _ . - allowed.</p>
-        <div style="border-top:1px solid var(--border);margin:8px 0 4px"></div>
+        <p class="pp-note" style="margin-top:0;margin-bottom:6px">Unique username — visible to friends. Letters, numbers, _ . - allowed.</p>
+        <div style="border-top:1px solid var(--border);margin:4px 0 8px"></div>
 
         <!-- Share card -->
         <div style="padding:12px 14px;background:rgba(56,189,248,.05);border:1px solid rgba(56,189,248,.15);border-radius:12px;">
