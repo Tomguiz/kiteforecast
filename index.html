@@ -3196,6 +3196,7 @@ async function renderSpotInfoCard(spotName) {
   el.innerHTML = `<div class="spot-info-card"><div class="spot-info-header" style="opacity:.5;pointer-events:none"><div style="flex:1"><div class="spot-info-title">📍 Spot info &amp; bookings</div><div class="spot-info-subtitle">Lessons · Gear rental · Contact</div></div><svg class="spot-info-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg></div></div>`;
   _spotInfoOpen = false;
   const info = await fetchSpotInfo(spotName);
+  _cachedSpotInfo = info||null;
 
   if(!info) {
     el.innerHTML = `
@@ -3212,6 +3213,10 @@ async function renderSpotInfoCard(spotName) {
           <div class="spot-info-unclaimed-title">No info yet for this spot</div>
           <div class="spot-info-unclaimed-sub">Are you the owner or manager here? Claim this spot to add lesson bookings, gear rental, and contact details.</div>
           <button class="spot-info-claim-cta" onclick="openClaimFlow()">Claim this spot →</button>
+          <div style="margin-top:8px;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;">
+            <span style="font-size:.68rem;color:var(--tdim);cursor:pointer;display:inline-flex;align-items:center;gap:4px;" onclick="openSuggestUpdate()">✏️ Suggest spot info</span>
+            ${loadProfile().isAdmin?`<span style="font-size:.68rem;color:#fb923c;cursor:pointer;display:inline-flex;align-items:center;gap:4px;font-weight:700" onclick="openAdminEditFromSpot()">⚡ Admin: Edit directly</span>`:''}
+          </div>
         </div>
       </div>`;
     return;
@@ -3284,6 +3289,10 @@ async function renderSpotInfoCard(spotName) {
         ${socialHTML}
         ${!info.verified ? `<div style="font-size:.68rem;color:var(--tdim);text-align:center;margin-top:4px;">Owner of this spot? <span style="color:var(--accent);cursor:pointer;" onclick="openClaimFlow()">Claim it to manage and verify your info →</span></div>` : ''}
         ${info.added_by ? `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:.68rem;color:var(--tdim);text-align:center;">🌍 Spot added by community member <strong style="color:var(--gray)">${info.added_by}</strong></div>` : ''}
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;">
+          <span style="font-size:.68rem;color:var(--tdim);cursor:pointer;display:inline-flex;align-items:center;gap:4px;" onclick="openSuggestUpdate()">✏️ Suggest an update</span>
+          ${loadProfile().isAdmin?`<span style="font-size:.68rem;color:#fb923c;cursor:pointer;display:inline-flex;align-items:center;gap:4px;font-weight:700" onclick="openAdminEditFromSpot()">⚡ Admin: Edit directly</span>`:''}
+        </div>
       </div>
     </div>`;
 }
@@ -4818,6 +4827,112 @@ function updateUpgradeModal(){
 }
 
 // ── SPOT OWNER DASHBOARD ─────────────────────────────────────────────────────
+// ── SUGGEST UPDATE ────────────────────────────────────────────────────────────
+const DIR_LABELS=['N','NE','E','SE','S','SW','W','NW'];
+const DIR_DEGS  =[  0, 45,90,135,180,225,270,315];
+
+function openSuggestUpdate(){
+  if(!_authSession?.user){ _signinContext='generic'; openProfilePanel('profile'); showToast('Sign in to suggest updates'); return; }
+  if(!cachedLoc) return;
+  const el=$('suggestUpdateOverlay'); if(!el) return;
+  const info=_cachedSpotInfo||{};
+  const currentDirs=([...windDirs]||[]);
+
+  // Build dir buttons pre-filled with current spot dirs
+  const dirBtns=DIR_LABELS.map((lbl,i)=>{
+    const active=currentDirs.includes(DIR_DEGS[i]);
+    return `<button class="shore-btn${active?' active':''}" data-deg="${DIR_DEGS[i]}" onclick="this.classList.toggle('active')" style="min-width:44px">${lbl}</button>`;
+  }).join('');
+
+  $('suggestUpdateContent').innerHTML=`
+    <div style="font-size:.75rem;color:var(--tdim);margin-bottom:16px;">Spot: <strong style="color:var(--text)">${cachedLoc.name}</strong> — your suggestions go to the admin for review.</div>
+
+    <label class="pp-label">Website</label>
+    <input type="url" id="suWebsite" class="pp-input" value="${info.website||''}" placeholder="https://…" style="margin-bottom:10px"/>
+
+    <label class="pp-label">Live cam URL</label>
+    <input type="url" id="suLivecam" class="pp-input" value="${info.livecam_url||''}" placeholder="https://youtube.com/…" style="margin-bottom:10px"/>
+
+    <label class="pp-label">Lesson booking URL</label>
+    <input type="url" id="suLesson" class="pp-input" value="${info.lesson_url||''}" placeholder="https://…" style="margin-bottom:10px"/>
+
+    <label class="pp-label">Gear rental URL</label>
+    <input type="url" id="suGear" class="pp-input" value="${info.gear_url||''}" placeholder="https://…" style="margin-bottom:10px"/>
+
+    <label class="pp-label">Instagram</label>
+    <input type="url" id="suInstagram" class="pp-input" value="${info.instagram_url||''}" placeholder="https://instagram.com/…" style="margin-bottom:10px"/>
+
+    <label class="pp-label">Facebook</label>
+    <input type="url" id="suFacebook" class="pp-input" value="${info.facebook_url||''}" placeholder="https://facebook.com/…" style="margin-bottom:10px"/>
+
+    <label class="pp-label">Address</label>
+    <input type="text" id="suAddress" class="pp-input" value="${info.address||''}" placeholder="Street, City" style="margin-bottom:10px"/>
+
+    <label class="pp-label">Good wind directions <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(tap to toggle)</span></label>
+    <div id="suDirBtns" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">${dirBtns}</div>
+
+    <label class="pp-label">Tip / key info for this spot</label>
+    <textarea id="suTip" class="pp-input" rows="3" placeholder="e.g. Shallow at low tide, best at high tide. Avoid S swell." style="margin-bottom:16px;resize:vertical;min-height:72px;font-family:inherit;font-size:.85rem">${info.spot_tip||''}</textarea>
+
+    <button class="btn pp-save-btn" id="suSubmitBtn" onclick="submitSuggestUpdate()" style="width:100%">Send suggestion →</button>
+  `;
+  el.style.display='block';
+  document.body.style.overflow='hidden';
+}
+
+function closeSuggestUpdate(){
+  const el=$('suggestUpdateOverlay'); if(el) el.style.display='none';
+  document.body.style.overflow='';
+}
+
+async function submitSuggestUpdate(){
+  const btn=$('suSubmitBtn'); if(!btn) return;
+  const email=loadProfile().email||_authSession?.user?.email;
+  if(!email){ showToast('Sign in first'); return; }
+  const spotName=cachedLoc?.name||'';
+  if(!spotName) return;
+
+  const selDirs=[...document.querySelectorAll('#suDirBtns .shore-btn.active')].map(b=>parseInt(b.dataset.deg));
+  const website   =($('suWebsite')?.value||'').trim();
+  const livecam   =($('suLivecam')?.value||'').trim();
+  const lesson    =($('suLesson')?.value||'').trim();
+  const gear      =($('suGear')?.value||'').trim();
+  const instagram =($('suInstagram')?.value||'').trim();
+  const facebook  =($('suFacebook')?.value||'').trim();
+  const address   =($('suAddress')?.value||'').trim();
+  const tip       =($('suTip')?.value||'').trim();
+
+  btn.disabled=true; btn.textContent='Sending…';
+  const sb=getSb(); if(!sb){ btn.disabled=false; btn.textContent='Send suggestion →'; return; }
+  const{error}=await sb.from('spot_update_suggestions').insert({
+    email, spot_name:spotName,
+    website:website||null, livecam_url:livecam||null, lesson_url:lesson||null,
+    gear_url:gear||null, instagram_url:instagram||null, facebook_url:facebook||null,
+    address:address||null, suggested_dirs:selDirs.length?selDirs:null, tip:tip||null,
+  });
+  if(error){ showToast('Error: '+error.message); btn.disabled=false; btn.textContent='Send suggestion →'; return; }
+
+  // Notify admin by email
+  await fetch('https://kpwmajtxmcfpakvonimf.supabase.co/functions/v1/update-notify',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwd21hanR4bWNmcGFrdm9uaW1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTcyMjYsImV4cCI6MjA5MDczMzIyNn0.QfQuIQbnfVUOApPbOdvCRbNsVdb0SBAwMX-hvioGJmg'},
+    body:JSON.stringify({email,spot_name:spotName,website,livecam_url:livecam,lesson_url:lesson,gear_url:gear,instagram_url:instagram,facebook_url:facebook,address,suggested_dirs:selDirs,tip}),
+  }).catch(()=>{});
+
+  showToast('✓ Suggestion sent! We\'ll review it shortly.');
+  closeSuggestUpdate();
+}
+
+// Admin shortcut: open admin edit panel directly from spot page
+function openAdminEditFromSpot(){
+  if(!loadProfile().isAdmin) return;
+  openProfilePanel('admin');
+  setTimeout(()=>adminOpenSpot(cachedLoc?.name||null),300);
+}
+
+let _cachedSpotInfo=null;
+// ── END SUGGEST UPDATE ────────────────────────────────────────────────────────
+
 function openClaimFlow(){
   if(!_authSession?.user){ _signinContext='generic'; openProfilePanel('profile'); showToast('Sign in to claim a spot'); return; }
   if(!cachedLoc) return;
@@ -5648,16 +5763,18 @@ async function renderAdminPanel(){
   el.innerHTML='<div style="color:var(--tdim);font-size:.8rem;padding:8px 0">Loading…</div>';
   const sb=getSb(); if(!sb) return;
 
-  const [{data:spotData},{data:suggData},{data:overrideData}] = await Promise.all([
+  const [{data:spotData},{data:suggData},{data:overrideData},{data:updateSuggData}] = await Promise.all([
     sb.from('spot_info').select('*').order('spot_name'),
     sb.from('spot_suggestions').select('*').or('reviewed.eq.false,reviewed.is.null').order('created_at',{ascending:false}),
     sb.from('spot_overrides').select('name,lat,lon,loc').eq('active',true),
+    sb.from('spot_update_suggestions').select('*').eq('reviewed',false).order('created_at',{ascending:false}),
   ]);
   _adminSpots = spotData||[];
   // Annotate each spot_info with coords from spot_overrides if available
   const overrideMap={}; for(const o of overrideData||[]) overrideMap[o.name]=o;
   _adminSpots.forEach(s=>{ const o=overrideMap[s.spot_name]; if(o){s._lat=o.lat;s._lon=o.lon;s._loc=o.loc;s._hasOverride=true;} else{s._hasOverride=false;} });
   const pendingSuggs = suggData||[];
+  const pendingUpdates = updateSuggData||[];
 
   const suggRows = pendingSuggs.map(s=>`
     <div style="background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.25);border-radius:10px;padding:12px 14px;margin-bottom:8px;">
@@ -5681,9 +5798,41 @@ async function renderAdminPanel(){
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color:var(--tdim)"><polyline points="9 18 15 12 9 6"/></svg>
     </div>`).join('');
 
+  const updateRows=pendingUpdates.map(u=>{
+    const dirsLabel=u.suggested_dirs?.length?DIR_LABELS.filter((_,i)=>u.suggested_dirs.includes(DIR_DEGS[i])).join(', '):'—';
+    const fields=[
+      u.website&&`Website: ${u.website}`,
+      u.livecam_url&&`Live cam: ${u.livecam_url}`,
+      u.lesson_url&&`Lessons: ${u.lesson_url}`,
+      u.gear_url&&`Gear: ${u.gear_url}`,
+      u.instagram_url&&`Instagram: ${u.instagram_url}`,
+      u.facebook_url&&`Facebook: ${u.facebook_url}`,
+      u.address&&`Address: ${u.address}`,
+      u.suggested_dirs?.length&&`Dirs: ${dirsLabel}`,
+      u.tip&&`Tip: "${u.tip}"`,
+    ].filter(Boolean).join(' · ');
+    return `<div style="background:rgba(0,212,255,.06);border:1px solid rgba(0,212,255,.2);border-radius:10px;padding:12px 14px;margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+        <div style="flex:1">
+          <div style="font-size:.82rem;font-weight:700;color:var(--accent)">${u.spot_name}</div>
+          <div style="font-size:.7rem;color:var(--tdim);margin-top:3px;line-height:1.5">${fields||'(no changes noted)'}</div>
+          <div style="font-size:.7rem;color:var(--tdim);margin-top:3px">By: ${u.email} · ${new Date(u.created_at).toLocaleDateString()}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
+          <button class="btn pp-save-btn" style="font-size:.7rem;padding:5px 10px;white-space:nowrap" onclick="adminApplyUpdate(${JSON.stringify(u).replace(/"/g,'&quot;')})">Apply →</button>
+          <button style="font-size:.7rem;padding:5px 10px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-radius:8px;color:#f87171;cursor:pointer" onclick="adminDismissUpdate('${u.id}')">Dismiss</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+
   el.innerHTML=`
+    ${pendingUpdates.length?`
+    <div class="stats-section-title" style="margin-bottom:8px;color:var(--accent)">Update suggestions — ${pendingUpdates.length}</div>
+    ${updateRows}
+    <div style="margin-bottom:18px"></div>`:''}
     ${pendingSuggs.length?`
-    <div class="stats-section-title" style="margin-bottom:8px;color:#fbbf24">Pending requests — ${pendingSuggs.length}</div>
+    <div class="stats-section-title" style="margin-bottom:8px;color:#fbbf24">New spot requests — ${pendingSuggs.length}</div>
     ${suggRows}
     <div style="margin-bottom:18px"></div>`:''}
     <div class="stats-section-title" style="margin-bottom:8px">Spot info — ${_adminSpots.length} spots</div>
@@ -5831,6 +5980,42 @@ function adminUnlockRename(){
   inp.style.borderColor='rgba(251,191,36,.5)';
   inp.focus();
   showToast('⚠️ Rename: edit name then Save — old name will be removed.');
+}
+
+async function adminApplyUpdate(u){
+  const sb=getSb(); if(!sb) return;
+  if(!loadProfile().isAdmin){ showToast('Access denied'); return; }
+
+  // Apply to spot_info
+  const updates={};
+  if(u.website)       updates.website=u.website;
+  if(u.livecam_url)   updates.livecam_url=u.livecam_url;
+  if(u.lesson_url)    updates.lesson_url=u.lesson_url;
+  if(u.gear_url)      updates.gear_url=u.gear_url;
+  if(u.instagram_url) updates.instagram_url=u.instagram_url;
+  if(u.facebook_url)  updates.facebook_url=u.facebook_url;
+  if(u.address)       updates.address=u.address;
+  if(u.tip)           updates.description=u.tip;
+  if(Object.keys(updates).length){
+    await sb.from('spot_info').upsert({spot_name:u.spot_name,...updates,updated_at:new Date().toISOString()},{onConflict:'spot_name'});
+  }
+
+  // Apply dirs to spot_overrides
+  if(u.suggested_dirs?.length){
+    await sb.from('spot_overrides').update({dirs:u.suggested_dirs}).eq('name',u.spot_name);
+  }
+
+  // Mark reviewed
+  await sb.from('spot_update_suggestions').update({reviewed:true}).eq('id',u.id);
+  showToast('✓ Update applied');
+  renderAdminPanel();
+}
+
+async function adminDismissUpdate(id){
+  const sb=getSb(); if(!sb) return;
+  await sb.from('spot_update_suggestions').update({reviewed:true}).eq('id',id);
+  showToast('Dismissed');
+  renderAdminPanel();
 }
 
 async function adminSaveSpotInfo(){
@@ -7501,6 +7686,18 @@ document.addEventListener('visibilitychange',()=>{
   },{passive:true});
 })();
 </script>
+<!-- ══ SUGGEST UPDATE MODAL ══ -->
+<div id="suggestUpdateOverlay" style="display:none;position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);overflow-y:auto;-webkit-overflow-scrolling:touch;" onclick="if(event.target===this)closeSuggestUpdate()">
+  <div style="min-height:100%;display:flex;align-items:flex-end;justify-content:center;">
+    <div id="suggestUpdateModal" style="background:#0d1b2e;border-radius:20px 20px 0 0;width:100%;max-width:560px;padding:24px 20px 40px;border-top:1px solid rgba(0,212,255,.15);">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+        <div style="font-size:.95rem;font-weight:700;color:var(--text)">✏️ Suggest an update</div>
+        <button onclick="closeSuggestUpdate()" style="background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:8px;color:var(--gray);font-size:.8rem;padding:6px 12px;cursor:pointer;">✕ Close</button>
+      </div>
+      <div id="suggestUpdateContent"></div>
+    </div>
+  </div>
+</div>
 <!-- ══ NOTIF SIGNUP MICRO-MODAL ══ -->
 <div id="notifSignupOverlay" style="display:none" onclick="if(event.target===this)closeNotifSignupModal()">
   <div id="notifSignupModal">

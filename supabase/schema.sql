@@ -353,3 +353,38 @@ SELECT cron.schedule(
   );
   $$
 );
+
+-- User-submitted spot update suggestions
+CREATE TABLE IF NOT EXISTS spot_update_suggestions (
+  id               uuid             PRIMARY KEY DEFAULT gen_random_uuid(),
+  email            text             NOT NULL,
+  spot_name        text             NOT NULL,
+  website          text,
+  livecam_url      text,
+  lesson_url       text,
+  gear_url         text,
+  instagram_url    text,
+  facebook_url     text,
+  address          text,
+  suggested_dirs   integer[],
+  tip              text,
+  reviewed         boolean          NOT NULL DEFAULT false,
+  created_at       timestamptz      NOT NULL DEFAULT now()
+);
+
+ALTER TABLE spot_update_suggestions ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  CREATE POLICY "all_insert_spot_update_suggestions" ON spot_update_suggestions FOR INSERT TO anon, authenticated WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "all_select_spot_update_suggestions" ON spot_update_suggestions FOR SELECT TO anon, authenticated USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "all_update_spot_update_suggestions" ON spot_update_suggestions FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- Add spot_tip column to spot_info for community tips
+DO $$ BEGIN ALTER TABLE spot_info ADD COLUMN spot_tip text; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
