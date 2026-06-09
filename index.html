@@ -3417,6 +3417,10 @@ window._spotsReady=new Promise(r=>{_spotsReadyResolve=r;});
         } else {
           const s=SPOTS.find(s=>s.name===r.name);
           if(!s.alias) s.alias=aliasMap[r.name]||null;
+          if(r.loc) s.loc=r.loc;
+          if(r.lat) s.lat=r.lat;
+          if(r.lon) s.lon=r.lon;
+          if(r.dirs?.length) s.dirs=r.dirs;
         }
       }
     }
