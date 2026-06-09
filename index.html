@@ -281,10 +281,11 @@
     .rating-badge { width:100%; padding:5px 0; border-radius:7px; text-align:center; font-weight:700; font-size:.64rem; letter-spacing:.04em; text-transform:uppercase; }
     .rating-perfect  { background:rgba(34,197,94,.18);   color:#4ade80; border:1px solid rgba(34,197,94,.32); }
     .rating-verygood { background:rgba(34,197,94,.1);    color:#86efac; border:1px solid rgba(34,197,94,.2); }
-    .rating-good     { background:rgba(190,242,100,.1);  color:#bef264; border:1px solid rgba(190,242,100,.22); }
-    .rating-marginal { background:rgba(234,179,8,.13);   color:#fde047; border:1px solid rgba(234,179,8,.28); }
-    .rating-none     { background:rgba(148,163,184,.08); color:#7a8fa8; border:1px solid rgba(148,163,184,.16); }
-    .rating-bad      { background:rgba(239,68,68,.08);   color:#fca5a5; border:1px solid rgba(239,68,68,.18); }
+    .rating-good      { background:rgba(190,242,100,.1);  color:#bef264; border:1px solid rgba(190,242,100,.22); }
+    .rating-marginal  { background:rgba(234,179,8,.13);   color:#fde047; border:1px solid rgba(234,179,8,.28); }
+    .rating-lightwind { background:rgba(251,146,60,.12);  color:#fb923c; border:1px solid rgba(251,146,60,.28); }
+    .rating-none      { background:rgba(148,163,184,.08); color:#7a8fa8; border:1px solid rgba(148,163,184,.16); }
+    .rating-bad       { background:rgba(239,68,68,.08);   color:#fca5a5; border:1px solid rgba(239,68,68,.18); }
     .rating-danger   { background:rgba(239,68,68,.16);   color:#f87171; border:1px solid rgba(239,68,68,.32); }
 
     /* ── FETCH TIMESTAMP ── */
@@ -523,9 +524,10 @@
     .c-gust-lbl { position:absolute; right:2px; top:50%; transform:translateY(-50%); font-size:.62rem; font-weight:700; color:rgba(255,255,255,.55); white-space:nowrap; pointer-events:none; }
     .c-gust-val { font-size:.62rem !important; opacity:.85; transform:translate(-100%,-50%) !important; }
     /* condition badge levels */
-    .cond-bad      { background:rgba(239,68,68,.18);  color:#f87171; border:1px solid rgba(239,68,68,.3); }
-    .cond-good     { background:rgba(34,197,94,.12);  color:#86efac; border:1px solid rgba(34,197,94,.25); }
-    .cond-vgood    { background:rgba(34,197,94,.20);  color:#4ade80; border:1px solid rgba(34,197,94,.4); }
+    .cond-bad       { background:rgba(239,68,68,.18);  color:#f87171; border:1px solid rgba(239,68,68,.3); }
+    .cond-lightwind { background:rgba(251,146,60,.15); color:#fb923c; border:1px solid rgba(251,146,60,.3); }
+    .cond-good      { background:rgba(34,197,94,.12);  color:#86efac; border:1px solid rgba(34,197,94,.25); }
+    .cond-vgood     { background:rgba(34,197,94,.20);  color:#4ade80; border:1px solid rgba(34,197,94,.4); }
     .cond-excellent{ background:rgba(0,212,255,.15);  color:#67e8f9; border:1px solid rgba(0,212,255,.35); }
     .cond-perfect  { background:rgba(250,204,21,.15); color:#fde047; border:1px solid rgba(250,204,21,.35); }
 
@@ -1695,26 +1697,31 @@ function windBarColor(kn){
 }
 function windBarPct(kn){ return Math.min(Math.round(kn/45*100),100); }
 
-function classifyHour(kn,dir,code){
+function classifyHour(kn,dir,code,gustKn=0){
   const sp=speedTier(kn);
-  if(sp===0) return {type:'light',qualifying:false};
   if(isRainy(code)) return {type:'rain',qualifying:false};
   if(!isWindDirOK(dir)) return {type:'lightdir',qualifying:false};
+  if(sp===0){
+    // Light-wind session: peak 12–14kn but gusts ≥ 20kn
+    if(kn>=12&&gustKn>=20) return {type:'lightwind',qualifying:true};
+    return {type:'light',qualifying:false};
+  }
   return {type:['good','verygood','perfect'][sp-1],qualifying:true};
 }
-function conditionLabel(kn,dir,code,temp){
+function conditionLabel(kn,dir,code,temp,gustKn=0){
   const sp=speedTier(kn);
   const light=sp===0;
   const rain=isRainy(code);
   const badDir=!isWindDirOK(dir);
-  if(light||rain||badDir){
+  if(rain||badDir||(light&&!(kn>=12&&gustKn>=20))){
     const reasons=[];
     if(rain)   reasons.push('🌧');
     if(badDir) reasons.push('🧭');
     if(light)  reasons.push('💨');
-    const suffix=reasons.length>1?'✕ Bad '+reasons.join(''):'✕ Bad '+reasons[0];
+    const suffix=reasons.length>1?'✕ Bad '+reasons.join(''):(reasons[0]?'✕ Bad '+reasons[0]:'✕ Bad 💨');
     return {label:suffix,cls:'cond-bad'};
   }
+  if(light&&kn>=12&&gustKn>=20) return {label:'⚡ Light wind',cls:'cond-lightwind'};
   const warm=temp>=13;
   if(sp>=3&&warm) return {label:'⚡ Perfect',   cls:'cond-perfect'};
   if(sp>=3)       return {label:'⚡ Perfect',   cls:'cond-perfect'};
@@ -1730,7 +1737,11 @@ function rateDay(gh,pk,code,badDir,peakDay){
     if(peakDay>=10)                return {cls:'rating-none', label:'❌ Too light'};
     return                                {cls:'rating-none', label:'❌ No wind'};
   }
-  if(gh===1) return {cls:'rating-bad',     label:'❌ Too brief (1h)'};
+  const isLightWind=pk<15; // qualifying only via gust rule (12kn + gust≥20)
+  if(gh===1) return isLightWind
+    ? {cls:'rating-lightwind', label:`⚡ 1h · Light wind`}
+    : {cls:'rating-bad',       label:'❌ Too brief (1h)'};
+  if(isLightWind) return {cls:'rating-lightwind', label:`⚡ ${gh}h · Light wind`};
   if(gh===2) return {cls:'rating-marginal',label:`✅ 2h · ${pk}kn`};
   if(gh<=4){
     if(pk>=25) return {cls:'rating-good',label:`✅ ${gh}h · 25+ kn`};
@@ -2461,9 +2472,11 @@ async function fetchChipQualDays(spot){
         const hr=parseInt(t.slice(11,13),10);
         if(hr<srH||hr>ssH) return;
         const kn=toKnotsR(wx.hourly.windspeed_10m[j]);
+        const gust=toKnotsR(wx.hourly.windgusts_10m[j])||0;
         const dir=wx.hourly.winddirection_10m[j];
         const code=wx.hourly.weather_code[j]??0;
-        if(speedTier(kn)>0&&!isRainy(code)&&isDirOK(dir)){ if(firstGoodHr===null) firstGoodHr=hr; qh++; if(kn>dayPeak) dayPeak=kn; }
+        const qualifying=(speedTier(kn)>0||(kn>=12&&gust>=20))&&!isRainy(code)&&isDirOK(dir);
+        if(qualifying){ if(firstGoodHr===null) firstGoodHr=hr; qh++; if(kn>dayPeak) dayPeak=kn; }
       });
       if(qh>=2){
         qualDays++;
@@ -2485,7 +2498,9 @@ async function fetchChipQualDays(spot){
         const kn=toKnotsR(wx.hourly.windspeed_10m[j]);
         const dir=wx.hourly.winddirection_10m[j];
         const code=wx.hourly.weather_code[j]??0;
-        if(speedTier(kn)>0&&!isRainy(code)&&isDirOK(dir)){
+        const gust2=toKnotsR(wx.hourly.windgusts_10m[j])||0;
+        const qualifying2=(speedTier(kn)>0||(kn>=12&&gust2>=20))&&!isRainy(code)&&isDirOK(dir);
+        if(qualifying2){
           if(firstGoodHr===null) firstGoodHr=hr; qh++; if(kn>dayPeak) dayPeak=kn;
           domDirSum[0]+=Math.sin(dir*Math.PI/180); domDirSum[1]+=Math.cos(dir*Math.PI/180); domDirN++;
         }
@@ -3579,7 +3594,7 @@ function buildDay(dateStr,sunrise,sunset){
     const tStr=`${dateStr}T${String(hr).padStart(2,'0')}:00`;
     // a daylight hour is one that starts at or after sunrise hour and ends before/at sunset hour
     const inDay=hr>=srHour&&hr<=ssHour;
-    const cl=classifyHour(d.kn,d.dir,d.code);
+    const cl=classifyHour(d.kn,d.dir,d.code,d.gustKn||0);
     hours.push({...d,...cl,tStr,hour:hr,inDay});
   }
   const day=hours.filter(h=>h.inDay);
@@ -3873,7 +3888,7 @@ function openModal(dateStr,dayIdx){
 
     let condTD='';
     if(ws){
-      const {label,cls}=conditionLabel(h.kn,h.dir,h.code,h.temp);
+      const {label,cls}=conditionLabel(h.kn,h.dir,h.code,h.temp,h.gustKn||0);
       condTD=`<div class="c-sp ${cls}">${label}</div>`;
     }
 
