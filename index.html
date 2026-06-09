@@ -3274,7 +3274,7 @@ async function renderSpotInfoCard(spotName) {
   const noteHTML = info.membership_note ? `<div class="spot-info-note">ℹ️ ${info.membership_note}</div>` : '';
   const tipHTML = info.spot_tip ? `
     <div class="spot-tip-block">
-      <div class="spot-tip-label">🧭 Local knowledge</div>
+      <div class="spot-tip-label">🤙 Riders say</div>
       <p class="spot-tip-text">${info.spot_tip}</p>
     </div>` : '';
 
@@ -4860,7 +4860,7 @@ function openSuggestUpdate(){
     <label class="pp-label">Good wind directions <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(tap to toggle)</span></label>
     <div id="suDirBtns" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:18px">${dirBtns}</div>
 
-    <label class="pp-label">Local knowledge <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">— tip visible to all riders on this spot</span></label>
+    <label class="pp-label">Riders say <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">— your tip, visible to all kiters on this spot</span></label>
     <textarea id="suTip" class="pp-input" rows="4" placeholder="e.g. Shallow at low tide, best at high tide. Avoid S swell. Parking on the north side." style="margin-bottom:6px;resize:vertical;min-height:88px;font-family:inherit;font-size:.85rem">${info.spot_tip||''}</textarea>
     <div style="font-size:.67rem;color:var(--tdim);margin-bottom:18px;">Want to update business info, booking links or contact details? <span style="color:var(--accent);cursor:pointer" onclick="closeSuggestUpdate();openClaimFlow()">Claim this spot →</span></div>
 
