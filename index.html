@@ -6165,9 +6165,23 @@ async function adminApplyUpdate(u){
     await sb.from('spot_info').upsert({spot_name:u.spot_name,...updates,updated_at:new Date().toISOString()},{onConflict:'spot_name'});
   }
 
-  // Apply dirs to spot_overrides
+  // Apply dirs to spot_overrides (upsert so it works even if no row exists yet)
   if(u.suggested_dirs?.length){
-    await sb.from('spot_overrides').update({dirs:u.suggested_dirs}).eq('name',u.spot_name);
+    const{error:dirErr}=await sb.from('spot_overrides').upsert(
+      {name:u.spot_name, dirs:u.suggested_dirs, active:true},
+      {onConflict:'name', ignoreDuplicates:false}
+    );
+    if(!dirErr){
+      // Update in-memory SPOTS so UI reflects immediately without reload
+      const si=SPOTS.findIndex(s=>s.name===u.spot_name);
+      if(si>=0) SPOTS[si].dirs=u.suggested_dirs;
+      // If this is the currently open spot, refresh wind dirs + spot card
+      if(cachedLoc?.name===u.spot_name){
+        windDirs=new Set(u.suggested_dirs);
+        document.querySelectorAll('.s-btn').forEach(b=>b.classList.toggle('active',windDirs.has(Number(b.dataset.deg))));
+        renderSpotInfoCard(u.spot_name);
+      }
+    }
   }
 
   // Mark reviewed + approved
