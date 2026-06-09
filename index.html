@@ -4317,16 +4317,21 @@ async function syncFavsFromSupabase(email){
       days:  r.spot_days||null,
     }));
     const local=loadFavs();
+    const remoteKeys=new Set(remote.map(f=>`${f.lat},${f.lon}`));
     const localKeys=new Set(local.map(f=>`${f.lat},${f.lon}`));
-    // Spots in Supabase but not in local = user removed them; delete from Supabase
-    const orphans=remote.filter(f=>!localKeys.has(`${f.lat},${f.lon}`));
-    if(orphans.length){
-      await Promise.all(orphans.map(f=>pushFavToSupabase(email,f,true)));
+
+    // Push local-only spots up to Supabase (added on this device)
+    const localOnly=local.filter(f=>!remoteKeys.has(`${f.lat},${f.lon}`));
+    if(localOnly.length){
+      await Promise.all(localOnly.map(f=>pushFavToSupabase(email,f,false)));
     }
-    if(local.length===0&&orphans.length===0){
-      // Genuinely empty local (fresh install) — restore from Supabase
-      saveFavs(remote);
-    }
+
+    // Merge: union of remote + local, remote wins on conflict
+    const merged=[
+      ...remote,
+      ...local.filter(f=>!remoteKeys.has(`${f.lat},${f.lon}`)),
+    ];
+    saveFavs(merged);
     renderHintChips();
   } finally {
     _syncFavsInFlight=false;
