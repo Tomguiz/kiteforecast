@@ -6221,7 +6221,17 @@ async function adminVerifyClaim(id, spotName, email){
   }
 
   await sb.from('spot_claims').update({verified:true,status:'verified'}).eq('id',id);
-  showToast(`✓ ${spotName} claim verified & spot info updated`);
+
+  // Notify the claimer by email
+  const claimEmail = claim?.email || email;
+  sb.functions.invoke('claim-accepted-notify',{body:{
+    email:         claimEmail,
+    spot_name:     spotName,
+    business_name: claim?.business_name||spotName,
+    contact_name:  claim?.contact_name||'',
+  }}).catch(e=>console.warn('claim-accepted-notify failed:',e));
+
+  showToast(`✓ ${spotName} verified & confirmation email sent`);
   renderAdminPanel();
 }
 
