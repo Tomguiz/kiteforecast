@@ -5873,7 +5873,7 @@ async function renderAdminPanel(){
     sb.from('spot_suggestions').select('*').or('reviewed.eq.false,reviewed.is.null').order('created_at',{ascending:false}),
     sb.from('spot_overrides').select('name,lat,lon,loc').eq('active',true),
     sb.from('spot_update_suggestions').select('*').eq('reviewed',false).order('created_at',{ascending:false}),
-    sb.from('spot_claims').select('*').neq('status','rejected').order('created_at',{ascending:false}),
+    sb.from('spot_claims').select('*').eq('verified',false).neq('status','rejected').order('created_at',{ascending:false}),
   ]);
   _adminSpots = spotData||[];
   // Annotate each spot_info with coords from spot_overrides if available
@@ -5882,7 +5882,6 @@ async function renderAdminPanel(){
   const pendingSuggs = suggData||[];
   const pendingUpdates = updateSuggData||[];
   const pendingClaims = (claimData||[]).filter(c=>!c.verified);
-  const verifiedClaims = (claimData||[]).filter(c=>c.verified);
 
   const suggRows = pendingSuggs.map(s=>`
     <div style="background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.25);border-radius:10px;padding:12px 14px;margin-bottom:8px;">
@@ -5954,19 +5953,6 @@ async function renderAdminPanel(){
           <button class="btn pp-save-btn admin-verify-btn" data-id="${c.id}" data-spot="${c.spot_name}" data-email="${c.email}" style="font-size:.7rem;padding:5px 12px;white-space:nowrap">✓ Verify</button>
           <button class="admin-reject-btn" data-id="${c.id}" data-spot="${c.spot_name}" data-email="${c.email}" style="font-size:.7rem;padding:5px 12px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-radius:8px;color:#f87171;cursor:pointer;white-space:nowrap">✕ Reject</button>
         </div>
-      </div>
-    </div>`).join('')}
-    <div style="margin-bottom:18px"></div>`:''}
-    ${verifiedClaims.length?`
-    <div class="stats-section-title" style="margin-bottom:8px;color:#4ade80">Verified claims — ${verifiedClaims.length}</div>
-    ${verifiedClaims.map(c=>`
-    <div style="background:rgba(74,222,128,.05);border:1px solid rgba(74,222,128,.15);border-radius:10px;padding:12px 14px;margin-bottom:8px;">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
-        <div style="flex:1;min-width:0">
-          <div style="font-size:.82rem;font-weight:700;color:#4ade80">${c.spot_name}</div>
-          <div style="font-size:.72rem;color:var(--tdim);margin-top:2px">${c.business_name||'—'} · <a href="mailto:${c.email}" style="color:var(--tdim)">${c.email}</a></div>
-        </div>
-        <button class="admin-verify-btn" data-id="${c.id}" data-spot="${c.spot_name}" data-email="${c.email}" style="font-size:.7rem;padding:5px 12px;background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.25);border-radius:8px;color:#4ade80;cursor:pointer;white-space:nowrap">↻ Re-apply</button>
       </div>
     </div>`).join('')}
     <div style="margin-bottom:18px"></div>`:''}
