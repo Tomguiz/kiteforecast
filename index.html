@@ -3200,8 +3200,18 @@ function youtubeId(url) {
 
 async function fetchSpotInfo(spotName) {
   const sb = getSb(); if(!sb) return null;
-  const { data } = await sb.from('spot_info').select('*').eq('spot_name', spotName).single();
-  return data || null;
+  const [{ data }, { data: claim }] = await Promise.all([
+    sb.from('spot_info').select('*').eq('spot_name', spotName).single(),
+    sb.from('spot_claims').select('email,contact_name').eq('spot_name', spotName).eq('status','verified').limit(1).single(),
+  ]);
+  if(!data) return null;
+  // Attach owner info
+  if(claim?.email){
+    const{data:prof}=await sb.from('profiles').select('nickname').eq('email',claim.email).single();
+    data._owner_email=claim.email;
+    data._owner_name=prof?.nickname||claim.contact_name||claim.email.split('@')[0];
+  }
+  return data;
 }
 
 async function renderSpotInfoCard(spotName) {
@@ -3308,10 +3318,12 @@ async function renderSpotInfoCard(spotName) {
         ${noteHTML}
         ${socialHTML}
         ${!info.verified ? `<div style="font-size:.68rem;color:var(--tdim);text-align:center;margin-top:4px;">Owner of this spot? <span style="color:var(--accent);cursor:pointer;" onclick="openClaimFlow()">Claim it to manage and verify your info →</span></div>` : ''}
-        ${info.added_by ? `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:.68rem;color:var(--tdim);text-align:center;">🌍 Spot added by community member <strong style="color:var(--gray)">${info.added_by}</strong></div>` : ''}
+        ${info.added_by||info._owner_name ? `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:.68rem;color:var(--tdim);text-align:center;">
+          ${info.added_by ? `🌍 Spot added by community member <strong style="color:var(--gray)">${info.added_by}</strong>` : ''}
+          ${info._owner_name ? `${info.added_by?'<br>':''}🏴 Spot owned by <strong style="color:var(--gray)">${info._owner_name}</strong>` : ''}
+        </div>` : ''}
         <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;">
-          <span style="font-size:.68rem;color:var(--tdim);cursor:pointer;display:inline-flex;align-items:center;gap:4px;" onclick="openSuggestUpdate()">✏️ Suggest an update</span>
-          ${loadProfile().isAdmin?`<span style="font-size:.68rem;color:#fb923c;cursor:pointer;display:inline-flex;align-items:center;gap:4px;font-weight:700" onclick="openAdminEditFromSpot()">⚡ Admin: Edit directly</span>`:''}
+          ${(()=>{const p=loadProfile();const isOwner=p.email&&info._owner_email&&p.email===info._owner_email;const isAdmin=p.isAdmin;return isOwner?`<span style="font-size:.68rem;color:var(--accent);cursor:pointer;display:inline-flex;align-items:center;gap:4px;font-weight:600" onclick="openAdminEditFromSpot()">✏️ Edit my spot info</span>`:`<span style="font-size:.68rem;color:var(--tdim);cursor:pointer;display:inline-flex;align-items:center;gap:4px;" onclick="openSuggestUpdate()">✏️ Suggest an update</span>${isAdmin?`<span style="font-size:.68rem;color:#fb923c;cursor:pointer;display:inline-flex;align-items:center;gap:4px;font-weight:700" onclick="openAdminEditFromSpot()">⚡ Admin: Edit directly</span>`:''}`;})()}
         </div>
       </div>
     </div>`;
@@ -4932,7 +4944,9 @@ async function submitSuggestUpdate(){
 
 // Admin shortcut: open admin edit panel directly from spot page
 async function openAdminEditFromSpot(){
-  if(!loadProfile().isAdmin) return;
+  const p=loadProfile();
+  const isOwner=_cachedSpotInfo?._owner_email&&p.email===_cachedSpotInfo._owner_email;
+  if(!p.isAdmin&&!isOwner) return;
   if(!cachedLoc) return;
   openProfilePanel('admin');
 
@@ -6273,7 +6287,9 @@ async function adminRejectClaim(id, spotName, email){
 
 async function adminSaveSpotInfo(){
   const sb=getSb(); if(!sb) return;
-  if(!loadProfile().isAdmin){ showToast('Access denied'); return; }
+  const _p=loadProfile();
+  const _isOwner=_cachedSpotInfo?._owner_email&&_p.email===_cachedSpotInfo._owner_email;
+  if(!_p.isAdmin&&!_isOwner){ showToast('Access denied'); return; }
   const btn=$('adSaveBtn'); if(btn){ btn.disabled=true; btn.textContent='Saving…'; }
   const spotName=($('adSpotName')?.value||'').trim();
   if(!spotName){ showToast('Spot name is required'); if(btn){btn.disabled=false;btn.textContent='Save';} return; }
