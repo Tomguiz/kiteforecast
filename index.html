@@ -6379,7 +6379,8 @@ async function adminSaveSpotInfo(){
 
   showToast(isRename?`✓ Renamed to "${spotName}"`:isNew?'✓ New spot added — visible to all users on next load!':'✓ Spot info saved!');
   $('adminEditForm').style.display='none';
-  renderAdminPanel();
+  if(_p.isAdmin) renderAdminPanel();
+  else closeProfilePanel();
   if(cachedLoc?.name===spotName) renderSpotInfoCard(spotName);
 }
 // ─────────────────────────────────────────────────────────────────────────────

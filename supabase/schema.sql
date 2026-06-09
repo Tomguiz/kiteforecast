@@ -142,6 +142,16 @@ DO $$ BEGIN
   CREATE POLICY "all_select_spot_info" ON spot_info FOR SELECT TO anon, authenticated USING (true);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
+DO $$ BEGIN
+  CREATE POLICY "owner_update_spot_info" ON spot_info FOR UPDATE TO authenticated
+    USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "owner_insert_spot_info" ON spot_info FOR INSERT TO authenticated
+    WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
 -- Admin-added spots (merged into SPOTS array at startup for all users)
 CREATE TABLE IF NOT EXISTS spot_overrides (
   id         uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
