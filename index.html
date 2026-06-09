@@ -2925,6 +2925,9 @@ function setChipDayBadge(el,n,isFav=false){
   el.title=`${n} day${n!==1?'s':''} with qualifying wind in the next 10`;
 }
 
+const FREE_FAV_LIMIT = 1;
+const _chipQueue={running:0,max:3,queue:[]};
+
 function renderHintChips(){
   // Always clear search bar when rendering home screen chips
   const _si=$('searchInput'); if(_si&&!cachedLoc) _si.value='';
@@ -3540,7 +3543,6 @@ async function safeFetch(url,timeoutMs=20000,retries=2){
 }
 
 // Throttled fetch queue — max N concurrent chip fetches to avoid rate limits
-const _chipQueue={running:0,max:3,queue:[]};
 function queuedFetch(fn){
   return new Promise((resolve,reject)=>{
     const run=()=>{ _chipQueue.running++; fn().then(resolve,reject).finally(()=>{ _chipQueue.running--; if(_chipQueue.queue.length) _chipQueue.queue.shift()(); }); };
@@ -5089,11 +5091,12 @@ async function renderMySpot(){
       return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><span style="font-size:.78rem;color:var(--text)">${c.spot_name}</span>${badge}</div>`;
     }).join('')}`:'';
 
-  el.innerHTML=claimFormHTML+otherHTML||'<div class="stats-empty">No claims yet.<br>Open a spot page and tap "Claim" to get started.</div>';
+  el.innerHTML=claimFormHTML+(otherHTML||'');
+  if(!claimFormHTML&&!otherHTML) el.innerHTML='<div class="stats-empty">No claims yet.<br>Open a spot page and tap "Claim" to get started.</div>';
 
-  // Wire buttons via addEventListener (avoids CSP issues with inline onclick in innerHTML)
-  el.querySelector('#mySpotRefreshBtn')?.addEventListener('click', ()=>renderMySpot());
-  el.querySelectorAll('.claim-withdraw-btn').forEach(btn=>btn.addEventListener('click', ()=>withdrawClaim(btn.dataset.wid)));
+  const refreshBtn=el.querySelector('#mySpotRefreshBtn');
+  if(refreshBtn) refreshBtn.onclick=()=>renderMySpot();
+  el.querySelectorAll('.claim-withdraw-btn').forEach(btn=>{ btn.onclick=()=>withdrawClaim(btn.dataset.wid); });
 }
 
 async function withdrawClaim(id){
@@ -6300,7 +6303,6 @@ async function checkShowMySpotTab(){
 }
 
 // ── PREMIUM ──────────────────────────────────────────────────────────────────
-const FREE_FAV_LIMIT = 1
 
 function isPremium(){
   const p=loadProfile();
