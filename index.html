@@ -2926,7 +2926,7 @@ function setChipDayBadge(el,n,isFav=false){
 }
 
 const FREE_FAV_LIMIT = 1;
-const _chipQueue={running:0,max:3,queue:[]};
+const _chipQueue={running:0,max:1,queue:[]};
 
 function renderHintChips(){
   // Always clear search bar when rendering home screen chips
@@ -3541,11 +3541,12 @@ async function safeFetch(url,timeoutMs=20000,retries=2){
     try{
       const r=await fetch(url,{signal:ctrl.signal});
       clearTimeout(timer);
+      if(r.status===429){ await new Promise(res=>setTimeout(res,2000*(attempt+1))); throw new Error('HTTP 429'); }
       if(!r.ok) throw new Error(`HTTP ${r.status}`);
       return await r.json();
     }catch(e){
       clearTimeout(timer);
-      if(attempt<retries&&(e.name==='AbortError'||e.name==='TypeError')){
+      if(attempt<retries&&(e.name==='AbortError'||e.name==='TypeError'||e.message==='HTTP 429')){
         await new Promise(res=>setTimeout(res,1000*(attempt+1)));
         continue;
       }
@@ -3557,7 +3558,13 @@ async function safeFetch(url,timeoutMs=20000,retries=2){
 // Throttled fetch queue — max N concurrent chip fetches to avoid rate limits
 function queuedFetch(fn){
   return new Promise((resolve,reject)=>{
-    const run=()=>{ _chipQueue.running++; fn().then(resolve,reject).finally(()=>{ _chipQueue.running--; if(_chipQueue.queue.length) _chipQueue.queue.shift()(); }); };
+    const run=()=>{
+      _chipQueue.running++;
+      fn().then(resolve,reject).finally(()=>{
+        _chipQueue.running--;
+        if(_chipQueue.queue.length) setTimeout(()=>_chipQueue.queue.shift()(),400);
+      });
+    };
     if(_chipQueue.running<_chipQueue.max) run(); else _chipQueue.queue.push(run);
   });
 }
