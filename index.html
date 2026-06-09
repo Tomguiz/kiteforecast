@@ -6299,7 +6299,8 @@ async function adminSaveSpotInfo(){
   // The original name is stored on the form container as data-orig
   const origName=$('adminEditForm').dataset.origSpotName||spotName;
   const isRename=!existingByNewName&&!!(_adminSpots||[]).find(x=>x.spot_name===origName)&&origName!==spotName;
-  const isNew=!existingByNewName&&!isRename;
+  // Non-admin owners editing their own claimed spot are never "new"
+  const isNew=!_isOwner&&!existingByNewName&&!isRename;
   const latRaw=($('adLat')?.value||'').trim();
   const lonRaw=($('adLon')?.value||'').trim();
   const lat=latRaw?parseFloat(latRaw):null;
@@ -6373,8 +6374,12 @@ async function adminSaveSpotInfo(){
 
   // Save wind dirs to spot_overrides (read from toggle buttons)
   const dirsArr=[...$('adDirBtns')?.querySelectorAll('.s-btn.active')||[]].map(b=>parseInt(b.dataset.deg));
-  if(finalLat&&finalLon){
-    sb.from('spot_overrides').upsert({name:spotName,dirs:dirsArr},{onConflict:'name'}).catch(()=>{});
+  const dirsLat=finalLat||cachedLoc?.latitude||null;
+  const dirsLon=finalLon||cachedLoc?.longitude||null;
+  if(dirsLat&&dirsLon){
+    sb.from('spot_overrides').upsert({name:spotName,dirs:dirsArr,lat:dirsLat,lon:dirsLon,active:true},{onConflict:'name'}).catch(()=>{});
+    const si=SPOTS.findIndex(s=>s.name===spotName);
+    if(si>=0) SPOTS[si].dirs=dirsArr;
   }
 
   showToast(isRename?`✓ Renamed to "${spotName}"`:isNew?'✓ New spot added — visible to all users on next load!':'✓ Spot info saved!');
