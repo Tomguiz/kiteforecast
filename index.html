@@ -5873,7 +5873,7 @@ async function renderAdminPanel(){
     sb.from('spot_suggestions').select('*').or('reviewed.eq.false,reviewed.is.null').order('created_at',{ascending:false}),
     sb.from('spot_overrides').select('name,lat,lon,loc').eq('active',true),
     sb.from('spot_update_suggestions').select('*').eq('reviewed',false).order('created_at',{ascending:false}),
-    sb.from('spot_claims').select('*').eq('verified',false).neq('status','rejected').order('created_at',{ascending:false}),
+    sb.from('spot_claims').select('*').neq('status','rejected').order('created_at',{ascending:false}),
   ]);
   _adminSpots = spotData||[];
   // Annotate each spot_info with coords from spot_overrides if available
@@ -5881,7 +5881,8 @@ async function renderAdminPanel(){
   _adminSpots.forEach(s=>{ const o=overrideMap[s.spot_name]; if(o){s._lat=o.lat;s._lon=o.lon;s._loc=o.loc;s._hasOverride=true;} else{s._hasOverride=false;} });
   const pendingSuggs = suggData||[];
   const pendingUpdates = updateSuggData||[];
-  const pendingClaims = claimData||[];
+  const pendingClaims = (claimData||[]).filter(c=>!c.verified);
+  const verifiedClaims = (claimData||[]).filter(c=>c.verified);
 
   const suggRows = pendingSuggs.map(s=>`
     <div style="background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.25);border-radius:10px;padding:12px 14px;margin-bottom:8px;">
@@ -5953,6 +5954,19 @@ async function renderAdminPanel(){
           <button class="btn pp-save-btn" style="font-size:.7rem;padding:5px 12px;white-space:nowrap" onclick="adminVerifyClaim('${c.id}','${c.spot_name.replace(/'/g,"\\'")}','${c.email.replace(/'/g,"\\'")}')">✓ Verify</button>
           <button style="font-size:.7rem;padding:5px 12px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-radius:8px;color:#f87171;cursor:pointer;white-space:nowrap" onclick="adminRejectClaim('${c.id}','${c.spot_name.replace(/'/g,"\\'")}','${c.email.replace(/'/g,"\\'")}')">✕ Reject</button>
         </div>
+      </div>
+    </div>`).join('')}
+    <div style="margin-bottom:18px"></div>`:''}
+    ${verifiedClaims.length?`
+    <div class="stats-section-title" style="margin-bottom:8px;color:#4ade80">Verified claims — ${verifiedClaims.length}</div>
+    ${verifiedClaims.map(c=>`
+    <div style="background:rgba(74,222,128,.05);border:1px solid rgba(74,222,128,.15);border-radius:10px;padding:12px 14px;margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:.82rem;font-weight:700;color:#4ade80">${c.spot_name}</div>
+          <div style="font-size:.72rem;color:var(--tdim);margin-top:2px">${c.business_name||'—'} · <a href="mailto:${c.email}" style="color:var(--tdim)">${c.email}</a></div>
+        </div>
+        <button style="font-size:.7rem;padding:5px 12px;background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.25);border-radius:8px;color:#4ade80;cursor:pointer;white-space:nowrap" onclick="adminVerifyClaim('${c.id}','${c.spot_name.replace(/'/g,"\\'")}','${c.email.replace(/'/g,"\\'")}')">↻ Re-apply</button>
       </div>
     </div>`).join('')}
     <div style="margin-bottom:18px"></div>`:''}
@@ -6196,12 +6210,14 @@ async function adminVerifyClaim(id, spotName, email){
       livecam_url:     claim.livecam_url||null,
       instagram_url:   claim.instagram_url||null,
       facebook_url:    claim.facebook_url||null,
+      contact_name:    claim.contact_name||null,
       description:     claim.description||null,
       membership_note: claim.membership_note||null,
       verified:        true,
       updated_at:      new Date().toISOString(),
     };
-    await sb.from('spot_info').upsert(row,{onConflict:'spot_name'});
+    const{error:uErr}=await sb.from('spot_info').upsert(row,{onConflict:'spot_name'});
+    if(uErr){ showToast('Error writing spot_info: '+uErr.message); return; }
   }
 
   await sb.from('spot_claims').update({verified:true,status:'verified'}).eq('id',id);
