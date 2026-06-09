@@ -4908,10 +4908,44 @@ async function submitSuggestUpdate(){
 }
 
 // Admin shortcut: open admin edit panel directly from spot page
-function openAdminEditFromSpot(){
+async function openAdminEditFromSpot(){
   if(!loadProfile().isAdmin) return;
+  if(!cachedLoc) return;
   openProfilePanel('admin');
-  setTimeout(()=>adminOpenSpot(cachedLoc?.name||null),300);
+
+  // Fetch spot_info row (may not exist yet) and merge with cachedLoc data
+  const sb=getSb();
+  let infoRow=null;
+  if(sb){
+    const{data}=await sb.from('spot_info').select('*').eq('spot_name',cachedLoc.name).single();
+    infoRow=data||null;
+  }
+
+  // Ensure _adminSpots is populated so adminSaveSpotInfo rename-detection works
+  if(!_adminSpots) _adminSpots=infoRow?[infoRow]:[];
+  else if(infoRow&&!_adminSpots.find(x=>x.spot_name===infoRow.spot_name)) _adminSpots.push(infoRow);
+
+  const prefill={
+    ...(infoRow||{}),
+    spot_name: cachedLoc.name,
+    _lat: infoRow?._lat ?? cachedLoc.latitude,
+    _lon: infoRow?._lon ?? cachedLoc.longitude,
+    _loc: infoRow?._loc ?? [cachedLoc.admin1,cachedLoc.country].filter(Boolean).join(', '),
+    _hasOverride: !!infoRow?._hasOverride,
+    spot_tip: infoRow?.spot_tip||_cachedSpotInfo?.spot_tip||'',
+  };
+
+  // Also inject overrides coords if missing
+  if(sb && !prefill._lat){
+    const{data:ov}=await sb.from('spot_overrides').select('lat,lon,loc,dirs').eq('name',cachedLoc.name).single();
+    if(ov){ prefill._lat=ov.lat; prefill._lon=ov.lon; prefill._loc=ov.loc; prefill._hasOverride=true; prefill.dirs=ov.dirs; }
+  }
+
+  setTimeout(()=>{
+    const el=$('adminEditForm');
+    if(!el){ adminOpenSpot(cachedLoc.name, prefill); return; }
+    adminOpenSpot(cachedLoc.name, prefill);
+  }, 300);
 }
 
 let _cachedSpotInfo=null;
@@ -5942,6 +5976,9 @@ async function adminOpenSpot(spotName, prefill){
       <label class="pp-label">Wind directions <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(comma-separated, e.g. SW, W, NW)</span></label>
       <input type="text" id="adDirs" class="pp-input" value="${s?._dirs||s?.dirs?.join(', ')||''}" placeholder="SW, W, NW" style="margin-bottom:10px"/>
 
+      <label class="pp-label">🤙 Local riders tips</label>
+      <textarea id="adSpotTip" class="pp-input" rows="3" placeholder="e.g. Shallow at low tide, best at high tide. Avoid S swell." style="margin-bottom:10px;resize:vertical;min-height:72px;font-family:inherit;font-size:.85rem">${s?.spot_tip||''}</textarea>
+
       <label class="pp-label">Membership / access note</label>
       <input type="text" id="adMembershipNote" class="pp-input" value="${s?.membership_note||''}" placeholder="e.g. Day pass €15 incl. insurance" style="margin-bottom:10px"/>
 
@@ -6056,6 +6093,7 @@ async function adminSaveSpotInfo(){
     instagram_url:   ($('adInstagram')?.value||'').trim()||null,
     facebook_url:    ($('adFacebook')?.value||'').trim()||null,
     description:     ($('adDesc')?.value||'').trim()||null,
+    spot_tip:        ($('adSpotTip')?.value||'').trim()||null,
     membership_note: ($('adMembershipNote')?.value||'').trim()||null,
     verified:        !!$('adVerified')?.classList.contains('on'),
     updated_at:      new Date().toISOString(),
