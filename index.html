@@ -1609,8 +1609,13 @@ function loadLastSpot(){
   try{ return JSON.parse(localStorage.getItem('kf_lastSpot')); }catch(e){ return null; }
 }
 function refreshForecast(){
-  const s=loadLastSpot();
-  if(s) pickSpot(s);
+  // Prefer current in-memory spot; fall back to localStorage only if no spot loaded
+  if(cachedLoc){
+    pickSpot({name:cachedLoc.name,loc:[cachedLoc.admin1,cachedLoc.country].filter(Boolean).join(', '),lat:cachedLoc.latitude,lon:cachedLoc.longitude,dirs:[...windDirs]});
+  } else {
+    const s=loadLastSpot();
+    if(s) pickSpot(s);
+  }
 }
 
 // ══════════════════════════════════
@@ -7486,7 +7491,7 @@ document.addEventListener('visibilitychange',()=>{
           ptr.style.opacity='0'; ptr.style.transform='scaleX(0)';
           spin.style.opacity='0'; spin.style.animation='';
         },600);
-        if(cachedLoc){ const s=loadLastSpot(); if(s) fetchForecastFromSpot(s); } else renderHintChips();
+        if(cachedLoc){ fetchForecastFromSpot({name:cachedLoc.name,loc:[cachedLoc.admin1,cachedLoc.country].filter(Boolean).join(', '),lat:cachedLoc.latitude,lon:cachedLoc.longitude,dirs:[...windDirs]}); } else renderHintChips();
       } else {
         ptr.style.opacity='0'; ptr.style.transform='scaleX(0)';
         spin.style.opacity='0';
