@@ -4985,8 +4985,8 @@ async function renderMySpot(){
   const{data:claims}=await sb.from('spot_claims').select('*').eq('email',email).order('created_at',{ascending:false});
   const spotName=cachedLoc?.name||'';
 
-  // Check if already claimed this spot
-  const existing=claims?.find(c=>c.spot_name===spotName);
+  // Check if already claimed this spot (ignore rejected — let them re-claim)
+  const existing=claims?.find(c=>c.spot_name===spotName&&c.status!=='rejected');
 
   let claimFormHTML='';
   if(spotName){
