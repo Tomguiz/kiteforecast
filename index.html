@@ -1089,7 +1089,7 @@
         <span onclick="_upgradeModalDismissed=true;$('upgradeModal').style.display='none'" style="cursor:pointer;color:var(--tdim);font-size:1rem;padding:2px 6px;">✕</span>
       </div>
       <div style="font-size:.75rem;color:var(--gray);line-height:1.7;margin-bottom:12px;">
-        📍 Track <strong style="color:var(--text)">unlimited favourite spots</strong> — free plan = 3 spots<br/>
+        📍 Track <strong style="color:var(--text)">unlimited favourite spots</strong> — free plan = 1 spot<br/>
         📱 <strong style="color:var(--text)">SMS alerts</strong> 1h before your session<br/>
         📬 <strong style="color:var(--text)">Weekly digest</strong> every Monday<br/>
         🏄 <strong style="color:var(--text)">Session tracking</strong> — notify friends when you hit the water<br/>
@@ -1421,7 +1421,7 @@
             <div style="font-size:.75rem;color:var(--gray);line-height:1.6;margin-bottom:2px;">
               📱 SMS alerts — text 1h before your session<br/>
               📬 Weekly digest — every Monday forecast summary<br/>
-              ⭐ Track unlimited favourite spots (free = 3)<br/>
+              ⭐ Track unlimited favourite spots (free = 1)<br/>
               🏄 Session tracking — notify friends when you hit the water<br/>
               🎯 Priority support
             </div>
@@ -2875,9 +2875,8 @@ function toggleFavorite(){
     favs.splice(idx,1);
   } else {
     if(!isPremium()&&favs.length>=FREE_FAV_LIMIT){
-      showToast(`⭐ ${loc.name} couldn't be added — free plan is limited to 3 spots.`, 4000, '#f87171');
-      goHome();
-      setTimeout(()=>showUpgradeModal(), 80);
+      showToast(`⚡ Free plan is limited to 1 spot — upgrade to add more.`, 4000, '#ef4444');
+      setTimeout(()=>{ openProfilePanel('profile'); setTimeout(()=>{ const el=$('ppPremiumUpgrade'); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); },200); }, 80);
       return;
     }
     favs.push(favEntry);
@@ -3015,7 +3014,9 @@ function renderHintChips(){
       } else {
         const favs2=loadFavs();
         if(!isPremium()&&favs2.length>=FREE_FAV_LIMIT&&!favs2.some(f=>f.name===spot.name)){
-          showUpgradeModal(); return;
+          showToast('⚡ Free plan is limited to 1 spot — upgrade to add more.', 4000, '#ef4444');
+          setTimeout(()=>{ openProfilePanel('profile'); setTimeout(()=>{ const el=$('ppPremiumUpgrade'); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); },200); }, 80);
+          return;
         }
         const newFav={name:spot.name,label:c.label,lat:spot.lat,lon:spot.lon,dirs:spot.dirs||[]};
         if(!favs2.some(f=>f.name===spot.name)){
@@ -6126,7 +6127,7 @@ async function checkShowMySpotTab(){
 }
 
 // ── PREMIUM ──────────────────────────────────────────────────────────────────
-const FREE_FAV_LIMIT = 3
+const FREE_FAV_LIMIT = 1
 
 function isPremium(){ return !!loadProfile().isPremium; }
 
