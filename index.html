@@ -1316,6 +1316,7 @@
         <button class="pp-tab" id="ppTabStats" onclick="switchPpTab('stats')">Stats</button>
         <button class="pp-tab" id="ppTabFriends" onclick="switchPpTab('friends')">Friends <span id="ppFriendReqCount" style="display:none;background:#f87171;color:#fff;border-radius:999px;font-size:.65rem;padding:1px 5px;margin-left:2px;font-weight:700"></span></button>
         <button class="pp-tab" id="ppTabMySpot" onclick="switchPpTab('myspot')" style="display:none">My Spot</button>
+        <button class="pp-tab" id="ppTabContrib" onclick="switchPpTab('contrib')" style="display:none">Contributions</button>
         <button class="pp-tab" id="ppTabAdmin" onclick="switchPpTab('admin')" style="display:none">⚙️ Admin</button>
       </div>
       <button class="pp-close" onclick="closeProfilePanel()">✕</button>
@@ -1459,6 +1460,9 @@
     </div>
     <div id="ppPanelMySpot" class="pp-body" style="display:none">
       <div id="ppMySpotContent"></div>
+    </div>
+    <div id="ppPanelContrib" class="pp-body" style="display:none">
+      <div id="ppContribContent"></div>
     </div>
     <div id="ppPanelAdmin" class="pp-body" style="display:none">
       <div id="ppAdminContent"></div>
@@ -4810,17 +4814,20 @@ function switchPpTab(tab){
   $('ppTabNotifs').classList.toggle('active',tab==='notifs');
   $('ppTabStats').classList.toggle('active',tab==='stats');
   $('ppTabMySpot').classList.toggle('active',tab==='myspot');
-  if($('ppTabAdmin'))   $('ppTabAdmin').classList.toggle('active',tab==='admin');
-  if($('ppTabFriends')) $('ppTabFriends').classList.toggle('active',tab==='friends');
+  if($('ppTabContrib'))  $('ppTabContrib').classList.toggle('active',tab==='contrib');
+  if($('ppTabAdmin'))    $('ppTabAdmin').classList.toggle('active',tab==='admin');
+  if($('ppTabFriends'))  $('ppTabFriends').classList.toggle('active',tab==='friends');
   $('ppPanelProfile').style.display=tab==='profile'?'block':'none';
   $('ppPanelNotifs').style.display=tab==='notifs'?'block':'none';
   $('ppPanelStats').style.display=tab==='stats'?'block':'none';
   $('ppPanelMySpot').style.display=tab==='myspot'?'block':'none';
-  if($('ppPanelAdmin'))   $('ppPanelAdmin').style.display=tab==='admin'?'block':'none';
-  if($('ppPanelFriends')) $('ppPanelFriends').style.display=tab==='friends'?'block':'none';
+  if($('ppPanelContrib'))  $('ppPanelContrib').style.display=tab==='contrib'?'block':'none';
+  if($('ppPanelAdmin'))    $('ppPanelAdmin').style.display=tab==='admin'?'block':'none';
+  if($('ppPanelFriends'))  $('ppPanelFriends').style.display=tab==='friends'?'block':'none';
   if(tab==='notifs')  renderNotifList();
   if(tab==='stats')   renderStats();
   if(tab==='myspot')  renderMySpot();
+  if(tab==='contrib') renderMyContributions();
   if(tab==='admin')   renderAdminPanel();
   if(tab==='friends') renderFriendsPanel();
 }
@@ -4909,6 +4916,8 @@ async function submitSuggestUpdate(){
 
   showToast('✓ Suggestion sent! We\'ll review it shortly.');
   closeSuggestUpdate();
+  const contribTab=$('ppTabContrib');
+  if(contribTab) contribTab.style.display='inline-flex';
 }
 
 // Admin shortcut: open admin edit panel directly from spot page
@@ -4968,10 +4977,7 @@ async function renderMySpot(){
   const email=loadProfile().email||_authSession.user.email;
   const sb=getSb(); if(!sb) return;
 
-  const[{data:claims},{data:suggestions}]=await Promise.all([
-    sb.from('spot_claims').select('*').eq('email',email).order('created_at',{ascending:false}),
-    sb.from('spot_update_suggestions').select('id,spot_name,suggested_dirs,tip,reviewed,approved,created_at').eq('email',email).order('created_at',{ascending:false}),
-  ]);
+  const{data:claims}=await sb.from('spot_claims').select('*').eq('email',email).order('created_at',{ascending:false});
   const spotName=cachedLoc?.name||'';
 
   // Check if already claimed this spot
@@ -5080,55 +5086,66 @@ async function renderMySpot(){
       return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><span style="font-size:.78rem;color:var(--text)">${c.spot_name}</span>${badge}</div>`;
     }).join('')}`:'';
 
-  // Contributions section — deduplicate: one row per spot (latest submission)
-  const dedupedSuggestions=Object.values((suggestions||[]).reduce((acc,s)=>{
-    if(!acc[s.spot_name]||new Date(s.created_at)>new Date(acc[s.spot_name].created_at)) acc[s.spot_name]=s;
-    return acc;
-  },{}));
-  const pts=loadProfile().contributionPoints||0;
-  const nextReward=5-(pts%5)||5;
-  const premiumUntil=loadProfile().premiumUntil;
-  const premiumEarned=Math.floor(pts/5);
-  let contribHTML='';
-  if(dedupedSuggestions.length){
-    const pointsBar=premiumEarned>0
-      ?`<div style="font-size:.7rem;color:#34d399;margin-top:2px;">🎁 ${premiumEarned} free month${premiumEarned>1?'s':''} earned${premiumUntil?` · Premium until ${new Date(premiumUntil).toLocaleDateString('en',{month:'short',year:'numeric'})}`:''}</div>`
-      :`<div style="font-size:.7rem;color:var(--tdim);margin-top:2px;">${nextReward} more point${nextReward>1?'s':''} → 1 free month of premium</div>`;
-    contribHTML=`
-      <div style="margin-top:18px">
-        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
-          <div class="stats-section-title" style="margin-bottom:0">Contributions</div>
-          <div style="font-size:.72rem;font-weight:700;color:#38bdf8;">⚡ ${pts} pt${pts!==1?'s':''}</div>
-        </div>
-        ${pointsBar}
-        <div style="margin-top:12px;display:flex;flex-direction:column;gap:6px;">
-          ${dedupedSuggestions.map(s=>{
-            const dirsLabel=s.suggested_dirs?.length?s.suggested_dirs.map(d=>({0:'N',45:'NE',90:'E',135:'SE',180:'S',225:'SW',270:'W',315:'NW'}[d]||d)).join(', '):'';
-            const detail=[dirsLabel,s.tip].filter(Boolean).join(' · ').substring(0,60)+(([dirsLabel,s.tip].filter(Boolean).join(' · ').length>60)?'…':'');
-            const badge=s.approved
-              ?`<span style="color:#4ade80;font-size:.65rem;font-weight:700;white-space:nowrap;">✓ +5 pts</span>`
-              :s.reviewed
-              ?`<span style="color:#f87171;font-size:.65rem;font-weight:700;white-space:nowrap;">✕ Declined</span>`
-              :`<span style="color:#f59e0b;font-size:.65rem;font-weight:700;white-space:nowrap;">⏳ Pending</span>`;
-            return `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">
-              <div style="flex:1;min-width:0">
-                <div style="font-size:.75rem;font-weight:600;color:var(--text)">${s.spot_name}</div>
-                ${detail?`<div style="font-size:.68rem;color:var(--tdim);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${detail}</div>`:''}
-              </div>
-              ${badge}
-            </div>`;
-          }).join('')}
-        </div>
-      </div>`;
-  }
-
-  el.innerHTML=claimFormHTML+otherHTML+contribHTML||'<div class="stats-empty">No claims yet.<br>Open a spot page and tap "Claim" to get started.</div>';
+  el.innerHTML=claimFormHTML+otherHTML||'<div class="stats-empty">No claims yet.<br>Open a spot page and tap "Claim" to get started.</div>';
 }
 
 async function withdrawClaim(id){
   const sb=getSb(); if(!sb) return;
   await sb.from('spot_claims').delete().eq('id',id);
   renderMySpot();
+}
+
+async function renderMyContributions(){
+  const el=$('ppContribContent'); if(!el) return;
+  if(!_authSession?.user){ el.innerHTML='<div class="stats-empty">Sign in to see your contributions</div>'; return; }
+  el.innerHTML='<div class="stats-empty">Loading…</div>';
+  const email=loadProfile().email||_authSession.user.email;
+  const sb=getSb(); if(!sb) return;
+  const{data:suggestions}=await sb.from('spot_update_suggestions')
+    .select('id,spot_name,suggested_dirs,tip,reviewed,approved,created_at')
+    .eq('email',email).order('created_at',{ascending:false});
+
+  const deduped=Object.values((suggestions||[]).reduce((acc,s)=>{
+    if(!acc[s.spot_name]||new Date(s.created_at)>new Date(acc[s.spot_name].created_at)) acc[s.spot_name]=s;
+    return acc;
+  },{}));
+
+  if(!deduped.length){ el.innerHTML='<div class="stats-empty">No contributions yet.<br>Open a spot page and tap "Suggest an update" to contribute.</div>'; return; }
+
+  const pts=loadProfile().contributionPoints||0;
+  const premiumUntil=loadProfile().premiumUntil;
+  const premiumEarned=Math.floor(pts/5);
+  const nextReward=5-(pts%5)||5;
+
+  const pointsBar=premiumEarned>0
+    ?`<div style="font-size:.75rem;color:#34d399;margin-bottom:16px;">🎁 ${premiumEarned} free month${premiumEarned>1?'s':''} earned${premiumUntil?` · Premium until ${new Date(premiumUntil).toLocaleDateString('en',{month:'short',year:'numeric'})}`:''}</div>`
+    :`<div style="font-size:.75rem;color:var(--tdim);margin-bottom:16px;">${nextReward} more point${nextReward>1?'s':''} → 1 free month of premium</div>`;
+
+  const rows=deduped.map(s=>{
+    const dirsLabel=s.suggested_dirs?.length?s.suggested_dirs.map(d=>({0:'N',45:'NE',90:'E',135:'SE',180:'S',225:'SW',270:'W',315:'NW'}[d]||d)).join(', '):'';
+    const detail=[dirsLabel,s.tip].filter(Boolean).join(' · ');
+    const badge=s.approved
+      ?`<span style="color:#4ade80;font-size:.68rem;font-weight:700;white-space:nowrap;">✓ +5 pts</span>`
+      :s.reviewed
+      ?`<span style="color:#f87171;font-size:.68rem;font-weight:700;white-space:nowrap;">✕ Declined</span>`
+      :`<span style="color:#f59e0b;font-size:.68rem;font-weight:700;white-space:nowrap;">⏳ Pending</span>`;
+    return `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:10px 0;border-bottom:1px solid var(--border)">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:.82rem;font-weight:600;color:var(--text)">${s.spot_name}</div>
+        ${detail?`<div style="font-size:.72rem;color:var(--tdim);margin-top:2px">${detail}</div>`:''}
+        <div style="font-size:.65rem;color:var(--tdim);margin-top:2px">${new Date(s.created_at).toLocaleDateString('en',{day:'numeric',month:'short',year:'numeric'})}</div>
+      </div>
+      ${badge}
+    </div>`;
+  }).join('');
+
+  el.innerHTML=`
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <div class="stats-section-title" style="margin-bottom:0">My contributions</div>
+      <div style="font-size:.8rem;font-weight:700;color:#38bdf8;">⚡ ${pts} pt${pts!==1?'s':''}</div>
+    </div>
+    ${pointsBar}
+    <div>${rows}</div>`;
 }
 
 async function submitClaim(spotName){
@@ -6260,14 +6277,19 @@ async function adminSaveSpotInfo(){
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
-// Show My Spot tab if user has any claims
+// Show My Spot / Contributions tabs if user has relevant data
 async function checkShowMySpotTab(){
   if(!_authSession?.user) return;
   const sb=getSb(); if(!sb) return;
   const email=loadProfile().email||_authSession.user.email;
-  const{data}=await sb.from('spot_claims').select('id').eq('email',email).limit(1);
-  const tab=$('ppTabMySpot');
-  if(tab) tab.style.display=(data&&data.length)?'inline-flex':'none';
+  const[{data:claims},{data:suggestions}]=await Promise.all([
+    sb.from('spot_claims').select('id').eq('email',email).limit(1),
+    sb.from('spot_update_suggestions').select('id').eq('email',email).limit(1),
+  ]);
+  const mySpotTab=$('ppTabMySpot');
+  const contribTab=$('ppTabContrib');
+  if(mySpotTab) mySpotTab.style.display=(claims?.length)?'inline-flex':'none';
+  if(contribTab) contribTab.style.display=(suggestions?.length)?'inline-flex':'none';
 }
 
 // ── PREMIUM ──────────────────────────────────────────────────────────────────
