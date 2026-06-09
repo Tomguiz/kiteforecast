@@ -6177,8 +6177,35 @@ async function adminDismissUpdate(id){
 
 async function adminVerifyClaim(id, spotName, email){
   const sb=getSb(); if(!sb) return;
+
+  // Fetch full claim row to promote into spot_info
+  const{data:claim}=await sb.from('spot_claims').select('*').eq('id',id).single();
+  if(claim){
+    const row={
+      spot_name:       claim.spot_name,
+      display_name:    claim.display_name||null,
+      business_name:   claim.business_name||null,
+      website:         claim.website||null,
+      address:         claim.address||null,
+      phone:           claim.contact_phone||null,
+      phone_public:    !!claim.phone_public,
+      email:           claim.contact_email||null,
+      email_public:    !!claim.email_public,
+      lesson_url:      claim.lesson_url||null,
+      gear_url:        claim.gear_url||null,
+      livecam_url:     claim.livecam_url||null,
+      instagram_url:   claim.instagram_url||null,
+      facebook_url:    claim.facebook_url||null,
+      description:     claim.description||null,
+      membership_note: claim.membership_note||null,
+      verified:        true,
+      updated_at:      new Date().toISOString(),
+    };
+    await sb.from('spot_info').upsert(row,{onConflict:'spot_name'});
+  }
+
   await sb.from('spot_claims').update({verified:true,status:'verified'}).eq('id',id);
-  showToast(`✓ ${spotName} claim verified`);
+  showToast(`✓ ${spotName} claim verified & spot info updated`);
   renderAdminPanel();
 }
 
