@@ -4842,7 +4842,7 @@ function openSuggestUpdate(){
   // Build dir buttons pre-filled with current spot dirs
   const dirBtns=DIR_LABELS.map((lbl,i)=>{
     const active=currentDirs.includes(DIR_DEGS[i]);
-    return `<button class="shore-btn${active?' active':''}" data-deg="${DIR_DEGS[i]}" onclick="this.classList.toggle('active')" style="min-width:44px">${lbl}</button>`;
+    return `<button class="s-btn${active?' active':''}" data-deg="${DIR_DEGS[i]}" onclick="this.classList.toggle('active')">${lbl}</button>`;
   }).join('');
 
   $('suggestUpdateContent').innerHTML=`
@@ -4893,7 +4893,7 @@ async function submitSuggestUpdate(){
   const spotName=cachedLoc?.name||'';
   if(!spotName) return;
 
-  const selDirs=[...document.querySelectorAll('#suDirBtns .shore-btn.active')].map(b=>parseInt(b.dataset.deg));
+  const selDirs=[...document.querySelectorAll('#suDirBtns .s-btn.active')].map(b=>parseInt(b.dataset.deg));
   const website   =($('suWebsite')?.value||'').trim();
   const livecam   =($('suLivecam')?.value||'').trim();
   const lesson    =($('suLesson')?.value||'').trim();
