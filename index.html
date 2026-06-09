@@ -5781,11 +5781,12 @@ async function renderAdminPanel(){
   el.innerHTML='<div style="color:var(--tdim);font-size:.8rem;padding:8px 0">Loading…</div>';
   const sb=getSb(); if(!sb) return;
 
-  const [{data:spotData},{data:suggData},{data:overrideData},{data:updateSuggData}] = await Promise.all([
+  const [{data:spotData},{data:suggData},{data:overrideData},{data:updateSuggData},{data:claimData}] = await Promise.all([
     sb.from('spot_info').select('*').order('spot_name'),
     sb.from('spot_suggestions').select('*').or('reviewed.eq.false,reviewed.is.null').order('created_at',{ascending:false}),
     sb.from('spot_overrides').select('name,lat,lon,loc').eq('active',true),
     sb.from('spot_update_suggestions').select('*').eq('reviewed',false).order('created_at',{ascending:false}),
+    sb.from('spot_claims').select('*').eq('verified',false).order('created_at',{ascending:false}),
   ]);
   _adminSpots = spotData||[];
   // Annotate each spot_info with coords from spot_overrides if available
@@ -5793,6 +5794,7 @@ async function renderAdminPanel(){
   _adminSpots.forEach(s=>{ const o=overrideMap[s.spot_name]; if(o){s._lat=o.lat;s._lon=o.lon;s._loc=o.loc;s._hasOverride=true;} else{s._hasOverride=false;} });
   const pendingSuggs = suggData||[];
   const pendingUpdates = updateSuggData||[];
+  const pendingClaims = claimData||[];
 
   const suggRows = pendingSuggs.map(s=>`
     <div style="background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.25);border-radius:10px;padding:12px 14px;margin-bottom:8px;">
@@ -5848,6 +5850,24 @@ async function renderAdminPanel(){
     ${pendingUpdates.length?`
     <div class="stats-section-title" style="margin-bottom:8px;color:var(--accent)">Update suggestions — ${pendingUpdates.length}</div>
     ${updateRows}
+    <div style="margin-bottom:18px"></div>`:''}
+    ${pendingClaims.length?`
+    <div class="stats-section-title" style="margin-bottom:8px;color:#38bdf8">Spot claims — ${pendingClaims.length} pending</div>
+    ${pendingClaims.map(c=>`
+    <div style="background:rgba(56,189,248,.06);border:1px solid rgba(56,189,248,.2);border-radius:10px;padding:12px 14px;margin-bottom:8px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
+        <div style="flex:1;min-width:0">
+          <div style="font-size:.82rem;font-weight:700;color:#38bdf8">${c.spot_name}</div>
+          <div style="font-size:.72rem;color:var(--tdim);margin-top:2px">${c.business_name||'—'} · <a href="mailto:${c.email}" style="color:var(--tdim)">${c.email}</a></div>
+          ${c.website?`<div style="font-size:.7rem;color:var(--tdim);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.website}</div>`:''}
+          <div style="font-size:.7rem;color:var(--tdim);margin-top:3px">${new Date(c.created_at).toLocaleDateString()}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
+          <button class="btn pp-save-btn" style="font-size:.7rem;padding:5px 12px;white-space:nowrap" onclick="adminVerifyClaim('${c.id}','${c.spot_name.replace(/'/g,"\\'")}','${c.email.replace(/'/g,"\\'")}')">✓ Verify</button>
+          <button style="font-size:.7rem;padding:5px 12px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-radius:8px;color:#f87171;cursor:pointer;white-space:nowrap" onclick="adminRejectClaim('${c.id}','${c.spot_name.replace(/'/g,"\\'")}','${c.email.replace(/'/g,"\\'")}')">✕ Reject</button>
+        </div>
+      </div>
+    </div>`).join('')}
     <div style="margin-bottom:18px"></div>`:''}
     ${pendingSuggs.length?`
     <div class="stats-section-title" style="margin-bottom:8px;color:#fbbf24">New spot requests — ${pendingSuggs.length}</div>
@@ -6036,6 +6056,21 @@ async function adminDismissUpdate(id){
   const sb=getSb(); if(!sb) return;
   await sb.from('spot_update_suggestions').update({reviewed:true}).eq('id',id);
   showToast('Dismissed');
+  renderAdminPanel();
+}
+
+async function adminVerifyClaim(id, spotName, email){
+  const sb=getSb(); if(!sb) return;
+  await sb.from('spot_claims').update({verified:true}).eq('id',id);
+  showToast(`✓ ${spotName} claim verified`);
+  renderAdminPanel();
+}
+
+async function adminRejectClaim(id, spotName, email){
+  if(!confirm(`Reject and delete the claim for "${spotName}" by ${email}?`)) return;
+  const sb=getSb(); if(!sb) return;
+  await sb.from('spot_claims').delete().eq('id',id);
+  showToast(`Claim rejected and removed`);
   renderAdminPanel();
 }
 
