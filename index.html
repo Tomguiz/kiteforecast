@@ -4328,22 +4328,17 @@ async function syncFavsFromSupabase(email){
       dirs:  r.spot_dirs||[],
       days:  r.spot_days||null,
     }));
-    const local=loadFavs();
-    const remoteKeys=new Set(remote.map(f=>`${f.lat},${f.lon}`));
-    const localKeys=new Set(local.map(f=>`${f.lat},${f.lon}`));
 
-    // Push local-only spots up to Supabase (added on this device)
-    const localOnly=local.filter(f=>!remoteKeys.has(`${f.lat},${f.lon}`));
-    if(localOnly.length){
-      await Promise.all(localOnly.map(f=>pushFavToSupabase(email,f,false)));
+    // Supabase is the source of truth — overwrite local completely.
+    // If this is a truly fresh install (no remote rows yet), keep local
+    // so the user doesn't lose spots added before signing in.
+    if(remote.length>0){
+      saveFavs(remote);
+    } else {
+      // No remote favs: push whatever is local up so it's backed up
+      const local=loadFavs();
+      await Promise.all(local.map(f=>pushFavToSupabase(email,f,false)));
     }
-
-    // Merge: union of remote + local, remote wins on conflict
-    const merged=[
-      ...remote,
-      ...local.filter(f=>!remoteKeys.has(`${f.lat},${f.lon}`)),
-    ];
-    saveFavs(merged);
     renderHintChips();
   } finally {
     _syncFavsInFlight=false;
