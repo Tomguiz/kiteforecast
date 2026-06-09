@@ -4855,34 +4855,14 @@ function openSuggestUpdate(){
   }).join('');
 
   $('suggestUpdateContent').innerHTML=`
-    <div style="font-size:.75rem;color:var(--tdim);margin-bottom:16px;">Spot: <strong style="color:var(--text)">${cachedLoc.name}</strong> — your suggestions go to the admin for review.</div>
-
-    <label class="pp-label">Website</label>
-    <input type="url" id="suWebsite" class="pp-input" value="${info.website||''}" placeholder="https://…" style="margin-bottom:10px"/>
-
-    <label class="pp-label">Live cam URL</label>
-    <input type="url" id="suLivecam" class="pp-input" value="${info.livecam_url||''}" placeholder="https://youtube.com/…" style="margin-bottom:10px"/>
-
-    <label class="pp-label">Lesson booking URL</label>
-    <input type="url" id="suLesson" class="pp-input" value="${info.lesson_url||''}" placeholder="https://…" style="margin-bottom:10px"/>
-
-    <label class="pp-label">Gear rental URL</label>
-    <input type="url" id="suGear" class="pp-input" value="${info.gear_url||''}" placeholder="https://…" style="margin-bottom:10px"/>
-
-    <label class="pp-label">Instagram</label>
-    <input type="url" id="suInstagram" class="pp-input" value="${info.instagram_url||''}" placeholder="https://instagram.com/…" style="margin-bottom:10px"/>
-
-    <label class="pp-label">Facebook</label>
-    <input type="url" id="suFacebook" class="pp-input" value="${info.facebook_url||''}" placeholder="https://facebook.com/…" style="margin-bottom:10px"/>
-
-    <label class="pp-label">Address</label>
-    <input type="text" id="suAddress" class="pp-input" value="${info.address||''}" placeholder="Street, City" style="margin-bottom:10px"/>
+    <div style="font-size:.75rem;color:var(--tdim);margin-bottom:18px;">Spot: <strong style="color:var(--text)">${cachedLoc.name}</strong> — community suggestions, reviewed by admin before going live.</div>
 
     <label class="pp-label">Good wind directions <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(tap to toggle)</span></label>
-    <div id="suDirBtns" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">${dirBtns}</div>
+    <div id="suDirBtns" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:18px">${dirBtns}</div>
 
-    <label class="pp-label">Tip / key info for this spot</label>
-    <textarea id="suTip" class="pp-input" rows="3" placeholder="e.g. Shallow at low tide, best at high tide. Avoid S swell." style="margin-bottom:16px;resize:vertical;min-height:72px;font-family:inherit;font-size:.85rem">${info.spot_tip||''}</textarea>
+    <label class="pp-label">Local knowledge <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">— tip visible to all riders on this spot</span></label>
+    <textarea id="suTip" class="pp-input" rows="4" placeholder="e.g. Shallow at low tide, best at high tide. Avoid S swell. Parking on the north side." style="margin-bottom:6px;resize:vertical;min-height:88px;font-family:inherit;font-size:.85rem">${info.spot_tip||''}</textarea>
+    <div style="font-size:.67rem;color:var(--tdim);margin-bottom:18px;">Want to update business info, booking links or contact details? <span style="color:var(--accent);cursor:pointer" onclick="closeSuggestUpdate();openClaimFlow()">Claim this spot →</span></div>
 
     <button class="btn pp-save-btn" id="suSubmitBtn" onclick="submitSuggestUpdate()" style="width:100%">Send suggestion →</button>
   `;
@@ -4903,22 +4883,15 @@ async function submitSuggestUpdate(){
   if(!spotName) return;
 
   const selDirs=[...document.querySelectorAll('#suDirBtns .s-btn.active')].map(b=>parseInt(b.dataset.deg));
-  const website   =($('suWebsite')?.value||'').trim();
-  const livecam   =($('suLivecam')?.value||'').trim();
-  const lesson    =($('suLesson')?.value||'').trim();
-  const gear      =($('suGear')?.value||'').trim();
-  const instagram =($('suInstagram')?.value||'').trim();
-  const facebook  =($('suFacebook')?.value||'').trim();
-  const address   =($('suAddress')?.value||'').trim();
-  const tip       =($('suTip')?.value||'').trim();
+  const tip=($('suTip')?.value||'').trim();
+
+  if(!selDirs.length&&!tip){ showToast('Add a wind direction or a tip before sending.'); return; }
 
   btn.disabled=true; btn.textContent='Sending…';
   const sb=getSb(); if(!sb){ btn.disabled=false; btn.textContent='Send suggestion →'; return; }
   const{error}=await sb.from('spot_update_suggestions').insert({
     email, spot_name:spotName,
-    website:website||null, livecam_url:livecam||null, lesson_url:lesson||null,
-    gear_url:gear||null, instagram_url:instagram||null, facebook_url:facebook||null,
-    address:address||null, suggested_dirs:selDirs.length?selDirs:null, tip:tip||null,
+    suggested_dirs:selDirs.length?selDirs:null, tip:tip||null,
   });
   if(error){ showToast('Error: '+error.message); btn.disabled=false; btn.textContent='Send suggestion →'; return; }
 
@@ -4926,7 +4899,7 @@ async function submitSuggestUpdate(){
   await fetch('https://kpwmajtxmcfpakvonimf.supabase.co/functions/v1/update-notify',{
     method:'POST',
     headers:{'Content-Type':'application/json','Authorization':'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwd21hanR4bWNmcGFrdm9uaW1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTcyMjYsImV4cCI6MjA5MDczMzIyNn0.QfQuIQbnfVUOApPbOdvCRbNsVdb0SBAwMX-hvioGJmg'},
-    body:JSON.stringify({email,spot_name:spotName,website,livecam_url:livecam,lesson_url:lesson,gear_url:gear,instagram_url:instagram,facebook_url:facebook,address,suggested_dirs:selDirs,tip}),
+    body:JSON.stringify({email,spot_name:spotName,suggested_dirs:selDirs,tip}),
   }).catch(()=>{});
 
   showToast('✓ Suggestion sent! We\'ll review it shortly.');
