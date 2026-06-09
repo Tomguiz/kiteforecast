@@ -2734,8 +2734,10 @@ async function fetchForecastFromSpot(spot){
   showOnly('loadingState');
   manualShoreSet=false;
   try{
-    const locParts=(spot.loc||'').split(', ');
-    cachedLoc={name:spot.name,country:locParts.pop()||'',admin1:locParts.join(', '),latitude:spot.lat,longitude:spot.lon};
+    const live=SPOTS.find(s=>s.name===spot.name);
+    const resolvedLoc=live?.loc||spot.loc||'';
+    const locParts=resolvedLoc.split(', ');
+    cachedLoc={name:spot.name,country:locParts.pop()||'',admin1:locParts.join(', '),latitude:live?.lat||spot.lat,longitude:live?.lon||spot.lon};
     const p=new URLSearchParams({
       latitude:spot.lat,longitude:spot.lon,
       hourly:['temperature_2m','weather_code','windspeed_10m','winddirection_10m','windgusts_10m'].join(','),
@@ -3054,7 +3056,8 @@ function pickFav(f){
   $('searchInput').value=f.name;
   closeAC();
   manualShoreSet=false;
-  fetchForecastFromSpot({name:f.name,loc:f.label,lat:f.lat,lon:f.lon,dirs:f.dirs||[]});
+  const live=SPOTS.find(s=>s.name===f.name);
+  fetchForecastFromSpot({name:f.name,loc:live?.loc||f.label,lat:live?.lat||f.lat,lon:live?.lon||f.lon,dirs:f.dirs||[]});
 }
 
 function removeFav(f){
