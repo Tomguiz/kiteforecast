@@ -5064,15 +5064,25 @@ async function renderMySpot(){
   // All user's claims
   const otherClaims=(claims||[]).filter(c=>c.spot_name!==spotName);
   const otherHTML=otherClaims.length?`
-    <div class="stats-section-title">Your other claims</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+      <div class="stats-section-title" style="margin-bottom:0">Your other claims</div>
+      <button onclick="renderMySpot()" style="background:none;border:none;color:var(--tdim);font-size:.7rem;cursor:pointer;padding:2px 6px;border-radius:6px;" title="Refresh">↻ Refresh</button>
+    </div>
     ${otherClaims.map(c=>{
       const badge=c.verified
         ?`<span style="color:#4ade80;font-size:.68rem;font-weight:700;">✓ Verified</span>`
-        :`<span style="color:#f59e0b;font-size:.68rem;font-weight:700;">⏳ Pending</span>`;
+        :`<div style="display:flex;align-items:center;gap:8px"><span style="color:#f59e0b;font-size:.68rem;font-weight:700;">⏳ Pending</span><button onclick="withdrawClaim('${c.id}')" style="background:none;border:none;color:var(--tdim);font-size:.65rem;cursor:pointer;padding:2px 4px;text-decoration:underline">Withdraw</button></div>`;
       return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><span style="font-size:.78rem;color:var(--text)">${c.spot_name}</span>${badge}</div>`;
     }).join('')}`:'';
 
   el.innerHTML=claimFormHTML+otherHTML||'<div class="stats-empty">No claims yet.<br>Open a spot page and tap "Claim" to get started.</div>';
+}
+
+async function withdrawClaim(id){
+  if(!confirm('Withdraw this claim?')) return;
+  const sb=getSb(); if(!sb) return;
+  await sb.from('spot_claims').delete().eq('id',id);
+  renderMySpot();
 }
 
 async function submitClaim(spotName){
