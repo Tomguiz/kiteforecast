@@ -5067,13 +5067,15 @@ async function renderMySpot(){
   // All user's claims
   const otherClaims=(claims||[]).filter(c=>c.spot_name!==spotName);
   const otherHTML=otherClaims.length?`
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
       <div class="stats-section-title" style="margin-bottom:0">Your other claims</div>
-      <button onclick="renderMySpot()" style="background:none;border:none;color:var(--tdim);font-size:.7rem;cursor:pointer;padding:2px 6px;border-radius:6px;" title="Refresh">↻ Refresh</button>
+      <button onclick="renderMySpot()" style="background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--text);font-size:.72rem;font-weight:600;cursor:pointer;padding:5px 12px;border-radius:8px;display:flex;align-items:center;gap:5px;">↻ Refresh</button>
     </div>
     ${otherClaims.map(c=>{
       const badge=c.verified
         ?`<span style="color:#4ade80;font-size:.68rem;font-weight:700;">✓ Verified</span>`
+        :c.status==='rejected'
+        ?`<div style="display:flex;align-items:center;gap:8px"><span style="color:#f87171;font-size:.68rem;font-weight:700;">✕ Rejected</span><button onclick="withdrawClaim('${c.id}')" style="background:none;border:none;color:var(--tdim);font-size:.65rem;cursor:pointer;padding:2px 4px;text-decoration:underline">Remove</button></div>`
         :`<div style="display:flex;align-items:center;gap:8px"><span style="color:#f59e0b;font-size:.68rem;font-weight:700;">⏳ Pending</span><button onclick="withdrawClaim('${c.id}')" style="background:none;border:none;color:var(--tdim);font-size:.65rem;cursor:pointer;padding:2px 4px;text-decoration:underline">Withdraw</button></div>`;
       return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><span style="font-size:.78rem;color:var(--text)">${c.spot_name}</span>${badge}</div>`;
     }).join('')}`:'';
@@ -5841,7 +5843,7 @@ async function renderAdminPanel(){
     sb.from('spot_suggestions').select('*').or('reviewed.eq.false,reviewed.is.null').order('created_at',{ascending:false}),
     sb.from('spot_overrides').select('name,lat,lon,loc').eq('active',true),
     sb.from('spot_update_suggestions').select('*').eq('reviewed',false).order('created_at',{ascending:false}),
-    sb.from('spot_claims').select('*').eq('verified',false).order('created_at',{ascending:false}),
+    sb.from('spot_claims').select('*').eq('verified',false).neq('status','rejected').order('created_at',{ascending:false}),
   ]);
   _adminSpots = spotData||[];
   // Annotate each spot_info with coords from spot_overrides if available
@@ -6145,16 +6147,16 @@ async function adminDismissUpdate(id){
 
 async function adminVerifyClaim(id, spotName, email){
   const sb=getSb(); if(!sb) return;
-  await sb.from('spot_claims').update({verified:true}).eq('id',id);
+  await sb.from('spot_claims').update({verified:true,status:'verified'}).eq('id',id);
   showToast(`✓ ${spotName} claim verified`);
   renderAdminPanel();
 }
 
 async function adminRejectClaim(id, spotName, email){
-  if(!confirm(`Reject and delete the claim for "${spotName}" by ${email}?`)) return;
+  if(!confirm(`Reject the claim for "${spotName}" by ${email}?`)) return;
   const sb=getSb(); if(!sb) return;
-  await sb.from('spot_claims').delete().eq('id',id);
-  showToast(`Claim rejected and removed`);
+  await sb.from('spot_claims').update({status:'rejected'}).eq('id',id);
+  showToast(`Claim rejected`);
   renderAdminPanel();
 }
 
