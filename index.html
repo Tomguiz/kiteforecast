@@ -4968,7 +4968,10 @@ async function renderMySpot(){
   const email=loadProfile().email||_authSession.user.email;
   const sb=getSb(); if(!sb) return;
 
-  const{data:claims}=await sb.from('spot_claims').select('*').eq('email',email).order('created_at',{ascending:false});
+  const[{data:claims},{data:suggestions}]=await Promise.all([
+    sb.from('spot_claims').select('*').eq('email',email).order('created_at',{ascending:false}),
+    sb.from('spot_update_suggestions').select('id,spot_name,suggested_dirs,tip,reviewed,approved,created_at').eq('email',email).order('created_at',{ascending:false}),
+  ]);
   const spotName=cachedLoc?.name||'';
 
   // Check if already claimed this spot
@@ -5075,7 +5078,45 @@ async function renderMySpot(){
       return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><span style="font-size:.78rem;color:var(--text)">${c.spot_name}</span>${badge}</div>`;
     }).join('')}`:'';
 
-  el.innerHTML=claimFormHTML+otherHTML||'<div class="stats-empty">No claims yet.<br>Open a spot page and tap "Claim" to get started.</div>';
+  // Contributions section
+  const pts=loadProfile().contributionPoints||0;
+  const nextReward=5-(pts%5)||5;
+  const premiumUntil=loadProfile().premiumUntil;
+  const premiumEarned=Math.floor(pts/5);
+  let contribHTML='';
+  if(suggestions?.length){
+    const pointsBar=premiumEarned>0
+      ?`<div style="font-size:.7rem;color:#34d399;margin-top:2px;">🎁 ${premiumEarned} free month${premiumEarned>1?'s':''} earned${premiumUntil?` · Premium until ${new Date(premiumUntil).toLocaleDateString('en',{month:'short',year:'numeric'})}`:''}</div>`
+      :`<div style="font-size:.7rem;color:var(--tdim);margin-top:2px;">${nextReward} more point${nextReward>1?'s':''} → 1 free month of premium</div>`;
+    contribHTML=`
+      <div style="margin-top:18px">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div class="stats-section-title" style="margin-bottom:0">Contributions</div>
+          <div style="font-size:.72rem;font-weight:700;color:#38bdf8;">⚡ ${pts} pt${pts!==1?'s':''}</div>
+        </div>
+        ${pointsBar}
+        <div style="margin-top:12px;display:flex;flex-direction:column;gap:6px;">
+          ${suggestions.map(s=>{
+            const dirsLabel=s.suggested_dirs?.length?s.suggested_dirs.map(d=>({0:'N',45:'NE',90:'E',135:'SE',180:'S',225:'SW',270:'W',315:'NW'}[d]||d)).join(', '):'';
+            const detail=[dirsLabel,s.tip].filter(Boolean).join(' · ').substring(0,60)+(([dirsLabel,s.tip].filter(Boolean).join(' · ').length>60)?'…':'');
+            const badge=s.approved
+              ?`<span style="color:#4ade80;font-size:.65rem;font-weight:700;white-space:nowrap;">✓ +5 pts</span>`
+              :s.reviewed
+              ?`<span style="color:#f87171;font-size:.65rem;font-weight:700;white-space:nowrap;">✕ Declined</span>`
+              :`<span style="color:#f59e0b;font-size:.65rem;font-weight:700;white-space:nowrap;">⏳ Pending</span>`;
+            return `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:8px 0;border-bottom:1px solid var(--border)">
+              <div style="flex:1;min-width:0">
+                <div style="font-size:.75rem;font-weight:600;color:var(--text)">${s.spot_name}</div>
+                ${detail?`<div style="font-size:.68rem;color:var(--tdim);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${detail}</div>`:''}
+              </div>
+              ${badge}
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+  }
+
+  el.innerHTML=claimFormHTML+otherHTML+contribHTML||'<div class="stats-empty">No claims yet.<br>Open a spot page and tap "Claim" to get started.</div>';
 }
 
 async function withdrawClaim(id){
@@ -6066,15 +6107,38 @@ async function adminApplyUpdate(u){
     await sb.from('spot_overrides').update({dirs:u.suggested_dirs}).eq('name',u.spot_name);
   }
 
-  // Mark reviewed
-  await sb.from('spot_update_suggestions').update({reviewed:true}).eq('id',u.id);
-  showToast('✓ Update applied');
+  // Mark reviewed + approved
+  await sb.from('spot_update_suggestions').update({reviewed:true,approved:true}).eq('id',u.id);
+
+  // Award 5 points — only once per spot per user
+  const{data:alreadyRewarded}=await sb.from('spot_update_suggestions')
+    .select('id').eq('email',u.email).eq('spot_name',u.spot_name).eq('approved',true).neq('id',u.id).limit(1);
+  if(!alreadyRewarded?.length){
+    const{data:prof}=await sb.from('profiles').select('contribution_points,premium_until').eq('email',u.email).single();
+    const newPoints=(prof?.contribution_points||0)+5;
+    // Every 5 points = 1 free month; calculate total free months earned
+    const totalFreeMonths=Math.floor(newPoints/5);
+    const prevMonths=Math.floor((prof?.contribution_points||0)/5);
+    let premiumUntil=prof?.premium_until?new Date(prof.premium_until):null;
+    if(totalFreeMonths>prevMonths){
+      // Add one month from now or from current premium_until, whichever is later
+      const base=premiumUntil&&premiumUntil>new Date()?premiumUntil:new Date();
+      base.setMonth(base.getMonth()+1);
+      premiumUntil=base;
+    }
+    await sb.from('profiles').update({
+      contribution_points:newPoints,
+      ...(premiumUntil?{premium_until:premiumUntil.toISOString()}:{}),
+    }).eq('email',u.email);
+  }
+
+  showToast('✓ Update applied — contributor rewarded');
   renderAdminPanel();
 }
 
 async function adminDismissUpdate(id){
   const sb=getSb(); if(!sb) return;
-  await sb.from('spot_update_suggestions').update({reviewed:true}).eq('id',id);
+  await sb.from('spot_update_suggestions').update({reviewed:true,approved:false}).eq('id',id);
   showToast('Dismissed');
   renderAdminPanel();
 }
@@ -6204,7 +6268,12 @@ async function checkShowMySpotTab(){
 // ── PREMIUM ──────────────────────────────────────────────────────────────────
 const FREE_FAV_LIMIT = 1
 
-function isPremium(){ return !!loadProfile().isPremium; }
+function isPremium(){
+  const p=loadProfile();
+  if(p.isPremium) return true;
+  if(p.premiumUntil && new Date(p.premiumUntil)>new Date()) return true;
+  return false;
+}
 
 function updatePremiumUI(){
   const premium=isPremium();
@@ -6270,7 +6339,7 @@ function updatePremiumUI(){
 
 async function syncPremiumFromSupabase(email){
   const sb=getSb(); if(!sb||!email) return;
-  const{data,error}=await sb.from('profiles').select('is_premium,sms_enabled,phone_number,is_admin,nickname,friend_session_notifs,notify_friends_on_confirm,avatar_url').eq('email',email).single();
+  const{data,error}=await sb.from('profiles').select('is_premium,sms_enabled,phone_number,is_admin,nickname,friend_session_notifs,notify_friends_on_confirm,avatar_url,contribution_points,premium_until').eq('email',email).single();
   console.log('[syncPremium] email=',email,'data=',data,'error=',error?.message);
   const p=loadProfile();
   if(data){
@@ -6284,6 +6353,8 @@ async function syncPremiumFromSupabase(email){
       p.friendSessionNotifs=data.friend_session_notifs!==false;
     if(data.notify_friends_on_confirm!==null&&data.notify_friends_on_confirm!==undefined)
       p.notifyFriendsOnConfirm=data.notify_friends_on_confirm!==false;
+    p.contributionPoints=data.contribution_points||0;
+    p.premiumUntil=data.premium_until||null;
     saveProfile(p);
     const fst=$('ppFriendSessionToggle');
     if(fst) fst.classList.toggle('on', p.friendSessionNotifs!==false);
