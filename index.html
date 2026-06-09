@@ -5997,8 +5997,14 @@ async function adminOpenSpot(spotName, prefill){
       <label class="pp-label">Description</label>
       <textarea id="adDesc" class="pp-input" rows="3" placeholder="Describe the spot…" style="margin-bottom:10px;resize:vertical;min-height:72px;font-family:inherit;font-size:.85rem">${s?.description||''}</textarea>
 
-      <label class="pp-label">Wind directions <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(comma-separated, e.g. SW, W, NW)</span></label>
-      <input type="text" id="adDirs" class="pp-input" value="${s?._dirs||s?.dirs?.join(', ')||''}" placeholder="SW, W, NW" style="margin-bottom:10px"/>
+      <label class="pp-label">Wind directions</label>
+      <div id="adDirBtns" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">
+        ${DIR_LABELS.map((lbl,i)=>{
+          const activeDirs=s?.dirs?.length?s.dirs:(s?._dirs||'').split(',').map(x=>{ const m=DIR_LABELS.indexOf(x.trim()); return m>=0?DIR_DEGS[m]:null; }).filter(x=>x!==null);
+          const active=activeDirs.includes(DIR_DEGS[i]);
+          return `<button class="s-btn${active?' active':''}" data-deg="${DIR_DEGS[i]}" onclick="this.classList.toggle('active')">${lbl}</button>`;
+        }).join('')}
+      </div>
 
       <label class="pp-label">🤙 Local riders tips</label>
       <textarea id="adSpotTip" class="pp-input" rows="3" placeholder="e.g. Shallow at low tide, best at high tide. Avoid S swell." style="margin-bottom:10px;resize:vertical;min-height:72px;font-family:inherit;font-size:.85rem">${s?.spot_tip||''}</textarea>
@@ -6162,10 +6168,9 @@ async function adminSaveSpotInfo(){
   const suggId=$('adminEditForm').dataset.suggId;
   if(suggId) sb.from('spot_suggestions').update({reviewed:true}).eq('id',suggId).catch(()=>{});
 
-  // Save wind dirs to spot_overrides
-  const dirsRaw=($('adDirs')?.value||'').trim();
-  const dirsArr=dirsRaw?dirsRaw.split(/[\s,]+/).map(d=>d.trim().toUpperCase()).filter(Boolean):[];
-  if(finalLat&&finalLon&&dirsArr.length){
+  // Save wind dirs to spot_overrides (read from toggle buttons)
+  const dirsArr=[...$('adDirBtns')?.querySelectorAll('.s-btn.active')||[]].map(b=>parseInt(b.dataset.deg));
+  if(finalLat&&finalLon){
     sb.from('spot_overrides').upsert({name:spotName,dirs:dirsArr},{onConflict:'name'}).catch(()=>{});
   }
 
