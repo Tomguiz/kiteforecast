@@ -5951,8 +5951,8 @@ async function renderAdminPanel(){
           <div style="font-size:.7rem;color:var(--tdim);margin-top:3px">${new Date(c.created_at).toLocaleDateString()}</div>
         </div>
         <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
-          <button class="btn pp-save-btn" style="font-size:.7rem;padding:5px 12px;white-space:nowrap" onclick="adminVerifyClaim('${c.id}','${c.spot_name.replace(/'/g,"\\'")}','${c.email.replace(/'/g,"\\'")}')">✓ Verify</button>
-          <button style="font-size:.7rem;padding:5px 12px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-radius:8px;color:#f87171;cursor:pointer;white-space:nowrap" onclick="adminRejectClaim('${c.id}','${c.spot_name.replace(/'/g,"\\'")}','${c.email.replace(/'/g,"\\'")}')">✕ Reject</button>
+          <button class="btn pp-save-btn admin-verify-btn" data-id="${c.id}" data-spot="${c.spot_name}" data-email="${c.email}" style="font-size:.7rem;padding:5px 12px;white-space:nowrap">✓ Verify</button>
+          <button class="admin-reject-btn" data-id="${c.id}" data-spot="${c.spot_name}" data-email="${c.email}" style="font-size:.7rem;padding:5px 12px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-radius:8px;color:#f87171;cursor:pointer;white-space:nowrap">✕ Reject</button>
         </div>
       </div>
     </div>`).join('')}
@@ -5966,7 +5966,7 @@ async function renderAdminPanel(){
           <div style="font-size:.82rem;font-weight:700;color:#4ade80">${c.spot_name}</div>
           <div style="font-size:.72rem;color:var(--tdim);margin-top:2px">${c.business_name||'—'} · <a href="mailto:${c.email}" style="color:var(--tdim)">${c.email}</a></div>
         </div>
-        <button style="font-size:.7rem;padding:5px 12px;background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.25);border-radius:8px;color:#4ade80;cursor:pointer;white-space:nowrap" onclick="adminVerifyClaim('${c.id}','${c.spot_name.replace(/'/g,"\\'")}','${c.email.replace(/'/g,"\\'")}')">↻ Re-apply</button>
+        <button class="admin-verify-btn" data-id="${c.id}" data-spot="${c.spot_name}" data-email="${c.email}" style="font-size:.7rem;padding:5px 12px;background:rgba(74,222,128,.1);border:1px solid rgba(74,222,128,.25);border-radius:8px;color:#4ade80;cursor:pointer;white-space:nowrap">↻ Re-apply</button>
       </div>
     </div>`).join('')}
     <div style="margin-bottom:18px"></div>`:''}
@@ -5978,6 +5978,14 @@ async function renderAdminPanel(){
     <button class="btn pp-save-btn" onclick="adminOpenSpot(null)" style="margin-bottom:14px;width:100%">+ Add new spot</button>
     ${rows||'<div class="stats-empty">No spots yet.</div>'}
     <div id="adminEditForm" style="display:none;margin-top:16px"></div>`;
+
+  // Wire claim action buttons (avoids CSP issues with inline onclick)
+  el.querySelectorAll('.admin-verify-btn').forEach(btn=>{
+    btn.onclick=()=>adminVerifyClaim(btn.dataset.id, btn.dataset.spot, btn.dataset.email);
+  });
+  el.querySelectorAll('.admin-reject-btn').forEach(btn=>{
+    btn.onclick=()=>adminRejectClaim(btn.dataset.id, btn.dataset.spot, btn.dataset.email);
+  });
 }
 
 async function adminApproveRequest(suggId, sugg){
@@ -6224,12 +6232,16 @@ async function adminVerifyClaim(id, spotName, email){
 
   // Notify the claimer by email
   const claimEmail = claim?.email || email;
-  sb.functions.invoke('claim-accepted-notify',{body:{
-    email:         claimEmail,
-    spot_name:     spotName,
-    business_name: claim?.business_name||spotName,
-    contact_name:  claim?.contact_name||'',
-  }}).catch(e=>console.warn('claim-accepted-notify failed:',e));
+  fetch(`${SB_URL}/functions/v1/claim-accepted-notify`,{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':`Bearer ${SB_ANON}`},
+    body:JSON.stringify({
+      email:         claimEmail,
+      spot_name:     spotName,
+      business_name: claim?.business_name||spotName,
+      contact_name:  claim?.contact_name||'',
+    }),
+  }).catch(e=>console.warn('claim-accepted-notify failed:',e));
 
   showToast(`✓ ${spotName} verified & confirmation email sent`);
   renderAdminPanel();
