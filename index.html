@@ -6224,52 +6224,39 @@ async function adminDismissUpdate(id){
 }
 
 async function adminVerifyClaim(id, spotName, email){
-  console.log('[adminVerifyClaim] start', {id, spotName, email});
-  const sb=getSb(); if(!sb){ console.warn('[adminVerifyClaim] no sb'); return; }
+  const sb=getSb(); if(!sb) return;
 
-  // Fetch full claim row to promote into spot_info
-  const{data:claim, error:cErr}=await sb.from('spot_claims').select('*').eq('id',id).single();
-  console.log('[adminVerifyClaim] claim fetch', {claim, cErr});
-
-  try{
-    if(claim){
-      const row={
-        spot_name:       claim.spot_name,
-        display_name:    claim.display_name||null,
-        business_name:   claim.business_name||null,
-        website:         claim.website||null,
-        address:         claim.address||null,
-        phone:           claim.contact_phone||null,
-        phone_public:    !!claim.phone_public,
-        email:           claim.contact_email||null,
-        email_public:    !!claim.email_public,
-        lesson_url:      claim.lesson_url||null,
-        gear_url:        claim.gear_url||null,
-        livecam_url:     claim.livecam_url||null,
-        instagram_url:   claim.instagram_url||null,
-        facebook_url:    claim.facebook_url||null,
-        contact_name:    claim.contact_name||null,
-        description:     claim.description||null,
-        membership_note: claim.membership_note||null,
-        verified:        true,
-        updated_at:      new Date().toISOString(),
-      };
-      console.log('[adminVerifyClaim] upserting spot_info row', row);
-      const{error:uErr}=await sb.from('spot_info').upsert(row,{onConflict:'spot_name'});
-      console.log('[adminVerifyClaim] upsert result', {uErr});
-      if(uErr){ showToast('spot_info error: '+uErr.message); return; }
-    }
-  }catch(e){
-    console.error('[adminVerifyClaim] exception in upsert', e);
-    showToast('Exception: '+e.message); return;
+  const{data:claim}=await sb.from('spot_claims').select('*').eq('id',id).single();
+  if(claim){
+    const row={
+      spot_name:       claim.spot_name,
+      display_name:    claim.display_name||null,
+      business_name:   claim.business_name||null,
+      website:         claim.website||null,
+      address:         claim.address||null,
+      phone:           claim.contact_phone||null,
+      phone_public:    !!claim.phone_public,
+      email:           claim.contact_email||null,
+      email_public:    !!claim.email_public,
+      lesson_url:      claim.lesson_url||null,
+      gear_url:        claim.gear_url||null,
+      livecam_url:     claim.livecam_url||null,
+      instagram_url:   claim.instagram_url||null,
+      facebook_url:    claim.facebook_url||null,
+      contact_name:    claim.contact_name||null,
+      description:     claim.description||null,
+      membership_note: claim.membership_note||null,
+      verified:        true,
+      updated_at:      new Date().toISOString(),
+    };
+    const{error:uErr}=await sb.from('spot_info').upsert(row,{onConflict:'spot_name'});
+    if(uErr){ showToast('spot_info error: '+uErr.message); return; }
   }
 
-  console.log('[adminVerifyClaim] updating claim status');
   await sb.from('spot_claims').update({verified:true,status:'verified'}).eq('id',id);
 
   // Notify the claimer by email
   const claimEmail = claim?.email || email;
-  console.log('[adminVerifyClaim] sending email to', claimEmail);
   fetch(`${SB_URL}/functions/v1/claim-accepted-notify`,{
     method:'POST',
     headers:{'Content-Type':'application/json','Authorization':`Bearer ${SB_ANON}`},
@@ -6279,7 +6266,7 @@ async function adminVerifyClaim(id, spotName, email){
       business_name: claim?.business_name||spotName,
       contact_name:  claim?.contact_name||'',
     }),
-  }).then(r=>r.json()).then(d=>console.log('[claim-accepted-notify] response',d)).catch(e=>console.error('[claim-accepted-notify] failed:',e));
+  }).catch(()=>{});
 
   showToast(`✓ ${spotName} verified & confirmation email sent`);
   renderAdminPanel();
