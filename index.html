@@ -3274,7 +3274,7 @@ async function renderSpotInfoCard(spotName) {
   const noteHTML = info.membership_note ? `<div class="spot-info-note">ℹ️ ${info.membership_note}</div>` : '';
   const tipHTML = info.spot_tip ? `
     <div class="spot-tip-block">
-      <div class="spot-tip-label">🤙 Riders say</div>
+      <div class="spot-tip-label">🤙 Local riders tips</div>
       <p class="spot-tip-text">${info.spot_tip}</p>
     </div>` : '';
 
@@ -4860,8 +4860,9 @@ function openSuggestUpdate(){
     <label class="pp-label">Good wind directions <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(tap to toggle)</span></label>
     <div id="suDirBtns" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:18px">${dirBtns}</div>
 
-    <label class="pp-label">Riders say <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">— your tip, visible to all kiters on this spot</span></label>
-    <textarea id="suTip" class="pp-input" rows="4" placeholder="e.g. Shallow at low tide, best at high tide. Avoid S swell. Parking on the north side." style="margin-bottom:6px;resize:vertical;min-height:88px;font-family:inherit;font-size:.85rem">${info.spot_tip||''}</textarea>
+    <label class="pp-label">Local riders tips <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">— visible to all kiters on this spot</span></label>
+    ${info.spot_tip?`<div style="font-size:.68rem;color:#38bdf8;margin-bottom:6px;display:flex;align-items:center;gap:4px">✏️ Current tip shown below — edit freely and submit your update</div>`:''}
+    <textarea id="suTip" class="pp-input" rows="4" placeholder="e.g. Shallow at low tide, best at high tide. Avoid S swell. Parking on the north side." style="margin-bottom:6px;resize:vertical;min-height:88px;font-family:inherit;font-size:.85rem${info.spot_tip?';border-color:rgba(56,189,248,.4)':''}">${info.spot_tip||''}</textarea>
     <div style="font-size:.67rem;color:var(--tdim);margin-bottom:18px;">Want to update business info, booking links or contact details? <span style="color:var(--accent);cursor:pointer" onclick="closeSuggestUpdate();openClaimFlow()">Claim this spot →</span></div>
 
     <button class="btn pp-save-btn" id="suSubmitBtn" onclick="submitSuggestUpdate()" style="width:100%">Send suggestion →</button>
