@@ -3202,7 +3202,7 @@ async function fetchSpotInfo(spotName) {
   const sb = getSb(); if(!sb) return null;
   const [{ data }, { data: claim }] = await Promise.all([
     sb.from('spot_info').select('*').eq('spot_name', spotName).single(),
-    sb.from('spot_claims').select('email,contact_name').eq('spot_name', spotName).eq('status','verified').limit(1).single(),
+    sb.from('spot_claims').select('email,contact_name').eq('spot_name', spotName).eq('status','verified').limit(1).maybeSingle(),
   ]);
   if(!data) return null;
   // Attach owner info
@@ -6365,14 +6365,14 @@ async function adminSaveSpotInfo(){
 
   // Mark suggestion as reviewed if this save came from approving a request
   const suggId=$('adminEditForm').dataset.suggId;
-  if(suggId) sb.from('spot_suggestions').update({reviewed:true}).eq('id',suggId).catch(()=>{});
+  if(suggId) sb.from('spot_suggestions').update({reviewed:true}).eq('id',suggId).then(()=>{}).catch(()=>{});
 
   // Save wind dirs to spot_overrides (read from toggle buttons)
   const dirsArr=[...$('adDirBtns')?.querySelectorAll('.s-btn.active')||[]].map(b=>parseInt(b.dataset.deg));
   const dirsLat=finalLat||cachedLoc?.latitude||null;
   const dirsLon=finalLon||cachedLoc?.longitude||null;
   if(dirsLat&&dirsLon){
-    sb.from('spot_overrides').upsert({name:spotName,dirs:dirsArr,lat:dirsLat,lon:dirsLon,active:true},{onConflict:'name'}).catch(()=>{});
+    try{ await sb.from('spot_overrides').upsert({name:spotName,dirs:dirsArr,lat:dirsLat,lon:dirsLon,active:true},{onConflict:'name'}); }catch(e){}
     const si=SPOTS.findIndex(s=>s.name===spotName);
     if(si>=0) SPOTS[si].dirs=dirsArr;
   }
