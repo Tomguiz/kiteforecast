@@ -5075,18 +5075,22 @@ async function renderMySpot(){
       const badge=c.verified
         ?`<span style="color:#4ade80;font-size:.68rem;font-weight:700;">✓ Verified</span>`
         :c.status==='rejected'
-        ?`<div style="display:flex;align-items:center;gap:8px"><span style="color:#f87171;font-size:.68rem;font-weight:700;">✕ Rejected</span><button onclick="withdrawClaim('${c.id}')" style="background:none;border:none;color:var(--tdim);font-size:.65rem;cursor:pointer;padding:2px 4px;text-decoration:underline">Remove</button></div>`
-        :`<div style="display:flex;align-items:center;gap:8px"><span style="color:#f59e0b;font-size:.68rem;font-weight:700;">⏳ Pending</span><button onclick="withdrawClaim('${c.id}')" style="background:none;border:none;color:var(--tdim);font-size:.65rem;cursor:pointer;padding:2px 4px;text-decoration:underline">Withdraw</button></div>`;
+        ?`<div style="display:flex;align-items:center;gap:8px"><span style="color:#f87171;font-size:.68rem;font-weight:700;">✕ Rejected</span><button onclick="this.outerHTML='<span style=&quot;font-size:.65rem;color:var(--tdim)&quot;>Removing…</span>';withdrawClaim('${c.id}')" style="background:none;border:none;color:var(--tdim);font-size:.65rem;cursor:pointer;padding:2px 4px;text-decoration:underline">Remove</button></div>`
+        :`<div style="display:flex;align-items:center;gap:8px"><span style="color:#f59e0b;font-size:.68rem;font-weight:700;">⏳ Pending</span><button onclick="this.outerHTML='<span style=&quot;font-size:.65rem;color:var(--tdim)&quot;>Withdrawing…</span>';withdrawClaim('${c.id}')" style="background:none;border:none;color:var(--tdim);font-size:.65rem;cursor:pointer;padding:2px 4px;text-decoration:underline">Withdraw</button></div>`;
       return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><span style="font-size:.78rem;color:var(--text)">${c.spot_name}</span>${badge}</div>`;
     }).join('')}`:'';
 
-  // Contributions section
+  // Contributions section — deduplicate: one row per spot (latest submission)
+  const dedupedSuggestions=Object.values((suggestions||[]).reduce((acc,s)=>{
+    if(!acc[s.spot_name]||new Date(s.created_at)>new Date(acc[s.spot_name].created_at)) acc[s.spot_name]=s;
+    return acc;
+  },{}));
   const pts=loadProfile().contributionPoints||0;
   const nextReward=5-(pts%5)||5;
   const premiumUntil=loadProfile().premiumUntil;
   const premiumEarned=Math.floor(pts/5);
   let contribHTML='';
-  if(suggestions?.length){
+  if(dedupedSuggestions.length){
     const pointsBar=premiumEarned>0
       ?`<div style="font-size:.7rem;color:#34d399;margin-top:2px;">🎁 ${premiumEarned} free month${premiumEarned>1?'s':''} earned${premiumUntil?` · Premium until ${new Date(premiumUntil).toLocaleDateString('en',{month:'short',year:'numeric'})}`:''}</div>`
       :`<div style="font-size:.7rem;color:var(--tdim);margin-top:2px;">${nextReward} more point${nextReward>1?'s':''} → 1 free month of premium</div>`;
@@ -5098,7 +5102,7 @@ async function renderMySpot(){
         </div>
         ${pointsBar}
         <div style="margin-top:12px;display:flex;flex-direction:column;gap:6px;">
-          ${suggestions.map(s=>{
+          ${dedupedSuggestions.map(s=>{
             const dirsLabel=s.suggested_dirs?.length?s.suggested_dirs.map(d=>({0:'N',45:'NE',90:'E',135:'SE',180:'S',225:'SW',270:'W',315:'NW'}[d]||d)).join(', '):'';
             const detail=[dirsLabel,s.tip].filter(Boolean).join(' · ').substring(0,60)+(([dirsLabel,s.tip].filter(Boolean).join(' · ').length>60)?'…':'');
             const badge=s.approved
@@ -5122,7 +5126,6 @@ async function renderMySpot(){
 }
 
 async function withdrawClaim(id){
-  if(!confirm('Withdraw this claim?')) return;
   const sb=getSb(); if(!sb) return;
   await sb.from('spot_claims').delete().eq('id',id);
   renderMySpot();
