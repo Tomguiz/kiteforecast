@@ -5075,18 +5075,22 @@ async function renderMySpot(){
   const otherHTML=otherClaims.length?`
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
       <div class="stats-section-title" style="margin-bottom:0">Your other claims</div>
-      <button onclick="renderMySpot()" style="background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--text);font-size:.72rem;font-weight:600;cursor:pointer;padding:5px 12px;border-radius:8px;display:flex;align-items:center;gap:5px;">↻ Refresh</button>
+      <button id="mySpotRefreshBtn" style="background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--text);font-size:.72rem;font-weight:600;cursor:pointer;padding:5px 12px;border-radius:8px;">↻ Refresh</button>
     </div>
     ${otherClaims.map(c=>{
       const badge=c.verified
         ?`<span style="color:#4ade80;font-size:.68rem;font-weight:700;">✓ Verified</span>`
         :c.status==='rejected'
-        ?`<div style="display:flex;align-items:center;gap:8px"><span style="color:#f87171;font-size:.68rem;font-weight:700;">✕ Rejected</span><button onclick="this.outerHTML='<span style=&quot;font-size:.65rem;color:var(--tdim)&quot;>Removing…</span>';withdrawClaim('${c.id}')" style="background:none;border:none;color:var(--tdim);font-size:.65rem;cursor:pointer;padding:2px 4px;text-decoration:underline">Remove</button></div>`
-        :`<div style="display:flex;align-items:center;gap:8px"><span style="color:#f59e0b;font-size:.68rem;font-weight:700;">⏳ Pending</span><button onclick="this.outerHTML='<span style=&quot;font-size:.65rem;color:var(--tdim)&quot;>Withdrawing…</span>';withdrawClaim('${c.id}')" style="background:none;border:none;color:var(--tdim);font-size:.65rem;cursor:pointer;padding:2px 4px;text-decoration:underline">Withdraw</button></div>`;
+        ?`<div style="display:flex;align-items:center;gap:8px"><span style="color:#f87171;font-size:.68rem;font-weight:700;">✕ Rejected</span><button class="claim-withdraw-btn" data-wid="${c.id}" style="background:none;border:none;color:var(--tdim);font-size:.65rem;cursor:pointer;padding:2px 4px;text-decoration:underline">Remove</button></div>`
+        :`<div style="display:flex;align-items:center;gap:8px"><span style="color:#f59e0b;font-size:.68rem;font-weight:700;">⏳ Pending</span><button class="claim-withdraw-btn" data-wid="${c.id}" style="background:none;border:none;color:var(--tdim);font-size:.65rem;cursor:pointer;padding:2px 4px;text-decoration:underline">Withdraw</button></div>`;
       return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><span style="font-size:.78rem;color:var(--text)">${c.spot_name}</span>${badge}</div>`;
     }).join('')}`:'';
 
   el.innerHTML=claimFormHTML+otherHTML||'<div class="stats-empty">No claims yet.<br>Open a spot page and tap "Claim" to get started.</div>';
+
+  // Wire buttons via addEventListener (avoids CSP issues with inline onclick in innerHTML)
+  el.querySelector('#mySpotRefreshBtn')?.addEventListener('click', ()=>renderMySpot());
+  el.querySelectorAll('.claim-withdraw-btn').forEach(btn=>btn.addEventListener('click', ()=>withdrawClaim(btn.dataset.wid)));
 }
 
 async function withdrawClaim(id){
