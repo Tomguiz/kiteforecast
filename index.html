@@ -5980,11 +5980,20 @@ async function renderAdminPanel(){
     <div id="adminEditForm" style="display:none;margin-top:16px"></div>`;
 
   // Wire claim action buttons (avoids CSP issues with inline onclick)
-  el.querySelectorAll('.admin-verify-btn').forEach(btn=>{
-    btn.onclick=()=>adminVerifyClaim(btn.dataset.id, btn.dataset.spot, btn.dataset.email);
+  const verifyBtns=el.querySelectorAll('.admin-verify-btn');
+  const rejectBtns=el.querySelectorAll('.admin-reject-btn');
+  console.log('[admin] wiring',verifyBtns.length,'verify +',rejectBtns.length,'reject buttons');
+  verifyBtns.forEach(btn=>{
+    btn.onclick=async()=>{
+      btn.disabled=true; btn.textContent='…';
+      await adminVerifyClaim(btn.dataset.id, btn.dataset.spot, btn.dataset.email);
+    };
   });
-  el.querySelectorAll('.admin-reject-btn').forEach(btn=>{
-    btn.onclick=()=>adminRejectClaim(btn.dataset.id, btn.dataset.spot, btn.dataset.email);
+  rejectBtns.forEach(btn=>{
+    btn.onclick=async()=>{
+      btn.disabled=true;
+      await adminRejectClaim(btn.dataset.id, btn.dataset.spot, btn.dataset.email);
+    };
   });
 }
 
@@ -6198,10 +6207,12 @@ async function adminDismissUpdate(id){
 }
 
 async function adminVerifyClaim(id, spotName, email){
-  const sb=getSb(); if(!sb) return;
+  console.log('[adminVerifyClaim] start', {id, spotName, email});
+  const sb=getSb(); if(!sb){ console.warn('[adminVerifyClaim] no sb'); return; }
 
   // Fetch full claim row to promote into spot_info
-  const{data:claim}=await sb.from('spot_claims').select('*').eq('id',id).single();
+  const{data:claim, error:cErr}=await sb.from('spot_claims').select('*').eq('id',id).single();
+  console.log('[adminVerifyClaim] claim fetch', {claim, cErr});
   if(claim){
     const row={
       spot_name:       claim.spot_name,
