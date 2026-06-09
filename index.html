@@ -5987,6 +5987,9 @@ async function renderAdminPanel(){
     btn.onclick=async()=>{
       btn.disabled=true; btn.textContent='…';
       await adminVerifyClaim(btn.dataset.id, btn.dataset.spot, btn.dataset.email);
+      // Remove the card immediately if it was a Re-apply (already verified)
+      const card=btn.closest('[style*="border-radius:10px"]');
+      if(card) card.remove();
     };
   });
   rejectBtns.forEach(btn=>{
@@ -6257,6 +6260,7 @@ async function adminVerifyClaim(id, spotName, email){
 
   // Notify the claimer by email
   const claimEmail = claim?.email || email;
+  console.log('[adminVerifyClaim] sending email to', claimEmail);
   fetch(`${SB_URL}/functions/v1/claim-accepted-notify`,{
     method:'POST',
     headers:{'Content-Type':'application/json','Authorization':`Bearer ${SB_ANON}`},
@@ -6266,7 +6270,7 @@ async function adminVerifyClaim(id, spotName, email){
       business_name: claim?.business_name||spotName,
       contact_name:  claim?.contact_name||'',
     }),
-  }).catch(e=>console.warn('claim-accepted-notify failed:',e));
+  }).then(r=>r.json()).then(d=>console.log('[claim-accepted-notify] response',d)).catch(e=>console.error('[claim-accepted-notify] failed:',e));
 
   showToast(`✓ ${spotName} verified & confirmation email sent`);
   renderAdminPanel();
