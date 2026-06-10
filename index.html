@@ -5398,13 +5398,14 @@ async function submitClaim(spotName){
     facebook_url:     facebook||null,
     description:      desc||null,
     membership_note:  membershipNote||null,
-  },{onConflict:'email,spot_name'});
+  },{onConflict:'email,spot_name'}).select('id').single();
   if(error){ showToast('Error: '+error.message); btn.disabled=false; btn.textContent='Submit claim'; return; }
+  const claimId=data?.id;
   // Notify admin
   await fetch('https://kpwmajtxmcfpakvonimf.supabase.co/functions/v1/claim-notify',{
     method:'POST',
     headers:{'Content-Type':'application/json','Authorization':'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwd21hanR4bWNmcGFrdm9uaW1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTcyMjYsImV4cCI6MjA5MDczMzIyNn0.QfQuIQbnfVUOApPbOdvCRbNsVdb0SBAwMX-hvioGJmg'},
-    body:JSON.stringify({email,spot_name:spotName,business_name:bizName,website,contact_name:contactName,contact_phone:phone,phone_public:phonePublic,contact_email:contactEmail,email_public:emailPublic,livecam_url:livecam,description:desc}),
+    body:JSON.stringify({email,spot_name:spotName,claim_id:claimId,business_name:bizName,website,contact_name:contactName,contact_phone:phone,phone_public:phonePublic,contact_email:contactEmail,email_public:emailPublic,livecam_url:livecam,description:desc}),
   }).catch(()=>{});
   showToast('✓ Claim submitted! We\'ll verify within 48h.');
   renderMySpot();
@@ -6185,6 +6186,21 @@ async function renderAdminPanel(){
       await adminRejectClaim(btn.dataset.id, btn.dataset.spot, btn.dataset.email);
     };
   });
+
+  // Deep-link: scroll to and highlight a specific pending claim
+  if(window._pendingClaimId){
+    const {id}=window._pendingClaimId;
+    window._pendingClaimId=null;
+    const targetBtn=el.querySelector(`.admin-verify-btn[data-id="${id}"]`);
+    if(targetBtn){
+      const card=targetBtn.closest('[style*="border-radius:10px"]');
+      if(card){
+        card.style.outline='2px solid #38bdf8';
+        card.style.outlineOffset='2px';
+        setTimeout(()=>card.scrollIntoView({behavior:'smooth',block:'center'}),200);
+      }
+    }
+  }
 }
 
 async function adminApproveRequest(suggId, sugg){
@@ -6724,6 +6740,7 @@ async function syncPremiumFromSupabase(email){
   const adminTab=$('ppTabAdmin');
   if(adminTab) adminTab.style.display=p.isAdmin?'inline-flex':'none';
   if(p.isAdmin && window._pendingReviewSpot) openAdminReview();
+  if(p.isAdmin && window._pendingClaimId) openAdminClaim();
   // Scroll hint: show arrow indicator on tabs if overflow
   const tabsEl=document.querySelector('.pp-tabs');
   if(tabsEl) tabsEl.classList.toggle('has-scroll', tabsEl.scrollWidth>tabsEl.clientWidth);
@@ -6848,6 +6865,28 @@ async function savePhone(){
     }
   }
 })();
+
+;(async function(){
+  const params=new URLSearchParams(location.search);
+  const claimParam=params.get('claim');
+  if(!claimParam) return;
+  history.replaceState({},'',location.pathname);
+  try{
+    window._pendingClaimId=JSON.parse(atob(claimParam));
+  }catch(e){}
+  const sb=getSb();
+  if(sb){
+    const {data:{session}}=await sb.auth.getSession();
+    if(session && session.user?.email !== 'tom.guisgand@gmail.com'){
+      await sb.auth.signOut();
+    }
+  }
+})();
+
+function openAdminClaim(){
+  if(!window._pendingClaimId) return;
+  openProfilePanel('admin');
+}
 
 function openAdminReview(){
   const spot=window._pendingReviewSpot;

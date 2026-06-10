@@ -13,7 +13,12 @@ const CORS = {
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS })
 
-  const { email, spot_name, business_name, website, contact_name, contact_phone, phone_public, contact_email, email_public, livecam_url, description } = await req.json()
+  const { email, spot_name, claim_id, business_name, website, contact_name, contact_phone, phone_public, contact_email, email_public, livecam_url, description } = await req.json()
+
+  // Deep-link: opens app as admin, scrolls to the pending claim card
+  const claimDeepLink = claim_id
+    ? `https://tomguiz.github.io/kiteforecast/?claim=${btoa(JSON.stringify({ id: claim_id, spot_name, email }))}`
+    : `https://tomguiz.github.io/kiteforecast/`
 
   const payload = {
     notification_type: 'claim',
@@ -30,7 +35,7 @@ Deno.serve(async (req) => {
     livecam_url:    livecam_url    || '—',
     description:    description    || '—',
     submitted_at:   new Date().toLocaleString('en', { dateStyle: 'full', timeStyle: 'short' }),
-    verify_url:     `https://supabase.com/dashboard/project/kpwmajtxmcfpakvonimf/editor?query=UPDATE+spot_claims+SET+verified%3Dtrue+WHERE+email%3D%27${encodeURIComponent(email)}%27+AND+spot_name%3D%27${encodeURIComponent(spot_name)}%27`,
+    verify_url:     claimDeepLink,
   }
 
   await fetch(MAKE_WEBHOOK_URL, {
