@@ -18,8 +18,10 @@ Deno.serve(async (req) => {
     requester_email:   email,
     spot_name,
     contact_name:      contact_name || '',
-    app_link:          app_link || `https://tomguiz.github.io/kiteforecast/?spot=${encodeURIComponent(spot_name)}`,
+    app_link:          app_link || `https://tomguiz.github.io/kiteforecast/?tab=contrib`,
     approved_at:       new Date().toLocaleString('en', { dateStyle: 'full', timeStyle: 'short' }),
+    reward_points:     5,
+    reward_premium:    '1 free month of Premium',
   }
 
   await fetch(MAKE_WEBHOOK_URL, {

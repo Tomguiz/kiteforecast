@@ -5380,7 +5380,7 @@ async function renderMyContributions(){
 
   const reqRows=(spotRequests||[]).map(r=>{
     const badge=r.approved
-      ?`<span style="color:#4ade80;font-size:.68rem;font-weight:700;white-space:nowrap;">✓ Added</span>`
+      ?`<span style="color:#4ade80;font-size:.68rem;font-weight:700;white-space:nowrap;">✓ Added · +5 pts</span>`
       :r.reviewed
       ?`<span style="color:#f87171;font-size:.68rem;font-weight:700;white-space:nowrap;">✕ Declined</span>`
       :`<span style="color:#f59e0b;font-size:.68rem;font-weight:700;white-space:nowrap;">⏳ Pending review</span>`;
@@ -6634,14 +6634,30 @@ async function adminSaveSpotInfo(){
     else{SPOTS.push({name:spotName,loc:finalLoc,lat:finalLat,lon:finalLon,dirs:[]});}
   }
 
-  // Mark suggestion as approved and notify the requester
+  // Mark suggestion as approved, award 5 contribution points, and notify the requester
   const suggId=$('adminEditForm').dataset.suggId;
   if(suggId&&suggId!=='review'){
     sb.from('spot_suggestions').select('submitted_by,contact_name,suggested_name').eq('id',suggId).single()
-      .then(({data:sugg})=>{
-        sb.from('spot_suggestions').update({reviewed:true,approved:true}).eq('id',suggId).then(()=>{}).catch(()=>{});
+      .then(async({data:sugg})=>{
+        await sb.from('spot_suggestions').update({reviewed:true,approved:true}).eq('id',suggId);
         const requesterEmail=sugg?.submitted_by;
         if(requesterEmail){
+          // Award 5 contribution points (spot request = 5 pts = 1 free month)
+          const{data:prof}=await sb.from('profiles').select('contribution_points,premium_until').eq('email',requesterEmail).single();
+          const newPoints=(prof?.contribution_points||0)+5;
+          const totalFreeMonths=Math.floor(newPoints/5);
+          const prevMonths=Math.floor((prof?.contribution_points||0)/5);
+          let premiumUntil=prof?.premium_until?new Date(prof.premium_until):null;
+          if(totalFreeMonths>prevMonths){
+            const base=premiumUntil&&premiumUntil>new Date()?premiumUntil:new Date();
+            base.setMonth(base.getMonth()+1);
+            premiumUntil=base;
+          }
+          await sb.from('profiles').update({
+            contribution_points:newPoints,
+            ...(premiumUntil?{premium_until:premiumUntil.toISOString()}:{}),
+          }).eq('email',requesterEmail);
+          // Notify requester by email
           fetch(`${SB_URL}/functions/v1/spot-request-approved-notify`,{
             method:'POST',
             headers:{'Content-Type':'application/json','Authorization':`Bearer ${SB_ANON}`},
@@ -6649,7 +6665,7 @@ async function adminSaveSpotInfo(){
               email:        requesterEmail,
               spot_name:    spotName,
               contact_name: sugg?.contact_name||'',
-              app_link:     `https://tomguiz.github.io/kiteforecast/?spot=${encodeURIComponent(spotName)}`,
+              app_link:     `https://tomguiz.github.io/kiteforecast/?spot=${encodeURIComponent(spotName)}&tab=contrib`,
             }),
           }).catch(()=>{});
         }
