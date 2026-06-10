@@ -5301,7 +5301,7 @@ async function renderMySpot(){
     </div>
     ${otherClaims.map(c=>{
       const badge=c.verified
-        ?`<span style="color:#4ade80;font-size:.68rem;font-weight:700;">✓ Verified</span>`
+        ?`<div style="display:flex;align-items:center;gap:8px"><span style="color:#4ade80;font-size:.68rem;font-weight:700;">✓ Verified</span><button class="owner-edit-btn" data-spot="${c.spot_name.replace(/"/g,'&quot;')}" style="background:rgba(56,189,248,.08);border:1px solid rgba(56,189,248,.25);border-radius:6px;color:var(--accent);font-size:.65rem;font-weight:600;cursor:pointer;padding:3px 8px;">✏️ Edit</button></div>`
         :c.status==='rejected'
         ?`<div style="display:flex;align-items:center;gap:8px"><span style="color:#f87171;font-size:.68rem;font-weight:700;">✕ Rejected</span><button class="claim-withdraw-btn" data-wid="${c.id}" style="background:none;border:none;color:var(--tdim);font-size:.65rem;cursor:pointer;padding:2px 4px;text-decoration:underline">Remove</button></div>`
         :`<div style="display:flex;align-items:center;gap:8px"><span style="color:#f59e0b;font-size:.68rem;font-weight:700;">⏳ Pending</span><button class="claim-withdraw-btn" data-wid="${c.id}" style="background:none;border:none;color:var(--tdim);font-size:.65rem;cursor:pointer;padding:2px 4px;text-decoration:underline">Withdraw</button></div>`;
@@ -5324,6 +5324,7 @@ async function renderMySpot(){
   const refreshBtn=el.querySelector('#mySpotRefreshBtn');
   if(refreshBtn) refreshBtn.onclick=()=>renderMySpot();
   el.querySelectorAll('.claim-withdraw-btn').forEach(btn=>{ btn.onclick=()=>withdrawClaim(btn.dataset.wid); });
+  el.querySelectorAll('.owner-edit-btn').forEach(btn=>{ btn.onclick=()=>openOwnerEditFromMySpot(btn.dataset.spot); });
 }
 
 async function withdrawClaim(id){
