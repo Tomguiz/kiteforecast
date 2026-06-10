@@ -2759,8 +2759,9 @@ function renderAC(items, query=''){
   const spotRows=items.map((s,i)=>
     `<div class="ac-item" data-i="${i}"><strong>${s.alias||s.name}</strong><span>${s.alias?s.name+' · ':''  }${s.loc}</span></div>`
   ).join('');
-  // Show pending spots that match the query
-  const pendingMatches=q.length>=2?getPendingSpots().filter(p=>p.nameLower.includes(q.toLowerCase())):[];
+  // Show pending spots that match the query, excluding any that are now live in SPOTS
+  const liveNames=new Set((SPOTS||[]).map(s=>(s.name||'').toLowerCase()));
+  const pendingMatches=q.length>=2?getPendingSpots().filter(p=>p.nameLower.includes(q.toLowerCase())&&!liveNames.has(p.nameLower)):[];
   const pendingRows=pendingMatches.map(p=>`<div class="ac-item" style="border-top:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:8px;opacity:.75;cursor:default"><span style="font-size:.85rem">⏳</span><span style="flex:1"><span style="font-weight:600;font-size:.82rem;color:#fbbf24">${p.name}</span><span style="display:block;font-size:.72rem;color:var(--tdim);margin-top:1px">Requested — under review by the team</span></span></div>`).join('');
   const addHint=q.length>=2&&!pendingMatches.some(p=>p.nameLower===q.toLowerCase())
     ? `<div class="ac-item ac-item-add" style="border-top:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:8px;color:var(--accent);opacity:.8"><span style="font-size:1rem;line-height:1">＋</span><span style="flex:1"><span style="font-weight:600;font-size:.82rem">Add "${q}" as a new spot</span><span style="display:block;font-size:.72rem;color:var(--tdim);margin-top:1px">Not listed? Request it — we'll review and add it</span></span></div>`
@@ -5144,7 +5145,10 @@ async function renderMySpot(){
   const email=loadProfile().email||_authSession.user.email;
   const sb=getSb(); if(!sb) return;
 
-  const{data:claims}=await sb.from('spot_claims').select('*').eq('email',email).order('created_at',{ascending:false});
+  const[{data:claims},{data:approvedReqs}]=await Promise.all([
+    sb.from('spot_claims').select('*').eq('email',email).order('created_at',{ascending:false}),
+    sb.from('spot_suggestions').select('suggested_name,created_at').eq('submitted_by',email).eq('approved',true).order('created_at',{ascending:false}),
+  ]);
   const spotName=cachedLoc?.name||'';
 
   // Check if already claimed this spot (ignore rejected — let them re-claim)
@@ -5253,8 +5257,18 @@ async function renderMySpot(){
       return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><span style="font-size:.78rem;color:var(--text)">${c.spot_name}</span>${badge}</div>`;
     }).join('')}`:'';
 
-  el.innerHTML=claimFormHTML+(otherHTML||'');
-  if(!claimFormHTML&&!otherHTML) el.innerHTML='<div class="stats-empty">No claims yet.<br>Open a spot page and tap "Claim" to get started.</div>';
+  const approvedReqsHTML=(approvedReqs&&approvedReqs.length)?`
+    <div style="margin-bottom:16px">
+      <div class="stats-section-title" style="margin-bottom:8px">Spots you requested</div>
+      ${approvedReqs.map(r=>`
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:rgba(74,222,128,.06);border:1px solid rgba(74,222,128,.2);border-radius:10px;margin-bottom:8px;">
+          <span style="font-size:.82rem;font-weight:600;color:var(--text)">📍 ${r.suggested_name}</span>
+          <span style="background:rgba(74,222,128,.15);border:1px solid rgba(74,222,128,.3);border-radius:99px;padding:2px 10px;font-size:.7rem;font-weight:700;color:#4ade80;">✓ Added</span>
+        </div>`).join('')}
+    </div>`:'' ;
+
+  el.innerHTML=approvedReqsHTML+claimFormHTML+(otherHTML||'');
+  if(!approvedReqsHTML&&!claimFormHTML&&!otherHTML) el.innerHTML='<div class="stats-empty">No claims yet.<br>Open a spot page and tap "Claim" to get started.</div>';
 
   const refreshBtn=el.querySelector('#mySpotRefreshBtn');
   if(refreshBtn) refreshBtn.onclick=()=>renderMySpot();
@@ -6594,13 +6608,14 @@ async function checkShowMySpotTab(){
   if(!_authSession?.user) return;
   const sb=getSb(); if(!sb) return;
   const email=loadProfile().email||_authSession.user.email;
-  const[{data:claims},{data:suggestions}]=await Promise.all([
+  const[{data:claims},{data:suggestions},{data:spotReqs}]=await Promise.all([
     sb.from('spot_claims').select('id').eq('email',email).limit(1),
     sb.from('spot_update_suggestions').select('id').eq('email',email).limit(1),
+    sb.from('spot_suggestions').select('id').eq('submitted_by',email).eq('approved',true).limit(1),
   ]);
   const mySpotTab=$('ppTabMySpot');
   const contribTab=$('ppTabContrib');
-  if(mySpotTab) mySpotTab.style.display=(claims?.length)?'inline-flex':'none';
+  if(mySpotTab) mySpotTab.style.display=(claims?.length||spotReqs?.length)?'inline-flex':'none';
   if(contribTab) contribTab.style.display=(suggestions?.length)?'inline-flex':'none';
 }
 
