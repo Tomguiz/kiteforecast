@@ -1878,6 +1878,7 @@ function toggleWindDir(btn){
     if(windDirs.size>0) saveUserDirsForSpot(cachedLoc.name,[...windDirs]);
     const key=`${cachedLoc.latitude},${cachedLoc.longitude}`;
     delete chipFxCache[key]; delete chipBestCache[key];
+    _saveChipCacheToLS();
     renderHintChips();
   }
 }
@@ -2458,6 +2459,26 @@ let osmSearchCache={};
 // ── Chip forecast cache (session-level) ──
 const chipFxCache={};
 const chipBestCache={}; // key -> {dateStr,peakKn,spotName,spot} | null
+const CHIP_CACHE_TTL=60*60*1000; // 1 hour
+const CHIP_CACHE_LS_KEY='kf_chipCache_v2';
+
+function _loadChipCacheFromLS(){
+  try{
+    const raw=localStorage.getItem(CHIP_CACHE_LS_KEY);
+    if(!raw) return;
+    const{ts,fx,best}=JSON.parse(raw);
+    if(Date.now()-ts>CHIP_CACHE_TTL) return; // stale — discard
+    Object.assign(chipFxCache,fx||{});
+    Object.assign(chipBestCache,best||{});
+  }catch(e){}
+}
+function _saveChipCacheToLS(){
+  try{
+    localStorage.setItem(CHIP_CACHE_LS_KEY,JSON.stringify({ts:Date.now(),fx:chipFxCache,best:chipBestCache}));
+  }catch(e){}
+}
+_loadChipCacheFromLS();
+
 async function fetchChipQualDays(spot){
   const key=`${spot.lat},${spot.lon}`;
   if(chipFxCache[key]!==undefined) return chipFxCache[key];
@@ -2524,6 +2545,7 @@ async function fetchChipQualDays(spot){
     });
     chipBestCache[key]=bestDateStr?{dateStr:bestDateStr,peakKn:bestPeakKn,startHr:bestStartHr,nextDateStr,nextStartHr,nextPeakKn,spotName:spot.name,spot,days10}:null;
     if(!bestDateStr) chipBestCache[key]={dateStr:null,peakKn:0,startHr:null,nextDateStr:null,nextStartHr:null,nextPeakKn:0,spotName:spot.name,spot,days10};
+    _saveChipCacheToLS();
     return qualDays;
   }catch{ chipFxCache[key]=null; chipBestCache[key]=null; return null; }
   }); // end queuedFetch
@@ -2910,6 +2932,7 @@ function reloadForecast(){
     // Home screen — clear chip cache and retry all chip fetches
     Object.keys(chipFxCache).forEach(k=>delete chipFxCache[k]);
     Object.keys(chipBestCache).forEach(k=>delete chipBestCache[k]);
+    localStorage.removeItem(CHIP_CACHE_LS_KEY);
     renderHintChips();
   }
 }
