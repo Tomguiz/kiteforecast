@@ -3109,6 +3109,7 @@ function resetSearch(){
   _fetchGen++; // cancel any in-flight fetch
   // Hide spot view immediately — do this first so UI responds even if something below throws
   showOnly('hintState');
+  updateFetchTimestamp();
   document.body.classList.remove('spot-loaded');
   $('locHdr').style.display='none';
   const _sb=$('shoreBar'); if(_sb) _sb.classList.remove('visible');
