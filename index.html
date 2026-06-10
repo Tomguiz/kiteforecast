@@ -6185,6 +6185,8 @@ async function adminApplyUpdate(u){
       // Update in-memory SPOTS so UI reflects immediately without reload
       const si=SPOTS.findIndex(s=>s.name===u.spot_name);
       if(si>=0) SPOTS[si].dirs=u.suggested_dirs;
+      // Clear localStorage user override so the new official dirs take effect for everyone
+      const allDirs=loadAllUserDirs(); delete allDirs[u.spot_name]; localStorage.setItem('kf_dirs',JSON.stringify(allDirs));
       // If this is the currently open spot, refresh wind dirs + spot card
       if(cachedLoc?.name===u.spot_name){
         windDirs=new Set(u.suggested_dirs);
@@ -6382,6 +6384,12 @@ async function adminSaveSpotInfo(){
     try{ await sb.from('spot_overrides').upsert({name:spotName,dirs:dirsArr,lat:dirsLat,lon:dirsLon,active:true},{onConflict:'name'}); }catch(e){}
     const si=SPOTS.findIndex(s=>s.name===spotName);
     if(si>=0) SPOTS[si].dirs=dirsArr;
+    // Clear localStorage user override so new official dirs take effect immediately
+    const _allDirs=loadAllUserDirs(); delete _allDirs[spotName]; localStorage.setItem('kf_dirs',JSON.stringify(_allDirs));
+    if(cachedLoc?.name===spotName){
+      windDirs=new Set(dirsArr);
+      document.querySelectorAll('.s-btn').forEach(b=>b.classList.toggle('active',windDirs.has(Number(b.dataset.deg))));
+    }
   }
 
   showToast(isRename?`✓ Renamed to "${spotName}"`:isNew?'✓ New spot added — visible to all users on next load!':'✓ Spot info saved!');
