@@ -1591,6 +1591,28 @@ let cachedHrMap       = null;
 let cachedMarineHrMap = null;
 let cachedTideExtremes= null; // [{time, height, type:'high'|'low'}] for current spot+day
 let lastFetchTime = parseInt(localStorage.getItem('kf_lastFetch')||'0',10);
+const WX_CACHE_KEY='kf_wxCache_v1';
+const WX_CACHE_TTL=60*60*1000; // 1 hour
+
+function _saveWxCache(loc,wx,marineHrMap,tideExtremes,dirs){
+  try{
+    // Convert Map to plain array pairs for JSON serialisation
+    const marineArr=marineHrMap?[...marineHrMap.entries()]:[];
+    localStorage.setItem(WX_CACHE_KEY,JSON.stringify({
+      ts:Date.now(),loc,wx,marineArr,tideExtremes,dirs,
+    }));
+  }catch(e){}
+}
+function _loadWxCache(lat,lon){
+  try{
+    const raw=localStorage.getItem(WX_CACHE_KEY); if(!raw) return null;
+    const c=JSON.parse(raw);
+    if(Date.now()-c.ts>WX_CACHE_TTL){ localStorage.removeItem(WX_CACHE_KEY); return null; }
+    // Must match same spot (within ~100 m)
+    if(Math.abs(c.loc.latitude-lat)>0.001||Math.abs(c.loc.longitude-lon)>0.001) return null;
+    return c;
+  }catch(e){ return null; }
+}
 
 function updateFetchTimestamp(){
   const el=$('fetchTimestamp'); if(!el) return;
@@ -2753,6 +2775,30 @@ function pickSpotAndOpenDay(spot,dateStr){
   pickSpot(spot);
 }
 
+function _applyWxData(loc,wx,marineArr,tideExtremes,savedDirs){
+  cachedLoc=loc;
+  cachedWx=wx;
+  cachedHrMap=new Map();
+  const h=wx.hourly;
+  h.time.forEach((t,i)=>{
+    const dateStr=t.slice(0,10);
+    const hour=parseInt(t.slice(11,13),10);
+    if(!cachedHrMap.has(dateStr)) cachedHrMap.set(dateStr,new Map());
+    cachedHrMap.get(dateStr).set(hour,{
+      temp:   Math.round(h.temperature_2m[i]),
+      code:   h.weather_code[i]??0,
+      kn:     toKnotsR(h.windspeed_10m[i]),
+      dir:    h.winddirection_10m[i],
+      gustKn: toKnotsR(h.windgusts_10m[i]),
+      kn80:   h.windspeed_80m?.[i]!=null?toKnotsR(h.windspeed_80m[i]):null,
+      dir80:  h.winddirection_80m?.[i]!=null?h.winddirection_80m[i]:null,
+    });
+  });
+  cachedMarineHrMap=new Map(marineArr||[]);
+  cachedTideExtremes=tideExtremes||null;
+  if(savedDirs?.length&&!manualShoreSet) setWindDirs(savedDirs);
+}
+
 async function fetchForecastFromSpot(spot){
   const myGen=++_fetchGen;
   showOnly('loadingState');
@@ -2761,7 +2807,25 @@ async function fetchForecastFromSpot(spot){
     const live=SPOTS.find(s=>s.name===spot.name);
     const resolvedLoc=live?.loc||spot.loc||'';
     const locParts=resolvedLoc.split(', ');
-    cachedLoc={name:spot.name,country:locParts.pop()||'',admin1:locParts.join(', '),latitude:live?.lat||spot.lat,longitude:live?.lon||spot.lon};
+    const loc={name:spot.name,country:locParts.pop()||'',admin1:locParts.join(', '),latitude:live?.lat||spot.lat,longitude:live?.lon||spot.lon};
+
+    // Serve from cache if same spot and data is under 1 hour old
+    const cached=_loadWxCache(loc.latitude,loc.longitude);
+    if(cached&&cached.loc.name===spot.name){
+      if(myGen!==_fetchGen) return;
+      _applyWxData(cached.loc,cached.wx,cached.marineArr,cached.tideExtremes,cached.dirs);
+      // Always prefer live dirs from SPOTS over cached dirs
+      if(!manualShoreSet){
+        const effectiveDirs=live?.dirs?.length?live.dirs:spot.dirs;
+        if(effectiveDirs?.length) setWindDirs(effectiveDirs);
+      }
+      lastFetchTime=cached.ts; try{localStorage.setItem('kf_lastFetch',lastFetchTime);}catch(e){}
+      renderGrid();
+      recheckSpotSubscription();
+      return;
+    }
+
+    cachedLoc=loc;
     const p=new URLSearchParams({
       latitude:spot.lat,longitude:spot.lon,
       hourly:['temperature_2m','weather_code','windspeed_10m','winddirection_10m','windgusts_10m'].join(','),
@@ -2805,6 +2869,7 @@ async function fetchForecastFromSpot(spot){
     cachedTideExtremes=tidesData;
     if(myGen!==_fetchGen) return; // user navigated away — discard results
     lastFetchTime=Date.now(); try{localStorage.setItem('kf_lastFetch',lastFetchTime);}catch(e){}
+    _saveWxCache(cachedLoc,cachedWx,[...cachedMarineHrMap.entries()],cachedTideExtremes,[...windDirs]);
     renderGrid();
     recheckSpotSubscription();
   }catch(err){
@@ -3628,6 +3693,16 @@ async function fetchForecast(query){
       latitude, longitude
     };
 
+    // Check cache before hitting the API
+    const cached2=_loadWxCache(latitude,longitude);
+    if(cached2){
+      _applyWxData(cached2.loc,cached2.wx,cached2.marineArr,cached2.tideExtremes,cached2.dirs);
+      saveLastSpot({name:cachedLoc.name,loc:[cachedLoc.admin1,cachedLoc.country].filter(Boolean).join(', '),lat:cachedLoc.latitude,lon:cachedLoc.longitude,dirs:[...windDirs]});
+      lastFetchTime=cached2.ts; try{localStorage.setItem('kf_lastFetch',lastFetchTime);}catch(e){}
+      renderGrid();
+      return;
+    }
+
     const p=new URLSearchParams({
       latitude,longitude,
       hourly:['temperature_2m','weather_code','windspeed_10m','winddirection_10m','windgusts_10m'].join(','),
@@ -3669,6 +3744,7 @@ async function fetchForecast(query){
 
     buildMarineMap(marineData2);
     cachedTideExtremes=tidesData2;
+    _saveWxCache(cachedLoc,cachedWx,[...cachedMarineHrMap.entries()],cachedTideExtremes,[...windDirs]);
     saveLastSpot({name:cachedLoc.name,loc:[cachedLoc.admin1,cachedLoc.country].filter(Boolean).join(', '),lat:cachedLoc.latitude,lon:cachedLoc.longitude,dirs:[...windDirs]});
     lastFetchTime=Date.now(); try{localStorage.setItem('kf_lastFetch',lastFetchTime);}catch(e){}
     renderGrid();
