@@ -2456,25 +2456,28 @@ function spotSearch(q){
 
 let osmSearchCache={};
 
-// ── Chip forecast cache (session-level) ──
+// ── Chip forecast cache (persisted, 1-hour TTL) ──
 const chipFxCache={};
 const chipBestCache={}; // key -> {dateStr,peakKn,spotName,spot} | null
 const CHIP_CACHE_TTL=60*60*1000; // 1 hour
 const CHIP_CACHE_LS_KEY='kf_chipCache_v2';
+let _chipCacheTs=0; // timestamp when this cache epoch started
 
 function _loadChipCacheFromLS(){
   try{
     const raw=localStorage.getItem(CHIP_CACHE_LS_KEY);
     if(!raw) return;
     const{ts,fx,best}=JSON.parse(raw);
-    if(Date.now()-ts>CHIP_CACHE_TTL) return; // stale — discard
+    if(Date.now()-ts>CHIP_CACHE_TTL){ localStorage.removeItem(CHIP_CACHE_LS_KEY); return; }
+    _chipCacheTs=ts; // preserve original timestamp so TTL isn't reset on each save
     Object.assign(chipFxCache,fx||{});
     Object.assign(chipBestCache,best||{});
   }catch(e){}
 }
 function _saveChipCacheToLS(){
   try{
-    localStorage.setItem(CHIP_CACHE_LS_KEY,JSON.stringify({ts:Date.now(),fx:chipFxCache,best:chipBestCache}));
+    if(!_chipCacheTs) _chipCacheTs=Date.now(); // stamp only on first save of this epoch
+    localStorage.setItem(CHIP_CACHE_LS_KEY,JSON.stringify({ts:_chipCacheTs,fx:chipFxCache,best:chipBestCache}));
   }catch(e){}
 }
 _loadChipCacheFromLS();
@@ -2928,6 +2931,7 @@ function reloadForecast(){
     // Home screen — clear chip cache and retry all chip fetches
     Object.keys(chipFxCache).forEach(k=>delete chipFxCache[k]);
     Object.keys(chipBestCache).forEach(k=>delete chipBestCache[k]);
+    _chipCacheTs=0;
     localStorage.removeItem(CHIP_CACHE_LS_KEY);
     renderHintChips();
   }
@@ -6379,12 +6383,14 @@ async function adminSaveSpotInfo(){
 
   // Persist to spot_overrides: always upsert so loc/country stays in sync
   const existingSpot=(_adminSpots||[]).find(x=>x.spot_name===spotName);
-  const finalLat=renameLat||lat||existingSpot?._lat||null;
-  const finalLon=renameLon||lon||existingSpot?._lon||null;
+  const finalLat=renameLat||lat||existingSpot?._lat||cachedLoc?.latitude||null;
+  const finalLon=renameLon||lon||existingSpot?._lon||cachedLoc?.longitude||null;
   const finalLoc=renameLoc||loc||existingSpot?._loc||'';
   if(finalLat&&finalLon){
+    // Do NOT include dirs here — the separate dirs upsert below handles them
+    // so we never accidentally wipe existing dirs when editing other fields
     const{error:oe}=await sb.from('spot_overrides').upsert({
-      name:spotName, loc:finalLoc, lat:finalLat, lon:finalLon, dirs:[], active:true, added_by:adminNickname
+      name:spotName, loc:finalLoc, lat:finalLat, lon:finalLon, active:true, added_by:adminNickname
     },{onConflict:'name'});
     if(oe){ showToast('spot_info saved but spot_overrides failed: '+oe.message); }
     const si=SPOTS.findIndex(x=>x.name===spotName);
