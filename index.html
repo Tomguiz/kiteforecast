@@ -2774,8 +2774,9 @@ async function fetchForecastFromSpot(spot){
     cachedWx=await safeFetch(`https://api.open-meteo.com/v1/forecast?${p}`);
     if(cachedWx.error) throw new Error(cachedWx.reason||'API error');
     if(!manualShoreSet){
-      if(spot.dirs&&spot.dirs.length>0){
-        setWindDirs(spot.dirs);
+      const effectiveDirs=live?.dirs?.length?live.dirs:spot.dirs;
+      if(effectiveDirs&&effectiveDirs.length>0){
+        setWindDirs(effectiveDirs);
       } else if(spot._osm){
         // OSM spot — try auto-detect
         const detected=await autoDetectShore(spot.lat,spot.lon).catch(()=>null);
