@@ -5,16 +5,26 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>KiteForecast &mdash; Your spot claim has been accepted!</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+  @media only screen and (max-width:620px){
+    .outer-td  { padding:16px 8px !important; }
+    .card      { width:100% !important; }
+    .section   { padding:20px 18px !important; }
+    .cta-td    { padding:24px 18px !important; }
+    .cta-btn   { display:block !important; width:100% !important; box-sizing:border-box !important; text-align:center !important; padding:18px 20px !important; font-size:17px !important; border-radius:12px !important; }
+    .hero-title{ font-size:38px !important; }
+  }
+</style>
 </head>
 <body style="margin:0;padding:0;background-color:#080a0f;font-family:'DM Sans',Arial,sans-serif;color:#e8eaf0;">
 
 <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#080a0f;">
-<tr><td align="center" style="padding:32px 16px;">
+<tr><td class="outer-td" align="center" style="padding:32px 16px;">
 
-<table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;">
+<table class="card" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;">
 
   <!-- HEADER -->
-  <tr><td style="background:linear-gradient(135deg,#0a3d6b,#0a4d3b);border-radius:16px 16px 0 0;padding:36px 40px 28px 40px;">
+  <tr><td class="section" style="background:linear-gradient(135deg,#0a3d6b,#0a4d3b);border-radius:16px 16px 0 0;padding:36px 40px 28px 40px;">
 
     <table cellpadding="0" cellspacing="0" border="0" style="margin-bottom:22px;">
       <tr>
@@ -29,7 +39,7 @@
       </tr>
     </table>
 
-    <div style="font-family:'Bebas Neue',Arial,sans-serif;font-size:52px;line-height:1.0;color:#ffffff;letter-spacing:1px;margin-bottom:8px;">You're now<br/><span style="color:#4ade80;">the owner</span></div>
+    <div class="hero-title" style="font-family:'Bebas Neue',Arial,sans-serif;font-size:52px;line-height:1.0;color:#ffffff;letter-spacing:1px;margin-bottom:8px;">You're now<br/><span style="color:#4ade80;">the owner</span></div>
     <div style="font-size:15px;color:rgba(255,255,255,0.72);">Your claim for <strong style="color:#ffffff;">[[spot_name]]</strong> has been verified. Your spot is now live on KiteForecast.</div>
 
   </td></tr>
@@ -108,9 +118,19 @@
   </td></tr>
 
   <!-- CTA -->
-  <tr><td style="background-color:#111827;border:1px solid #1e2535;border-top:none;padding:28px 40px;text-align:center;">
-    <a href="[[app_link]]" style="display:inline-block;background:linear-gradient(135deg,#4ade80,#16a34a);color:#ffffff;font-family:'DM Sans',Arial,sans-serif;font-size:16px;font-weight:700;padding:16px 40px;border-radius:10px;text-decoration:none;text-shadow:0 1px 2px rgba(0,0,0,0.4);">&#127993; View your spot on KiteForecast</a>
-    <div style="font-size:12px;color:#4a5568;margin-top:12px;">Accepted on [[accepted_at]]</div>
+  <tr><td class="cta-td" style="background-color:#111827;border:1px solid #1e2535;border-top:none;padding:28px 40px;text-align:center;">
+    <table cellpadding="0" cellspacing="0" border="0" width="100%">
+      <tr>
+        <td align="center">
+          <a href="[[app_link]]" class="cta-btn" style="display:inline-block;background:linear-gradient(135deg,#4ade80,#16a34a);color:#ffffff;font-family:'DM Sans',Arial,sans-serif;font-size:16px;font-weight:700;padding:16px 40px;border-radius:10px;text-decoration:none;text-shadow:0 1px 2px rgba(0,0,0,0.4);">&#127993;&nbsp; View your spot on KiteForecast</a>
+        </td>
+      </tr>
+      <tr>
+        <td align="center" style="padding-top:12px;">
+          <div style="font-size:12px;color:#4a5568;">Accepted on [[accepted_at]]</div>
+        </td>
+      </tr>
+    </table>
   </td></tr>
 
   <!-- FOOTER -->

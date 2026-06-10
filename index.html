@@ -6856,7 +6856,7 @@ async function savePhone(){
 ;(function(){
   const params=new URLSearchParams(location.search);
   const tab=params.get('tab');
-  if(tab==='friends'||tab==='notifs'){
+  if(tab==='friends'||tab==='notifs'||tab==='myspot'||tab==='contrib'){
     history.replaceState({},'',location.pathname);
     window._pendingTab=tab;
   }
