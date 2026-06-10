@@ -1094,11 +1094,12 @@
       <div style="font-size:.75rem;color:var(--gray);line-height:1.7;margin-bottom:12px;">
         ⭐ <strong style="color:var(--text)">Unlimited favourite spots</strong> — free plan = 1<br/>
         📬 <strong style="color:var(--text)">Weekly wind digest</strong> — Monday forecast for all your spots<br/>
-        🌊 <strong style="color:var(--text)">Tide times</strong> — full tide schedule on every forecast<br/>
-        🏄 <strong style="color:var(--text)">Session tracking</strong> — log sessions &amp; notify friends on the water<br/>
-        🤝 <strong style="color:var(--text)">Support indie development</strong> — keep KiteForecast free for everyone
+        🌊 <strong style="color:var(--text)">Tide times</strong> — full schedule on every spot forecast<br/>
+        🏄 <strong style="color:var(--text)">Session tracking</strong> — log &amp; notify friends when you're on the water<br/>
+        🤝 <strong style="color:var(--text)">Support indie development</strong> — keep KiteForecast free for everyone<br/>
+        🎯 <strong style="color:var(--text)">Priority support</strong> — direct access to the team
       </div>
-      <button class="btn-premium" onclick="$('upgradeModal').style.display='none';startCheckout()">⚡ Upgrade — €1.99/month →</button>
+      <button class="btn-premium" onclick="$('upgradeModal').style.display='none';startCheckout()">⚡ Get Lifetime Access — €19.99 →</button>
     </div>
   </div>
   <!-- mobile map button -->
@@ -1421,15 +1422,17 @@
         <!-- Premium section (non-premium) -->
         <div id="ppPremiumUpgrade">
           <div class="premium-card">
-            <div style="font-size:.85rem;font-weight:700;color:#f59e0b;margin-bottom:6px;">⚡ Go Premium — €1.99/month</div>
+            <div style="font-size:.85rem;font-weight:700;color:#f59e0b;margin-bottom:2px;">⚡ Lifetime Access — €19.99</div>
+            <div style="font-size:.72rem;color:var(--tdim);margin-bottom:8px;">One-time payment · no subscription · yours forever</div>
             <div style="font-size:.75rem;color:var(--gray);line-height:1.6;margin-bottom:2px;">
               ⭐ Unlimited favourite spots — free plan = 1<br/>
               📬 Weekly wind digest — Monday forecast for all your spots<br/>
               🌊 Tide times — full schedule on every spot forecast<br/>
-              🏄 Session tracking — log &amp; notify friends when you're on the water<br/>
-              🤝 Support indie development — keep KiteForecast free for everyone
+              🏄 Session tracking — log &amp; notify friends when on the water<br/>
+              🤝 Support indie development — keep KiteForecast free for all<br/>
+              🎯 Priority support — direct access to the team
             </div>
-            <button class="btn-premium" id="ppUpgradeBtn" onclick="startCheckout()">Upgrade to Premium →</button>
+            <button class="btn-premium" id="ppUpgradeBtn" onclick="startCheckout()">Get Lifetime Access — €19.99 →</button>
           </div>
         </div>
 
@@ -1449,8 +1452,9 @@
               <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.15);border-radius:8px;padding:8px 10px;color:var(--gray);">🌊 Tide times</div>
               <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.15);border-radius:8px;padding:8px 10px;color:var(--gray);">🏄 Session tracking</div>
               <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.15);border-radius:8px;padding:8px 10px;color:var(--gray);">🤝 Support indie dev</div>
+              <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.15);border-radius:8px;padding:8px 10px;color:var(--gray);">🎯 Priority support</div>
             </div>
-            <button id="ppManageSubBtn" onclick="manageSubscription()" style="width:100%;padding:10px;background:transparent;border:1px solid rgba(245,158,11,.35);border-radius:8px;font-size:.78rem;font-weight:600;color:#f59e0b;cursor:pointer;transition:background .15s;" onmouseover="this.style.background='rgba(245,158,11,.1)'" onmouseout="this.style.background='transparent'">Manage subscription → cancel, change card</button>
+            <div style="text-align:center;padding:10px 0 2px;font-size:.75rem;color:#f59e0b;font-weight:600;">✓ Lifetime access — no subscription</div>
           </div>
         </div>
 
@@ -6882,7 +6886,7 @@ async function startCheckout(){
     const data=await resp.json();
     if(data.url) location.href=data.url;
     else throw new Error(data.error||'No checkout URL returned');
-  }catch(e){ showToast('Error starting checkout: '+e.message); btn.disabled=false; btn.textContent='Upgrade to Premium →'; }
+  }catch(e){ showToast('Error starting checkout: '+e.message); btn.disabled=false; btn.textContent='Get Lifetime Access — €19.99 →'; }
 }
 
 async function manageSubscription(){
