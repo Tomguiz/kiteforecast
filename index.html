@@ -1460,6 +1460,7 @@
     </div>
     <div id="ppPanelMySpot" class="pp-body" style="display:none">
       <div id="ppMySpotContent"></div>
+      <div id="ownerEditForm" style="display:none;margin-top:16px"></div>
     </div>
     <div id="ppPanelContrib" class="pp-body" style="display:none">
       <div id="ppContribContent"></div>
@@ -5136,6 +5137,48 @@ async function openAdminEditFromSpot(){
 }
 
 let _cachedSpotInfo=null;
+
+async function openOwnerEditFromMySpot(spotName){
+  const p=loadProfile();
+  const sb=getSb(); if(!sb) return;
+  // Verify this user actually has a verified claim for the spot
+  const{data:claim}=await sb.from('spot_claims').select('*').eq('email',p.email).eq('spot_name',spotName).eq('verified',true).maybeSingle();
+  if(!claim){ showToast('Access denied'); return; }
+  // Fetch existing spot_info and spot_overrides
+  const[{data:infoRow},{data:ov}]=await Promise.all([
+    sb.from('spot_info').select('*').eq('spot_name',spotName).maybeSingle(),
+    sb.from('spot_overrides').select('lat,lon,loc,dirs').eq('name',spotName).maybeSingle(),
+  ]);
+  // Populate _cachedSpotInfo so adminSaveSpotInfo owner-check passes
+  _cachedSpotInfo={...(infoRow||{}),spot_name:spotName,_owner_email:claim.email};
+  if(!_adminSpots) _adminSpots=infoRow?[{...infoRow,_lat:ov?.lat,_lon:ov?.lon,_loc:ov?.loc}]:[];
+  else if(infoRow&&!_adminSpots.find(x=>x.spot_name===infoRow.spot_name)) _adminSpots.push({...infoRow,_lat:ov?.lat,_lon:ov?.lon,_loc:ov?.loc});
+  else{ const si=_adminSpots.findIndex(x=>x.spot_name===spotName); if(si>=0){_adminSpots[si]._lat=ov?.lat;_adminSpots[si]._lon=ov?.lon;_adminSpots[si]._loc=ov?.loc;} }
+  const prefill={
+    ...(infoRow||{}),
+    spot_name: spotName,
+    _lat: ov?.lat??null,
+    _lon: ov?.lon??null,
+    _loc: ov?.loc??'',
+    _hasOverride: !!ov,
+    dirs: ov?.dirs??[],
+  };
+  // Render the edit form inline in the My Spot panel (avoids admin access-denied check)
+  window._ownerEditMode=true;
+  switchPpTab('myspot');
+  const ownerEl=$('ownerEditForm');
+  const contentEl=$('ppMySpotContent');
+  if(ownerEl&&contentEl){
+    contentEl.style.display='none';
+    ownerEl.style.display='block';
+    ownerEl.innerHTML=`<div style="font-size:.8rem;font-weight:700;color:var(--text);margin-bottom:12px;">✏️ Edit — ${spotName}</div>`;
+    // Temporarily swap id so adminOpenSpot writes into ownerEditForm
+    ownerEl.id='adminEditForm';
+    const realAdminForm=$('adminEditForm'); // this is now the one in admin panel (may not exist if not rendered)
+    adminOpenSpot(spotName, prefill);
+    ownerEl.id='ownerEditForm';
+  }
+}
 // ── END SUGGEST UPDATE ────────────────────────────────────────────────────────
 
 function openClaimFlow(){
@@ -5173,11 +5216,13 @@ async function renderMySpot(){
             ${badge}
           </div>
           ${existing.verified?`
-          <div style="font-size:.75rem;color:var(--gray);line-height:1.6;">
+          <div style="font-size:.75rem;color:var(--gray);line-height:1.6;margin-bottom:12px;">
             ${existing.business_name?`<div><strong>Business:</strong> ${existing.business_name}</div>`:''}
             ${existing.website?`<div><strong>Website:</strong> <a href="${existing.website}" target="_blank" style="color:var(--accent)">${existing.website}</a></div>`:''}
             ${existing.description?`<div style="margin-top:4px">${existing.description}</div>`:''}
-          </div>`:`<div style="font-size:.75rem;color:var(--tdim);">We'll verify your claim and get back to you within 48h.</div>`}
+          </div>
+          <button onclick="openOwnerEditFromMySpot('${existing.spot_name.replace(/'/g,"\\'")}')" style="width:100%;padding:10px;background:rgba(56,189,248,.08);border:1px solid rgba(56,189,248,.25);border-radius:10px;color:var(--accent);font-size:.8rem;font-weight:600;cursor:pointer;">✏️ Edit spot info</button>
+          `:`<div style="font-size:.75rem;color:var(--tdim);">We'll verify your claim and get back to you within 48h.</div>`}
         </div>`;
     } else {
       claimFormHTML=`
@@ -6339,7 +6384,7 @@ async function adminOpenSpot(spotName, prefill){
 
       <div style="display:flex;gap:8px">
         <button class="btn pp-save-btn" id="adSaveBtn" onclick="adminSaveSpotInfo()" style="flex:1">${isNew?'Add spot':'Save changes'}</button>
-        <button onclick="$('adminEditForm').style.display='none'" style="flex-shrink:0;padding:10px 16px;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:10px;color:var(--tdim);font-size:.82rem;cursor:pointer">Cancel</button>
+        <button onclick="closeAdminEditForm()" style="flex-shrink:0;padding:10px 16px;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:10px;color:var(--tdim);font-size:.82rem;cursor:pointer">Cancel</button>
       </div>
       ${!isNew?`<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:12px">
         <button onclick="adminDeleteSpot()" style="width:100%;padding:10px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:10px;color:#f87171;font-size:.8rem;font-weight:600;cursor:pointer;">🗑 Delete this spot</button>
@@ -6347,6 +6392,17 @@ async function adminOpenSpot(spotName, prefill){
     </div>`;
 }
 
+function closeAdminEditForm(){
+  if(window._ownerEditMode){
+    window._ownerEditMode=false;
+    const ownerEl=$('ownerEditForm');
+    if(ownerEl){ ownerEl.style.display='none'; ownerEl.innerHTML=''; }
+    const contentEl=$('ppMySpotContent');
+    if(contentEl){ contentEl.style.display=''; renderMySpot(); }
+  } else {
+    const el=$('adminEditForm'); if(el) el.style.display='none';
+  }
+}
 function adminUnlockRename(){
   const inp=$('adSpotName'); if(!inp) return;
   inp.removeAttribute('readonly');
@@ -6621,9 +6677,8 @@ async function adminSaveSpotInfo(){
   }
 
   showToast(isRename?`✓ Renamed to "${spotName}"`:isNew?'✓ New spot added — visible to all users on next load!':'✓ Spot info saved!');
-  $('adminEditForm').style.display='none';
-  if(_p.isAdmin) renderAdminPanel();
-  else closeProfilePanel();
+  closeAdminEditForm();
+  if(!window._ownerEditMode&&_p.isAdmin) renderAdminPanel();
   if(cachedLoc?.name===spotName) renderSpotInfoCard(spotName);
 }
 async function adminDeleteSpot(){
@@ -6649,8 +6704,8 @@ async function adminDeleteSpot(){
     _chipCacheTs=0; localStorage.removeItem(CHIP_CACHE_LS_KEY);
   }
   showToast(`✓ "${spotName}" deleted`);
-  $('adminEditForm').style.display='none';
-  renderAdminPanel();
+  closeAdminEditForm();
+  if(!window._ownerEditMode) renderAdminPanel();
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
