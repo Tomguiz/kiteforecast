@@ -236,6 +236,10 @@ DO $$ BEGIN
   CREATE POLICY "all_update_claims" ON spot_claims FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
+DO $$ BEGIN
+  CREATE POLICY "all_delete_claims" ON spot_claims FOR DELETE TO anon, authenticated USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 
 DO $$ BEGIN
