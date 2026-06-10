@@ -2493,8 +2493,7 @@ async function fetchChipQualDays(spot){
     });
     const wx=await safeFetch(`https://api.open-meteo.com/v1/forecast?${p}`,15000);
     if(wx.error) throw new Error(wx.reason);
-    const userDirs=loadUserDirsForSpot(spot.name);
-    const dirs=new Set(userDirs||(spot.dirs&&spot.dirs.length?spot.dirs:[]));
+    const dirs=new Set(spot.dirs&&spot.dirs.length?spot.dirs:[]);
     const isDirOK=d=>{ if(!dirs.size) return true; for(const sd of dirs) if(angleDiff(d,sd)<=22.5) return true; return false; };
     let qualDays=0;
     let bestDateStr=null, bestPeakKn=0, bestStartHr=null, nextDateStr=null, nextStartHr=null, nextPeakKn=0;
@@ -2772,10 +2771,7 @@ async function fetchForecastFromSpot(spot){
     cachedWx=await safeFetch(`https://api.open-meteo.com/v1/forecast?${p}`);
     if(cachedWx.error) throw new Error(cachedWx.reason||'API error');
     if(!manualShoreSet){
-      const userDirs=loadUserDirsForSpot(spot.name);
-      if(userDirs&&userDirs.length>0){
-        setWindDirs(userDirs);
-      } else if(spot.dirs&&spot.dirs.length>0){
+      if(spot.dirs&&spot.dirs.length>0){
         setWindDirs(spot.dirs);
       } else if(spot._osm){
         // OSM spot — try auto-detect
