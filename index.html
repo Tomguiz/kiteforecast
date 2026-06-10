@@ -2506,6 +2506,21 @@ function _saveChipCacheToLS(){
 }
 _loadChipCacheFromLS();
 
+// Lookup helper: exact key first, then any entry for same lat/lon (used before SPOTS dirs are loaded)
+function _chipCacheGet(lat,lon,dirs){
+  const dirsStr=(dirs||[]).slice().sort((a,b)=>a-b).join(',');
+  const exactKey=`${lat},${lon}|${dirsStr}`;
+  if(chipFxCache[exactKey]!==undefined) return{key:exactKey,val:chipFxCache[exactKey]};
+  // Fallback: find any cached entry for this location (pre-SPOTS-ready renders)
+  const prefix=`${lat},${lon}|`;
+  const fallbackKey=Object.keys(chipFxCache).find(k=>k.startsWith(prefix));
+  if(fallbackKey!==undefined) return{key:fallbackKey,val:chipFxCache[fallbackKey]};
+  return null;
+}
+
+let _spotsIsReady=false; // flipped to true once _spotsReady resolves
+window._spotsReady?.then?.(()=>{ _spotsIsReady=true; });
+
 async function fetchChipQualDays(spot){
   const dirsStr=(spot.dirs||[]).slice().sort((a,b)=>a-b).join(',');
   const key=`${spot.lat},${spot.lon}|${dirsStr}`;
@@ -3056,12 +3071,14 @@ function renderHintChips(){
       const fbadge=document.createElement('span');
       // Use live SPOTS dirs (DB-sourced) so admin updates are reflected immediately
       const _liveDirs=(_ks?.dirs?.length?_ks.dirs:f.dirs)||[];
-      const _fkey=`${f.lat},${f.lon}`;
-      const _cached=chipFxCache[_fkey];
-      if(_cached!==undefined){ fbadge.className='chip-days'; setChipDayBadge(fbadge,_cached,true); }
+      const _fhit=_chipCacheGet(f.lat,f.lon,_liveDirs);
+      if(_fhit){ fbadge.className='chip-days'; setChipDayBadge(fbadge,_fhit.val,true); }
       else{ fbadge.className='chip-days cd-loading'; fbadge.textContent='·'; }
       label.appendChild(fbadge);
-      fetchChipQualDays({name:f.name,loc:f.label||'',lat:f.lat,lon:f.lon,dirs:_liveDirs}).then(n=>{setChipDayBadge(fbadge,n,true);updateBestWindowBar();});
+      // Defer API fetch until SPOTS dirs are loaded; the re-render after _spotsReady will call this again
+      if(_spotsIsReady){
+        fetchChipQualDays({name:f.name,loc:f.label||'',lat:f.lat,lon:f.lon,dirs:_liveDirs}).then(n=>{setChipDayBadge(fbadge,n,true);updateBestWindowBar();});
+      }
       const rm=document.createElement('span');
       rm.className='fav-chip-remove'; rm.textContent='✕'; rm.title='Remove from your spots';
       rm.addEventListener('click',e=>{e.stopPropagation();removeFav(f);});
@@ -3112,9 +3129,8 @@ function renderHintChips(){
       inner.appendChild(bi);
     }
     const badge=document.createElement('span');
-    const _skey=`${spot.lat},${spot.lon}`;
-    const _scached=chipFxCache[_skey];
-    if(_scached!==undefined){ badge.className='chip-days'; setChipDayBadge(badge,_scached,false); }
+    const _shit=_chipCacheGet(spot.lat,spot.lon,spot.dirs);
+    if(_shit){ badge.className='chip-days'; setChipDayBadge(badge,_shit.val,false); }
     else{ badge.className='chip-days cd-loading'; badge.textContent='·'; }
     inner.appendChild(badge);
     inner.addEventListener('click',()=>pickSpot(spot));
@@ -3146,7 +3162,9 @@ function renderHintChips(){
     });
     chip.appendChild(inner); chip.appendChild(add);
     wrap.appendChild(chip);
-    fetchChipQualDays(spot).then(n=>{ setChipDayBadge(badge,n); updateBestWindowBar(); });
+    if(_spotsIsReady){
+      fetchChipQualDays(spot).then(n=>{ setChipDayBadge(badge,n); updateBestWindowBar(); });
+    }
   });
   // Sync step visibility and bar state immediately (before async fetches complete)
   updateBestWindowBar();
@@ -3552,6 +3570,7 @@ window._spotsReady=new Promise(r=>{_spotsReadyResolve=r;});
       }
     }
   }catch(e){}
+  _spotsIsReady=true;
   _spotsReadyResolve();
   renderHintChips();
   $('hintLegend').innerHTML=buildLegendHTML();
