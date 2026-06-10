@@ -1900,7 +1900,8 @@ function toggleWindDir(btn){
   if(cachedLoc){
     if(windDirs.size>0) saveUserDirsForSpot(cachedLoc.name,[...windDirs]);
     const key=`${cachedLoc.latitude},${cachedLoc.longitude}`;
-    delete chipFxCache[key]; delete chipBestCache[key];
+    Object.keys(chipFxCache).forEach(k=>{ if(k.startsWith(key)) delete chipFxCache[k]; });
+    Object.keys(chipBestCache).forEach(k=>{ if(k.startsWith(key)) delete chipBestCache[k]; });
     _saveChipCacheToLS();
     renderHintChips();
   }
@@ -2506,7 +2507,8 @@ function _saveChipCacheToLS(){
 _loadChipCacheFromLS();
 
 async function fetchChipQualDays(spot){
-  const key=`${spot.lat},${spot.lon}`;
+  const dirsStr=(spot.dirs||[]).slice().sort((a,b)=>a-b).join(',');
+  const key=`${spot.lat},${spot.lon}|${dirsStr}`;
   if(chipFxCache[key]!==undefined) return chipFxCache[key];
   return queuedFetch(async()=>{
   if(chipFxCache[key]!==undefined) return chipFxCache[key]; // re-check after queue wait
@@ -3052,9 +3054,14 @@ function renderHintChips(){
       }
       label.addEventListener('click',()=>pickFav(f));
       const fbadge=document.createElement('span');
-      fbadge.className='chip-days cd-loading'; fbadge.textContent='·';
+      // Use live SPOTS dirs (DB-sourced) so admin updates are reflected immediately
+      const _liveDirs=(_ks?.dirs?.length?_ks.dirs:f.dirs)||[];
+      const _fkey=`${f.lat},${f.lon}`;
+      const _cached=chipFxCache[_fkey];
+      if(_cached!==undefined){ fbadge.className='chip-days'; setChipDayBadge(fbadge,_cached,true); }
+      else{ fbadge.className='chip-days cd-loading'; fbadge.textContent='·'; }
       label.appendChild(fbadge);
-      fetchChipQualDays({name:f.name,loc:f.label||'',lat:f.lat,lon:f.lon,dirs:f.dirs||[]}).then(n=>{setChipDayBadge(fbadge,n,true);updateBestWindowBar();});
+      fetchChipQualDays({name:f.name,loc:f.label||'',lat:f.lat,lon:f.lon,dirs:_liveDirs}).then(n=>{setChipDayBadge(fbadge,n,true);updateBestWindowBar();});
       const rm=document.createElement('span');
       rm.className='fav-chip-remove'; rm.textContent='✕'; rm.title='Remove from your spots';
       rm.addEventListener('click',e=>{e.stopPropagation();removeFav(f);});
@@ -3091,6 +3098,7 @@ function renderHintChips(){
     ...recent
   ];
   suggestions.forEach(c=>{
+    // Always use live SPOTS entry so admin-updated dirs are respected
     const spot=SPOTS.find(s=>s.name===c.name)||{name:c.name,lat:c.lat,lon:c.lon,dirs:c.dirs||[]};
     const chip=document.createElement('span');
     chip.className='chip';
@@ -3104,7 +3112,10 @@ function renderHintChips(){
       inner.appendChild(bi);
     }
     const badge=document.createElement('span');
-    badge.className='chip-days cd-loading'; badge.textContent='·';
+    const _skey=`${spot.lat},${spot.lon}`;
+    const _scached=chipFxCache[_skey];
+    if(_scached!==undefined){ badge.className='chip-days'; setChipDayBadge(badge,_scached,false); }
+    else{ badge.className='chip-days cd-loading'; badge.textContent='·'; }
     inner.appendChild(badge);
     inner.addEventListener('click',()=>pickSpot(spot));
     // "+" to add to favourites instead of dismiss X
@@ -6501,7 +6512,8 @@ async function adminSaveSpotInfo(){
     if(si>=0) SPOTS[si].dirs=dirsArr;
     // Invalidate chip cache for this spot so home screen re-fetches with new dirs
     const cacheKey=`${dirsLat},${dirsLon}`;
-    delete chipFxCache[cacheKey]; delete chipBestCache[cacheKey];
+    Object.keys(chipFxCache).forEach(k=>{ if(k.startsWith(cacheKey)) delete chipFxCache[k]; });
+    Object.keys(chipBestCache).forEach(k=>{ if(k.startsWith(cacheKey)) delete chipBestCache[k]; });
     _chipCacheTs=0; localStorage.removeItem(CHIP_CACHE_LS_KEY);
     // Clear localStorage user override so new official dirs take effect immediately
     const _allDirs=loadAllUserDirs(); delete _allDirs[spotName]; localStorage.setItem('kf_dirs',JSON.stringify(_allDirs));
