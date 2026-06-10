@@ -6689,12 +6689,20 @@ async function adminDeleteSpot(){
   const sb=getSb(); if(!sb) return;
   const btn=document.querySelector('[onclick="adminDeleteSpot()"]');
   if(btn){ btn.disabled=true; btn.textContent='Deleting…'; }
-  const [r1,r2]=await Promise.all([
+  const [r1,r2,r3,r4,r5,r6]=await Promise.all([
     sb.from('spot_info').delete().eq('spot_name',spotName),
     sb.from('spot_overrides').delete().eq('name',spotName),
+    sb.from('spot_claims').delete().eq('spot_name',spotName),
+    sb.from('spot_suggestions').delete().eq('suggested_name',spotName),
+    sb.from('spot_update_suggestions').delete().eq('spot_name',spotName),
+    sb.from('favourites').delete().eq('spot_name',spotName),
   ]);
   if(r1.error) console.error('spot_info delete error:',r1.error);
   if(r2.error) console.error('spot_overrides delete error:',r2.error);
+  if(r3.error) console.error('spot_claims delete error:',r3.error);
+  if(r4.error) console.error('spot_suggestions delete error:',r4.error);
+  if(r5.error) console.error('spot_update_suggestions delete error:',r5.error);
+  if(r6.error) console.error('favourites delete error:',r6.error);
   // Remove from in-memory SPOTS and _adminSpots
   const si=SPOTS.findIndex(s=>s.name===spotName);
   if(si>=0) SPOTS.splice(si,1);

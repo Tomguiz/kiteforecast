@@ -213,6 +213,10 @@ DO $$ BEGIN
   CREATE POLICY "all_select_suggestions" ON spot_suggestions FOR SELECT TO anon, authenticated USING (true);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
+DO $$ BEGIN
+  CREATE POLICY "all_delete_suggestions" ON spot_suggestions FOR DELETE TO authenticated USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
 -- CTA click tracking (lesson, gear, website, instagram, facebook, livecam)
 CREATE TABLE IF NOT EXISTS spot_cta_clicks (
   id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -408,6 +412,10 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
   CREATE POLICY "all_update_spot_update_suggestions" ON spot_update_suggestions FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "all_delete_spot_update_suggestions" ON spot_update_suggestions FOR DELETE TO authenticated USING (true);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- Add spot_tip column to spot_info for community tips
