@@ -6688,24 +6688,37 @@ async function adminDeleteSpot(){
   const sb=getSb(); if(!sb) return;
   const btn=document.querySelector('[onclick="adminDeleteSpot()"]');
   if(btn){ btn.disabled=true; btn.textContent='Deleting…'; }
-  await Promise.all([
+  const [r1,r2]=await Promise.all([
     sb.from('spot_info').delete().eq('spot_name',spotName),
     sb.from('spot_overrides').delete().eq('name',spotName),
   ]);
-  // Remove from in-memory SPOTS
+  if(r1.error) console.error('spot_info delete error:',r1.error);
+  if(r2.error) console.error('spot_overrides delete error:',r2.error);
+  // Remove from in-memory SPOTS and _adminSpots
   const si=SPOTS.findIndex(s=>s.name===spotName);
   if(si>=0) SPOTS.splice(si,1);
+  if(_adminSpots){ const ai=_adminSpots.findIndex(s=>s.spot_name===spotName); if(ai>=0) _adminSpots.splice(ai,1); }
   // Bust chip cache
   const spot=(_adminSpots||[]).find(s=>s.spot_name===spotName);
-  if(spot?._lat&&spot?._lon){
-    const prefix=`${spot._lat},${spot._lon}`;
+  const ov=SPOTS.find(s=>s.name===spotName); // already removed, grab from r2 result is not possible here
+  // Try to get coords from the edit form inputs before they disappear
+  const delLat=parseFloat($('adLat')?.value||'0')||null;
+  const delLon=parseFloat($('adLon')?.value||'0')||null;
+  if(delLat&&delLon){
+    const prefix=`${delLat},${delLon}`;
     Object.keys(chipFxCache).forEach(k=>{ if(k.startsWith(prefix)) delete chipFxCache[k]; });
     Object.keys(chipBestCache).forEach(k=>{ if(k.startsWith(prefix)) delete chipBestCache[k]; });
     _chipCacheTs=0; localStorage.removeItem(CHIP_CACHE_LS_KEY);
   }
+  // Also remove from localStorage search favourites if present
+  try{
+    const favs=JSON.parse(localStorage.getItem('kf_favs')||'[]').filter(f=>f.name!==spotName);
+    localStorage.setItem('kf_favs',JSON.stringify(favs));
+  }catch(e){}
   showToast(`✓ "${spotName}" deleted`);
+  const wasOwnerMode=window._ownerEditMode;
   closeAdminEditForm();
-  if(!window._ownerEditMode) renderAdminPanel();
+  if(!wasOwnerMode) renderAdminPanel();
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
