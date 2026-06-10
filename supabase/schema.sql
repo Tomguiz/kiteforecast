@@ -152,6 +152,10 @@ DO $$ BEGIN
     WITH CHECK (true);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
+DO $$ BEGIN
+  CREATE POLICY "all_delete_spot_info" ON spot_info FOR DELETE TO authenticated USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
 -- Admin-added spots (merged into SPOTS array at startup for all users)
 CREATE TABLE IF NOT EXISTS spot_overrides (
   id         uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -176,6 +180,10 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 DO $$ BEGIN
   CREATE POLICY "all_update_spot_overrides" ON spot_overrides FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "all_delete_spot_overrides" ON spot_overrides FOR DELETE TO authenticated USING (true);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- User-submitted spot suggestions (when search finds nothing)
