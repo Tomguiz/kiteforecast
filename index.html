@@ -6341,6 +6341,9 @@ async function adminOpenSpot(spotName, prefill){
         <button class="btn pp-save-btn" id="adSaveBtn" onclick="adminSaveSpotInfo()" style="flex:1">${isNew?'Add spot':'Save changes'}</button>
         <button onclick="$('adminEditForm').style.display='none'" style="flex-shrink:0;padding:10px 16px;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:10px;color:var(--tdim);font-size:.82rem;cursor:pointer">Cancel</button>
       </div>
+      ${!isNew?`<div style="margin-top:8px;border-top:1px solid var(--border);padding-top:12px">
+        <button onclick="adminDeleteSpot()" style="width:100%;padding:10px;background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:10px;color:#f87171;font-size:.8rem;font-weight:600;cursor:pointer;">🗑 Delete this spot</button>
+      </div>`:''}
     </div>`;
 }
 
@@ -6622,6 +6625,32 @@ async function adminSaveSpotInfo(){
   if(_p.isAdmin) renderAdminPanel();
   else closeProfilePanel();
   if(cachedLoc?.name===spotName) renderSpotInfoCard(spotName);
+}
+async function adminDeleteSpot(){
+  const spotName=($('adSpotName')?.value||'').trim();
+  if(!spotName) return;
+  if(!confirm(`Delete "${spotName}" permanently? This cannot be undone.`)) return;
+  const sb=getSb(); if(!sb) return;
+  const btn=document.querySelector('[onclick="adminDeleteSpot()"]');
+  if(btn){ btn.disabled=true; btn.textContent='Deleting…'; }
+  await Promise.all([
+    sb.from('spot_info').delete().eq('spot_name',spotName),
+    sb.from('spot_overrides').delete().eq('name',spotName),
+  ]);
+  // Remove from in-memory SPOTS
+  const si=SPOTS.findIndex(s=>s.name===spotName);
+  if(si>=0) SPOTS.splice(si,1);
+  // Bust chip cache
+  const spot=(_adminSpots||[]).find(s=>s.spot_name===spotName);
+  if(spot?._lat&&spot?._lon){
+    const prefix=`${spot._lat},${spot._lon}`;
+    Object.keys(chipFxCache).forEach(k=>{ if(k.startsWith(prefix)) delete chipFxCache[k]; });
+    Object.keys(chipBestCache).forEach(k=>{ if(k.startsWith(prefix)) delete chipBestCache[k]; });
+    _chipCacheTs=0; localStorage.removeItem(CHIP_CACHE_LS_KEY);
+  }
+  showToast(`✓ "${spotName}" deleted`);
+  $('adminEditForm').style.display='none';
+  renderAdminPanel();
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
