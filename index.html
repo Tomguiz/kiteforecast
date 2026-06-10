@@ -3575,6 +3575,12 @@ window._spotsReady=new Promise(r=>{_spotsReadyResolve=r;});
   }catch(e){}
   _spotsIsReady=true;
   _spotsReadyResolve();
+  // Remove any pending-spot entries that are now live in SPOTS (approved by admin)
+  try{
+    const liveSet=new Set(SPOTS.map(s=>(s.name||'').toLowerCase()));
+    const cleaned=getPendingSpots().filter(p=>!liveSet.has(p.nameLower));
+    localStorage.setItem('kf_pendingSpots',JSON.stringify(cleaned));
+  }catch(e){}
   renderHintChips();
   $('hintLegend').innerHTML=buildLegendHTML();
   $('resultsLegend').innerHTML=buildLegendHTML();
