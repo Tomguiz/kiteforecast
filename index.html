@@ -5273,16 +5273,17 @@ async function renderMyContributions(){
   el.innerHTML='<div class="stats-empty">Loading…</div>';
   const email=loadProfile().email||_authSession.user.email;
   const sb=getSb(); if(!sb) return;
-  const{data:suggestions}=await sb.from('spot_update_suggestions')
-    .select('id,spot_name,suggested_dirs,tip,reviewed,approved,created_at')
-    .eq('email',email).order('created_at',{ascending:false});
+  const [{data:suggestions},{data:spotRequests}]=await Promise.all([
+    sb.from('spot_update_suggestions').select('id,spot_name,suggested_dirs,tip,reviewed,approved,created_at').eq('email',email).order('created_at',{ascending:false}),
+    sb.from('spot_suggestions').select('id,suggested_name,reviewed,approved,created_at').eq('submitted_by',email).order('created_at',{ascending:false}),
+  ]);
 
   const deduped=Object.values((suggestions||[]).reduce((acc,s)=>{
     if(!acc[s.spot_name]||new Date(s.created_at)>new Date(acc[s.spot_name].created_at)) acc[s.spot_name]=s;
     return acc;
   },{}));
 
-  if(!deduped.length){ el.innerHTML='<div class="stats-empty">No contributions yet.<br>Open a spot page and tap "Suggest an update" to contribute.</div>'; return; }
+  if(!deduped.length&&!(spotRequests?.length)){ el.innerHTML='<div class="stats-empty">No contributions yet.<br>Open a spot page and tap "Suggest an update" to contribute.</div>'; return; }
 
   const pts=loadProfile().contributionPoints||0;
   const premiumUntil=loadProfile().premiumUntil;
@@ -5311,13 +5312,30 @@ async function renderMyContributions(){
     </div>`;
   }).join('');
 
+  const reqRows=(spotRequests||[]).map(r=>{
+    const badge=r.approved
+      ?`<span style="color:#4ade80;font-size:.68rem;font-weight:700;white-space:nowrap;">✓ Added</span>`
+      :r.reviewed
+      ?`<span style="color:#f87171;font-size:.68rem;font-weight:700;white-space:nowrap;">✕ Declined</span>`
+      :`<span style="color:#f59e0b;font-size:.68rem;font-weight:700;white-space:nowrap;">⏳ Pending review</span>`;
+    return `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:10px 0;border-bottom:1px solid var(--border)">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:.82rem;font-weight:600;color:var(--text)">${r.suggested_name}</div>
+        <div style="font-size:.65rem;color:var(--tdim);margin-top:2px">${new Date(r.created_at).toLocaleDateString('en',{day:'numeric',month:'short',year:'numeric'})}</div>
+      </div>
+      ${badge}
+    </div>`;
+  }).join('');
+
   el.innerHTML=`
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
       <div class="stats-section-title" style="margin-bottom:0">My contributions</div>
       <div style="font-size:.8rem;font-weight:700;color:#38bdf8;">⚡ ${pts} pt${pts!==1?'s':''}</div>
     </div>
     ${pointsBar}
-    <div>${rows}</div>`;
+    ${reqRows?`<div class="stats-section-title" style="margin-bottom:8px;margin-top:4px">Spot requests</div><div>${reqRows}</div>`:''}
+    ${rows?`<div class="stats-section-title" style="margin-bottom:8px;margin-top:${reqRows?'16':'4'}px">Spot updates</div><div>${rows}</div>`:''}
+    ${!reqRows&&!rows?'<div class="stats-empty">No contributions yet.</div>':''}`;
 }
 
 async function submitClaim(spotName){
@@ -5484,7 +5502,8 @@ async function submitSpotSuggestion(){
       lat:  lat  ? parseFloat(lat)  : null,
       lon:  lon  ? parseFloat(lon)  : null,
       note: [dirs&&`Dirs: ${dirs}`, business&&`Business: ${business}`, website&&`Website: ${website}`, webcam&&`Webcam: ${webcam}`, note].filter(Boolean).join(' | ')||null,
-      submitted_by: contactEmail||null,
+      submitted_by:  contactEmail||null,
+      contact_name:  profileName||null,
     }).then(()=>{}).catch(()=>{});
   }
 
@@ -6519,9 +6538,27 @@ async function adminSaveSpotInfo(){
     else{SPOTS.push({name:spotName,loc:finalLoc,lat:finalLat,lon:finalLon,dirs:[]});}
   }
 
-  // Mark suggestion as reviewed if this save came from approving a request
+  // Mark suggestion as approved and notify the requester
   const suggId=$('adminEditForm').dataset.suggId;
-  if(suggId) sb.from('spot_suggestions').update({reviewed:true}).eq('id',suggId).then(()=>{}).catch(()=>{});
+  if(suggId&&suggId!=='review'){
+    sb.from('spot_suggestions').select('submitted_by,contact_name,suggested_name').eq('id',suggId).single()
+      .then(({data:sugg})=>{
+        sb.from('spot_suggestions').update({reviewed:true,approved:true}).eq('id',suggId).then(()=>{}).catch(()=>{});
+        const requesterEmail=sugg?.submitted_by;
+        if(requesterEmail){
+          fetch(`${SB_URL}/functions/v1/spot-request-approved-notify`,{
+            method:'POST',
+            headers:{'Content-Type':'application/json','Authorization':`Bearer ${SB_ANON}`},
+            body:JSON.stringify({
+              email:        requesterEmail,
+              spot_name:    spotName,
+              contact_name: sugg?.contact_name||'',
+              app_link:     `https://tomguiz.github.io/kiteforecast/?spot=${encodeURIComponent(spotName)}`,
+            }),
+          }).catch(()=>{});
+        }
+      }).catch(()=>{});
+  }
 
   // Save wind dirs to spot_overrides (read from toggle buttons)
   const dirsArr=[...$('adDirBtns')?.querySelectorAll('.s-btn.active')||[]].map(b=>parseInt(b.dataset.deg));

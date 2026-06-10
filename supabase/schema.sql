@@ -192,6 +192,8 @@ CREATE TABLE IF NOT EXISTS spot_suggestions (
 );
 DO $$ BEGIN ALTER TABLE spot_suggestions ADD COLUMN lat double precision; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE spot_suggestions ADD COLUMN lon double precision; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE spot_suggestions ADD COLUMN approved boolean NOT NULL DEFAULT false; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE spot_suggestions ADD COLUMN contact_name text; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
 
 ALTER TABLE spot_suggestions ENABLE ROW LEVEL SECURITY;
 
