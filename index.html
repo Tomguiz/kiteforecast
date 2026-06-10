@@ -2769,9 +2769,13 @@ async function fetchForecastFromSpot(spot){
       forecast_days:10, timezone:'auto', windspeed_unit:'ms',
     });
     const mP=new URLSearchParams({latitude:spot.lat,longitude:spot.lon,hourly:'wave_height,wave_period,wave_direction',forecast_days:10,timezone:'auto'});
-    const marineP=safeFetch(`https://marine-api.open-meteo.com/v1/marine?${mP}`,8000).catch(()=>null);
-    const tidesP=isPremium()?fetchStormglassTides(spot.lat,spot.lon):Promise.resolve(null);
-    cachedWx=await safeFetch(`https://api.open-meteo.com/v1/forecast?${p}`);
+    // Fire all requests in parallel
+    const [wx, marineData, tidesData] = await Promise.all([
+      safeFetch(`https://api.open-meteo.com/v1/forecast?${p}`),
+      safeFetch(`https://marine-api.open-meteo.com/v1/marine?${mP}`,8000).catch(()=>null),
+      isPremium()?fetchStormglassTides(spot.lat,spot.lon):Promise.resolve(null),
+    ]);
+    cachedWx=wx;
     if(cachedWx.error) throw new Error(cachedWx.reason||'API error');
     if(!manualShoreSet){
       const effectiveDirs=live?.dirs?.length?live.dirs:spot.dirs;
@@ -2797,8 +2801,8 @@ async function fetchForecastFromSpot(spot){
         gustKn: toKnotsR(h.windgusts_10m[i]),
       });
     });
-    buildMarineMap(await marineP);
-    cachedTideExtremes=await tidesP;
+    buildMarineMap(marineData);
+    cachedTideExtremes=tidesData;
     if(myGen!==_fetchGen) return; // user navigated away — discard results
     lastFetchTime=Date.now(); try{localStorage.setItem('kf_lastFetch',lastFetchTime);}catch(e){}
     renderGrid();
@@ -3624,9 +3628,6 @@ async function fetchForecast(query){
       latitude, longitude
     };
 
-    // fire shore detection in parallel with weather fetch (don't await yet)
-    const shorePromise=autoDetectShore(latitude,longitude);
-
     const p=new URLSearchParams({
       latitude,longitude,
       hourly:['temperature_2m','weather_code','windspeed_10m','winddirection_10m','windgusts_10m'].join(','),
@@ -3634,17 +3635,18 @@ async function fetchForecast(query){
       forecast_days:16, timezone:'auto', windspeed_unit:'ms',
     });
     const mP2=new URLSearchParams({latitude,longitude,hourly:'wave_height,wave_period,wave_direction',forecast_days:16,timezone:'auto'});
-    const marineP2=safeFetch(`https://marine-api.open-meteo.com/v1/marine?${mP2}`,8000).catch(()=>null);
-    const tidesP2=isPremium()?fetchStormglassTides(latitude,longitude):Promise.resolve(null);
-    cachedWx=await safeFetch(`https://api.open-meteo.com/v1/forecast?${p}`);
+    // Fire all requests in parallel (including shore detection for unknown spots)
+    const [wx2, marineData2, tidesData2, shoreResult] = await Promise.all([
+      safeFetch(`https://api.open-meteo.com/v1/forecast?${p}`),
+      safeFetch(`https://marine-api.open-meteo.com/v1/marine?${mP2}`,8000).catch(()=>null),
+      isPremium()?fetchStormglassTides(latitude,longitude):Promise.resolve(null),
+      autoDetectShore(latitude,longitude).catch(()=>null),
+    ]);
+    cachedWx=wx2;
     if(cachedWx.error) throw new Error(cachedWx.reason||'API error');
 
-    // apply auto-detected shore if user hasn't manually set one
-    if(!manualShoreSet){
-      const detected=await shorePromise.catch(()=>null);
-      if(detected!==null){
-        setWindDirs([snapTo8(detected)]);
-      }
+    if(!manualShoreSet&&shoreResult!==null){
+      setWindDirs([snapTo8(shoreResult)]);
     }
 
     // build hour map: dateStr -> Map(hour 0-23 -> data)
@@ -3665,8 +3667,8 @@ async function fetchForecast(query){
       });
     });
 
-    buildMarineMap(await marineP2);
-    cachedTideExtremes=await tidesP2;
+    buildMarineMap(marineData2);
+    cachedTideExtremes=tidesData2;
     saveLastSpot({name:cachedLoc.name,loc:[cachedLoc.admin1,cachedLoc.country].filter(Boolean).join(', '),lat:cachedLoc.latitude,lon:cachedLoc.longitude,dirs:[...windDirs]});
     lastFetchTime=Date.now(); try{localStorage.setItem('kf_lastFetch',lastFetchTime);}catch(e){}
     renderGrid();
