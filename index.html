@@ -6794,29 +6794,24 @@ async function savePhone(){
 function openAdminReview(){
   const spot=window._pendingReviewSpot;
   if(!spot) return;
+  window._pendingReviewSpot=null;
   openProfilePanel('admin');
-  // Wait for admin panel to render then open the pre-filled form
   setTimeout(()=>{
-    adminOpenSpot(null);
-    setTimeout(()=>{
-      if($('adSpotName'))    $('adSpotName').value    = spot.name     ||'';
-      if($('adDisplayName')) $('adDisplayName').value = spot.name     ||'';
-      if($('adLat'))         $('adLat').value          = spot.lat      ||'';
-      if($('adLon'))         $('adLon').value          = spot.lon      ||'';
-      if($('adCountry'))     $('adCountry').value      = spot.location ||'';
-      if($('adBizName'))     $('adBizName').value      = spot.business ||'';
-      if($('adWebsite'))     $('adWebsite').value      = spot.website  ||'';
-      if($('adDesc'))        $('adDesc').value         = spot.note     ||'';
-      // Show a banner so admin knows what they're reviewing
-      const el=$('adminEditForm');
-      if(el){
-        const banner=document.createElement('div');
-        banner.style.cssText='background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:10px 14px;font-size:.78rem;color:#fbbf24;margin-bottom:10px;';
-        banner.innerHTML=`⚡ Pre-filled from spot request by <strong>${spot.contact_name||'a user'}</strong> (${spot.contact_email||'—'}) — review, adjust if needed, then save.`;
-        el.querySelector('div')?.prepend(banner);
-      }
-      window._pendingReviewSpot=null;
-    },100);
+    const prefill={
+      spot_name:    spot.name||'',
+      display_name: spot.name||'',
+      business_name:spot.business||'',
+      website:      spot.website||'',
+      description:  spot.note||'',
+      _lat:         spot.lat||'',
+      _lon:         spot.lon||'',
+      _loc:         spot.location||'',
+      _country:     spot.location||'',
+      verified:     false,
+      _suggId:      spot._suggId||'review',
+      _submittedBy: spot.contact_name?(spot.contact_name+(spot.contact_email?' ('+spot.contact_email+')':'')):spot.contact_email||'a user',
+    };
+    adminOpenSpot(null, prefill);
   },400);
 }
 
