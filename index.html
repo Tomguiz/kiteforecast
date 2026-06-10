@@ -2606,17 +2606,19 @@ function updateBestWindowBar(){
   if(!hasFavs){ bar.style.display='none'; return; }
 
   // Evict any cache entries that don't belong to current favs
-  const favKeys=favs.map(f=>`${f.lat},${f.lon}`);
-  const favKeySet=new Set(favKeys);
-  Object.keys(chipBestCache).forEach(k=>{ if(!favKeySet.has(k)){ delete chipBestCache[k]; delete chipFxCache[k]; } });
-  const loadedKeys=favKeys.filter(k=>k in chipBestCache);
-  const allLoaded=loadedKeys.length===favKeys.length;
+  const favPrefixes=favs.map(f=>`${f.lat},${f.lon}`);
+  const favPrefixSet=new Set(favPrefixes);
+  Object.keys(chipBestCache).forEach(k=>{ const p=k.split('|')[0]; if(!favPrefixSet.has(p)){ delete chipBestCache[k]; delete chipFxCache[k]; } });
+  // A fav is "loaded" if any cache entry exists for its lat,lon (regardless of dirs suffix)
+  const loadedKeys=favPrefixes.filter(p=>Object.keys(chipBestCache).some(k=>k.startsWith(p+'|')||k===p));
+  const allLoaded=loadedKeys.length===favPrefixes.length;
 
   // Find best (peak kn) and next (earliest date) across all fav spots
   // For "next": prefer spots with an active notification, then earliest date
   let best=null, next=null;
-  for(const key of loadedKeys){
-    const entry=chipBestCache[key];
+  for(const prefix of loadedKeys){
+    const cacheKey=Object.keys(chipBestCache).find(k=>k.startsWith(prefix+'|')||k===prefix);
+    const entry=cacheKey?chipBestCache[cacheKey]:undefined;
     if(!entry||!entry.nextDateStr) continue; // skip spots with no qualifying sessions
     if(!best||entry.peakKn>best.peakKn) best=entry;
     const hasNotif=hasSpotNotif(entry.spotName);
@@ -2678,7 +2680,7 @@ function renderCompareBar(){
   if(!_authSession?.user||favs.length<2){ el.style.display='none'; return; }
   // Evict non-fav cache entries before building compare table
   const _favKeySet=new Set(favs.map(f=>`${f.lat},${f.lon}`));
-  Object.keys(chipBestCache).forEach(k=>{ if(!_favKeySet.has(k)){ delete chipBestCache[k]; delete chipFxCache[k]; } });
+  Object.keys(chipBestCache).forEach(k=>{ if(!_favKeySet.has(k.split('|')[0])){ delete chipBestCache[k]; delete chipFxCache[k]; } });
   const loadedEntries=favs.map(f=>chipBestCache[`${f.lat},${f.lon}`]).filter(Boolean);
   if(loadedEntries.length<2){ el.style.display='none'; return; }
   el.style.display='block';
@@ -3045,7 +3047,7 @@ function renderHintChips(){
   const favs=signedIn?loadFavs():[];
   // Evict cache entries for spots no longer in favs so they can't appear in Best/Next pills
   const favKeySet=new Set(favs.map(f=>`${f.lat},${f.lon}`));
-  Object.keys(chipBestCache).forEach(k=>{ if(!favKeySet.has(k)){ delete chipBestCache[k]; delete chipFxCache[k]; } });
+  Object.keys(chipBestCache).forEach(k=>{ if(!favKeySet.has(k.split('|')[0])){ delete chipBestCache[k]; delete chipFxCache[k]; } });
   const wrap=$('hintChips');
   wrap.innerHTML='';
 
