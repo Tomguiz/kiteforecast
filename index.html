@@ -1454,7 +1454,7 @@
               <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.15);border-radius:8px;padding:8px 10px;color:var(--gray);">🤝 Support indie dev</div>
               <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.15);border-radius:8px;padding:8px 10px;color:var(--gray);">🎯 Priority support</div>
             </div>
-            <div style="text-align:center;padding:10px 0 2px;font-size:.75rem;color:#f59e0b;font-weight:600;">✓ Lifetime access — no subscription</div>
+            <div class="premium-access-footer" style="text-align:center;padding:10px 0 2px;font-size:.75rem;color:#f59e0b;font-weight:600;line-height:1.5;">✓ Lifetime access — no subscription</div>
           </div>
         </div>
 
@@ -6779,7 +6779,23 @@ function isPremium(){
 function updatePremiumUI(){
   const premium=isPremium();
   const upgradeEl=$('ppPremiumUpgrade'); if(upgradeEl) upgradeEl.style.display=premium?'none':'block';
-  const activeEl=$('ppPremiumActive');   if(activeEl)  activeEl.style.display=premium?'block':'none';
+  const activeEl=$('ppPremiumActive');   if(activeEl){
+    activeEl.style.display=premium?'block':'none';
+    if(premium){
+      const p=loadProfile();
+      const footerEl=activeEl.querySelector('.premium-access-footer');
+      if(footerEl){
+        if(p.isPremium){
+          footerEl.textContent='✓ Lifetime access — no subscription';
+          footerEl.style.color='#f59e0b';
+        } else if(p.premiumUntil){
+          const until=new Date(p.premiumUntil).toLocaleDateString('en',{day:'numeric',month:'long',year:'numeric'});
+          footerEl.innerHTML=`🎁 Free month earned via contributions<br/><span style="font-size:.7rem;color:var(--tdim);">Access until ${until}</span>`;
+          footerEl.style.color='#34d399';
+        }
+      }
+    }
+  }
   // Make all premium badges clickable → open upgrade CTA for non-premium
   document.querySelectorAll('.premium-badge').forEach(b=>{
     b.onclick=premium?null:()=>showUpgradeModal();
