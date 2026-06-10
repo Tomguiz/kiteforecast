@@ -1591,7 +1591,7 @@ let cachedHrMap       = null;
 let cachedMarineHrMap = null;
 let cachedTideExtremes= null; // [{time, height, type:'high'|'low'}] for current spot+day
 let lastFetchTime = parseInt(localStorage.getItem('kf_lastFetch')||'0',10);
-const WX_CACHE_KEY='kf_wxCache_v1';
+const WX_CACHE_KEY='kf_wxCache_v2';
 const WX_CACHE_TTL=60*60*1000; // 1 hour
 
 function _saveWxCache(loc,wx,marineHrMap,tideExtremes){
@@ -2847,9 +2847,9 @@ async function fetchForecastFromSpot(spot){
       latitude:spot.lat,longitude:spot.lon,
       hourly:['temperature_2m','weather_code','windspeed_10m','winddirection_10m','windgusts_10m'].join(','),
       daily:['weather_code','temperature_2m_max','temperature_2m_min','windgusts_10m_max','sunrise','sunset'].join(','),
-      forecast_days:7, timezone:'auto', windspeed_unit:'ms',
+      forecast_days:10, timezone:'auto', windspeed_unit:'ms',
     });
-    const mP=new URLSearchParams({latitude:spot.lat,longitude:spot.lon,hourly:'wave_height,wave_period,wave_direction',forecast_days:7,timezone:'auto'});
+    const mP=new URLSearchParams({latitude:spot.lat,longitude:spot.lon,hourly:'wave_height,wave_period,wave_direction',forecast_days:10,timezone:'auto'});
     const needsShore=spot._osm&&!manualShoreSet&&!(live?.dirs?.length||spot.dirs?.length);
     // Fire all requests in parallel; include shore detection only when needed
     const [wx, marineData, tidesData, shoreResult] = await Promise.all([
@@ -3743,9 +3743,9 @@ async function fetchForecast(query){
       latitude,longitude,
       hourly:['temperature_2m','weather_code','windspeed_10m','winddirection_10m','windgusts_10m'].join(','),
       daily:['weather_code','temperature_2m_max','temperature_2m_min','windgusts_10m_max','sunrise','sunset'].join(','),
-      forecast_days:7, timezone:'auto', windspeed_unit:'ms',
+      forecast_days:10, timezone:'auto', windspeed_unit:'ms',
     });
-    const mP2=new URLSearchParams({latitude,longitude,hourly:'wave_height,wave_period,wave_direction',forecast_days:7,timezone:'auto'});
+    const mP2=new URLSearchParams({latitude,longitude,hourly:'wave_height,wave_period,wave_direction',forecast_days:10,timezone:'auto'});
     // Fire all requests in parallel (including shore detection for unknown spots)
     const [wx2, marineData2, tidesData2, shoreResult] = await Promise.all([
       safeFetch(`https://api.open-meteo.com/v1/forecast?${p}`,10000),
