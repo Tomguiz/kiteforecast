@@ -1594,12 +1594,13 @@ let lastFetchTime = parseInt(localStorage.getItem('kf_lastFetch')||'0',10);
 const WX_CACHE_KEY='kf_wxCache_v1';
 const WX_CACHE_TTL=60*60*1000; // 1 hour
 
-function _saveWxCache(loc,wx,marineHrMap,tideExtremes,dirs){
+function _saveWxCache(loc,wx,marineHrMap,tideExtremes){
   try{
     // Convert Map to plain array pairs for JSON serialisation
+    // Dirs are intentionally NOT cached — they come from SPOTS (DB) so admin updates are always live
     const marineArr=marineHrMap?[...marineHrMap.entries()]:[];
     localStorage.setItem(WX_CACHE_KEY,JSON.stringify({
-      ts:Date.now(),loc,wx,marineArr,tideExtremes,dirs,
+      ts:Date.now(),loc,wx,marineArr,tideExtremes,
     }));
   }catch(e){}
 }
@@ -2775,7 +2776,7 @@ function pickSpotAndOpenDay(spot,dateStr){
   pickSpot(spot);
 }
 
-function _applyWxData(loc,wx,marineArr,tideExtremes,savedDirs){
+function _applyWxData(loc,wx,marineArr,tideExtremes){
   cachedLoc=loc;
   cachedWx=wx;
   cachedHrMap=new Map();
@@ -2796,7 +2797,6 @@ function _applyWxData(loc,wx,marineArr,tideExtremes,savedDirs){
   });
   cachedMarineHrMap=new Map(marineArr||[]);
   cachedTideExtremes=tideExtremes||null;
-  if(savedDirs?.length&&!manualShoreSet) setWindDirs(savedDirs);
 }
 
 async function fetchForecastFromSpot(spot){
@@ -2813,8 +2813,8 @@ async function fetchForecastFromSpot(spot){
     const cached=_loadWxCache(loc.latitude,loc.longitude);
     if(cached&&cached.loc.name===spot.name){
       if(myGen!==_fetchGen) return;
-      _applyWxData(cached.loc,cached.wx,cached.marineArr,cached.tideExtremes,cached.dirs);
-      // Always prefer live dirs from SPOTS over cached dirs
+      _applyWxData(cached.loc,cached.wx,cached.marineArr,cached.tideExtremes);
+      // Dirs always come from SPOTS (DB, loaded fresh on startup) — never from wx cache
       if(!manualShoreSet){
         const effectiveDirs=live?.dirs?.length?live.dirs:spot.dirs;
         if(effectiveDirs?.length) setWindDirs(effectiveDirs);
@@ -2869,7 +2869,7 @@ async function fetchForecastFromSpot(spot){
     cachedTideExtremes=tidesData;
     if(myGen!==_fetchGen) return; // user navigated away — discard results
     lastFetchTime=Date.now(); try{localStorage.setItem('kf_lastFetch',lastFetchTime);}catch(e){}
-    _saveWxCache(cachedLoc,cachedWx,[...cachedMarineHrMap.entries()],cachedTideExtremes,[...windDirs]);
+    _saveWxCache(cachedLoc,cachedWx,[...cachedMarineHrMap.entries()],cachedTideExtremes);
     renderGrid();
     recheckSpotSubscription();
   }catch(err){
@@ -3696,7 +3696,13 @@ async function fetchForecast(query){
     // Check cache before hitting the API
     const cached2=_loadWxCache(latitude,longitude);
     if(cached2){
-      _applyWxData(cached2.loc,cached2.wx,cached2.marineArr,cached2.tideExtremes,cached2.dirs);
+      _applyWxData(cached2.loc,cached2.wx,cached2.marineArr,cached2.tideExtremes);
+      // Dirs always come from SPOTS (DB, loaded fresh on startup) — never from wx cache
+      if(!manualShoreSet){
+        const _liveSpot=SPOTS.find(s=>s.name===cachedLoc.name);
+        const effectiveDirs2=_liveSpot?.dirs?.length?_liveSpot.dirs:null;
+        if(effectiveDirs2?.length) setWindDirs(effectiveDirs2);
+      }
       saveLastSpot({name:cachedLoc.name,loc:[cachedLoc.admin1,cachedLoc.country].filter(Boolean).join(', '),lat:cachedLoc.latitude,lon:cachedLoc.longitude,dirs:[...windDirs]});
       lastFetchTime=cached2.ts; try{localStorage.setItem('kf_lastFetch',lastFetchTime);}catch(e){}
       renderGrid();
@@ -3744,7 +3750,7 @@ async function fetchForecast(query){
 
     buildMarineMap(marineData2);
     cachedTideExtremes=tidesData2;
-    _saveWxCache(cachedLoc,cachedWx,[...cachedMarineHrMap.entries()],cachedTideExtremes,[...windDirs]);
+    _saveWxCache(cachedLoc,cachedWx,[...cachedMarineHrMap.entries()],cachedTideExtremes);
     saveLastSpot({name:cachedLoc.name,loc:[cachedLoc.admin1,cachedLoc.country].filter(Boolean).join(', '),lat:cachedLoc.latitude,lon:cachedLoc.longitude,dirs:[...windDirs]});
     lastFetchTime=Date.now(); try{localStorage.setItem('kf_lastFetch',lastFetchTime);}catch(e){}
     renderGrid();
