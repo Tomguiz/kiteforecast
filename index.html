@@ -3255,6 +3255,8 @@ function goHome(){
   $('searchInput').blur();
 }
 function showAddSpotFromHome(prefill=''){
+  // Require sign-in before showing the add-spot form
+  if(!_authSession?.user){ _signinContext='generic'; openProfilePanel('profile'); showToast('Sign in to request a spot'); return; }
   // Show the error/suggest state with empty form so user can add their spot directly
   $('errorTitle').textContent='Add your spot';
   $('errorMsg').textContent='Fill in the details below and we\'ll review and add it to the app.';
