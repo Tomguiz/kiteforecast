@@ -1174,8 +1174,8 @@
         <a href="https://maps.google.com" target="_blank" style="display:inline-flex;align-items:center;gap:5px;margin-top:-4px;padding:6px 12px;background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.25);border-radius:8px;font-size:.72rem;font-weight:700;color:var(--accent);text-decoration:none">📍 Open Google Maps → long-press the spot → tap the coordinates → copy</a>
 
         <div>
-          <label class="pp-label">Good wind directions <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(optional)</span></label>
-          <input type="text" id="suggestDirs" class="pp-input" placeholder="e.g. SW, W, NW"/>
+          <label class="pp-label">Good wind directions <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(optional — tap to toggle)</span></label>
+          <div id="suggestDirBtns" style="display:flex;flex-wrap:wrap;gap:6px"></div>
         </div>
 
         <div>
@@ -1190,7 +1190,7 @@
 
         <div>
           <label class="pp-label">Your email</label>
-          <input type="email" id="suggestEmail" class="pp-input" placeholder="you@example.com" readonly style="opacity:.7;cursor:default;"/>
+          <input type="email" id="suggestEmail" class="pp-input" placeholder="you@example.com" readonly tabindex="-1" style="opacity:.6;cursor:not-allowed;pointer-events:none;background:rgba(255,255,255,.03)"/>
         </div>
 
         <div>
@@ -3266,8 +3266,10 @@ function showAddSpotFromHome(prefill=''){
     sw.style.display='block';
     $('suggestName').value=prefill; $('suggestLocation').value=''; $('suggestCountry').value='';
     $('suggestCoords').value=''; $('suggestLat').value=''; $('suggestLon').value='';
-    $('suggestDirs').value=''; $('suggestBusiness').value=''; $('suggestWebsite').value='';
+    $('suggestBusiness').value=''; $('suggestWebsite').value='';
     if($('suggestWebcam')) $('suggestWebcam').value=''; $('suggestNote').value='';
+    const db=$('suggestDirBtns');
+    if(db) db.innerHTML=DIR_LABELS.map(lbl=>`<button type="button" class="s-btn" data-dir="${lbl}" onclick="this.classList.toggle('active')">${lbl}</button>`).join('');
     const pe=loadProfile().email||_authSession?.user?.email||'';
     if($('suggestEmail')) $('suggestEmail').value=pe;
   }
@@ -3718,14 +3720,15 @@ async function fetchForecast(query){
       $('errorTitle').textContent='Location not found';
       $('errorMsg').textContent=`Could not find "${query}". Try a more specific name.`;
       const isPending=checkSpotPending(query);
-      const sw=$('suggestSpotWrap'); if(sw){
+      const sw=$('suggestSpotWrap'); if(sw && _authSession?.user){
         sw.style.display=isPending?'none':'block';
         $('suggestName').value=query;
         $('suggestLocation').value=''; $('suggestCountry').value=''; $('suggestCoords').value=''; $('suggestLat').value=''; $('suggestLon').value='';
-        $('suggestDirs').value=''; $('suggestBusiness').value=''; $('suggestWebsite').value=''; if($('suggestWebcam')) $('suggestWebcam').value=''; $('suggestNote').value='';
+        $('suggestBusiness').value=''; $('suggestWebsite').value=''; if($('suggestWebcam')) $('suggestWebcam').value=''; $('suggestNote').value='';
+        const db=$('suggestDirBtns'); if(db) db.innerHTML=DIR_LABELS.map(lbl=>`<button type="button" class="s-btn" data-dir="${lbl}" onclick="this.classList.toggle('active')">${lbl}</button>`).join('');
         const pe=loadProfile().email||_authSession?.user?.email||'';
         if($('suggestEmail')) $('suggestEmail').value=pe;
-      }
+      } else if(sw){ sw.style.display='none'; }
       showOnly('errorState'); return;
     }
     const sw=$('suggestSpotWrap'); if(sw) sw.style.display='none';
@@ -5518,7 +5521,10 @@ async function autofillFromWebsite(){
     fill('suggestCountry', d.country);
     fill('suggestBusiness',d.business);
     fill('suggestWebcam',  d.webcam);
-    fill('suggestDirs',    d.dirs);
+    if(d.dirs){
+      const wanted=new Set((Array.isArray(d.dirs)?d.dirs:String(d.dirs).split(/[,\/\s]+/)).map(s=>s.trim().toUpperCase()).filter(Boolean));
+      document.querySelectorAll('#suggestDirBtns .s-btn').forEach(b=>{ if(wanted.has(b.dataset.dir)){ b.classList.add('active'); filled++; } });
+    }
     if(d.lat!=null&&d.lon!=null){
       const latEl=$('suggestLat'); const lonEl=$('suggestLon');
       const coordEl=$('suggestCoords');
@@ -5542,7 +5548,7 @@ async function submitSpotSuggestion(){
   const country  =($('suggestCountry')?.value||'').trim();
   const lat      =($('suggestLat')?.value||'').trim().replace(',','.');
   const lon      =($('suggestLon')?.value||'').trim().replace(',','.');
-  const dirs     =($('suggestDirs')?.value||'').trim();
+  const dirs     =[...document.querySelectorAll('#suggestDirBtns .s-btn.active')].map(b=>b.dataset.dir).join(', ');
   const business =($('suggestBusiness')?.value||'').trim();
   const website  =($('suggestWebsite')?.value||'').trim();
   const webcam   =($('suggestWebcam')?.value||'').trim();
