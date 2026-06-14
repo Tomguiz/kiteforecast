@@ -45,7 +45,7 @@ Deno.serve(async (req) => {
 
     const session = await stripePost('checkout/sessions', {
       customer:              customerId,
-      mode:                  'subscription',
+      mode:                  'payment',
       'line_items[0][price]': STRIPE_PRICE_ID,
       'line_items[0][quantity]': '1',
       success_url:           success_url || 'https://tomguiz.github.io/kiteforecast/?premium=success',

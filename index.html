@@ -1099,7 +1099,7 @@
         🤝 <strong style="color:var(--text)">Support indie development</strong> — keep KiteForecast free for everyone<br/>
         🎯 <strong style="color:var(--text)">Priority support</strong> — direct access to the team
       </div>
-      <button class="btn-premium" onclick="$('upgradeModal').style.display='none';startCheckout()">⚡ Get Lifetime Access — €19.99 →</button>
+      <button class="btn-premium" onclick="$('upgradeModal').style.display='none';startCheckout(this)">⚡ Get Lifetime Access — €19.99 →</button>
     </div>
   </div>
   <!-- mobile map button -->
@@ -6888,11 +6888,11 @@ async function syncPremiumFromSupabase(email){
   if(tabsEl) tabsEl.classList.toggle('has-scroll', tabsEl.scrollWidth>tabsEl.clientWidth);
 }
 
-async function startCheckout(){
-  const btn=$('ppUpgradeBtn'); if(!btn) return;
+async function startCheckout(triggerBtn){
+  const btn=triggerBtn||$('ppUpgradeBtn');
   const email=loadProfile().email||_authSession?.user?.email;
   if(!email){ showToast('Sign in first'); return; }
-  btn.disabled=true; btn.textContent='Redirecting…';
+  if(btn){ btn.disabled=true; btn.textContent='Redirecting…'; }
   try{
     const resp=await fetch('https://kpwmajtxmcfpakvonimf.supabase.co/functions/v1/stripe-checkout',{
       method:'POST',
@@ -6902,7 +6902,7 @@ async function startCheckout(){
     const data=await resp.json();
     if(data.url) location.href=data.url;
     else throw new Error(data.error||'No checkout URL returned');
-  }catch(e){ showToast('Error starting checkout: '+e.message); btn.disabled=false; btn.textContent='Get Lifetime Access — €19.99 →'; }
+  }catch(e){ showToast('Error starting checkout: '+e.message); if(btn){ btn.disabled=false; btn.textContent='Get Lifetime Access — €19.99 →'; } }
 }
 
 async function manageSubscription(){

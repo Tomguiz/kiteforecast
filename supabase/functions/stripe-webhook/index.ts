@@ -16,18 +16,24 @@ Deno.serve(async (req) => {
     return new Response(`Webhook error: ${e.message}`, { status: 400 })
   }
 
-  const setPremium = async (customerId: string, isPremium: boolean, subscriptionId?: string) => {
-    const update: Record<string, unknown> = { is_premium: isPremium }
-    if (subscriptionId) update.stripe_subscription_id = subscriptionId
-    await supabase.from('profiles').update(update).eq('stripe_customer_id', customerId)
+  const setPremium = async (customerId: string, isPremium: boolean) => {
+    await supabase.from('profiles').update({ is_premium: isPremium }).eq('stripe_customer_id', customerId)
   }
 
   switch (event.type) {
+    case 'checkout.session.completed': {
+      const session = event.data.object as Stripe.Checkout.Session
+      if (session.payment_status === 'paid' && session.mode === 'payment') {
+        await setPremium(session.customer as string, true)
+      }
+      break
+    }
+    // Keep subscription events for legacy/future use
     case 'customer.subscription.created':
     case 'customer.subscription.updated': {
       const sub = event.data.object as Stripe.Subscription
       const active = sub.status === 'active' || sub.status === 'trialing'
-      await setPremium(sub.customer as string, active, sub.id)
+      await setPremium(sub.customer as string, active)
       break
     }
     case 'customer.subscription.deleted': {
