@@ -3348,7 +3348,7 @@ async function fetchSpotInfo(spotName) {
   if(!data) return null;
   // Attach owner info
   if(claim?.email){
-    const{data:prof}=await sb.from('profiles').select('nickname').eq('email',claim.email).single();
+    const{data:prof}=await sb.from('public_profiles').select('nickname').eq('email',claim.email).single();
     data._owner_email=claim.email;
     data._owner_name=prof?.nickname||claim.contact_name||claim.email.split('@')[0];
   }
@@ -5537,9 +5537,13 @@ async function autofillFromWebsite(){
   btn.disabled=true; btn.textContent='⏳ Scanning…';
   status.style.display='block'; status.textContent='Fetching website and extracting data with AI…';
   try{
+    // spot-autofill now requires an authenticated user (SSRF/cost hardening).
+    let token=_authSession?.access_token;
+    if(!token){ try{ const{data:{session}}=await getSb().auth.getSession(); token=session?.access_token||null; }catch{} }
+    if(!token){ status.textContent='⚠️ Sign in to use autofill'; btn.disabled=false; btn.textContent='✨ Autofill'; return; }
     const res=await fetch('https://kpwmajtxmcfpakvonimf.supabase.co/functions/v1/spot-autofill',{
       method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwd21hanR4bWNmcGFrdm9uaW1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTcyMjYsImV4cCI6MjA5MDczMzIyNn0.QfQuIQbnfVUOApPbOdvCRbNsVdb0SBAwMX-hvioGJmg'},
+      headers:{'Content-Type':'application/json','apikey':SB_ANON,'Authorization':`Bearer ${token}`},
       body:JSON.stringify({url}),
     });
     const json=await res.json();
@@ -5976,7 +5980,7 @@ async function renderFriendsPanel(){
     reqSection.style.display='block';
     // Fetch nicknames for requesters
     const emails=incoming.map(r=>r.requester);
-    const{data:profiles}=await sb.from('profiles').select('email,nickname').in('email',emails);
+    const{data:profiles}=await sb.from('public_profiles').select('email,nickname').in('email',emails);
     const nickMap=Object.fromEntries((profiles||[]).map(p=>[p.email,p.nickname||p.email]));
     reqList.innerHTML=incoming.map(r=>`
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.2);border-radius:10px;padding:10px 12px;">
@@ -6001,7 +6005,7 @@ async function renderFriendsPanel(){
   ];
   const nickMap={};
   if(allEmails.length){
-    const{data:allProfiles}=await sb.from('profiles').select('email,nickname').in('email',allEmails);
+    const{data:allProfiles}=await sb.from('public_profiles').select('email,nickname').in('email',allEmails);
     (allProfiles||[]).forEach(p=>{ nickMap[p.email]=p.nickname||'someone'; });
   }
 
@@ -6046,7 +6050,7 @@ function onFriendSearch(){
 async function doFriendSearch(query){
   const sb=getSb(); const email=_authSession?.user?.email||loadProfile().email;
   if(!sb||!email) return;
-  const{data}=await sb.from('profiles').select('email,nickname')
+  const{data}=await sb.from('public_profiles').select('email,nickname')
     .ilike('nickname',`%${query}%`).neq('email',email).limit(8);
   const results=data||[];
   const el=$('friendSearchResults');
@@ -6982,15 +6986,24 @@ async function syncPremiumFromSupabase(email){
   if(tabsEl) tabsEl.classList.toggle('has-scroll', tabsEl.scrollWidth>tabsEl.clientWidth);
 }
 
+// Returns the signed-in user's access token (needed by JWT-protected functions).
+async function _userToken(){
+  let token=_authSession?.access_token;
+  if(!token){ try{ const{data:{session}}=await getSb().auth.getSession(); token=session?.access_token||null; }catch{} }
+  return token;
+}
+
 async function startCheckout(triggerBtn){
   const btn=triggerBtn||$('ppUpgradeBtn');
   const email=loadProfile().email||_authSession?.user?.email;
   if(!email){ showToast('Sign in first'); return; }
+  const token=await _userToken();
+  if(!token){ showToast('Sign in first'); return; }
   if(btn){ btn.disabled=true; btn.textContent='Redirecting…'; }
   try{
     const resp=await fetch('https://kpwmajtxmcfpakvonimf.supabase.co/functions/v1/stripe-checkout',{
       method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwd21hanR4bWNmcGFrdm9uaW1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTcyMjYsImV4cCI6MjA5MDczMzIyNn0.QfQuIQbnfVUOApPbOdvCRbNsVdb0SBAwMX-hvioGJmg'},
+      headers:{'Content-Type':'application/json','apikey':SB_ANON,'Authorization':`Bearer ${token}`},
       body:JSON.stringify({email,success_url:location.origin+location.pathname+'?premium=success',cancel_url:location.origin+location.pathname+'?premium=cancelled'}),
     });
     const data=await resp.json();
@@ -7002,10 +7015,12 @@ async function startCheckout(triggerBtn){
 async function manageSubscription(){
   const btn=$('ppManageSubBtn'); if(btn){ btn.textContent='Opening…'; btn.disabled=true; }
   const email=loadProfile().email||_authSession?.user?.email;
+  const token=await _userToken();
+  if(!token){ showToast('Sign in first'); if(btn){ btn.textContent='Manage subscription → cancel, change card'; btn.disabled=false; } return; }
   try{
     const resp=await fetch('https://kpwmajtxmcfpakvonimf.supabase.co/functions/v1/stripe-portal',{
       method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwd21hanR4bWNmcGFrdm9uaW1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTcyMjYsImV4cCI6MjA5MDczMzIyNn0.QfQuIQbnfVUOApPbOdvCRbNsVdb0SBAwMX-hvioGJmg'},
+      headers:{'Content-Type':'application/json','apikey':SB_ANON,'Authorization':`Bearer ${token}`},
       body:JSON.stringify({email,return_url:location.origin+location.pathname}),
     });
     const{url,error}=await resp.json();
@@ -7276,7 +7291,7 @@ async function saveNickname(fromModal){
   const sb=getSb();
   if(sb && email){
     // Fast head-only count check (no row data returned) then upsert
-    const {count}=await sb.from('profiles').select('email',{count:'exact',head:true}).eq('nickname',val).neq('email',email);
+    const {count}=await sb.from('public_profiles').select('email',{count:'exact',head:true}).eq('nickname',val).neq('email',email);
     if((count??0)>0){
       showToast('❌ Nickname already taken — try another');
       if(btn){ btn.disabled=false; btn.textContent=fromModal?'Continue →':'Save'; }
@@ -7862,7 +7877,7 @@ async function renderStats(){
     const friendCounts={};
     for(const r of friendRows||[]) friendCounts[r.email]=(friendCounts[r.email]||0)+1;
     // Fetch friend nicknames
-    const{data:profiles}=await sb.from('profiles').select('email,nickname').in('email',friendEmails);
+    const{data:profiles}=await sb.from('public_profiles').select('email,nickname').in('email',friendEmails);
     const nickMap={}; for(const p of profiles||[]) nickMap[p.email]=p.nickname||p.email.split('@')[0];
     // Build leaderboard entries
     const entries=[{email,name:'You',count:myMonthCount,isYou:true},...friendEmails.map(e=>({email:e,name:nickMap[e]||e.split('@')[0],count:friendCounts[e]||0,isYou:false}))];

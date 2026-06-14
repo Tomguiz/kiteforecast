@@ -1,0 +1,11 @@
+# macOS
+.DS_Store
+
+# Supabase CLI local state
+supabase/.temp/
+supabase/.branches/
+
+# Env / secrets
+.env
+.env.*
+*.local
