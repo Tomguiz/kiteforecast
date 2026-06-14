@@ -15,6 +15,7 @@
   <meta name="theme-color" content="#0a0f1e" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+  <script src="https://accounts.google.com/gsi/client" async></script>
   <script>
   // Eagerly init Supabase client so detectSessionInUrl catches #access_token before anything strips the hash
   window._sbEarlyInit=(function(){
@@ -1351,6 +1352,7 @@
             <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.08 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-3.59-13.46-8.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
             Continue with Google
           </button>
+          <div id="gisBtnFallback" style="display:none;justify-content:center;margin:2px 0"></div>
           <div style="display:flex;align-items:center;gap:8px;margin:2px 0">
             <div style="flex:1;height:1px;background:var(--border)"></div>
             <span style="font-size:.72rem;color:var(--tdim)">or use email</span>
@@ -7334,16 +7336,78 @@ async function initAuth(){
 
 const _googleBtnHTML=`<svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.08 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-3.59-13.46-8.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg> Continue with Google`;
 function _resetGoogleBtn(){ const b=$('ppGoogleBtn'); if(b){ b.disabled=false; b.innerHTML=_googleBtnHTML; } }
+
+// ── Native Google Sign-In (Google Identity Services) ──────────────────────────
+// Uses GIS to obtain an ID token in-page, then signInWithIdToken — no redirect to
+// the supabase.co domain, so the account picker shows only the KiteForecast app.
+const GOOGLE_CLIENT_ID='927737240724-ie4hbrnkhcakbe7s9u9vqhs6jesjtrsa.apps.googleusercontent.com';
+let _gisInited=false;
+let _gisNonce=null;
+
+// SHA-256 of the raw nonce, hex-encoded — Supabase compares the hashed nonce in
+// the ID token against the raw nonce we pass to signInWithIdToken.
+async function _sha256hex(str){
+  const buf=await crypto.subtle.digest('SHA-256', new TextEncoder().encode(str));
+  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+
+async function _onGoogleCredential(resp){
+  const sb=getSb(); if(!sb) return;
+  try{
+    const{error}=await sb.auth.signInWithIdToken({
+      provider:'google',
+      token: resp.credential,
+      nonce: _gisNonce,
+    });
+    if(error) throw error;
+    // SIGNED_IN fires via onAuthStateChange → handles profile setup, sync, toast.
+  }catch(e){
+    showToast('Google sign-in failed: '+(e.message||e));
+    _resetGoogleBtn();
+  }
+}
+
+async function _initGis(){
+  if(_gisInited) return true;
+  if(!window.google?.accounts?.id) return false;
+  _gisNonce=crypto.randomUUID();
+  const hashedNonce=await _sha256hex(_gisNonce);
+  window.google.accounts.id.initialize({
+    client_id: GOOGLE_CLIENT_ID,
+    callback: _onGoogleCredential,
+    nonce: hashedNonce,
+    use_fedcm_for_prompt: true,
+  });
+  _gisInited=true;
+  return true;
+}
+
 async function signInWithGoogle(){
   const sb=getSb(); if(!sb) return;
-  const btn=$('ppGoogleBtn'); if(btn){ btn.disabled=true; btn.textContent='Redirecting…'; }
-  // Reset button after 8s in case user cancels or comes back without completing OAuth
+  const btn=$('ppGoogleBtn'); if(btn){ btn.disabled=true; btn.textContent='Opening…'; }
   const resetTimer=setTimeout(_resetGoogleBtn, 8000);
-  const{error}=await sb.auth.signInWithOAuth({
-    provider:'google',
-    options:{ redirectTo: window.location.origin+window.location.pathname }
+  // Wait briefly for the GIS script if it hasn't loaded yet
+  let tries=0;
+  while(!window.google?.accounts?.id && tries<20){ await new Promise(r=>setTimeout(r,150)); tries++; }
+  const ok=await _initGis();
+  if(!ok){ clearTimeout(resetTimer); showToast('Google sign-in unavailable — try email instead.'); _resetGoogleBtn(); return; }
+  clearTimeout(resetTimer);
+  _resetGoogleBtn();
+  // Show the One Tap / account-picker prompt
+  window.google.accounts.id.prompt((notif)=>{
+    if(notif.isNotDisplayed?.()||notif.isSkippedMoment?.()){
+      // Fallback: render a temporary GIS button the user can click (covers cases
+      // where One Tap is suppressed, e.g. cooldown or browser settings).
+      _renderGisButtonFallback();
+    }
   });
-  if(error){ clearTimeout(resetTimer); showToast('Google sign-in failed: '+error.message); _resetGoogleBtn(); }
+}
+
+function _renderGisButtonFallback(){
+  const host=$('gisBtnFallback'); if(!host||!window.google?.accounts?.id) return;
+  host.innerHTML='';
+  host.style.display='flex';
+  window.google.accounts.id.renderButton(host,{ theme:'outline', size:'large', width:280, text:'continue_with' });
 }
 
 async function sendOtpCode(){
