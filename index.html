@@ -5534,6 +5534,7 @@ async function autofillFromWebsite(){
 
 async function submitSpotSuggestion(){
   const btn=$('suggestSubmitBtn'); if(!btn) return;
+  if(!_authSession?.user){ _signinContext='generic'; openProfilePanel('profile'); showToast('Sign in to request a spot'); return; }
   const name     =($('suggestName')?.value||'').trim();
   const location =($('suggestLocation')?.value||'').trim();
   const country  =($('suggestCountry')?.value||'').trim();
