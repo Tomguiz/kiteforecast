@@ -1314,12 +1314,12 @@
     <div class="pp-hdr">
       <div class="pp-tabs">
         <button class="pp-tab active" id="ppTabProfile" onclick="switchPpTab('profile')">Profile</button>
-        <button class="pp-tab" id="ppTabNotifs" onclick="switchPpTab('notifs')">Notifications <span id="ppNotifCount" style="display:none"></span></button>
+        <button class="pp-tab" id="ppTabNotifs" onclick="switchPpTab('notifs')">Notifications <span id="ppNotifCount" style="display:none;background:#f87171;color:#fff;border-radius:999px;font-size:.65rem;padding:1px 5px;margin-left:2px;font-weight:700"></span></button>
         <button class="pp-tab" id="ppTabStats" onclick="switchPpTab('stats')">Stats</button>
         <button class="pp-tab" id="ppTabFriends" onclick="switchPpTab('friends')">Friends <span id="ppFriendReqCount" style="display:none;background:#f87171;color:#fff;border-radius:999px;font-size:.65rem;padding:1px 5px;margin-left:2px;font-weight:700"></span></button>
         <button class="pp-tab" id="ppTabMySpot" onclick="switchPpTab('myspot')" style="display:none">My Spot</button>
-        <button class="pp-tab" id="ppTabContrib" onclick="switchPpTab('contrib')" style="display:none">Contributions</button>
-        <button class="pp-tab" id="ppTabAdmin" onclick="switchPpTab('admin')" style="display:none">⚙️ Admin</button>
+        <button class="pp-tab" id="ppTabContrib" onclick="switchPpTab('contrib')" style="display:none">Contributions <span id="ppContribCount" style="display:none;background:#f87171;color:#fff;border-radius:999px;font-size:.65rem;padding:1px 5px;margin-left:2px;font-weight:700"></span></button>
+        <button class="pp-tab" id="ppTabAdmin" onclick="switchPpTab('admin')" style="display:none">⚙️ Admin <span id="ppAdminCount" style="display:none;background:#f87171;color:#fff;border-radius:999px;font-size:.65rem;padding:1px 5px;margin-left:2px;font-weight:700"></span></button>
       </div>
       <button class="pp-close" onclick="closeProfilePanel()">✕</button>
     </div>
@@ -4706,6 +4706,8 @@ function addSpotNotif(spot,sessions){
     notifs.push({id:spotId+'_d'+i,type:'day',fromSpot:true,spotName:spot.name,spotLat,spotLon,date:dateStr,label:full,createdAt:new Date().toISOString()});
   });
   saveNotifs(notifs);
+  // Self-created alerts shouldn't badge the user's own Notifications tab
+  try{ localStorage.setItem('kf_notifsSeenAt', Date.now()); }catch{}
   updateProfileDot();
   renderHintChips();
   // Write a sentinel row to Supabase so the subscription is visible across devices
@@ -4980,6 +4982,7 @@ function openProfilePanel(tab){
     updateAuthUI();
     renderNotifList();
     updateProfileDot();
+    updateTabBadges();
     setTimeout(initShareQR, 50);
     // Sync in background on every open so cross-device changes appear immediately
     const email=_authSession?.user?.email||loadProfile().email;
@@ -5018,6 +5021,28 @@ function switchPpTab(tab){
   if(tab==='contrib') renderMyContributions();
   if(tab==='admin')   renderAdminPanel();
   if(tab==='friends') renderFriendsPanel();
+  // Mark "seen" tabs as read on open, then refresh badges
+  if(tab==='notifs'){
+    try{ localStorage.setItem('kf_notifsSeenAt', Date.now()); }catch{}
+    _setTabBadge('ppNotifCount',0);
+  }
+  if(tab==='contrib') markContributionsSeen();
+  updateTabBadges();
+}
+
+// Mark all currently-reviewed contributions as acknowledged so the badge clears.
+async function markContributionsSeen(){
+  const sb=getSb(); const email=_authSession?.user?.email||loadProfile().email;
+  if(!sb||!email) return;
+  try{
+    const [{data:upd},{data:reqs}]=await Promise.all([
+      sb.from('spot_update_suggestions').select('id').eq('email',email).eq('reviewed',true),
+      sb.from('spot_suggestions').select('id').eq('submitted_by',email).eq('reviewed',true),
+    ]);
+    const ids=[...(upd||[]),...(reqs||[])].map(r=>r.id);
+    localStorage.setItem('kf_contribSeenIds',JSON.stringify(ids));
+    _setTabBadge('ppContribCount',0);
+  }catch{}
 }
 function onEmailEdit(){}
 function showUpgradeModal(){
@@ -6117,14 +6142,68 @@ async function cancelFriendRequest(id){
   showToast('Request cancelled.');
 }
 
-async function updateFriendRequestBadge(){
-  const sb=getSb(); const email=_authSession?.user?.email||loadProfile().email;
-  if(!sb||!email) return;
-  const{count}=await sb.from('friendships').select('id',{count:'exact',head:true})
-    .eq('recipient',email).eq('status','pending');
-  const badge=$('ppFriendReqCount');
-  if(badge){ badge.textContent=count||0; badge.style.display=count?'inline':'none'; }
+function _setTabBadge(id,count){
+  const b=$(id); if(!b) return;
+  b.textContent=count||0;
+  b.style.display=count>0?'inline':'none';
 }
+
+// ── Tab badges ────────────────────────────────────────────────────────────────
+// Badges signal "something new / needs action" — not a settings count.
+//  • Notifications: alerts added but not yet seen in the panel (cleared on open).
+//  • Contributions: spot suggestions/requests reviewed since last opened (cleared on open).
+//  • Friends: pending friend requests (cleared when accepted/declined).
+//  • Admin: pending spot requests / updates / claims to review (cleared when reviewed).
+async function updateTabBadges(){
+  const sb=getSb(); const email=_authSession?.user?.email||loadProfile().email;
+  if(!email) return;
+
+  // Notifications — count alerts created after the last time the tab was opened.
+  try{
+    const seenAt=+(localStorage.getItem('kf_notifsSeenAt')||0);
+    const unseen=loadNotifs().filter(n=>n.type==='spot' && n.createdAt && new Date(n.createdAt).getTime()>seenAt).length;
+    _setTabBadge('ppNotifCount',unseen);
+  }catch{}
+
+  if(!sb) return;
+
+  // Friends — pending incoming requests (resolved when accepted/declined).
+  try{
+    const{count}=await sb.from('friendships').select('id',{count:'exact',head:true})
+      .eq('recipient',email).eq('status','pending');
+    _setTabBadge('ppFriendReqCount',count||0);
+  }catch{}
+
+  // Contributions — items reviewed by admin that the user hasn't acknowledged yet.
+  // Tracked by reviewed-item IDs in localStorage (no reviewed_at column exists).
+  if($('ppTabContrib') && $('ppTabContrib').style.display!=='none'){
+    try{
+      const seen=new Set(JSON.parse(localStorage.getItem('kf_contribSeenIds')||'[]'));
+      const [{data:upd},{data:reqs}]=await Promise.all([
+        sb.from('spot_update_suggestions').select('id').eq('email',email).eq('reviewed',true),
+        sb.from('spot_suggestions').select('id').eq('submitted_by',email).eq('reviewed',true),
+      ]);
+      const reviewedIds=[...(upd||[]),...(reqs||[])].map(r=>r.id);
+      const unseen=reviewedIds.filter(id=>!seen.has(id)).length;
+      _setTabBadge('ppContribCount', unseen);
+    }catch{}
+  }
+
+  // Admin — total pending items needing review (resolved as they're reviewed).
+  if(loadProfile().isAdmin && $('ppTabAdmin') && $('ppTabAdmin').style.display!=='none'){
+    try{
+      const [s,u,c]=await Promise.all([
+        sb.from('spot_suggestions').select('id',{count:'exact',head:true}).or('reviewed.eq.false,reviewed.is.null'),
+        sb.from('spot_update_suggestions').select('id',{count:'exact',head:true}).eq('reviewed',false),
+        sb.from('spot_claims').select('id',{count:'exact',head:true}).eq('verified',false).neq('status','rejected'),
+      ]);
+      _setTabBadge('ppAdminCount',(s.count||0)+(u.count||0)+(c.count||0));
+    }catch{}
+  }
+}
+
+// Back-compat alias — existing callers use updateFriendRequestBadge()
+async function updateFriendRequestBadge(){ return updateTabBadges(); }
 
 // ── ADMIN PANEL ──────────────────────────────────────────────────────────────
 let _adminSpots=null;
@@ -7928,9 +8007,6 @@ async function renderNotifList(){
     }
     return false;
   });
-  const countEl=$('ppNotifCount');
-  if(visible.length>0){countEl.style.display='inline-flex';countEl.textContent=visible.length;}
-  else{countEl.style.display='none';}
   const _masterOn=notifMasterEnabled();
   $('ppMasterToggle').className='pp-toggle'+(_masterOn?' on':'');
   const _offNote=$('ppMasterOffNote'); if(_offNote) _offNote.style.display=_masterOn?'none':'block';
