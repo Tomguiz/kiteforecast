@@ -1171,7 +1171,7 @@
             <input type="text" id="suggestLon" class="pp-input" placeholder="Longitude" style="font-size:.78rem;opacity:.7"/>
           </div>
         </div>
-        <a href="https://maps.google.com" target="_blank" style="display:inline-flex;align-items:center;gap:5px;margin-top:-4px;padding:6px 12px;background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.25);border-radius:8px;font-size:.72rem;font-weight:700;color:var(--accent);text-decoration:none">📍 Open Google Maps → long-press the spot → tap the coordinates → copy</a>
+        <a href="https://maps.google.com" target="_blank" rel="noopener" id="suggestMapsLink" onclick="this.href=spotMapsSearchUrl()" style="display:inline-flex;align-items:center;gap:5px;margin-top:-4px;padding:6px 12px;background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.25);border-radius:8px;font-size:.72rem;font-weight:700;color:var(--accent);text-decoration:none">📍 Open Google Maps → long-press the spot → tap the coordinates → copy</a>
 
         <div>
           <label class="pp-label">Good wind directions <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(optional — tap to toggle)</span></label>
@@ -3253,6 +3253,10 @@ function goHome(){
   resetSearch();
   $('searchInput').value='';
   $('searchInput').blur();
+}
+function spotMapsSearchUrl(){
+  const q=[$('suggestName')?.value, $('suggestLocation')?.value, $('suggestCountry')?.value].map(v=>(v||'').trim()).filter(Boolean).join(', ');
+  return q ? 'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(q) : 'https://maps.google.com';
 }
 function showAddSpotFromHome(prefill=''){
   // Require sign-in before showing the add-spot form
