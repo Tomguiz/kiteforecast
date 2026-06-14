@@ -157,15 +157,10 @@ Deno.serve(async (req) => {
 
     const APP_BASE = 'https://tomguiz.github.io/kiteforecast/'
 
-    // Generate a magic link for a given redirect URL, falling back to the plain URL
+    // Email CTAs use plain app URLs (not single-use magic links): magic links get
+    // pre-consumed by email link-scanners and expire, breaking the CTA. The app
+    // restores the user's saved session on load, so returning users land signed-in.
     async function magicLink(redirectTo: string): Promise<string> {
-      try {
-        const { data, error } = await supabase.auth.admin.generateLink({
-          type: 'magiclink', email,
-          options: { redirectTo },
-        })
-        if (!error && data?.properties?.action_link) return data.properties.action_link
-      } catch { /* fall through */ }
       return redirectTo
     }
 

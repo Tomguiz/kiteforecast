@@ -28,20 +28,10 @@ Deno.serve(async (req) => {
 
   const recipient_nickname = recipient?.nickname || recipient_email.split('@')[0]
 
-  // Generate magic link so recipient is auto-logged in when clicking
-  let app_link = 'https://tomguiz.github.io/kiteforecast/'
-  try {
-    const { data, error } = await admin.auth.admin.generateLink({
-      type:    'magiclink',
-      email:   recipient_email,
-      options: { redirectTo: 'https://tomguiz.github.io/kiteforecast/?tab=friends' },
-    })
-    if (!error && data?.properties?.action_link) {
-      app_link = data.properties.action_link
-    }
-  } catch (e) {
-    console.error('Magic link error:', e)
-  }
+  // Plain app URL (not a single-use magic link): magic links get pre-consumed by
+  // email link-scanners and expire, breaking the CTA. The app restores the user's
+  // saved session on load, so returning users land signed-in.
+  const app_link = 'https://tomguiz.github.io/kiteforecast/?tab=friends'
 
   const rNick = requester_nickname || requester_email.split('@')[0]
   const payload = {

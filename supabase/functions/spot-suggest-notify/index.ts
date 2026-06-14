@@ -1,11 +1,7 @@
 // Notifies admin when a user submits a new spot request
-// Generates a magic link so admin is auto-authenticated on click
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const MAKE_WEBHOOK_URL  = 'https://hook.eu1.make.com/6t9fgm6btixri2wf5lnx47requf416vs'
 const ADMIN_EMAIL       = Deno.env.get('ADMIN_EMAIL')        ?? 'tom.guisgand@gmail.com'
-const SUPABASE_URL      = Deno.env.get('SUPABASE_URL')       ?? 'https://kpwmajtxmcfpakvonimf.supabase.co'
-const SUPABASE_SERVICE  = Deno.env.get('SERVICE_ROLE_KEY') ?? ''
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -23,21 +19,10 @@ Deno.serve(async (req) => {
   const reviewToken = btoa(JSON.stringify(reviewData))
   const reviewUrl   = `https://tomguiz.github.io/kiteforecast/?review=${reviewToken}`
 
-  // Generate a magic link that auto-logs in the admin and redirects to the review URL
-  let review_link = reviewUrl // fallback if magic link generation fails
-  try {
-    const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE)
-    const { data, error } = await admin.auth.admin.generateLink({
-      type:       'magiclink',
-      email:      ADMIN_EMAIL,
-      options:    { redirectTo: reviewUrl },
-    })
-    if (!error && data?.properties?.action_link) {
-      review_link = data.properties.action_link
-    }
-  } catch (e) {
-    console.error('Magic link generation failed:', e)
-  }
+  // Plain app URL (not a single-use magic link): magic links get pre-consumed by
+  // email link-scanners and expire, breaking the CTA. The admin's saved session
+  // is restored on load, so they land signed-in on the review page.
+  const review_link = reviewUrl
 
   const payload = {
     notification_type: 'spot_suggestion',

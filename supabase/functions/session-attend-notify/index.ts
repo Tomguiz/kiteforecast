@@ -56,15 +56,10 @@ Deno.serve(async (req) => {
 
   // Send one webhook per friend
   const sends = (friends || []).map(async (friend: any) => {
-    // Generate magic link that auto-logs in friend and redirects to join URL
-    let join_link = joinUrl
-    try {
-      const { data, error } = await admin.auth.admin.generateLink({
-        type: 'magiclink', email: friend.email,
-        options: { redirectTo: joinUrl },
-      })
-      if (!error && data?.properties?.action_link) join_link = data.properties.action_link
-    } catch (e) {}
+    // Plain app URL (not a single-use magic link): magic links get pre-consumed by
+    // email link-scanners and expire, breaking the CTA. The app restores the user's
+    // saved session on load, so returning users land signed-in.
+    const join_link = joinUrl
 
     return fetch(MAKE_WEBHOOK_URL, {
       method: 'POST',
