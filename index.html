@@ -6211,6 +6211,7 @@ async function updateFriendRequestBadge(){ return updateTabBadges(); }
 
 // ── ADMIN PANEL ──────────────────────────────────────────────────────────────
 let _adminSpots=null;
+let _adminRequests=null;  // cached pending spot_suggestions for click handlers
 
 async function renderAdminPanel(){
   const el=$('ppAdminContent'); if(!el) return;
@@ -6230,6 +6231,7 @@ async function renderAdminPanel(){
   const overrideMap={}; for(const o of overrideData||[]) overrideMap[o.name]=o;
   _adminSpots.forEach(s=>{ const o=overrideMap[s.spot_name]; if(o){s._lat=o.lat;s._lon=o.lon;s._loc=o.loc;s._hasOverride=true;} else{s._hasOverride=false;} });
   const pendingSuggs = suggData||[];
+  _adminRequests = pendingSuggs;  // cache so click handlers can look up by id (avoids unsafe inline JSON)
   const pendingUpdates = updateSuggData||[];
   const pendingClaims = (claimData||[]).filter(c=>!c.verified);
 
@@ -6242,7 +6244,7 @@ async function renderAdminPanel(){
           ${s.note?`<div style="font-size:.72rem;color:var(--tdim);margin-top:3px">${s.note}</div>`:''}
           <div style="font-size:.7rem;color:var(--tdim);margin-top:3px">By: ${s.submitted_by||'anonymous'} · ${new Date(s.created_at).toLocaleDateString()}</div>
         </div>
-        <button class="btn pp-save-btn" style="font-size:.72rem;padding:6px 12px;white-space:nowrap" onclick="adminApproveRequest('${s.id}',${JSON.stringify(s)})">Review &amp; add →</button>
+        <button class="btn pp-save-btn" style="font-size:.72rem;padding:6px 12px;white-space:nowrap" onclick="adminApproveRequest('${s.id}')">Review &amp; add →</button>
       </div>
     </div>`).join('');
 
@@ -6353,6 +6355,10 @@ async function renderAdminPanel(){
 
 async function adminApproveRequest(suggId, sugg){
   const sb=getSb(); if(!sb) return;
+  // Look the row up from the cached list (passing the full object inline broke
+  // the onclick whenever a field contained a quote — silent no-op on click).
+  if(!sugg) sugg=(_adminRequests||[]).find(r=>String(r.id)===String(suggId));
+  if(!sugg){ showToast('Could not load this request — refresh and try again'); return; }
   // Parse note field: "Dirs: SW, W | Business: X | Website: Y | Webcam: Z | ..."
   const note = sugg.note||'';
   const parseNote = (key) => { const m=note.match(new RegExp(key+':\\s*([^|]+)')); return m?m[1].trim():''; };
