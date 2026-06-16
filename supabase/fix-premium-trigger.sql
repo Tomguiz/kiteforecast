@@ -19,8 +19,10 @@ DECLARE
   pg_role  text := current_user;
   is_enduser boolean;
 BEGIN
-  is_enduser := (jwt_role IN ('anon', 'authenticated'))
-                OR (pg_role IN ('anon', 'authenticated'));
+  -- coalesce to '' so a NULL role (service role / postgres) can't poison the
+  -- IN () into NULL and fall through to the REVERT branch.
+  is_enduser := (coalesce(jwt_role, '') IN ('anon', 'authenticated'))
+                OR (coalesce(pg_role, '') IN ('anon', 'authenticated'));
 
   IF NOT is_enduser OR is_admin() THEN
     RETURN NEW;

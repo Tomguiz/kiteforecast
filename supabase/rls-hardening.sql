@@ -104,8 +104,12 @@ DECLARE
   is_enduser boolean;
 BEGIN
   -- An ordinary end-user request: PostgREST switched the role to anon/authenticated.
-  is_enduser := (jwt_role IN ('anon', 'authenticated'))
-                OR (pg_role IN ('anon', 'authenticated'));
+  -- coalesce each side to '' — `NULL IN (...)` yields NULL (not false), and a NULL
+  -- here would poison the IF below into the REVERT branch, blocking even the
+  -- service role / postgres superuser. This was the cause of paid users not
+  -- getting premium: the webhook's write was silently reverted.
+  is_enduser := (coalesce(jwt_role, '') IN ('anon', 'authenticated'))
+                OR (coalesce(pg_role, '') IN ('anon', 'authenticated'));
 
   -- Privileged (service role, superuser, internal) OR an admin end-user: allow.
   IF NOT is_enduser OR is_admin() THEN
