@@ -88,17 +88,28 @@ CREATE VIEW public_profiles AS
 GRANT SELECT ON public_profiles TO authenticated;
 
 -- Trigger: reject client changes to privilege/billing columns.
--- Service role bypasses RLS but NOT triggers, so we explicitly allow it via
--- current_setting('role') and the admin check.
+-- Service role bypasses RLS but NOT triggers, so we must let it (and the
+-- postgres superuser used by the SQL editor / internal jobs) through.
+--
+-- Robust rule: ONLY ordinary end-users come through PostgREST as the 'anon' or
+-- 'authenticated' role. ANYTHING ELSE — service_role (the Stripe webhook),
+-- postgres/supabase_admin (SQL editor, migrations) — is privileged. Detecting
+-- "not an end-user" is far more reliable than enumerating service-role signals,
+-- which vary across SECURITY DEFINER contexts and connection types.
 CREATE OR REPLACE FUNCTION protect_profile_columns() RETURNS trigger
   LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
-  is_service boolean := (current_setting('request.jwt.claim.role', true) = 'service_role')
-                        OR (current_setting('role', true) = 'service_role')
-                        OR (auth.role() = 'service_role');
+  jwt_role text := nullif(current_setting('request.jwt.claim.role', true), '');
+  pg_role  text := current_user;            -- e.g. authenticator / postgres / supabase_admin
+  is_enduser boolean;
 BEGIN
-  IF is_service OR is_admin() THEN
-    RETURN NEW;  -- server / admin may set anything
+  -- An ordinary end-user request: PostgREST switched the role to anon/authenticated.
+  is_enduser := (jwt_role IN ('anon', 'authenticated'))
+                OR (pg_role IN ('anon', 'authenticated'));
+
+  -- Privileged (service role, superuser, internal) OR an admin end-user: allow.
+  IF NOT is_enduser OR is_admin() THEN
+    RETURN NEW;
   END IF;
 
   IF TG_OP = 'INSERT' THEN
