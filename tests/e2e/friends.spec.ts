@@ -13,6 +13,16 @@ test('friends panel renders accepted friends and pending requests', async ({ got
   await expect(page.locator('#friendRequestsList')).toContainText('Nikite');
 });
 
+test('expired session shows a sign-in prompt, not a silent empty list', async ({ gotoApp, page }) => {
+  // email cached (looks signed in) but no valid token and refresh fails
+  await gotoApp('staleSession');
+  await page.evaluate(() => {
+    // @ts-expect-error app global
+    if (typeof openProfilePanel === 'function') openProfilePanel('friends');
+  });
+  await expect(page.locator('#friendsList')).toContainText(/session expired/i);
+});
+
 test('premium friends show a crown', async ({ gotoApp, page }) => {
   await gotoApp('signedIn');
   await page.evaluate(() => {

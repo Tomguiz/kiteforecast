@@ -85,9 +85,15 @@ DO $$ BEGIN ALTER TABLE profiles ADD COLUMN nickname text; EXCEPTION WHEN duplic
 -- is_premium is included so the friends list can show a crown next to premium
 -- members. It is low-sensitivity (already surfaced as a crown in the UI) — unlike
 -- phone numbers / stripe ids / admin flag, which stay private to the base table.
+--
+-- IMPORTANT: this view runs with its owner's rights (security_invoker off), so it
+-- bypasses profiles' own-row RLS by design. That makes the GRANT the ONLY access
+-- control — so we must REVOKE from anon/public, else the public anon key could
+-- read every user's email+nickname+premium. authenticated only.
 DROP VIEW IF EXISTS public_profiles;
 CREATE VIEW public_profiles AS
   SELECT email, nickname, is_premium FROM profiles;
+REVOKE ALL ON public_profiles FROM anon, public;
 GRANT SELECT ON public_profiles TO authenticated;
 
 -- Trigger: reject client changes to privilege/billing columns.

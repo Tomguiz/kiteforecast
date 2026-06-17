@@ -4987,9 +4987,17 @@ function openProfilePanel(tab){
     updateProfileDot();
     updateTabBadges();
     setTimeout(initShareQR, 50);
-    // Sync in background on every open so cross-device changes appear immediately
+    // Proactively restore/refresh a valid auth token on open, so identity-scoped
+    // reads (friends, reminders, favourites) work even if the token had expired.
     const email=_authSession?.user?.email||loadProfile().email;
-    if(email) syncAllFromSupabase(email).then(()=>{ renderNotifList(); updateProfileDot(); });
+    if(email){
+      ensureSession().then(()=>{
+        // Sync in background so cross-device changes appear immediately
+        syncAllFromSupabase(email).then(()=>{ renderNotifList(); updateProfileDot(); });
+        // re-render the friends tab if it's the active one, now that we're authed
+        if(ppCurrentTab==='friends'){ _friendsCache=null; renderFriendsPanel(); }
+      });
+    }
   }catch(err){
     console.error('openProfilePanel error:',err);
     showToast('Error opening panel: '+err.message);
@@ -5953,6 +5961,24 @@ async function cancelAttendance(dateStr){
 }
 
 // ── FRIENDS ──────────────────────────────────────────────────────────────────
+// Returns a VALID Supabase session (with a live access token), refreshing if the
+// stored token is missing/expired. Keeps _authSession in sync. Returns null only
+// when there is genuinely no recoverable session (user must sign in again).
+async function ensureSession(){
+  const sb=getSb(); if(!sb) return null;
+  try{
+    let{data:{session}}=await sb.auth.getSession();
+    // getSession returns the stored session even if expired; check expiry.
+    const expired=session && session.expires_at && (session.expires_at*1000 < Date.now()+5000);
+    if(!session || expired){
+      const{data:{session:refreshed}}=await sb.auth.refreshSession();
+      session=refreshed||null;
+    }
+    if(session?.access_token){ _authSession=session; return session; }
+  }catch(e){ console.warn('[auth] ensureSession failed',e); }
+  return null;
+}
+
 let _friendsCache=null;
 
 async function renderFriendsPanel(){
@@ -5961,16 +5987,11 @@ async function renderFriendsPanel(){
 
   // Friendships RLS requires an AUTHENTICATED request (the row must belong to
   // the caller's JWT email). The app can be in an "optimistic" signed-in state
-  // (kf_profile email present, but the Supabase session token expired or not yet
-  // restored). In that state queries go out as `anon` and RLS returns 0 rows —
-  // making the list look empty. So ensure a real session before querying.
-  if(!_authSession?.access_token){
-    try{
-      const{data:{session}}=await sb.auth.getSession();
-      if(session) _authSession=session;
-    }catch(e){ console.warn('[friends] getSession failed',e); }
-  }
-  if(!_authSession?.access_token){
+  // (kf_profile email present, but the Supabase access token expired). In that
+  // state queries go out as `anon` and RLS returns 0 rows. ensureSession() tries
+  // to restore/refresh a valid token first; only if that fails do we prompt.
+  const session=await ensureSession();
+  if(!session){
     $('friendsList').innerHTML='<div class="stats-empty">Your session expired — please sign in again to see your friends.</div>';
     return;
   }
