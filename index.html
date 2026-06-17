@@ -5992,7 +5992,14 @@ async function renderFriendsPanel(){
   // to restore/refresh a valid token first; only if that fails do we prompt.
   const session=await ensureSession();
   if(!session){
-    $('friendsList').innerHTML='<div class="stats-empty">Your session expired — please sign in again to see your friends.</div>';
+    // TEMP DIAGNOSTIC (mobile debugging): show why the session couldn't be restored.
+    let dbg={};
+    try{ const{data:{session:gs},error}=await sb.auth.getSession(); dbg.getSession={token:!!gs?.access_token,exp:gs?.expires_at,err:error?.message}; }catch(e){ dbg.getSession='threw:'+e.message; }
+    try{ const{data:{session:rs},error}=await sb.auth.refreshSession(); dbg.refresh={token:!!rs?.access_token,err:error?.message}; }catch(e){ dbg.refresh='threw:'+e.message; }
+    dbg.cookie=/kf_auth=/.test(document.cookie);
+    try{ dbg.lsAuth=!!localStorage.getItem('kf-auth'); }catch(e){ dbg.lsAuth='blocked'; }
+    dbg.standalone=(window.navigator.standalone===true)||window.matchMedia('(display-mode: standalone)').matches;
+    $('friendsList').innerHTML=`<div class="stats-empty">Your session expired — please sign in again.<br><br><span style="font-size:.6rem;color:#888;font-family:monospace;word-break:break-all">DIAG: ${JSON.stringify(dbg)}</span></div>`;
     return;
   }
 
@@ -6004,10 +6011,11 @@ async function renderFriendsPanel(){
       .or(`requester.eq.${email},recipient.eq.${email}`);
     if(fErr){
       console.error('[friends] friendships fetch error:',fErr);
-      $('friendsList').innerHTML=`<div class="stats-empty">Couldn't load friends: ${fErr.message||fErr.code||'error'}</div>`;
+      $('friendsList').innerHTML=`<div class="stats-empty">Couldn't load friends: ${fErr.message||fErr.code||'error'}<br><span style="font-size:.6rem;color:#888;font-family:monospace">DIAG2: ${JSON.stringify({code:fErr.code,msg:fErr.message,email})}</span></div>`;
       return;
     }
     _friendsCache=rows||[];
+    window._friendsDiag={rows:(rows||[]).length,email,hadToken:!!session.access_token};
   }
 
   const accepted = _friendsCache.filter(r=>r.status==='accepted');
@@ -6081,7 +6089,8 @@ async function renderFriendsPanel(){
   } else if(outgoing.length){
     $('friendsList').innerHTML=outgoingHtml;
   } else {
-    $('friendsList').innerHTML='<div class="stats-empty">No friends yet — search by nickname to add some!</div>';
+    const d=window._friendsDiag||{};
+    $('friendsList').innerHTML=`<div class="stats-empty">No friends yet — search by nickname to add some!<br><span style="font-size:.6rem;color:#888;font-family:monospace">DIAG3: rows=${d.rows} email=${d.email} token=${d.hadToken}</span></div>`;
   }
 }
 
