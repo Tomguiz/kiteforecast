@@ -1324,6 +1324,10 @@
       </div>
       <button class="pp-close" onclick="closeProfilePanel()">✕</button>
     </div>
+    <div id="ppReauthBanner" style="display:none;margin:0 0 10px;padding:12px 14px;border-radius:10px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.35);font-size:.8rem;color:#fbbf24;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between">
+      <span>⚠️ Your session isn't active here — sign in again to sync your friends, alerts &amp; account.</span>
+      <button class="btn pp-save-btn" style="font-size:.75rem;padding:6px 14px;white-space:nowrap" onclick="forceReauth()">Sign in again</button>
+    </div>
     <div id="ppPanelProfile" class="pp-body">
       <!-- Not signed in -->
       <div id="ppAuthSection" style="display:flex;flex-direction:column;gap:14px">
@@ -4991,11 +4995,19 @@ function openProfilePanel(tab){
     // reads (friends, reminders, favourites) work even if the token had expired.
     const email=_authSession?.user?.email||loadProfile().email;
     if(email){
-      ensureSession().then(()=>{
-        // Sync in background so cross-device changes appear immediately
-        syncAllFromSupabase(email).then(()=>{ renderNotifList(); updateProfileDot(); });
-        // re-render the friends tab if it's the active one, now that we're authed
-        if(ppCurrentTab==='friends'){ _friendsCache=null; renderFriendsPanel(); }
+      ensureSession().then((session)=>{
+        // No recoverable session but we show a cached email = stale "signed in"
+        // state (typical on a fresh iOS PWA with isolated storage). Surface a
+        // re-auth banner so the user knows to sign in inside the app.
+        const banner=$('ppReauthBanner');
+        if(!session){
+          if(banner) banner.style.display='block';
+        } else {
+          if(banner) banner.style.display='none';
+          // Sync in background so cross-device changes appear immediately
+          syncAllFromSupabase(email).then(()=>{ renderNotifList(); updateProfileDot(); });
+          if(ppCurrentTab==='friends'){ _friendsCache=null; renderFriendsPanel(); }
+        }
       });
     }
   }catch(err){
@@ -5992,14 +6004,7 @@ async function renderFriendsPanel(){
   // to restore/refresh a valid token first; only if that fails do we prompt.
   const session=await ensureSession();
   if(!session){
-    // TEMP DIAGNOSTIC (mobile debugging): show why the session couldn't be restored.
-    let dbg={};
-    try{ const{data:{session:gs},error}=await sb.auth.getSession(); dbg.getSession={token:!!gs?.access_token,exp:gs?.expires_at,err:error?.message}; }catch(e){ dbg.getSession='threw:'+e.message; }
-    try{ const{data:{session:rs},error}=await sb.auth.refreshSession(); dbg.refresh={token:!!rs?.access_token,err:error?.message}; }catch(e){ dbg.refresh='threw:'+e.message; }
-    dbg.cookie=/kf_auth=/.test(document.cookie);
-    try{ dbg.lsAuth=!!localStorage.getItem('kf-auth'); }catch(e){ dbg.lsAuth='blocked'; }
-    dbg.standalone=(window.navigator.standalone===true)||window.matchMedia('(display-mode: standalone)').matches;
-    $('friendsList').innerHTML=`<div class="stats-empty">Your session expired — please sign in again.<br><br><span style="font-size:.6rem;color:#888;font-family:monospace;word-break:break-all">DIAG: ${JSON.stringify(dbg)}</span></div>`;
+    $('friendsList').innerHTML='<div class="stats-empty">Your session expired — please sign in again to see your friends.<br><br><button class="btn pp-save-btn" style="font-size:.78rem;padding:8px 16px" onclick="forceReauth()">Sign in again</button></div>';
     return;
   }
 
@@ -6011,11 +6016,10 @@ async function renderFriendsPanel(){
       .or(`requester.eq.${email},recipient.eq.${email}`);
     if(fErr){
       console.error('[friends] friendships fetch error:',fErr);
-      $('friendsList').innerHTML=`<div class="stats-empty">Couldn't load friends: ${fErr.message||fErr.code||'error'}<br><span style="font-size:.6rem;color:#888;font-family:monospace">DIAG2: ${JSON.stringify({code:fErr.code,msg:fErr.message,email})}</span></div>`;
+      $('friendsList').innerHTML=`<div class="stats-empty">Couldn't load friends: ${fErr.message||fErr.code||'error'}</div>`;
       return;
     }
     _friendsCache=rows||[];
-    window._friendsDiag={rows:(rows||[]).length,email,hadToken:!!session.access_token};
   }
 
   const accepted = _friendsCache.filter(r=>r.status==='accepted');
@@ -6089,8 +6093,7 @@ async function renderFriendsPanel(){
   } else if(outgoing.length){
     $('friendsList').innerHTML=outgoingHtml;
   } else {
-    const d=window._friendsDiag||{};
-    $('friendsList').innerHTML=`<div class="stats-empty">No friends yet — search by nickname to add some!<br><span style="font-size:.6rem;color:#888;font-family:monospace">DIAG3: rows=${d.rows} email=${d.email} token=${d.hadToken}</span></div>`;
+    $('friendsList').innerHTML='<div class="stats-empty">No friends yet — search by nickname to add some!</div>';
   }
 }
 
@@ -7650,6 +7653,18 @@ async function signOut(){
   updateAuthUI(); updateProfileDot(); renderNotifList(); renderHintChips();
   try{ await getSb().auth.signOut(); }catch(e){ /* ignore network errors on sign-out */ }
   showToast('Signed out');
+}
+
+// Called when the app is in a "signed in by cached email, but no real Supabase
+// session" state (common on a freshly installed iOS PWA, which has isolated
+// storage from where the user originally signed in). Clears the stale state and
+// drops the user into a clean sign-in so identity-scoped data works again.
+async function forceReauth(){
+  await signOut();
+  _signinContext='generic';
+  openProfilePanel('profile');
+  renderSignInOnboarding();
+  showToast('Please sign in again to sync your account');
 }
 
 // ── NOTIF SIGNUP MICRO-MODAL ──
