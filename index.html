@@ -4707,8 +4707,9 @@ function addSpotNotif(spot,sessions){
     notifs.push({id:spotId+'_d'+i,type:'day',fromSpot:true,spotName:spot.name,spotLat,spotLon,date:dateStr,label:full,createdAt:new Date().toISOString()});
   });
   saveNotifs(notifs);
-  // Self-created alerts shouldn't badge the user's own Notifications tab
-  try{ localStorage.setItem('kf_notifsSeenAt', Date.now()); }catch{}
+  // New alerts mark the Notifications tab + profile bubble as having something
+  // new (badge), cleared when the user opens the Notifications section.
+  updateTabBadges();
   updateProfileDot();
   renderHintChips();
   // Write a sentinel row to Supabase so the subscription is visible across devices
@@ -4740,6 +4741,7 @@ function addDayNotif(spot,dateStr,sessInfo){
   const{full}=fmtDate(dateStr);
   notifs.push({id:Date.now()+'_d',type:'day',fromSpot:false,spotName:spot.name,spotLat:spot.lat||spot.latitude,spotLon:spot.lon||spot.longitude,date:dateStr,label:full,createdAt:new Date().toISOString()});
   saveNotifs(notifs);
+  updateTabBadges();
   updateProfileDot();
   renderHintChips();
   scheduleReminders(spot,sessInfo,'day');
@@ -6205,7 +6207,13 @@ async function updateTabBadges(){
   // Notifications — count alerts created after the last time the tab was opened.
   try{
     const seenAt=+(localStorage.getItem('kf_notifsSeenAt')||0);
-    const unseen=loadNotifs().filter(n=>n.type==='spot' && n.createdAt && new Date(n.createdAt).getTime()>seenAt).length;
+    // Count distinct user-created alerts since last open: each followed spot (1)
+    // and each standalone day alert (1). Skip auto-added day children of a spot
+    // (fromSpot) so following one spot badges as 1, not 1-per-session.
+    const unseen=loadNotifs().filter(n=>
+      (n.type==='spot' || (n.type==='day' && !n.fromSpot))
+      && n.createdAt && new Date(n.createdAt).getTime()>seenAt
+    ).length;
     _setTabBadge('ppNotifCount',unseen);
   }catch{}
 
