@@ -5957,12 +5957,33 @@ async function renderFriendsPanel(){
   const sb=getSb(); const email=_authSession?.user?.email||loadProfile().email;
   if(!sb||!email){ $('friendsList').innerHTML='<div class="stats-empty">Sign in to see friends.</div>'; return; }
 
+  // Friendships RLS requires an AUTHENTICATED request (the row must belong to
+  // the caller's JWT email). The app can be in an "optimistic" signed-in state
+  // (kf_profile email present, but the Supabase session token expired or not yet
+  // restored). In that state queries go out as `anon` and RLS returns 0 rows —
+  // making the list look empty. So ensure a real session before querying.
+  if(!_authSession?.access_token){
+    try{
+      const{data:{session}}=await sb.auth.getSession();
+      if(session) _authSession=session;
+    }catch(e){ console.warn('[friends] getSession failed',e); }
+  }
+  if(!_authSession?.access_token){
+    $('friendsList').innerHTML='<div class="stats-empty">Your session expired — please sign in again to see your friends.</div>';
+    return;
+  }
+
   if(!_friendsCache) $('friendsList').innerHTML='<div class="stats-empty">Loading…</div>';
 
   // Fetch all friendships involving this user (skip if cache is fresh)
   if(!_friendsCache){
-    const{data:rows}=await sb.from('friendships').select('*')
+    const{data:rows,error:fErr}=await sb.from('friendships').select('*')
       .or(`requester.eq.${email},recipient.eq.${email}`);
+    if(fErr){
+      console.error('[friends] friendships fetch error:',fErr);
+      $('friendsList').innerHTML=`<div class="stats-empty">Couldn't load friends: ${fErr.message||fErr.code||'error'}</div>`;
+      return;
+    }
     _friendsCache=rows||[];
   }
 
@@ -6004,10 +6025,11 @@ async function renderFriendsPanel(){
     ...accepted.map(r=>r.requester===email?r.recipient:r.requester),
     ...outgoing.map(r=>r.recipient),
   ];
-  const nickMap={};
+  const nickMap={}; const premiumMap={};
   if(allEmails.length){
-    const{data:allProfiles}=await sb.from('public_profiles').select('email,nickname').in('email',allEmails);
-    (allProfiles||[]).forEach(p=>{ nickMap[p.email]=p.nickname||'someone'; });
+    const{data:allProfiles,error:npErr}=await sb.from('public_profiles').select('email,nickname,is_premium').in('email',allEmails);
+    if(npErr) console.error('[friends] public_profiles lookup error:',npErr);
+    (allProfiles||[]).forEach(p=>{ nickMap[p.email]=p.nickname||'someone'; premiumMap[p.email]=!!p.is_premium; });
   }
 
   // Outgoing pending requests (always shown if any)
@@ -6025,8 +6047,8 @@ async function renderFriendsPanel(){
         <div style="display:flex;align-items:center;gap:10px">
           <div style="width:34px;height:34px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:800;color:#000;flex-shrink:0">${(nickMap[fe]||'?')[0].toUpperCase()}</div>
           <div>
-            <div style="font-size:.82rem;font-weight:700;color:var(--text)">${nickMap[fe]||fe}</div>
-            <div style="font-size:.7rem;color:var(--tdim)">friend</div>
+            <div style="font-size:.82rem;font-weight:700;color:var(--text)">${nickMap[fe]||fe}${premiumMap[fe]?' <span title="Premium member" style="font-size:.8rem">👑</span>':''}</div>
+            <div style="font-size:.7rem;color:var(--tdim)">${premiumMap[fe]?'premium friend':'friend'}</div>
           </div>
         </div>
         <button class="btn-reset" style="font-size:.7rem;color:var(--tdim);padding:4px 8px;border:1px solid var(--border);border-radius:6px" onclick="removeFriend('${r.id}')">Remove</button>

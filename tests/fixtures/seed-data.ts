@@ -23,10 +23,11 @@ export const friendshipsRows = (email: string) => [
   { id: 'f2', requester: 'nikite@test.dev', recipient: email, status: 'pending' },
 ];
 
-// public_profiles rows for nickname display
+// public_profiles rows for nickname + premium display.
+// Ruben is premium (gets a crown); Nikite is not.
 export const publicProfileRows = [
-  { email: 'ruben@test.dev', nickname: 'Ruben' },
-  { email: 'nikite@test.dev', nickname: 'Nikite' },
+  { email: 'ruben@test.dev', nickname: 'Ruben', is_premium: true },
+  { email: 'nikite@test.dev', nickname: 'Nikite', is_premium: false },
 ];
 
 // one pending spot suggestion whose name contains an apostrophe (regression input)

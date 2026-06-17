@@ -28,9 +28,20 @@ export const test = base.extend<{
       await mockSupabase(page, mockOpts(state, extra));
       const seed = profileSeed(state);
       if (seed) {
-        await page.addInitScript((p) => {
+        const email = state === 'admin' ? ADMIN_EMAIL : TEST_EMAIL;
+        await page.addInitScript((args) => {
+          const { p, email } = args as { p: unknown; email: string };
           localStorage.setItem('kf_profile', JSON.stringify(p));
-        }, seed);
+          // Seed a Supabase session so the client restores an AUTHENTICATED
+          // session (token present) — without this, queries go out as `anon`
+          // and identity-scoped RLS returns nothing, mirroring an expired login.
+          const farFuture = 4102444800; // 2100-01-01
+          localStorage.setItem('kf-auth', JSON.stringify({
+            access_token: 'test-token', token_type: 'bearer',
+            expires_at: farFuture, expires_in: 3600, refresh_token: 'test-refresh',
+            user: { id: 'test-uid', email, role: 'authenticated' },
+          }));
+        }, { p: seed, email });
       }
       await page.goto('/index.html');
       return page;

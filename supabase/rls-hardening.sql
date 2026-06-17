@@ -82,9 +82,12 @@ CREATE POLICY "profiles_update_own" ON profiles FOR UPDATE TO authenticated
 -- exists so the view never fails on a fresh DB.
 DO $$ BEGIN ALTER TABLE profiles ADD COLUMN nickname text; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
 
+-- is_premium is included so the friends list can show a crown next to premium
+-- members. It is low-sensitivity (already surfaced as a crown in the UI) — unlike
+-- phone numbers / stripe ids / admin flag, which stay private to the base table.
 DROP VIEW IF EXISTS public_profiles;
 CREATE VIEW public_profiles AS
-  SELECT email, nickname FROM profiles;
+  SELECT email, nickname, is_premium FROM profiles;
 GRANT SELECT ON public_profiles TO authenticated;
 
 -- Trigger: reject client changes to privilege/billing columns.
