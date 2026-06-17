@@ -6325,7 +6325,10 @@ async function renderAdminPanel(){
           ${s.note?`<div style="font-size:.72rem;color:var(--tdim);margin-top:3px">${s.note}</div>`:''}
           <div style="font-size:.7rem;color:var(--tdim);margin-top:3px">By: ${s.submitted_by||'anonymous'} · ${new Date(s.created_at).toLocaleDateString()}</div>
         </div>
-        <button class="btn pp-save-btn" style="font-size:.72rem;padding:6px 12px;white-space:nowrap" onclick="adminApproveRequest('${s.id}')">Review &amp; add →</button>
+        <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
+          <button class="btn pp-save-btn" style="font-size:.72rem;padding:6px 12px;white-space:nowrap" onclick="adminApproveRequest('${s.id}')">Review &amp; add →</button>
+          <button class="btn-reset" style="font-size:.7rem;padding:5px 12px;white-space:nowrap;background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.25);border-radius:8px;color:#f87171;cursor:pointer" onclick="adminRejectRequest('${s.id}')">Reject</button>
+        </div>
       </div>
     </div>`).join('');
 
@@ -6432,6 +6435,20 @@ async function renderAdminPanel(){
       }
     }
   }
+}
+
+// Reject a spot request: mark it reviewed-but-not-approved. The requester then
+// sees "✕ Declined" in their Contributions tab (which also badges as new).
+async function adminRejectRequest(suggId){
+  if(!loadProfile().isAdmin){ showToast('Access denied'); return; }
+  const sugg=(_adminRequests||[]).find(r=>String(r.id)===String(suggId));
+  const name=sugg?.suggested_name||'this request';
+  if(!confirm(`Reject "${name}"? The requester will see it was declined.`)) return;
+  const sb=getSb(); if(!sb) return;
+  const{error}=await sb.from('spot_suggestions').update({reviewed:true,approved:false}).eq('id',suggId);
+  if(error){ showToast('Could not reject — try again'); return; }
+  showToast('Request declined');
+  renderAdminPanel();
 }
 
 async function adminApproveRequest(suggId, sugg){
@@ -6941,15 +6958,18 @@ async function checkShowMySpotTab(){
   if(!_authSession?.user) return;
   const sb=getSb(); if(!sb) return;
   const email=loadProfile().email||_authSession.user.email;
-  const[{data:claims},{data:suggestions},{data:spotReqs}]=await Promise.all([
+  const[{data:claims},{data:suggestions},{data:approvedReqs},{data:anyReqs}]=await Promise.all([
     sb.from('spot_claims').select('id').eq('email',email).limit(1),
     sb.from('spot_update_suggestions').select('id').eq('email',email).limit(1),
     sb.from('spot_suggestions').select('id').eq('submitted_by',email).eq('approved',true).limit(1),
+    sb.from('spot_suggestions').select('id').eq('submitted_by',email).limit(1),
   ]);
   const mySpotTab=$('ppTabMySpot');
   const contribTab=$('ppTabContrib');
-  if(mySpotTab) mySpotTab.style.display=(claims?.length||spotReqs?.length)?'inline-flex':'none';
-  if(contribTab) contribTab.style.display=(suggestions?.length)?'inline-flex':'none';
+  if(mySpotTab) mySpotTab.style.display=(claims?.length||approvedReqs?.length)?'inline-flex':'none';
+  // Show Contributions if the user has ANY update suggestion OR ANY spot request
+  // (pending/approved/declined) — so they can see the admin's review decision.
+  if(contribTab) contribTab.style.display=(suggestions?.length||anyReqs?.length)?'inline-flex':'none';
 }
 
 // ── PREMIUM ──────────────────────────────────────────────────────────────────

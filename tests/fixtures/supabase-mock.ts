@@ -77,11 +77,17 @@ export async function mockSupabase(page: Page, opts: MockOptions = {}) {
     if (method === 'GET' || method === 'HEAD') {
       const rows = tableResponse(table, opts) as unknown[];
       const n = Array.isArray(rows) ? rows.length : 0;
+      // .single()/.maybeSingle() send Accept: application/vnd.pgrst.object+json
+      // and expect a SINGLE OBJECT, not an array. Honour that so the client's
+      // `data.field` reads work (else data is an array and fields are undefined).
+      const accept = req.headers()['accept'] || '';
+      const wantsObject = accept.includes('vnd.pgrst.object');
+      const body = wantsObject ? JSON.stringify(rows[0] ?? null) : JSON.stringify(rows);
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
         headers: { 'Content-Range': `0-${Math.max(0, n - 1)}/${n}` },
-        body: method === 'HEAD' ? '' : JSON.stringify(rows),
+        body: method === 'HEAD' ? '' : body,
       });
     }
     // INSERT/UPDATE/DELETE — return an empty 200/201
