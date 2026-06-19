@@ -563,9 +563,9 @@
     .cond-perfect  { background:rgba(250,204,21,.15); color:#fde047; border:1px solid rgba(250,204,21,.35); }
 
     .burger-btn {
-      position:absolute; left:14px; top:14px; z-index:30;
-      width:38px; height:38px; border-radius:50%;
-      background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2);
+      position:absolute; left:clamp(12px,2.5vw,20px); top:clamp(10px,2.5vw,18px); z-index:30;
+      width:42px; height:42px; border-radius:50%;
+      background:rgba(255,255,255,.1); border:1.5px solid rgba(255,255,255,.2);
       display:flex; align-items:center; justify-content:center; cursor:pointer;
     }
     .burger-btn:hover { background:rgba(255,255,255,.2); }
