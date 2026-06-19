@@ -57,3 +57,18 @@ test('empty name does not call the geocoder', async ({ gotoApp, page }) => {
   await page.waitForTimeout(200);
   expect(called).toBe(false);
 });
+
+test('non-numeric coordinates show a "no coordinates" message', async ({ gotoApp, page }) => {
+  // Defensive branch: a result row whose lat/lon aren't parseable.
+  await page.route(/.*nominatim\.openstreetmap\.org\/search.*/, (route) =>
+    route.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify([{ lat: 'x', lon: 'y', display_name: 'Weird Place' }]) }));
+  await gotoApp('signedIn');
+  await page.evaluate(() => {
+    (document.getElementById('suggestName') as HTMLInputElement).value = 'Weird Place';
+    // @ts-expect-error app global
+    return findCoordsFromName();
+  });
+  await expect(page.locator('#findCoordsStatus')).toContainText(/no coordinates/i);
+  await expect(page.locator('#suggestLat')).toHaveValue('');
+});
