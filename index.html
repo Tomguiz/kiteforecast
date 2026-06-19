@@ -578,7 +578,7 @@
       text-align:center; display:none;
     }
     .burger-dot.visible { display:block; }
-    #burgerOverlay { position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:200; display:flex; align-items:flex-start; justify-content:flex-start; }
+    #burgerOverlay { position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:400; display:flex; align-items:flex-start; justify-content:flex-start; }
     #burgerPanel { background:var(--surface); width:min(320px,82vw); height:100%; border-right:1px solid var(--border); display:flex; flex-direction:column; animation:burgerSlide .2s ease; overflow-y:auto; }
     @keyframes burgerSlide { from{transform:translateX(-100%)} to{transform:translateX(0)} }
     .burger-hdr { display:flex; align-items:center; justify-content:space-between; padding:16px 18px; border-bottom:1px solid var(--border); }
@@ -4370,7 +4370,7 @@ function toggleModalDayNotif(){
   if(mBell) mBell.className='notif-btn m-notif-btn'+(hasDayNotif(cachedLoc.name,_modalDateStr)?' active':'');
 }
 function handleOverlayClick(e){if(e.target===$('modalOverlay'))closeModal();}
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('modalOverlay').style.display==='flex')closeModal();else if(e.key==='Escape'&&$('notifSignupOverlay').style.display==='flex')closeNotifSignupModal();else if(e.key==='Escape'&&$('profileOverlay').style.display==='flex')closeProfilePanel();else if(e.key==='Escape'&&$('spotsMapOverlay').style.display==='flex')closeSpotsMap();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('modalOverlay').style.display==='flex')closeModal();else if(e.key==='Escape'&&$('notifSignupOverlay').style.display==='flex')closeNotifSignupModal();else if(e.key==='Escape'&&$('profileOverlay').style.display==='flex')closeProfilePanel();else if(e.key==='Escape'&&$('spotsMapOverlay').style.display==='flex')closeSpotsMap();else if(e.key==='Escape'&&$('burgerOverlay').style.display!=='none')closeBurger();});
 
 // ══════════════════════════════════
 //  SPOTS MAP
@@ -5102,7 +5102,7 @@ const SECTIONS = {
   friends: { title: 'Friends',       icon: '👥', badge: 'ppFriendReqCount', render: renderFriendsPanel },
   myspot:  { title: 'My Spot',       icon: '📍', badge: null,               render: renderMySpot },
   contrib: { title: 'Contributions', icon: '🎁', badge: 'ppContribCount',   render: renderMyContributions },
-  admin:   { title: '⚙️ Admin',      icon: '⚙️', badge: 'ppAdminCount',     render: renderAdminPanel },
+  admin:   { title: 'Admin',         icon: '⚙️', badge: 'ppAdminCount',     render: renderAdminPanel },
 };
 // Which optional sections are currently visible (mirrors the old tab visibility).
 function sectionVisible(key){
@@ -5121,7 +5121,7 @@ function renderBurgerList(){
       <span class="burger-item-badge" id="burger_${key}_badge"></span>
     </button>`;
   }).join('');
-  updateTabBadges(); // refresh counts into the new badge spans
+  updateTabBadges(); // recompute counts (burger badge spans are populated by _setTabBadge once wired)
 }
 function openBurger(){
   renderBurgerList();
