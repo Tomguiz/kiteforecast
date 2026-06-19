@@ -635,25 +635,6 @@
       display:flex; align-items:center; justify-content:space-between;
       padding:16px 18px 0; border-bottom:1px solid var(--border); flex-shrink:0;
     }
-    .pp-tabs { display:flex; gap:0; overflow-x:auto; scrollbar-width:none; -ms-overflow-style:none; position:relative; }
-    .pp-tabs::-webkit-scrollbar { display:none; }
-    .pp-tabs::after { content:'›'; position:sticky; right:0; top:0; bottom:0; padding:10px 6px; font-size:1.1rem; color:var(--accent); background:linear-gradient(to right, transparent, var(--surface) 60%); pointer-events:none; flex-shrink:0; display:none; }
-    .pp-tabs.has-scroll::after { display:block; }
-    .pp-tab {
-      background:none; border:none; cursor:pointer;
-      font-size:.82rem; font-weight:600; color:var(--gray);
-      padding:10px 12px; border-bottom:2px solid transparent;
-      transition:color .15s, border-color .15s; white-space:nowrap; flex-shrink:0;
-    }
-    @media(max-width:420px){
-      .pp-tab { font-size:.72rem; padding:10px 8px; }
-    }
-    .pp-tab.active { color:var(--accent); border-bottom-color:var(--accent); }
-    .pp-tab span {
-      display:inline-flex; align-items:center; justify-content:center;
-      background:var(--accent); color:#000; font-size:.6rem; font-weight:800;
-      width:16px; height:16px; border-radius:50%; margin-left:5px;
-    }
     .pp-close {
       background:none; border:1.5px solid var(--border); color:var(--gray);
       border-radius:7px; padding:5px 12px; cursor:pointer; font-size:.78rem; font-weight:600;
@@ -5101,12 +5082,12 @@ function renderSignInOnboarding(){
 // so they're HOISTED — referencing them here is fine even though some are defined
 // later in the file.
 const SECTIONS = {
-  notifs:  { title: 'Notifications', icon: '🔔', badge: 'ppNotifCount',     render: renderNotifList },
-  stats:   { title: 'Stats',         icon: '📊', badge: null,               render: renderStats },
-  friends: { title: 'Friends',       icon: '👥', badge: 'ppFriendReqCount', render: renderFriendsPanel },
-  myspot:  { title: 'My Spot',       icon: '📍', badge: null,               render: renderMySpot },
-  contrib: { title: 'Contributions', icon: '🎁', badge: 'ppContribCount',   render: renderMyContributions },
-  admin:   { title: 'Admin',         icon: '⚙️', badge: 'ppAdminCount',     render: renderAdminPanel },
+  notifs:  { title: 'Notifications', icon: '🔔', badge: 'ppNotifCount',     render: renderNotifList,        panel: 'ppPanelNotifs' },
+  stats:   { title: 'Stats',         icon: '📊', badge: null,               render: renderStats,            panel: 'ppPanelStats' },
+  friends: { title: 'Friends',       icon: '👥', badge: 'ppFriendReqCount', render: renderFriendsPanel,     panel: 'ppPanelFriends' },
+  myspot:  { title: 'My Spot',       icon: '📍', badge: null,               render: renderMySpot,           panel: 'ppPanelMySpot' },
+  contrib: { title: 'Contributions', icon: '🎁', badge: 'ppContribCount',   render: renderMyContributions,  panel: 'ppPanelContrib' },
+  admin:   { title: 'Admin',         icon: '⚙️', badge: 'ppAdminCount',     render: renderAdminPanel,       panel: 'ppPanelAdmin' },
 };
 // Which optional sections are currently visible (mirrors the old tab visibility).
 function sectionVisible(key){
@@ -5193,10 +5174,10 @@ function handleProfileOverlayClick(e){
 }
 // Show exactly one panel body in the overlay; hide the rest.
 function _showOnlyPanel(key){
-  const map={profile:'ppPanelProfile',notifs:'ppPanelNotifs',stats:'ppPanelStats',
-    myspot:'ppPanelMySpot',contrib:'ppPanelContrib',admin:'ppPanelAdmin',friends:'ppPanelFriends'};
-  Object.values(map).forEach(id=>{ const el=$(id); if(el) el.style.display='none'; });
-  const showEl=$(map[key]); if(showEl) showEl.style.display='block';
+  const ids=['ppPanelProfile', ...Object.values(SECTIONS).map(s=>s.panel)];
+  ids.forEach(id=>{ const el=$(id); if(el) el.style.display='none'; });
+  const showId = key==='profile' ? 'ppPanelProfile' : (SECTIONS[key] && SECTIONS[key].panel);
+  const showEl = showId ? $(showId) : null; if(showEl) showEl.style.display='block';
   ppCurrentTab=key;
 }
 // Open the Profile sheet (from the profile bubble).
@@ -7265,9 +7246,6 @@ async function syncPremiumFromSupabase(email){
   if(adminTab) adminTab.style.display=p.isAdmin?'inline-flex':'none';
   if(p.isAdmin && window._pendingReviewSpot) openAdminReview();
   if(p.isAdmin && window._pendingClaimId) openAdminClaim();
-  // Scroll hint: show arrow indicator on tabs if overflow
-  const tabsEl=document.querySelector('.pp-tabs');
-  if(tabsEl) tabsEl.classList.toggle('has-scroll', tabsEl.scrollWidth>tabsEl.clientWidth);
 }
 
 // Returns the signed-in user's access token (needed by JWT-protected functions).
@@ -7996,9 +7974,6 @@ function updateAuthUI(){
     _setAvatarPreview(avatarUrl);
     const initEl=$('ppAvatarInitials'); if(initEl&&!avatarUrl) initEl.textContent=getInitials(_authSession.user.email);
   }
-  // Hide tabs for unauthenticated users
-  const tabs=document.querySelector('.pp-tabs');
-  if(tabs) tabs.style.display=loggedIn?'flex':'none';
   // Update profile button
   const btn=$('profileBtn');
   if(loggedIn){
