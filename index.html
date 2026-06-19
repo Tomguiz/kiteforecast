@@ -589,6 +589,8 @@
     .burger-item-label { flex:1; }
     .burger-item-badge { min-width:18px; height:18px; padding:0 5px; box-sizing:border-box; border-radius:999px; background:#f87171; color:#fff; font-size:.65rem; font-weight:700; line-height:18px; text-align:center; display:none; }
     .burger-item-badge.visible { display:block; }
+    .pp-back { background:none; border:none; color:var(--accent); font-size:1.8rem; line-height:1; cursor:pointer; padding:0 8px 0 0; }
+    .pp-hdr-title { font-size:1rem; font-weight:800; color:var(--text); flex:1; }
 
     /* ── PROFILE BUTTON ── */
     .profile-btn {
@@ -1375,15 +1377,17 @@
 <div id="profileOverlay" style="display:none" onclick="handleProfileOverlayClick(event)">
   <div id="profilePanel">
     <div class="pp-hdr">
-      <div class="pp-tabs">
-        <button class="pp-tab active" id="ppTabProfile" onclick="switchPpTab('profile')">Profile</button>
-        <button class="pp-tab" id="ppTabNotifs" onclick="switchPpTab('notifs')">Notifications <span id="ppNotifCount" style="display:none;background:#f87171;color:#fff;border-radius:999px;font-size:.65rem;padding:1px 5px;margin-left:2px;font-weight:700"></span></button>
-        <button class="pp-tab" id="ppTabStats" onclick="switchPpTab('stats')">Stats</button>
-        <button class="pp-tab" id="ppTabFriends" onclick="switchPpTab('friends')">Friends <span id="ppFriendReqCount" style="display:none;background:#f87171;color:#fff;border-radius:999px;font-size:.65rem;padding:1px 5px;margin-left:2px;font-weight:700"></span></button>
-        <button class="pp-tab" id="ppTabMySpot" onclick="switchPpTab('myspot')" style="display:none">My Spot</button>
-        <button class="pp-tab" id="ppTabContrib" onclick="switchPpTab('contrib')" style="display:none">Contributions <span id="ppContribCount" style="display:none;background:#f87171;color:#fff;border-radius:999px;font-size:.65rem;padding:1px 5px;margin-left:2px;font-weight:700"></span></button>
-        <button class="pp-tab" id="ppTabAdmin" onclick="switchPpTab('admin')" style="display:none">⚙️ Admin <span id="ppAdminCount" style="display:none;background:#f87171;color:#fff;border-radius:999px;font-size:.65rem;padding:1px 5px;margin-left:2px;font-weight:700"></span></button>
-      </div>
+      <button class="pp-back" id="ppBackBtn" onclick="backToBurger()" style="display:none" aria-label="Back">‹</button>
+      <span class="pp-hdr-title" id="ppHdrTitle">Profile</span>
+      <!-- badge carriers kept (hidden) so updateTabBadges/_setTabBadge still find them -->
+      <span id="ppNotifCount" style="display:none"></span>
+      <span id="ppFriendReqCount" style="display:none"></span>
+      <span id="ppContribCount" style="display:none"></span>
+      <span id="ppAdminCount" style="display:none"></span>
+      <!-- visibility-flag carriers kept (hidden) so sectionVisible() still gates My Spot / Contributions / Admin in the burger -->
+      <span id="ppTabMySpot" style="display:none"></span>
+      <span id="ppTabContrib" style="display:none"></span>
+      <span id="ppTabAdmin" style="display:none"></span>
       <button class="pp-close" onclick="closeProfilePanel()">✕</button>
     </div>
     <div id="ppReauthBanner" style="display:none;margin:0 0 10px;padding:12px 14px;border-radius:10px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.35);font-size:.8rem;color:#fbbf24;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between">
@@ -5138,7 +5142,8 @@ function openProfilePanel(tab){
     $('profileOverlay').style.display='flex';
     document.body.style.overflow='hidden';
     _resetGoogleBtn(); // reset in case user cancelled OAuth and came back
-    switchPpTab(tab);
+    if(tab && tab!=='profile' && SECTIONS[tab]){ openSection(tab); return; }
+    openProfileSheet();
     const _p=loadProfile();
     const _ni=$('ppNicknameInput'); if(_ni) _ni.value=_p.nickname||'';
     // Set save button initial state: dim if nickname already saved, default if not yet set
@@ -5186,35 +5191,40 @@ function closeProfilePanel(){
 function handleProfileOverlayClick(e){
   if(e.target===$('profileOverlay'))closeProfilePanel();
 }
-function switchPpTab(tab){
-  ppCurrentTab=tab;
-  $('ppTabProfile').classList.toggle('active',tab==='profile');
-  $('ppTabNotifs').classList.toggle('active',tab==='notifs');
-  $('ppTabStats').classList.toggle('active',tab==='stats');
-  $('ppTabMySpot').classList.toggle('active',tab==='myspot');
-  if($('ppTabContrib'))  $('ppTabContrib').classList.toggle('active',tab==='contrib');
-  if($('ppTabAdmin'))    $('ppTabAdmin').classList.toggle('active',tab==='admin');
-  if($('ppTabFriends'))  $('ppTabFriends').classList.toggle('active',tab==='friends');
-  $('ppPanelProfile').style.display=tab==='profile'?'block':'none';
-  $('ppPanelNotifs').style.display=tab==='notifs'?'block':'none';
-  $('ppPanelStats').style.display=tab==='stats'?'block':'none';
-  $('ppPanelMySpot').style.display=tab==='myspot'?'block':'none';
-  if($('ppPanelContrib'))  $('ppPanelContrib').style.display=tab==='contrib'?'block':'none';
-  if($('ppPanelAdmin'))    $('ppPanelAdmin').style.display=tab==='admin'?'block':'none';
-  if($('ppPanelFriends'))  $('ppPanelFriends').style.display=tab==='friends'?'block':'none';
-  if(tab==='notifs')  renderNotifList();
-  if(tab==='stats')   renderStats();
-  if(tab==='myspot')  renderMySpot();
-  if(tab==='contrib') renderMyContributions();
-  if(tab==='admin')   renderAdminPanel();
-  if(tab==='friends') renderFriendsPanel();
-  // Mark "seen" tabs as read on open, then refresh badges
-  if(tab==='notifs'){
-    try{ localStorage.setItem('kf_notifsSeenAt', Date.now()); }catch{}
-    _setTabBadge('ppNotifCount',0);
-  }
-  if(tab==='contrib') markContributionsSeen();
+// Show exactly one panel body in the overlay; hide the rest.
+function _showOnlyPanel(key){
+  const map={profile:'ppPanelProfile',notifs:'ppPanelNotifs',stats:'ppPanelStats',
+    myspot:'ppPanelMySpot',contrib:'ppPanelContrib',admin:'ppPanelAdmin',friends:'ppPanelFriends'};
+  Object.values(map).forEach(id=>{ const el=$(id); if(el) el.style.display='none'; });
+  const showEl=$(map[key]); if(showEl) showEl.style.display='block';
+  ppCurrentTab=key;
+}
+// Open the Profile sheet (from the profile bubble).
+function openProfileSheet(){
+  $('profileOverlay').style.display='flex';
+  document.body.style.overflow='hidden';
+  $('ppBackBtn').style.display='none';
+  $('ppHdrTitle').textContent='Profile';
+  _showOnlyPanel('profile');
+}
+// Open a feature section full-screen (from the burger). Reuses the overlay.
+function openSection(key){
+  const s=SECTIONS[key]; if(!s) return;
+  closeBurger();
+  $('profileOverlay').style.display='flex';
+  document.body.style.overflow='hidden';
+  $('ppBackBtn').style.display='block';
+  $('ppHdrTitle').textContent=s.title;
+  _showOnlyPanel(key);
+  s.render();
+  if(key==='notifs'){ try{ localStorage.setItem('kf_notifsSeenAt', Date.now()); }catch{} _setTabBadge('ppNotifCount',0); }
+  if(key==='contrib') markContributionsSeen();
   updateTabBadges();
+}
+// Back arrow: close the section, reopen the burger list.
+function backToBurger(){
+  $('profileOverlay').style.display='none';
+  openBurger();
 }
 
 // Mark all currently-reviewed contributions as acknowledged so the badge clears.
@@ -5392,7 +5402,7 @@ async function openOwnerEditFromMySpot(spotName){
   };
   // Render the edit form inline in the My Spot panel (avoids admin access-denied check)
   window._ownerEditMode=true;
-  switchPpTab('myspot');
+  openSection('myspot');
   const ownerEl=$('ownerEditForm');
   const contentEl=$('ppMySpotContent');
   if(ownerEl&&contentEl){
@@ -6369,9 +6379,10 @@ async function cancelFriendRequest(id){
 }
 
 function _setTabBadge(id,count){
-  const b=$(id); if(!b) return;
-  b.textContent=count||0;
-  b.style.display=count>0?'inline':'none';
+  const b=$(id); if(b){ b.textContent=count||0; b.style.display=count>0?'inline':'none'; }
+  // mirror onto the burger list item badge, if present
+  const key=Object.keys(SECTIONS).find(k=>SECTIONS[k].badge===id);
+  if(key){ const bb=$('burger_'+key+'_badge'); if(bb){ bb.textContent=count||0; bb.classList.toggle('visible',count>0); } }
   recomputeProfileBtnBadge();
 }
 
@@ -6389,6 +6400,8 @@ function recomputeProfileBtnBadge(){
     d.textContent=total>99?'99+':String(total);
     d.classList.toggle('visible',total>0);
   });
+  // Mirror the same total onto the burger icon.
+  const bd=$('burgerDot'); if(bd){ bd.textContent=total>99?'99+':String(total); bd.classList.toggle('visible',total>0); }
 }
 
 // ── Tab badges ────────────────────────────────────────────────────────────────
