@@ -17,14 +17,15 @@
   <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
   <script src="https://accounts.google.com/gsi/client" async></script>
   <script>
-  // Eagerly init Supabase client so detectSessionInUrl catches #access_token before anything strips the hash
+  // Eagerly init Supabase client so the persisted session is restored ASAP and
+  // detectSessionInUrl can handle any auth params before the page reworks the URL.
   window._sbEarlyInit=(function(){
     try{
       if(!window.supabase) return null;
       const SB_URL='https://kpwmajtxmcfpakvonimf.supabase.co';
       const SB_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwd21hanR4bWNmcGFrdm9uaW1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTcyMjYsImV4cCI6MjA5MDczMzIyNn0.QfQuIQbnfVUOApPbOdvCRbNsVdb0SBAwMX-hvioGJmg';
       return window.supabase.createClient(SB_URL, SB_ANON, {
-        auth:{ persistSession:true, autoRefreshToken:true, detectSessionInUrl:true, storageKey:'kf-auth', flowType:'implicit' }
+        auth:{ persistSession:true, autoRefreshToken:true, detectSessionInUrl:true, storageKey:'kf-auth', flowType:'pkce' }
       });
     }catch(e){ return null; }
   })();
@@ -4362,7 +4363,11 @@ function getSb(){
         detectSessionInUrl:true,
         storageKey:        'kf-auth',
         storage:           kfStorage,
-        flowType:          'implicit',
+        // PKCE (not implicit): sign-in here is codeless (Google signInWithIdToken
+        // + email verifyOtp), both of which return refresh tokens directly. PKCE
+        // gives the session manager proper refresh-token handling, improving
+        // session persistence (esp. iOS PWA) vs. the old vestigial implicit flow.
+        flowType:          'pkce',
       }
     });
   }
