@@ -1215,14 +1215,14 @@
         </div>
 
         <div>
-          <label class="pp-label">Coordinates <span style="color:#f87171">*</span> <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(paste from Google Maps)</span></label>
+          <label class="pp-label">Coordinates <span style="color:#f87171">*</span> <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(use 📍 Find coordinates above, or enter manually)</span></label>
           <input type="text" id="suggestCoords" class="pp-input" placeholder="e.g. 51.361390, 3.327422" oninput="splitCoords(this.value)"/>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px">
             <input type="text" id="suggestLat" class="pp-input" placeholder="Latitude" style="font-size:.78rem;opacity:.7"/>
             <input type="text" id="suggestLon" class="pp-input" placeholder="Longitude" style="font-size:.78rem;opacity:.7"/>
           </div>
         </div>
-        <a href="https://maps.google.com" target="_blank" rel="noopener" id="suggestMapsLink" onclick="this.href=spotMapsSearchUrl()" style="display:inline-flex;align-items:center;gap:5px;margin-top:-4px;padding:6px 12px;background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.25);border-radius:8px;font-size:.72rem;font-weight:700;color:var(--accent);text-decoration:none">📍 Open Google Maps → long-press the spot → tap the coordinates → copy</a>
+        <a href="https://maps.google.com" target="_blank" rel="noopener" id="suggestMapsLink" onclick="this.href=spotMapsSearchUrl()" style="display:inline-flex;align-items:center;gap:5px;margin-top:-4px;padding:6px 12px;background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.25);border-radius:8px;font-size:.72rem;font-weight:700;color:var(--accent);text-decoration:none">🗺️ Or check the location on Google Maps</a>
 
         <div>
           <label class="pp-label">Good wind directions <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(optional — tap to toggle)</span></label>
