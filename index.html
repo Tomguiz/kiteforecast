@@ -623,7 +623,10 @@
     }
     @media (max-width:599px) {
       #profileOverlay { align-items:flex-end; }
-      #profilePanel { width:100%; border-radius:20px 20px 0 0; max-height:min(85vh,85dvh); }
+      /* Fixed height so every section/panel opens at the same size regardless of
+         content — no more short panels for empty sections vs. tall ones. The
+         .pp-body (flex:1, overflow-y:auto) scrolls within this fixed frame. */
+      #profilePanel { width:100%; border-radius:20px 20px 0 0; height:80dvh; max-height:80dvh; }
     }
     #profilePanel {
       background:var(--surface); border-left:1px solid var(--border);
