@@ -19,13 +19,39 @@
   <script>
   // Eagerly init Supabase client so the persisted session is restored ASAP and
   // detectSessionInUrl can handle any auth params before the page reworks the URL.
+  // This is the client the app actually uses (getSb() reuses it), so it MUST use
+  // the cookie-mirrored storage — iOS Safari/PWA clears localStorage after ~7
+  // days, and the session (incl. PKCE code-verifier) would be lost otherwise.
+  // Defined inline because this runs before the rest of the script loads.
+  window._kfEarlyStorage=(function(){
+    var DAYS=30;
+    // Per-key cookie name: PKCE writes BOTH 'kf-auth' and 'kf-auth-code-verifier'
+    // through this adapter, so they must mirror to DISTINCT cookies, not clobber one.
+    var ck=function(k){ return 'kfc_'+k.replace(/[^a-zA-Z0-9_-]/g,'_'); };
+    return {
+      getItem:function(k){
+        try{ var ls=localStorage.getItem(k); if(ls) return ls; }catch(e){}
+        try{ var m=document.cookie.match('(?:^|; )'+ck(k)+'=([^;]*)');
+          if(m){ var v=decodeURIComponent(m[1]); try{ localStorage.setItem(k,v); }catch(e){} return v; } }catch(e){}
+        return null;
+      },
+      setItem:function(k,v){
+        try{ localStorage.setItem(k,v); }catch(e){}
+        try{ document.cookie=ck(k)+'='+encodeURIComponent(v)+'; max-age='+(DAYS*86400)+'; path=/; SameSite=Lax'; }catch(e){}
+      },
+      removeItem:function(k){
+        try{ localStorage.removeItem(k); }catch(e){}
+        try{ document.cookie=ck(k)+'=; max-age=0; path=/; SameSite=Lax'; }catch(e){}
+      }
+    };
+  })();
   window._sbEarlyInit=(function(){
     try{
       if(!window.supabase) return null;
       const SB_URL='https://kpwmajtxmcfpakvonimf.supabase.co';
       const SB_ANON='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwd21hanR4bWNmcGFrdm9uaW1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTcyMjYsImV4cCI6MjA5MDczMzIyNn0.QfQuIQbnfVUOApPbOdvCRbNsVdb0SBAwMX-hvioGJmg';
       return window.supabase.createClient(SB_URL, SB_ANON, {
-        auth:{ persistSession:true, autoRefreshToken:true, detectSessionInUrl:true, storageKey:'kf-auth', flowType:'pkce' }
+        auth:{ persistSession:true, autoRefreshToken:true, detectSessionInUrl:true, storageKey:'kf-auth', flowType:'pkce', storage:window._kfEarlyStorage }
       });
     }catch(e){ return null; }
   })();
@@ -4349,11 +4375,14 @@ function getSb(){
     if(window._sbEarlyInit){ _sb=window._sbEarlyInit; window._sbEarlyInit=null; return _sb; }
     if(!window.supabase){ console.error('Supabase SDK not loaded'); return null; }
     // One-time migration: pull old default Supabase localStorage key into kfStorage
+    // Use the SAME storage adapter as the early-init client (per-key cookie
+    // mirror), so both clients agree and the session survives iOS storage clears.
+    const _store = window._kfEarlyStorage || kfStorage;
     try{
       const OLD = 'sb-kpwmajtxmcfpakvonimf-auth-token';
-      if(!kfStorage.getItem('kf-auth')){
+      if(!_store.getItem('kf-auth')){
         const legacy = localStorage.getItem(OLD) || localStorage.getItem('kf-auth');
-        if(legacy) kfStorage.setItem('kf-auth', legacy);
+        if(legacy) _store.setItem('kf-auth', legacy);
       }
     }catch(e){}
     _sb = window.supabase.createClient(SB_URL, SB_ANON, {
@@ -4362,7 +4391,7 @@ function getSb(){
         autoRefreshToken:  true,
         detectSessionInUrl:true,
         storageKey:        'kf-auth',
-        storage:           kfStorage,
+        storage:           _store,
         // PKCE (not implicit): sign-in here is codeless (Google signInWithIdToken
         // + email verifyOtp), both of which return refresh tokens directly. PKCE
         // gives the session manager proper refresh-token handling, improving
