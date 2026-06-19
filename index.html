@@ -1191,7 +1191,7 @@
             <input type="text" id="suggestName" class="pp-input" placeholder="e.g. Koksijde Beach" style="flex:1"/>
             <button type="button" id="findCoordsBtn" onclick="findCoordsFromName()" style="flex-shrink:0;padding:10px 14px;border-radius:10px;border:1.5px solid var(--accent);background:rgba(0,212,255,.1);color:var(--accent);font-size:.78rem;font-weight:700;cursor:pointer;white-space:nowrap">📍 Find coordinates</button>
           </div>
-          <div id="findCoordsStatus" style="font-size:.72rem;color:var(--tdim);margin-top:4px;display:none"></div>
+          <div id="findCoordsStatus" role="status" aria-live="polite" style="font-size:.72rem;color:var(--tdim);margin-top:4px;display:none"></div>
         </div>
 
         <div>
@@ -5727,7 +5727,7 @@ async function findCoordsFromName(){
   if(status){ status.style.display='block'; status.style.color='var(--tdim)'; status.textContent='Searching for the spot…'; }
   try{
     const url='https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(q);
-    const res=await fetch(url,{headers:{'Accept':'application/json'}});
+    const res=await fetch(url,{headers:{'Accept':'application/json'},signal:AbortSignal.timeout(10000)});
     if(!res.ok) throw new Error('http '+res.status);
     const arr=await res.json();
     if(!Array.isArray(arr)||!arr.length){
@@ -5744,7 +5744,7 @@ async function findCoordsFromName(){
     if($('suggestLat')) $('suggestLat').value=latStr;
     if($('suggestLon')) $('suggestLon').value=lonStr;
     if($('suggestCoords')) $('suggestCoords').value=latStr+', '+lonStr;
-    if(status){ status.innerHTML='✓ Found: '+(top.display_name||name)+' <span style="color:var(--tdim)">('+latDisp+', '+lonDisp+')</span> — not the right place? edit the fields manually.'; status.style.color='#4ade80'; }
+    if(status){ status.textContent='✓ Found: '+(top.display_name||name)+' ('+latDisp+', '+lonDisp+') — not the right place? edit the fields manually.'; status.style.color='#4ade80'; }
   }catch(e){
     if(status){ status.textContent='⚠️ Couldn\'t reach the geocoder — enter coordinates manually.'; status.style.color='#f59e0b'; }
   }finally{
