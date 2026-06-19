@@ -578,6 +578,17 @@
       text-align:center; display:none;
     }
     .burger-dot.visible { display:block; }
+    #burgerOverlay { position:fixed; inset:0; background:rgba(0,0,0,.6); z-index:200; display:flex; align-items:flex-start; justify-content:flex-start; }
+    #burgerPanel { background:var(--surface); width:min(320px,82vw); height:100%; border-right:1px solid var(--border); display:flex; flex-direction:column; animation:burgerSlide .2s ease; overflow-y:auto; }
+    @keyframes burgerSlide { from{transform:translateX(-100%)} to{transform:translateX(0)} }
+    .burger-hdr { display:flex; align-items:center; justify-content:space-between; padding:16px 18px; border-bottom:1px solid var(--border); }
+    .burger-title { font-size:1rem; font-weight:800; color:var(--text); }
+    .burger-item { display:flex; align-items:center; gap:12px; width:100%; padding:14px 18px; background:none; border:none; border-bottom:1px solid var(--border); color:var(--text); font-size:.9rem; font-weight:600; cursor:pointer; text-align:left; }
+    .burger-item:hover { background:var(--card-hov); }
+    .burger-item-icon { font-size:1.1rem; width:24px; text-align:center; flex-shrink:0; }
+    .burger-item-label { flex:1; }
+    .burger-item-badge { min-width:18px; height:18px; padding:0 5px; box-sizing:border-box; border-radius:999px; background:#f87171; color:#fff; font-size:.65rem; font-weight:700; line-height:18px; text-align:center; display:none; }
+    .burger-item-badge.visible { display:block; }
 
     /* ── PROFILE BUTTON ── */
     .profile-btn {
@@ -1635,6 +1646,17 @@
       </div>
 
     </div>
+  </div>
+</div>
+
+<!-- ══ BURGER MENU ══ -->
+<div id="burgerOverlay" style="display:none" onclick="if(event.target===this)closeBurger()">
+  <div id="burgerPanel">
+    <div class="burger-hdr">
+      <span class="burger-title">Menu</span>
+      <button class="pp-close" onclick="closeBurger()" aria-label="Close">✕</button>
+    </div>
+    <div id="burgerList"></div>
   </div>
 </div>
 
@@ -5069,6 +5091,46 @@ function renderSignInOnboarding(){
     ctx.style.display='none';
     if(div) div.style.display='none';
   }
+}
+// Section registry — single source of truth for the burger menu + section view.
+// NOTE: the render fns (renderStats etc.) are top-level `function` declarations,
+// so they're HOISTED — referencing them here is fine even though some are defined
+// later in the file.
+const SECTIONS = {
+  notifs:  { title: 'Notifications', icon: '🔔', badge: 'ppNotifCount',     render: renderNotifList },
+  stats:   { title: 'Stats',         icon: '📊', badge: null,               render: renderStats },
+  friends: { title: 'Friends',       icon: '👥', badge: 'ppFriendReqCount', render: renderFriendsPanel },
+  myspot:  { title: 'My Spot',       icon: '📍', badge: null,               render: renderMySpot },
+  contrib: { title: 'Contributions', icon: '🎁', badge: 'ppContribCount',   render: renderMyContributions },
+  admin:   { title: '⚙️ Admin',      icon: '⚙️', badge: 'ppAdminCount',     render: renderAdminPanel },
+};
+// Which optional sections are currently visible (mirrors the old tab visibility).
+function sectionVisible(key){
+  if(key==='myspot')  return $('ppTabMySpot')  && $('ppTabMySpot').style.display!=='none';
+  if(key==='contrib') return $('ppTabContrib') && $('ppTabContrib').style.display!=='none';
+  if(key==='admin')   return !!loadProfile().isAdmin;
+  return true; // notifs, stats, friends always listed
+}
+function renderBurgerList(){
+  const el=$('burgerList'); if(!el) return;
+  el.innerHTML=Object.keys(SECTIONS).filter(sectionVisible).map(key=>{
+    const s=SECTIONS[key];
+    return `<button class="burger-item" onclick="openSection('${key}')">
+      <span class="burger-item-icon">${s.icon}</span>
+      <span class="burger-item-label">${s.title}</span>
+      <span class="burger-item-badge" id="burger_${key}_badge"></span>
+    </button>`;
+  }).join('');
+  updateTabBadges(); // refresh counts into the new badge spans
+}
+function openBurger(){
+  renderBurgerList();
+  $('burgerOverlay').style.display='flex';
+  document.body.style.overflow='hidden';
+}
+function closeBurger(){
+  $('burgerOverlay').style.display='none';
+  document.body.style.overflow='';
 }
 function openProfilePanel(tab){
   try{
