@@ -431,7 +431,10 @@
     .m-close:hover { border-color:var(--accent); color:var(--accent); }
     /* drag handle on mobile */
     .m-handle { display:none; width:36px; height:4px; background:var(--border); border-radius:99px; margin:10px auto 0; }
-    @media (max-width:599px) { .m-handle { display:block; } }
+    @media (max-width:599px) {
+      .m-handle { display:block; width:44px; height:5px; padding:8px 30px; box-sizing:content-box; margin:6px auto 0; background-clip:content-box; cursor:grab; touch-action:none; }
+      .m-hdr { touch-action:pan-x; }
+    }
 
     /* session strip */
     .m-session {
@@ -4232,12 +4235,56 @@ function closeModal(){
   const as=$('mAttendStatus'); if(as) as.style.display='none';
   $('searchInput').blur();
   _attendSessionStart=null; _attendDateStr=null;
+  // Reset any swipe transform so the next open starts clean
+  const m=$('modal'); if(m){ m.style.transition=''; m.style.transform=''; }
   // Restore background scroll position
   const scrollY=parseInt(document.body.dataset.scrollY||'0',10);
   document.body.style.position='';
   document.body.style.top='';
   document.body.style.width='';
   window.scrollTo(0,scrollY);
+}
+
+// Swipe-down-to-dismiss for the mobile day modal (the drag handle implies it).
+// Bound to the handle + header only, so it never fights the scrollable hour list.
+function setupModalSwipe(){
+  const modal=$('modal'); const overlay=$('modalOverlay');
+  if(!modal||!overlay) return;
+  const grip=modal.querySelector('.m-handle'); const hdr=modal.querySelector('.m-hdr');
+  let startY=0, dy=0, dragging=false;
+
+  const onStart=(e)=>{
+    if(window.innerWidth>599) return;            // bottom-sheet gesture is mobile-only
+    startY=e.touches[0].clientY; dy=0; dragging=true;
+    modal.style.transition='none';
+  };
+  const onMove=(e)=>{
+    if(!dragging) return;
+    dy=e.touches[0].clientY-startY;
+    if(dy<0) dy=0;                                // only allow downward drag
+    if(dy>0 && e.cancelable) e.preventDefault();  // stop background scroll while dragging
+    modal.style.transform=`translateY(${dy}px)`;
+    overlay.style.background=`rgba(0,0,0,${Math.max(0,0.6-dy/600)})`;
+  };
+  const onEnd=()=>{
+    if(!dragging) return; dragging=false;
+    modal.style.transition='transform .22s cubic-bezier(.22,.68,0,1.2)';
+    overlay.style.background='';
+    if(dy>120){                                   // past threshold → close
+      modal.style.transform='translateY(100%)';
+      setTimeout(closeModal,200);
+    }else{
+      modal.style.transform='translateY(0)';      // snap back
+    }
+  };
+
+  [grip,hdr].forEach(el=>{
+    if(!el) return;
+    el.addEventListener('touchstart',onStart,{passive:true});
+    el.addEventListener('touchmove',onMove,{passive:false});
+    el.addEventListener('touchend',onEnd);
+    el.addEventListener('touchcancel',onEnd);
+  });
 }
 function updateModalFavBtn(){
   const btn=$('mFavBtn'); if(!btn||!cachedLoc) return;
@@ -8572,6 +8619,7 @@ function initSpotsMap(){
 
 // ── INIT ──
 updateProfileDot();
+setupModalSwipe();
 $('ppMasterToggle').classList.toggle('on', notifMasterEnabled());
 
 // Wire persistent attend bar buttons
