@@ -1,3 +1,11 @@
+// ⚠️ STRIPE DASHBOARD REQUIREMENT:
+// The app uses ONE-TIME payments (mode:'payment'), so premium is granted in the
+// `checkout.session.completed` case below. The Stripe webhook endpoint MUST have
+// `checkout.session.completed` in its enabled events — otherwise paid users
+// never get is_premium=true (the bug that left every payer needing a manual fix
+// until 2026-06-19). Enabled events should include at least:
+//   checkout.session.completed   ← REQUIRED for premium grant
+//   customer.subscription.{created,updated,deleted}, invoice.payment_failed
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import Stripe from 'https://esm.sh/stripe@14?target=deno'
 
