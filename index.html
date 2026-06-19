@@ -562,6 +562,23 @@
     .cond-excellent{ background:rgba(0,212,255,.15);  color:#67e8f9; border:1px solid rgba(0,212,255,.35); }
     .cond-perfect  { background:rgba(250,204,21,.15); color:#fde047; border:1px solid rgba(250,204,21,.35); }
 
+    .burger-btn {
+      position:absolute; left:14px; top:14px; z-index:30;
+      width:38px; height:38px; border-radius:50%;
+      background:rgba(255,255,255,.1); border:1px solid rgba(255,255,255,.2);
+      display:flex; align-items:center; justify-content:center; cursor:pointer;
+    }
+    .burger-btn:hover { background:rgba(255,255,255,.2); }
+    .burger-btn svg { stroke:rgba(255,255,255,.7); display:block; }
+    .burger-dot {
+      position:absolute; top:-4px; right:-4px;
+      min-width:16px; height:16px; padding:0 4px; box-sizing:border-box;
+      border-radius:999px; background:#f87171; border:2px solid var(--bg);
+      color:#fff; font-size:.6rem; font-weight:800; line-height:12px;
+      text-align:center; display:none;
+    }
+    .burger-dot.visible { display:block; }
+
     /* ── PROFILE BUTTON ── */
     .profile-btn {
       position:absolute; top:clamp(10px,2.5vw,18px); right:clamp(12px,2.5vw,20px);
@@ -1061,6 +1078,10 @@
 <header class="hero">
   <button class="home-btn" onclick="logoEasterEgg()" title="Home">
     <img src="logo.png" alt="Tichkes" class="site-logo" onerror="this.style.display='none'">
+  </button>
+  <button class="burger-btn" id="burgerBtn" onclick="openBurger()" title="Menu" aria-label="Menu">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
+    <span class="burger-dot" id="burgerDot"></span>
   </button>
   <button class="profile-btn" onclick="_signinContext='generic';openProfilePanel()" title="Profile &amp; Notifications" id="profileBtn">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
