@@ -7225,8 +7225,27 @@ async function savePhone(){
         await syncPremiumFromSupabase(email);
         if(isPremium()) break;
       }
+      // Safety net: if the webhook hasn't set premium (mis-set events, downtime,
+      // customer-id mismatch), self-heal by verifying the payment with Stripe.
+      if(!isPremium()){
+        try{
+          const token=await _userToken();
+          if(token){
+            await fetch('https://kpwmajtxmcfpakvonimf.supabase.co/functions/v1/verify-premium',{
+              method:'POST',
+              headers:{'Content-Type':'application/json','apikey':SB_ANON,'Authorization':`Bearer ${token}`},
+            });
+            await syncPremiumFromSupabase(email);
+          }
+        }catch(e){ console.warn('[premium] verify-premium fallback failed',e); }
+      }
     }
-    showToast('👑 Welcome to Premium! SMS alerts are now active.');
+    if(isPremium()){
+      showToast('👑 Welcome to Premium! SMS alerts are now active.');
+    }else{
+      // Payment may still be processing — don't falsely claim premium.
+      showToast('✓ Payment received — premium will activate shortly. Reopen the app if it doesn\'t appear.',5000);
+    }
     openProfilePanel('profile');
   } else if(params.get('premium')==='cancelled'){
     history.replaceState({},'',location.pathname);

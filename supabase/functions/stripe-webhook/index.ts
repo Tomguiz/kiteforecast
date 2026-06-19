@@ -25,7 +25,13 @@ Deno.serve(async (req) => {
   }
 
   const setPremium = async (customerId: string, isPremium: boolean) => {
-    await supabase.from('profiles').update({ is_premium: isPremium }).eq('stripe_customer_id', customerId)
+    // .select() returns the affected rows so we can detect a no-op (e.g. a
+    // customer id with no matching profile) instead of failing silently.
+    const { data, error } = await supabase.from('profiles')
+      .update({ is_premium: isPremium }).eq('stripe_customer_id', customerId).select('email')
+    if (error) console.error(`[webhook] setPremium error for ${customerId}:`, error.message)
+    else if (!data || data.length === 0) console.error(`[webhook] setPremium matched 0 profiles for customer ${customerId} (premium=${isPremium}) — possible customer-id mismatch`)
+    else console.log(`[webhook] setPremium ${isPremium} for ${data.map((r) => r.email).join(',')}`)
   }
 
   switch (event.type) {
