@@ -14,3 +14,58 @@ test('premium user does not see the upgrade block', async ({ gotoApp, page }) =>
   });
   expect(hidden).toBe(true);
 });
+
+test('premium user can open a feature detail popup from a grid tile', async ({ gotoApp, page }) => {
+  await gotoApp('premium');
+  await page.waitForTimeout(300);
+  await page.locator('#profileBtn').click();
+  await expect(page.locator('#profileOverlay')).toBeVisible();
+  await page.locator('#ppPremiumGrid .premium-feature-tile[data-feature="tides"]').click();
+  await expect(page.locator('#featureModalOverlay')).toBeVisible();
+  await expect(page.locator('#featureModalTitle')).toHaveText('Tide times');
+  await expect(page.locator('#featureModalBlurb')).toContainText('tide schedule');
+});
+
+test('non-premium user can open a feature detail popup from the upgrade list', async ({ gotoApp, page }) => {
+  await gotoApp('signedIn');
+  await page.locator('#profileBtn').click();
+  await expect(page.locator('#profileOverlay')).toBeVisible();
+  await page.locator('#ppUpgradeFeatures .premium-feature-row[data-feature="favs"]').click();
+  await expect(page.locator('#featureModalOverlay')).toBeVisible();
+  await expect(page.locator('#featureModalTitle')).toHaveText('Unlimited fav spots');
+  await expect(page.locator('#featureModalBlurb')).toContainText('favourite spots');
+});
+
+test('the feature popup closes via the X button and leaves the profile panel open', async ({ gotoApp, page }) => {
+  await gotoApp('premium');
+  await page.waitForTimeout(300);
+  await page.locator('#profileBtn').click();
+  await page.locator('#ppPremiumGrid .premium-feature-tile[data-feature="favs"]').click();
+  await expect(page.locator('#featureModalOverlay')).toBeVisible();
+  await page.locator('#featureModal .m-close').click();
+  await expect(page.locator('#featureModalOverlay')).toBeHidden();
+  await expect(page.locator('#profileOverlay')).toBeVisible();
+});
+
+test('the feature popup closes via backdrop click', async ({ gotoApp, page }) => {
+  await gotoApp('premium');
+  await page.waitForTimeout(300);
+  await page.locator('#profileBtn').click();
+  await page.locator('#ppPremiumGrid .premium-feature-tile[data-feature="favs"]').click();
+  await expect(page.locator('#featureModalOverlay')).toBeVisible();
+  // click the overlay itself (top-left corner avoids the centered card)
+  await page.locator('#featureModalOverlay').click({ position: { x: 5, y: 5 } });
+  await expect(page.locator('#featureModalOverlay')).toBeHidden();
+  await expect(page.locator('#profileOverlay')).toBeVisible();
+});
+
+test('the feature popup closes via Escape and leaves the profile panel open', async ({ gotoApp, page }) => {
+  await gotoApp('premium');
+  await page.waitForTimeout(300);
+  await page.locator('#profileBtn').click();
+  await page.locator('#ppPremiumGrid .premium-feature-tile[data-feature="favs"]').click();
+  await expect(page.locator('#featureModalOverlay')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#featureModalOverlay')).toBeHidden();
+  await expect(page.locator('#profileOverlay')).toBeVisible();
+});

@@ -427,6 +427,14 @@
     @keyframes mFadeIn  { from{opacity:0} to{opacity:1} }
     @keyframes mSlideUp { from{transform:translateY(40px);opacity:0} to{transform:translateY(0);opacity:1} }
 
+    .feature-modal-overlay { z-index:500; }
+    .feature-modal {
+      position:relative; max-width:340px; width:calc(100% - 32px);
+      background:var(--panel,#0f1626); border:1px solid rgba(245,158,11,.25);
+      border-radius:14px; padding:22px 20px 20px; text-align:left;
+      box-shadow:0 12px 40px rgba(0,0,0,.5);
+    }
+
     .modal {
       background:var(--surface); border:1px solid var(--border);
       width:100%; max-width:760px; max-height:min(95vh,95dvh);
@@ -1635,6 +1643,16 @@
       </div>
 
     </div>
+  </div>
+</div>
+
+<!-- ══ FEATURE DETAIL MODAL ══ -->
+<div id="featureModalOverlay" class="modal-overlay feature-modal-overlay" style="display:none" onclick="handleFeatureOverlayClick(event)">
+  <div class="feature-modal" id="featureModal" role="dialog" aria-modal="true" aria-labelledby="featureModalTitle">
+    <button class="m-close" onclick="closeFeatureModal()" aria-label="Close" style="position:absolute;top:8px;right:10px">✕</button>
+    <div id="featureModalEmoji" style="font-size:2rem;line-height:1;margin-bottom:6px"></div>
+    <h3 id="featureModalTitle" style="margin:0 0 8px;font-size:1rem;color:#f59e0b"></h3>
+    <p id="featureModalBlurb" style="margin:0;font-size:.82rem;color:var(--gray);line-height:1.5"></p>
   </div>
 </div>
 
@@ -4359,7 +4377,7 @@ function toggleModalDayNotif(){
   if(mBell) mBell.className='notif-btn m-notif-btn'+(hasDayNotif(cachedLoc.name,_modalDateStr)?' active':'');
 }
 function handleOverlayClick(e){if(e.target===$('modalOverlay'))closeModal();}
-document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('modalOverlay').style.display==='flex')closeModal();else if(e.key==='Escape'&&$('notifSignupOverlay').style.display==='flex')closeNotifSignupModal();else if(e.key==='Escape'&&$('profileOverlay').style.display==='flex')closeProfilePanel();else if(e.key==='Escape'&&$('spotsMapOverlay').style.display==='flex')closeSpotsMap();else if(e.key==='Escape'&&$('burgerOverlay').style.display!=='none')closeBurger();});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&$('featureModalOverlay').style.display==='flex'){closeFeatureModal();return;}if(e.key==='Escape'&&$('modalOverlay').style.display==='flex')closeModal();else if(e.key==='Escape'&&$('notifSignupOverlay').style.display==='flex')closeNotifSignupModal();else if(e.key==='Escape'&&$('profileOverlay').style.display==='flex')closeProfilePanel();else if(e.key==='Escape'&&$('spotsMapOverlay').style.display==='flex')closeSpotsMap();else if(e.key==='Escape'&&$('burgerOverlay').style.display!=='none')closeBurger();});
 
 // ══════════════════════════════════
 //  SPOTS MAP
@@ -7287,6 +7305,16 @@ function renderPremiumFeatureLists(){
     }
   }
 }
+
+function openFeatureModal(key){
+  const f=PREMIUM_FEATURES.find(x=>x.key===key); if(!f) return;
+  $('featureModalEmoji').textContent=f.emoji;
+  $('featureModalTitle').textContent=f.label;
+  $('featureModalBlurb').textContent=f.blurb;
+  $('featureModalOverlay').style.display='flex';
+}
+function closeFeatureModal(){ $('featureModalOverlay').style.display='none'; }
+function handleFeatureOverlayClick(e){ if(e.target===$('featureModalOverlay')) closeFeatureModal(); }
 
 function isPremium(){
   const p=loadProfile();
