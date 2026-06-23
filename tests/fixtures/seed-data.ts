@@ -45,3 +45,10 @@ export const spotSuggestionRows = [
 ];
 
 export const emptyArray: unknown[] = [];
+
+// Canned roster for the admin Users section (admin_list_users RPC).
+export const adminUserRows = [
+  { email: 'newbie@example.com', created_at: '2026-06-22T10:00:00Z', last_seen_at: null },
+  { email: 'alice@example.com',  created_at: '2026-06-20T09:00:00Z', last_seen_at: '2026-06-23T08:00:00Z' },
+  { email: 'admin@test.dev',     created_at: '2026-01-01T00:00:00Z', last_seen_at: '2026-06-23T07:00:00Z' },
+];
