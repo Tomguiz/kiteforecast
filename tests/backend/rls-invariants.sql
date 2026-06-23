@@ -89,3 +89,8 @@ BEGIN
 END $$;
 
 SELECT 'rls-invariants: ALL PASSED' AS result;
+
+-- admin_list_users(): SECURITY DEFINER, gated by is_admin().
+--   * EXECUTE granted to authenticated, REVOKEd from anon/public.
+--   * A non-admin caller receives zero rows (WHERE is_admin() short-circuits).
+--   * Returns email, created_at (from auth.users), last_seen_at (from profiles).

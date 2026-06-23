@@ -319,3 +319,25 @@ CREATE POLICY "tide_select_all" ON tide_cache FOR SELECT TO anon, authenticated 
 -- Done. Cleanup helper.
 -- ══════════════════════════════════════════════════════════════════════════
 DROP FUNCTION IF EXISTS _drop_all_policies(regclass);
+
+-- ---------------------------------------------------------------------------
+-- admin_list_users(): admin-only roster of every account.
+-- Joins auth.users (true signup date — not client-queryable directly) with
+-- profiles (last_seen_at). SECURITY DEFINER so it can read auth.users; gated
+-- by is_admin() so a non-admin caller gets ZERO rows even with EXECUTE granted.
+-- LEFT JOIN so a brand-new auth user without a profiles row still appears.
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION admin_list_users()
+RETURNS TABLE(email text, created_at timestamptz, last_seen_at timestamptz)
+LANGUAGE sql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT u.email::text, u.created_at, p.last_seen_at
+  FROM auth.users u
+  LEFT JOIN profiles p ON p.email = u.email
+  WHERE is_admin()
+  ORDER BY u.created_at DESC;
+$$;
+REVOKE ALL ON FUNCTION admin_list_users() FROM anon, public;
+GRANT EXECUTE ON FUNCTION admin_list_users() TO authenticated;
