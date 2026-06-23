@@ -1533,6 +1533,9 @@
     <div id="ppPanelAdmin" class="pp-body" style="display:none">
       <div id="ppAdminContent"></div>
     </div>
+    <div id="ppPanelAdminUsers" class="pp-body" style="display:none">
+      <div id="ppAdminUsersContent"></div>
+    </div>
     <div id="ppPanelFriends" class="pp-body" style="display:none;flex-direction:column;gap:14px">
       <!-- Search -->
       <div style="position:relative">
@@ -5095,12 +5098,14 @@ const SECTIONS = {
   myspot:  { title: 'My Spot',       icon: '📍', badge: null,               render: renderMySpot,           panel: 'ppPanelMySpot' },
   contrib: { title: 'Contributions', icon: '🎁', badge: 'ppContribCount',   render: renderMyContributions,  panel: 'ppPanelContrib' },
   admin:   { title: 'Admin',         icon: '⚙️', badge: 'ppAdminCount',     render: renderAdminPanel,       panel: 'ppPanelAdmin' },
+  users:   { title: 'Users',         icon: '🧑‍🤝‍🧑', badge: null,           render: renderAdminUsers,       panel: 'ppPanelAdminUsers' },
 };
 // Which optional sections are currently visible (mirrors the old tab visibility).
 function sectionVisible(key){
   if(key==='myspot')  return $('ppTabMySpot')  && $('ppTabMySpot').style.display!=='none';
   if(key==='contrib') return $('ppTabContrib') && $('ppTabContrib').style.display!=='none';
   if(key==='admin')   return !!loadProfile().isAdmin;
+  if(key==='users')   return !!loadProfile().isAdmin;
   return true; // notifs, stats, friends always listed
 }
 function renderBurgerList(){
@@ -6498,6 +6503,12 @@ async function updateFriendRequestBadge(){ return updateTabBadges(); }
 // ── ADMIN PANEL ──────────────────────────────────────────────────────────────
 let _adminSpots=null;
 let _adminRequests=null;  // cached pending spot_suggestions for click handlers
+
+async function renderAdminUsers(){
+  const el=$('ppAdminUsersContent'); if(!el) return;
+  if(!loadProfile().isAdmin){ el.innerHTML='<div class="stats-empty">Access denied.</div>'; return; }
+  el.innerHTML='<div class="stats-empty">Loading…</div>';
+}
 
 async function renderAdminPanel(){
   const el=$('ppAdminContent'); if(!el) return;

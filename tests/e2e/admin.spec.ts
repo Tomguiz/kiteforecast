@@ -47,3 +47,16 @@ test('spot requests have a Reject button that updates the suggestion', async ({ 
   expect(req.postData() || '').toContain('"reviewed":true');
   expect(req.postData() || '').toContain('"approved":false');
 });
+
+test('admin sees Users in the burger menu; non-admin does not', async ({ gotoApp, page }) => {
+  await gotoApp('admin');
+  await page.waitForTimeout(300); // profile refresh sets isAdmin
+  await page.locator('#burgerBtn').click();
+  await expect(page.locator('#burgerList')).toContainText('Users');
+});
+
+test('non-admin does not see Users in the burger', async ({ gotoApp, page }) => {
+  await gotoApp('signedIn');
+  await page.locator('#burgerBtn').click();
+  await expect(page.locator('#burgerList')).not.toContainText('Users');
+});
