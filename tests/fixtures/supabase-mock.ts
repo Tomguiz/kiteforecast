@@ -9,6 +9,7 @@ export type MockOptions = {
   isPremium?: boolean;
   isAdmin?: boolean;
   favourites?: unknown[];
+  usersRpc?: unknown[];   // rows returned by the admin_list_users RPC
 };
 
 const json = (route: Route, body: unknown, status = 200) =>
@@ -89,6 +90,10 @@ export async function mockSupabase(page: Page, opts: MockOptions = {}) {
         headers: { 'Content-Range': `0-${Math.max(0, n - 1)}/${n}` },
         body: method === 'HEAD' ? '' : body,
       });
+    }
+    // RPC calls POST to /rest/v1/rpc/<fn>. Answer admin_list_users explicitly.
+    if (method === 'POST' && path.endsWith('/rpc/admin_list_users')) {
+      return json(route, opts.usersRpc ?? []);
     }
     // INSERT/UPDATE/DELETE — return an empty 200/201
     return json(route, [], method === 'POST' ? 201 : 200);
