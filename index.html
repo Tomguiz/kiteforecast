@@ -6419,22 +6419,28 @@ function _setTabBadge(id,count){
   recomputeProfileBtnBadge();
 }
 
-// Mirror the sum of all per-tab "needs action" badges onto the profile bubble,
-// so the count is visible without opening the panel. Reads the live tab-badge
-// spans (single source of truth) — no extra data fetching. Hidden at zero.
+// Each header bubble badges only its own sources. The profile bubble shows
+// unread notifications; the menu (burger) bubble shows the actionable items
+// reached through the menu (friends + contributions + admin). A count is only
+// added when its carrier span is visible, so hidden sections don't leak.
 function recomputeProfileBtnBadge(){
-  const ids=['ppNotifCount','ppFriendReqCount','ppContribCount','ppAdminCount'];
-  let total=0;
-  for(const id of ids){
-    const el=$(id);
-    if(el && el.style.display!=='none') total+=parseInt(el.textContent,10)||0;
-  }
+  const sum=ids=>{
+    let t=0;
+    for(const id of ids){
+      const el=$(id);
+      if(el && el.style.display!=='none') t+=parseInt(el.textContent,10)||0;
+    }
+    return t;
+  };
+  const fmt=n=>n>99?'99+':String(n);
+  const profileTotal=sum(['ppNotifCount']);
+  const menuTotal=sum(['ppFriendReqCount','ppContribCount','ppAdminCount']);
   document.querySelectorAll('.profile-btn-dot').forEach(d=>{
-    d.textContent=total>99?'99+':String(total);
-    d.classList.toggle('visible',total>0);
+    d.textContent=fmt(profileTotal);
+    d.classList.toggle('visible',profileTotal>0);
   });
-  // Mirror the same total onto the burger icon.
-  const bd=$('burgerDot'); if(bd){ bd.textContent=total>99?'99+':String(total); bd.classList.toggle('visible',total>0); }
+  const bd=$('burgerDot');
+  if(bd){ bd.textContent=fmt(menuTotal); bd.classList.toggle('visible',menuTotal>0); }
 }
 
 // ── Tab badges ────────────────────────────────────────────────────────────────
