@@ -86,3 +86,14 @@ test('Users section shows empty state when there are no users', async ({ gotoApp
   await page.locator('#burgerList').getByText('Users').click();
   await expect(page.locator('#ppAdminUsersContent')).toContainText('No users');
 });
+
+test('Users section shows an error state when the RPC fails', async ({ gotoApp, page }) => {
+  await gotoApp('admin', { usersRpc: adminUserRows });
+  await page.waitForTimeout(300);
+  // Override just the admin_list_users RPC with a 500 (registered last = wins).
+  await page.route(/.*\/rest\/v1\/rpc\/admin_list_users.*/, (route) =>
+    route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ message: 'boom' }) }));
+  await page.locator('#burgerBtn').click();
+  await page.locator('#burgerList').getByText('Users').click();
+  await expect(page.locator('#ppAdminUsersContent')).toContainText(/couldn.?t load users/i);
+});
