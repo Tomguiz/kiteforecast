@@ -1,4 +1,5 @@
 import { test, expect } from '../fixtures/auth';
+import { adminUserRows } from '../fixtures/seed-data';
 
 test('admin can open the Admin panel', async ({ gotoApp, page }) => {
   await gotoApp('admin');
@@ -59,4 +60,29 @@ test('non-admin does not see Users in the burger', async ({ gotoApp, page }) => 
   await gotoApp('signedIn');
   await page.locator('#burgerBtn').click();
   await expect(page.locator('#burgerList')).not.toContainText('Users');
+});
+
+test('Users section lists each account with created + last-seen', async ({ gotoApp, page }) => {
+  await gotoApp('admin', { usersRpc: adminUserRows });
+  await page.waitForTimeout(300);
+  await page.locator('#burgerBtn').click();
+  await page.locator('#burgerList').getByText('Users').click();
+  await expect(page.locator('#ppHdrTitle')).toHaveText('Users');
+  const content = page.locator('#ppAdminUsersContent');
+  await expect(content).toContainText('Users (3)');
+  await expect(content).toContainText('newbie@example.com');
+  await expect(content).toContainText('alice@example.com');
+  // newest signup first: newbie (Jun 22) appears before alice (Jun 20)
+  const text = await content.innerText();
+  expect(text.indexOf('newbie@example.com')).toBeLessThan(text.indexOf('alice@example.com'));
+  // a user who never logged in shows "never"
+  await expect(content).toContainText('never');
+});
+
+test('Users section shows empty state when there are no users', async ({ gotoApp, page }) => {
+  await gotoApp('admin', { usersRpc: [] });
+  await page.waitForTimeout(300);
+  await page.locator('#burgerBtn').click();
+  await page.locator('#burgerList').getByText('Users').click();
+  await expect(page.locator('#ppAdminUsersContent')).toContainText('No users');
 });
