@@ -805,6 +805,14 @@
     .btn-premium { display:block; width:100%; padding:13px; background:linear-gradient(135deg,#f59e0b,#d97706); color:#000; border:none; border-radius:9px; font-size:.88rem; font-weight:800; cursor:pointer; text-align:center; letter-spacing:.03em; transition:opacity .15s; margin-top:10px; }
     .btn-premium:hover { opacity:.9; }
     .btn-premium:disabled { opacity:.5; cursor:default; }
+    .premium-feature-tile, .premium-feature-row {
+      display:block; width:100%; text-align:left; cursor:pointer;
+      font:inherit; color:var(--gray);
+      background:rgba(245,158,11,.08); border:1px solid rgba(245,158,11,.15);
+      border-radius:8px; padding:8px 10px;
+    }
+    .premium-feature-row { margin-bottom:4px; background:transparent; border:1px solid transparent; padding:4px 6px; }
+    .premium-feature-tile:hover, .premium-feature-row:hover { border-color:rgba(245,158,11,.4); }
     .premium-active-card { background:linear-gradient(135deg,rgba(245,158,11,.08),rgba(217,119,6,.04)); border:1px solid rgba(245,158,11,.25); border-radius:12px; padding:14px 16px; display:flex; align-items:center; gap:12px; }
     /* ── Share banner ── */
     #shareBanner { position:sticky; top:0; z-index:200; display:none; align-items:center; gap:10px; padding:10px 16px; background:linear-gradient(135deg,rgba(0,212,255,.15),rgba(56,189,248,.08)); border-bottom:1px solid rgba(0,212,255,.25); font-size:.8rem; color:var(--text); }
@@ -1485,14 +1493,7 @@
           <div class="premium-card">
             <div style="font-size:.85rem;font-weight:700;color:#f59e0b;margin-bottom:2px;">⚡ Lifetime Access — €19.99</div>
             <div style="font-size:.72rem;color:var(--tdim);margin-bottom:8px;">One-time payment · no subscription · yours forever</div>
-            <div style="font-size:.75rem;color:var(--gray);line-height:1.6;margin-bottom:2px;">
-              ⭐ Unlimited favourite spots — free plan = 1<br/>
-              📬 Weekly wind digest — Monday forecast for all your spots<br/>
-              🌊 Tide times — full schedule on every spot forecast<br/>
-              🏄 Session tracking — log &amp; notify friends when on the water<br/>
-              🤝 Support indie development — keep KiteForecast free for all<br/>
-              🎯 Priority support — direct access to the team
-            </div>
+            <div id="ppUpgradeFeatures" style="font-size:.75rem;line-height:1.6;margin-bottom:2px;"></div>
             <button class="btn-premium" id="ppUpgradeBtn" onclick="startCheckout()">Get Lifetime Access — €19.99 →</button>
           </div>
         </div>
@@ -1507,14 +1508,7 @@
                 <div style="font-size:.72rem;color:var(--tdim);margin-top:1px;">All features unlocked</div>
               </div>
             </div>
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:.72rem;">
-              <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.15);border-radius:8px;padding:8px 10px;color:var(--gray);">⭐ Unlimited fav spots</div>
-              <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.15);border-radius:8px;padding:8px 10px;color:var(--gray);">📬 Weekly wind digest</div>
-              <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.15);border-radius:8px;padding:8px 10px;color:var(--gray);">🌊 Tide times</div>
-              <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.15);border-radius:8px;padding:8px 10px;color:var(--gray);">🏄 Session tracking</div>
-              <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.15);border-radius:8px;padding:8px 10px;color:var(--gray);">🤝 Support indie dev</div>
-              <div style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.15);border-radius:8px;padding:8px 10px;color:var(--gray);">🎯 Priority support</div>
-            </div>
+            <div id="ppPremiumGrid" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:.72rem;"></div>
             <div class="premium-access-footer" style="text-align:center;padding:10px 0 2px;font-size:.75rem;color:#f59e0b;font-weight:600;line-height:1.5;">✓ Lifetime access — no subscription</div>
           </div>
         </div>
@@ -7247,6 +7241,53 @@ async function checkShowMySpotTab(){
 
 // ── PREMIUM ──────────────────────────────────────────────────────────────────
 
+const PREMIUM_FEATURES = [
+  { key:'favs',    emoji:'⭐', label:'Unlimited fav spots',
+    blurb:'Save as many favourite spots as you like. The free plan caps you at 1 — Premium removes the limit entirely.' },
+  { key:'digest',  emoji:'📬', label:'Weekly wind digest',
+    blurb:'Every Monday, get an email forecast for the week ahead across all your favourite spots, so you can plan your sessions early.' },
+  { key:'tides',   emoji:'🌊', label:'Tide times',
+    blurb:'See the full tide schedule — highs, lows and timing — directly on every spot\'s forecast.' },
+  { key:'session', emoji:'🏄', label:'Session tracking',
+    blurb:'Log your sessions and let friends know when you\'re on the water, building your riding history over time.' },
+  { key:'support', emoji:'🤝', label:'Support indie dev',
+    blurb:'KiteForecast is built by one person. Your purchase keeps it running and free for everyone else.' },
+  { key:'priority',emoji:'🎯', label:'Priority support',
+    blurb:'Get direct access to the team — your questions and requests jump to the front of the queue.' },
+];
+
+// Render both premium feature lists (active grid + upgrade list) from the single
+// PREMIUM_FEATURES source so they never drift. Each item is clickable and opens
+// the feature detail modal. Idempotent — clears its containers before filling.
+function renderPremiumFeatureLists(){
+  const grid=$('ppPremiumGrid');
+  if(grid){
+    grid.innerHTML='';
+    for(const f of PREMIUM_FEATURES){
+      const tile=document.createElement('button');
+      tile.type='button';
+      tile.className='premium-feature-tile';
+      tile.dataset.feature=f.key;
+      tile.textContent=`${f.emoji} ${f.label}`;
+      tile.onclick=()=>openFeatureModal(f.key);
+      grid.appendChild(tile);
+    }
+  }
+  const list=$('ppUpgradeFeatures');
+  if(list){
+    list.innerHTML='';
+    for(const f of PREMIUM_FEATURES){
+      const row=document.createElement('button');
+      row.type='button';
+      row.className='premium-feature-row';
+      row.dataset.feature=f.key;
+      row.textContent=`${f.emoji} ${f.label}`;
+      row.onclick=()=>openFeatureModal(f.key);
+      list.appendChild(row);
+    }
+  }
+}
+
 function isPremium(){
   const p=loadProfile();
   if(p.isPremium) return true;
@@ -7330,6 +7371,7 @@ function updatePremiumUI(){
       crown.remove();
     }
   }
+  if(!renderPremiumFeatureLists._done){ renderPremiumFeatureLists(); renderPremiumFeatureLists._done=true; }
 }
 
 async function syncPremiumFromSupabase(email){
