@@ -48,7 +48,23 @@ export const emptyArray: unknown[] = [];
 
 // Canned roster for the admin Users section (admin_list_users RPC).
 export const adminUserRows = [
-  { email: 'newbie@example.com', created_at: '2026-06-22T10:00:00Z', last_seen_at: null },
-  { email: 'alice@example.com',  created_at: '2026-06-20T09:00:00Z', last_seen_at: '2026-06-23T08:00:00Z' },
-  { email: 'admin@test.dev',     created_at: '2026-01-01T00:00:00Z', last_seen_at: '2026-06-23T07:00:00Z' },
+  { email: 'newbie@example.com', created_at: '2026-06-22T10:00:00Z', last_seen_at: null,                 nickname: null },
+  { email: 'alice@example.com',  created_at: '2026-06-20T09:00:00Z', last_seen_at: '2026-06-23T08:00:00Z', nickname: 'Alice' },
+  { email: 'admin@test.dev',     created_at: '2026-01-01T00:00:00Z', last_seen_at: '2026-06-24T07:00:00Z', nickname: 'Boss' },
 ];
+
+// Per-user favourites / followed spots for the admin Users expand view.
+export const adminFavourites: Record<string, Array<{spot_name:string; spot_label:string|null}>> = {
+  'alice@example.com': [
+    { spot_name: 'Knokke',   spot_label: null },
+    { spot_name: 'Oostende', spot_label: 'Oostende beach' },
+  ],
+  'newbie@example.com': [],
+};
+export const adminReminders: Record<string, Array<{spot_name:string}>> = {
+  'alice@example.com': [
+    { spot_name: 'Knokke' }, { spot_name: 'Knokke' }, // 3 rows, Knokke dup → de-dups to 2 distinct
+    { spot_name: 'De Panne' },
+  ],
+  'newbie@example.com': [],
+};

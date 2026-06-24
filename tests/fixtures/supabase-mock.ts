@@ -10,6 +10,8 @@ export type MockOptions = {
   isAdmin?: boolean;
   favourites?: unknown[];
   usersRpc?: unknown[];   // rows returned by the admin_list_users RPC
+  adminFavourites?: Record<string, unknown[]>;
+  adminReminders?: Record<string, unknown[]>;
 };
 
 const json = (route: Route, body: unknown, status = 200) =>
@@ -76,6 +78,22 @@ export async function mockSupabase(page: Page, opts: MockOptions = {}) {
     const path = new URL(req.url()).pathname;            // /rest/v1/<table>
     const table = path.split('/rest/v1/')[1]?.split('?')[0] ?? '';
     if (method === 'GET' || method === 'HEAD') {
+      // Admin Users expand: per-email favourites/reminders keyed by the email filter.
+      const url = req.url();
+      const emailMatch = url.match(/email=eq\.([^&]+)/);
+      const wantEmail = emailMatch ? decodeURIComponent(emailMatch[1]) : null;
+      if (wantEmail && table === 'favourites' && opts.adminFavourites) {
+        const rows = opts.adminFavourites[wantEmail] ?? [];
+        return route.fulfill({ status: 200, contentType: 'application/json',
+          headers: { 'Content-Range': `0-${Math.max(0, rows.length - 1)}/${rows.length}` },
+          body: JSON.stringify(rows) });
+      }
+      if (wantEmail && table === 'reminders' && opts.adminReminders) {
+        const rows = opts.adminReminders[wantEmail] ?? [];
+        return route.fulfill({ status: 200, contentType: 'application/json',
+          headers: { 'Content-Range': `0-${Math.max(0, rows.length - 1)}/${rows.length}` },
+          body: JSON.stringify(rows) });
+      }
       const rows = tableResponse(table, opts) as unknown[];
       const n = Array.isArray(rows) ? rows.length : 0;
       // .single()/.maybeSingle() send Accept: application/vnd.pgrst.object+json
