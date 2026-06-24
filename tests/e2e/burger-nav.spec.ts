@@ -39,9 +39,9 @@ test('profile bubble opens Profile only (no tab strip, no back arrow)', async ({
   await expect(page.locator('.pp-tab')).toHaveCount(0); // old tab strip gone
 });
 
-// An unseen alert mirrors its count onto the burger ICON badge (#burgerDot) and,
+// An unseen alert mirrors its count onto the profile bubble badge (#profileDot) and,
 // once the burger is opened, onto the Notifications ITEM badge inside the list.
-test('an unseen alert badges the burger icon', async ({ gotoApp, page }) => {
+test('an unseen alert badges the profile icon', async ({ gotoApp, page }) => {
   await gotoApp('signedIn');
   await page.evaluate(() => {
     localStorage.setItem('kf_notifsSeenAt', '1'); // last seen = epoch ms 1
@@ -53,8 +53,8 @@ test('an unseen alert badges the burger icon', async ({ gotoApp, page }) => {
     // @ts-expect-error app global
     if (typeof updateTabBadges === 'function') updateTabBadges();
   });
-  await expect(page.locator('#burgerDot')).toHaveText('1');
-  await expect(page.locator('#burgerDot')).toHaveClass(/visible/);
+  await expect(page.locator('#profileDot')).toHaveText('1');
+  await expect(page.locator('#profileDot')).toHaveClass(/visible/);
   // and the Notifications item badge inside the burger
   await page.locator('#burgerBtn').click();
   await expect(page.locator('#burger_notifs_badge')).toHaveText('1');
@@ -79,4 +79,38 @@ test('opening Stats while signed out shows a sign-in prompt', async ({ gotoApp, 
   await page.locator('#burgerList').getByText('Stats').click();
   await expect(page.locator('#ppHdrTitle')).toHaveText('Stats');
   await expect(page.locator('#profileOverlay')).toContainText(/sign in to see your session stats/i);
+});
+
+// A notification badges ONLY the bubble it belongs to. Notifs → profile dot;
+// friends/contrib/admin → burger dot.
+test('an unread alert badges the profile dot but not the burger dot', async ({ gotoApp, page }) => {
+  await gotoApp('signedIn');
+  await page.evaluate(() => {
+    localStorage.setItem('kf_notifsSeenAt', '1');
+    const notifs = [{
+      id: 'n1', type: 'spot', spotName: 'Test Spot', spotLat: 1, spotLon: 1,
+      label: 'All sessions', createdAt: new Date().toISOString(),
+    }];
+    localStorage.setItem('kf_notifs', JSON.stringify(notifs));
+    // @ts-expect-error app global
+    if (typeof updateTabBadges === 'function') updateTabBadges();
+  });
+  await expect(page.locator('#profileDot')).toHaveText('1');
+  await expect(page.locator('#profileDot')).toHaveClass(/visible/);
+  await expect(page.locator('#burgerDot')).not.toHaveClass(/visible/);
+});
+
+test('a pending friend request badges the burger dot but not the profile dot', async ({ gotoApp, page }) => {
+  await gotoApp('signedIn');
+  await page.evaluate(() => {
+    // Simulate the friends badge being set (the real count comes from a mocked
+    // Supabase query); drive the carrier span + recompute directly.
+    const c = document.getElementById('ppFriendReqCount');
+    if (c) { c.textContent = '2'; c.style.display = 'inline'; }
+    // @ts-expect-error app global
+    if (typeof recomputeProfileBtnBadge === 'function') recomputeProfileBtnBadge();
+  });
+  await expect(page.locator('#burgerDot')).toHaveText('2');
+  await expect(page.locator('#burgerDot')).toHaveClass(/visible/);
+  await expect(page.locator('#profileDot')).not.toHaveClass(/visible/);
 });
