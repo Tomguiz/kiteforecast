@@ -84,3 +84,19 @@ test('the home-view Go Premium promo lists features and opens the popup on click
   await page.keyboard.press('Escape');
   await expect(page.locator('#featureModalOverlay')).toBeHidden();
 });
+
+test('the feature popup is centered with a gap above and below (not clipped at the screen edge)', async ({ gotoApp, page }) => {
+  await page.setViewportSize({ width: 390, height: 844 }); // iPhone portrait
+  await gotoApp('premium');
+  await page.waitForTimeout(300);
+  await page.locator('#profileBtn').click();
+  await page.locator('#ppPremiumGrid .premium-feature-tile[data-feature="digest"]').click();
+  await expect(page.locator('#featureModalOverlay')).toBeVisible();
+  const geom = await page.evaluate(() => {
+    const r = document.getElementById('featureModal')!.getBoundingClientRect();
+    return { top: r.top, bottom: r.bottom, vh: window.innerHeight };
+  });
+  // The card must not touch the top or bottom edge — both gaps clear the safe area.
+  expect(geom.top).toBeGreaterThan(16);
+  expect(geom.vh - geom.bottom).toBeGreaterThan(16);
+});
