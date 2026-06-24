@@ -326,7 +326,11 @@ DROP FUNCTION IF EXISTS _drop_all_policies(regclass);
 -- profiles (last_seen_at). SECURITY DEFINER so it can read auth.users; gated
 -- by is_admin() so a non-admin caller gets ZERO rows even with EXECUTE granted.
 -- LEFT JOIN so a brand-new auth user without a profiles row still appears.
+-- DROP first: CREATE OR REPLACE cannot change an existing function's return
+-- columns, so re-running this file after the signature changed (e.g. adding
+-- nickname) errors without the drop. Safe — nothing but the admin tab calls it.
 -- ---------------------------------------------------------------------------
+DROP FUNCTION IF EXISTS admin_list_users();
 CREATE OR REPLACE FUNCTION admin_list_users()
 RETURNS TABLE(email text, created_at timestamptz, last_seen_at timestamptz, nickname text)
 LANGUAGE sql
