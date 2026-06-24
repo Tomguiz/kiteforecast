@@ -1157,14 +1157,7 @@
         <div style="font-size:.88rem;font-weight:800;color:#f59e0b;">👑 Go Premium</div>
         <span onclick="_upgradeModalDismissed=true;$('upgradeModal').style.display='none'" style="cursor:pointer;color:var(--tdim);font-size:1rem;padding:2px 6px;">✕</span>
       </div>
-      <div style="font-size:.75rem;color:var(--gray);line-height:1.7;margin-bottom:12px;">
-        ⭐ <strong style="color:var(--text)">Unlimited favourite spots</strong> — free plan = 1<br/>
-        📬 <strong style="color:var(--text)">Weekly wind digest</strong> — Monday forecast for all your spots<br/>
-        🌊 <strong style="color:var(--text)">Tide times</strong> — full schedule on every spot forecast<br/>
-        🏄 <strong style="color:var(--text)">Session tracking</strong> — log &amp; notify friends when you're on the water<br/>
-        🤝 <strong style="color:var(--text)">Support indie development</strong> — keep KiteForecast free for everyone<br/>
-        🎯 <strong style="color:var(--text)">Priority support</strong> — direct access to the team
-      </div>
+      <div id="upgradeModalFeatures" style="font-size:.75rem;line-height:1.7;margin-bottom:12px;"></div>
       <button class="btn-premium" onclick="$('upgradeModal').style.display='none';startCheckout(this)">⚡ Get Lifetime Access — €19.99 →</button>
     </div>
   </div>
@@ -7411,33 +7404,30 @@ const PREMIUM_FEATURES = [
 // PREMIUM_FEATURES source so they never drift. Each item is clickable and opens
 // the feature detail modal. Idempotent — clears its containers before filling.
 function renderPremiumFeatureLists(){
-  const grid=$('ppPremiumGrid');
-  if(grid){
-    grid.innerHTML='';
+  // Fill a container with one clickable item per feature, sourced from the
+  // single PREMIUM_FEATURES array so every premium list stays in sync. Each
+  // item opens the feature-detail popup. Idempotent (clears before filling).
+  const fill=(id,cls)=>{
+    const host=$(id); if(!host) return;
+    host.innerHTML='';
     for(const f of PREMIUM_FEATURES){
-      const tile=document.createElement('button');
-      tile.type='button';
-      tile.className='premium-feature-tile';
-      tile.dataset.feature=f.key;
-      tile.textContent=`${f.emoji} ${f.label}`;
-      tile.onclick=()=>openFeatureModal(f.key);
-      grid.appendChild(tile);
+      const item=document.createElement('button');
+      item.type='button';
+      item.className=cls;
+      item.dataset.feature=f.key;
+      item.textContent=`${f.emoji} ${f.label}`;
+      item.onclick=()=>openFeatureModal(f.key);
+      host.appendChild(item);
     }
-  }
-  const list=$('ppUpgradeFeatures');
-  if(list){
-    list.innerHTML='';
-    for(const f of PREMIUM_FEATURES){
-      const row=document.createElement('button');
-      row.type='button';
-      row.className='premium-feature-row';
-      row.dataset.feature=f.key;
-      row.textContent=`${f.emoji} ${f.label}`;
-      row.onclick=()=>openFeatureModal(f.key);
-      list.appendChild(row);
-    }
-  }
+  };
+  fill('ppPremiumGrid','premium-feature-tile');       // premium-active grid
+  fill('ppUpgradeFeatures','premium-feature-row');    // profile upgrade card
+  fill('upgradeModalFeatures','premium-feature-row'); // home-view "Go Premium" promo
 }
+// Populate the premium feature lists once at boot. The inline script runs after
+// the DOM is parsed, so the (static) containers exist. Done here — not gated
+// behind updatePremiumUI — so the lists render regardless of auth/premium state.
+renderPremiumFeatureLists();
 
 function openFeatureModal(key){
   const f=PREMIUM_FEATURES.find(x=>x.key===key); if(!f) return;
@@ -7532,7 +7522,6 @@ function updatePremiumUI(){
       crown.remove();
     }
   }
-  if(!renderPremiumFeatureLists._done){ renderPremiumFeatureLists(); renderPremiumFeatureLists._done=true; }
 }
 
 async function syncPremiumFromSupabase(email){

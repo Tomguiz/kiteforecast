@@ -69,3 +69,18 @@ test('the feature popup closes via Escape and leaves the profile panel open', as
   await expect(page.locator('#featureModalOverlay')).toBeHidden();
   await expect(page.locator('#profileOverlay')).toBeVisible();
 });
+
+test('the home-view Go Premium promo lists features and opens the popup on click', async ({ gotoApp, page }) => {
+  await gotoApp('signedIn'); // non-premium
+  await page.waitForTimeout(300);
+  // The promo is shown on explicit trigger, never auto-shown — reveal it directly.
+  await page.evaluate(() => { const m = document.getElementById('upgradeModal'); if (m) m.style.display = 'block'; });
+  const promo = page.locator('#upgradeModalFeatures');
+  await expect(promo.locator('.premium-feature-row')).toHaveCount(6);
+  await promo.locator('.premium-feature-row[data-feature="tides"]').click();
+  await expect(page.locator('#featureModalOverlay')).toBeVisible();
+  await expect(page.locator('#featureModalTitle')).toHaveText('Tide times');
+  // dismiss returns to the page (promo still present underneath)
+  await page.keyboard.press('Escape');
+  await expect(page.locator('#featureModalOverlay')).toBeHidden();
+});
