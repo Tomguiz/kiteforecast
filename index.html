@@ -6619,7 +6619,69 @@ function _renderAdminUsersList(){
   }
 }
 
-function toggleUserExpand(){ /* implemented in Task 4 */ }
+async function toggleUserExpand(email,card){
+  const detail=card.querySelector('.pp-user-detail'); if(!detail) return;
+
+  // Collapse if this one is already open.
+  if(_adminUsersExpanded===email){
+    detail.style.display='none';
+    _adminUsersExpanded=null;
+    return;
+  }
+  // Accordion: collapse any other open card.
+  if(_adminUsersExpanded){
+    const prev=$('ppAdminUsersContent').querySelector(`[data-email="${CSS.escape(_adminUsersExpanded)}"] .pp-user-detail`);
+    if(prev) prev.style.display='none';
+  }
+  _adminUsersExpanded=email;
+  detail.style.display='block';
+
+  // Cached? render from cache.
+  if(_adminUserSpots[email]){ _renderUserSpots(detail,_adminUserSpots[email]); return; }
+
+  detail.innerHTML='<div style="font-size:.7rem;color:var(--tdim)">Loading…</div>';
+  const sb=getSb(); if(!sb) return;
+  const [favRes,remRes]=await Promise.all([
+    sb.from('favourites').select('spot_name,spot_label').eq('email',email).order('spot_name'),
+    sb.from('reminders').select('spot_name').eq('email',email).eq('notif_type','spot').eq('cancelled',false).order('spot_name'),
+  ]);
+  // De-dupe follows by spot_name.
+  let follows=null;
+  if(!remRes.error){
+    const seen=new Set(); follows=[];
+    for(const r of (remRes.data||[])){ if(!seen.has(r.spot_name)){ seen.add(r.spot_name); follows.push(r.spot_name); } }
+  }
+  const data={
+    favs: favRes.error ? null : (favRes.data||[]).map(f=>f.spot_label||f.spot_name),
+    follows,
+  };
+  _adminUserSpots[email]=data;
+  // Only render if still the expanded one (admin may have clicked elsewhere).
+  if(_adminUsersExpanded===email) _renderUserSpots(detail,data);
+}
+
+// Render the two spot lists into a card's detail container. `favs`/`follows`
+// are arrays of display strings, or null when their query errored.
+function _renderUserSpots(detail,{favs,follows}){
+  detail.innerHTML='';
+  const section=(emoji,label,items,emptyMsg)=>{
+    const wrap=document.createElement('div');
+    wrap.style.cssText='margin-top:6px';
+    const head=document.createElement('div');
+    head.style.cssText='font-size:.72rem;font-weight:700;color:var(--gray)';
+    head.textContent = items===null ? `${emoji} ${label}` : `${emoji} ${label} (${items.length})`;
+    wrap.appendChild(head);
+    const body=document.createElement('div');
+    body.style.cssText='font-size:.72rem;color:var(--tdim);margin-top:2px;word-break:break-word';
+    if(items===null){ body.textContent='Couldn\'t load.'; }
+    else if(!items.length){ body.textContent=emptyMsg; }
+    else { body.textContent=items.join(' · '); }
+    wrap.appendChild(body);
+    return wrap;
+  };
+  detail.appendChild(section('⭐','Favourites',favs,'No favourites'));
+  detail.appendChild(section('🔔','Following',follows,'Not following any spots'));
+}
 
 async function renderAdminPanel(){
   const el=$('ppAdminContent'); if(!el) return;

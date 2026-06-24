@@ -135,3 +135,50 @@ test('Users list sorts by created (default) then by last seen, and flips directi
   expect(t.indexOf('alice@example.com')).toBeLessThan(t.indexOf('admin@test.dev'));
   expect(t.indexOf('admin@test.dev')).toBeLessThan(t.indexOf('newbie@example.com'));
 });
+
+test('clicking a user expands their favourites and following spots', async ({ gotoApp, page }) => {
+  await gotoApp('admin', { usersRpc: adminUserRows, adminFavourites, adminReminders });
+  await page.waitForTimeout(300);
+  await page.locator('#burgerBtn').click();
+  await page.locator('#burgerList').getByText('Users').click();
+  const alice = page.locator('#ppAdminUsersContent [data-email="alice@example.com"]');
+  await alice.click();
+  const detail = alice.locator('.pp-user-detail');
+  await expect(detail).toBeVisible();
+  await expect(detail).toContainText('Favourites (2)');
+  await expect(detail).toContainText('Knokke');
+  await expect(detail).toContainText('Oostende beach');   // spot_label preferred
+  await expect(detail).toContainText('Following (2)');     // 3 reminder rows, Knokke dup → 2 distinct
+  await expect(detail).toContainText('De Panne');
+
+  // Clicking again collapses
+  await alice.click();
+  await expect(detail).toBeHidden();
+});
+
+test('expanding a second user collapses the first (accordion)', async ({ gotoApp, page }) => {
+  await gotoApp('admin', { usersRpc: adminUserRows, adminFavourites, adminReminders });
+  await page.waitForTimeout(300);
+  await page.locator('#burgerBtn').click();
+  await page.locator('#burgerList').getByText('Users').click();
+  const content = page.locator('#ppAdminUsersContent');
+  const alice = content.locator('[data-email="alice@example.com"]');
+  const newbie = content.locator('[data-email="newbie@example.com"]');
+  await alice.click();
+  await expect(alice.locator('.pp-user-detail')).toBeVisible();
+  await newbie.click();
+  await expect(alice.locator('.pp-user-detail')).toBeHidden();
+  await expect(newbie.locator('.pp-user-detail')).toBeVisible();
+});
+
+test('a user with no favourites or follows shows empty states', async ({ gotoApp, page }) => {
+  await gotoApp('admin', { usersRpc: adminUserRows, adminFavourites, adminReminders });
+  await page.waitForTimeout(300);
+  await page.locator('#burgerBtn').click();
+  await page.locator('#burgerList').getByText('Users').click();
+  const newbie = page.locator('#ppAdminUsersContent [data-email="newbie@example.com"]');
+  await newbie.click();
+  const detail = newbie.locator('.pp-user-detail');
+  await expect(detail).toContainText('No favourites');
+  await expect(detail).toContainText('Not following any spots');
+});
