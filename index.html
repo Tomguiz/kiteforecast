@@ -6617,6 +6617,17 @@ function _renderAdminUsersList(){
     card.onclick=()=>toggleUserExpand(u.email,card);
     el.appendChild(card);
   }
+
+  // Re-render rebuilds every card collapsed. If a user was expanded (e.g. the
+  // admin re-sorted with a card open), re-show that card's detail from cache so
+  // the open state survives the sort instead of silently collapsing.
+  if(_adminUsersExpanded){
+    const card=el.querySelector(`[data-email="${CSS.escape(_adminUsersExpanded)}"]`);
+    const detail=card&&card.querySelector('.pp-user-detail');
+    const cached=_adminUserSpots[_adminUsersExpanded];
+    if(detail&&cached){ detail.style.display='block'; _renderUserSpots(detail,cached); }
+    else { _adminUsersExpanded=null; }  // card gone or never fetched → drop stale state
+  }
 }
 
 async function toggleUserExpand(email,card){

@@ -171,6 +171,21 @@ test('expanding a second user collapses the first (accordion)', async ({ gotoApp
   await expect(newbie.locator('.pp-user-detail')).toBeVisible();
 });
 
+test('an expanded user stays expanded after re-sorting the list', async ({ gotoApp, page }) => {
+  await gotoApp('admin', { usersRpc: adminUserRows, adminFavourites, adminReminders });
+  await page.waitForTimeout(300);
+  await page.locator('#burgerBtn').click();
+  await page.locator('#burgerList').getByText('Users').click();
+  const content = page.locator('#ppAdminUsersContent');
+  const alice = content.locator('[data-email="alice@example.com"]');
+  await alice.click();
+  await expect(alice.locator('.pp-user-detail')).toBeVisible();
+  // Re-sort the list while alice is open — her card must stay expanded.
+  await content.locator('#ppUsersSortBar [data-sort="seen"]').click();
+  await expect(content.locator('[data-email="alice@example.com"] .pp-user-detail')).toBeVisible();
+  await expect(content.locator('[data-email="alice@example.com"] .pp-user-detail')).toContainText('Favourites (2)');
+});
+
 test('a user with no favourites or follows shows empty states', async ({ gotoApp, page }) => {
   await gotoApp('admin', { usersRpc: adminUserRows, adminFavourites, adminReminders });
   await page.waitForTimeout(300);
