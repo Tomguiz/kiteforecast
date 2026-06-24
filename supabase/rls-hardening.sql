@@ -328,12 +328,12 @@ DROP FUNCTION IF EXISTS _drop_all_policies(regclass);
 -- LEFT JOIN so a brand-new auth user without a profiles row still appears.
 -- ---------------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION admin_list_users()
-RETURNS TABLE(email text, created_at timestamptz, last_seen_at timestamptz)
+RETURNS TABLE(email text, created_at timestamptz, last_seen_at timestamptz, nickname text)
 LANGUAGE sql
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT u.email::text, u.created_at, p.last_seen_at
+  SELECT u.email::text, u.created_at, p.last_seen_at, p.nickname
   FROM auth.users u
   LEFT JOIN profiles p ON p.email = u.email
   WHERE is_admin()

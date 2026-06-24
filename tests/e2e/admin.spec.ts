@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/auth';
-import { adminUserRows } from '../fixtures/seed-data';
+import { adminUserRows, adminFavourites, adminReminders } from '../fixtures/seed-data';
 
 test('admin can open the Admin panel', async ({ gotoApp, page }) => {
   await gotoApp('admin');
@@ -96,4 +96,104 @@ test('Users section shows an error state when the RPC fails', async ({ gotoApp, 
   await page.locator('#burgerBtn').click();
   await page.locator('#burgerList').getByText('Users').click();
   await expect(page.locator('#ppAdminUsersContent')).toContainText(/couldn.?t load users/i);
+});
+
+test('Users cards show the nickname when present, email-only when null', async ({ gotoApp, page }) => {
+  await gotoApp('admin', { usersRpc: adminUserRows });
+  await page.waitForTimeout(300);
+  await page.locator('#burgerBtn').click();
+  await page.locator('#burgerList').getByText('Users').click();
+  const content = page.locator('#ppAdminUsersContent');
+  // The email LINE (not the whole card) shows "email · nickname" when present.
+  await expect(content.locator('[data-email="alice@example.com"] .pp-user-email')).toHaveText('alice@example.com · Alice');
+  // newbie has null nickname → email line is the bare email, no separator.
+  await expect(content.locator('[data-email="newbie@example.com"] .pp-user-email')).toHaveText('newbie@example.com');
+});
+
+test('Users list sorts by created (default) then by last seen, and flips direction', async ({ gotoApp, page }) => {
+  await gotoApp('admin', { usersRpc: adminUserRows });
+  await page.waitForTimeout(300);
+  await page.locator('#burgerBtn').click();
+  await page.locator('#burgerList').getByText('Users').click();
+  const content = page.locator('#ppAdminUsersContent');
+
+  const order = async () => (await content.innerText());
+  // Default: created desc → newbie (Jun 22) before alice (Jun 20) before admin (Jan 1)
+  let t = await order();
+  expect(t.indexOf('newbie@example.com')).toBeLessThan(t.indexOf('alice@example.com'));
+  expect(t.indexOf('alice@example.com')).toBeLessThan(t.indexOf('admin@test.dev'));
+
+  // Sort by Last seen → admin (Jun 24) before alice (Jun 23); newbie (null) last.
+  await content.locator('#ppUsersSortBar [data-sort="seen"]').click();
+  t = await order();
+  expect(t.indexOf('admin@test.dev')).toBeLessThan(t.indexOf('alice@example.com'));
+  expect(t.indexOf('alice@example.com')).toBeLessThan(t.indexOf('newbie@example.com'));
+
+  // Click active Last seen again → flip to asc → alice before admin; newbie still last (null sinks).
+  await content.locator('#ppUsersSortBar [data-sort="seen"]').click();
+  t = await order();
+  expect(t.indexOf('alice@example.com')).toBeLessThan(t.indexOf('admin@test.dev'));
+  expect(t.indexOf('admin@test.dev')).toBeLessThan(t.indexOf('newbie@example.com'));
+});
+
+test('clicking a user expands their favourites and following spots', async ({ gotoApp, page }) => {
+  await gotoApp('admin', { usersRpc: adminUserRows, adminFavourites, adminReminders });
+  await page.waitForTimeout(300);
+  await page.locator('#burgerBtn').click();
+  await page.locator('#burgerList').getByText('Users').click();
+  const alice = page.locator('#ppAdminUsersContent [data-email="alice@example.com"]');
+  await alice.click();
+  const detail = alice.locator('.pp-user-detail');
+  await expect(detail).toBeVisible();
+  await expect(detail).toContainText('Favourites (2)');
+  await expect(detail).toContainText('Knokke');
+  await expect(detail).toContainText('Oostende beach');   // spot_label preferred
+  await expect(detail).toContainText('Following (2)');     // 3 reminder rows, Knokke dup → 2 distinct
+  await expect(detail).toContainText('De Panne');
+
+  // Clicking again collapses
+  await alice.click();
+  await expect(detail).toBeHidden();
+});
+
+test('expanding a second user collapses the first (accordion)', async ({ gotoApp, page }) => {
+  await gotoApp('admin', { usersRpc: adminUserRows, adminFavourites, adminReminders });
+  await page.waitForTimeout(300);
+  await page.locator('#burgerBtn').click();
+  await page.locator('#burgerList').getByText('Users').click();
+  const content = page.locator('#ppAdminUsersContent');
+  const alice = content.locator('[data-email="alice@example.com"]');
+  const newbie = content.locator('[data-email="newbie@example.com"]');
+  await alice.click();
+  await expect(alice.locator('.pp-user-detail')).toBeVisible();
+  await newbie.click();
+  await expect(alice.locator('.pp-user-detail')).toBeHidden();
+  await expect(newbie.locator('.pp-user-detail')).toBeVisible();
+});
+
+test('an expanded user stays expanded after re-sorting the list', async ({ gotoApp, page }) => {
+  await gotoApp('admin', { usersRpc: adminUserRows, adminFavourites, adminReminders });
+  await page.waitForTimeout(300);
+  await page.locator('#burgerBtn').click();
+  await page.locator('#burgerList').getByText('Users').click();
+  const content = page.locator('#ppAdminUsersContent');
+  const alice = content.locator('[data-email="alice@example.com"]');
+  await alice.click();
+  await expect(alice.locator('.pp-user-detail')).toBeVisible();
+  // Re-sort the list while alice is open — her card must stay expanded.
+  await content.locator('#ppUsersSortBar [data-sort="seen"]').click();
+  await expect(content.locator('[data-email="alice@example.com"] .pp-user-detail')).toBeVisible();
+  await expect(content.locator('[data-email="alice@example.com"] .pp-user-detail')).toContainText('Favourites (2)');
+});
+
+test('a user with no favourites or follows shows empty states', async ({ gotoApp, page }) => {
+  await gotoApp('admin', { usersRpc: adminUserRows, adminFavourites, adminReminders });
+  await page.waitForTimeout(300);
+  await page.locator('#burgerBtn').click();
+  await page.locator('#burgerList').getByText('Users').click();
+  const newbie = page.locator('#ppAdminUsersContent [data-email="newbie@example.com"]');
+  await newbie.click();
+  const detail = newbie.locator('.pp-user-detail');
+  await expect(detail).toContainText('No favourites');
+  await expect(detail).toContainText('Not following any spots');
 });
