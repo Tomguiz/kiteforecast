@@ -1,5 +1,5 @@
 import { test, expect } from '../fixtures/auth';
-import { adminUserRows } from '../fixtures/seed-data';
+import { adminUserRows, adminFavourites, adminReminders } from '../fixtures/seed-data';
 
 test('admin can open the Admin panel', async ({ gotoApp, page }) => {
   await gotoApp('admin');
@@ -96,4 +96,42 @@ test('Users section shows an error state when the RPC fails', async ({ gotoApp, 
   await page.locator('#burgerBtn').click();
   await page.locator('#burgerList').getByText('Users').click();
   await expect(page.locator('#ppAdminUsersContent')).toContainText(/couldn.?t load users/i);
+});
+
+test('Users cards show the nickname when present, email-only when null', async ({ gotoApp, page }) => {
+  await gotoApp('admin', { usersRpc: adminUserRows });
+  await page.waitForTimeout(300);
+  await page.locator('#burgerBtn').click();
+  await page.locator('#burgerList').getByText('Users').click();
+  const content = page.locator('#ppAdminUsersContent');
+  // The email LINE (not the whole card) shows "email · nickname" when present.
+  await expect(content.locator('[data-email="alice@example.com"] .pp-user-email')).toHaveText('alice@example.com · Alice');
+  // newbie has null nickname → email line is the bare email, no separator.
+  await expect(content.locator('[data-email="newbie@example.com"] .pp-user-email')).toHaveText('newbie@example.com');
+});
+
+test('Users list sorts by created (default) then by last seen, and flips direction', async ({ gotoApp, page }) => {
+  await gotoApp('admin', { usersRpc: adminUserRows });
+  await page.waitForTimeout(300);
+  await page.locator('#burgerBtn').click();
+  await page.locator('#burgerList').getByText('Users').click();
+  const content = page.locator('#ppAdminUsersContent');
+
+  const order = async () => (await content.innerText());
+  // Default: created desc → newbie (Jun 22) before alice (Jun 20) before admin (Jan 1)
+  let t = await order();
+  expect(t.indexOf('newbie@example.com')).toBeLessThan(t.indexOf('alice@example.com'));
+  expect(t.indexOf('alice@example.com')).toBeLessThan(t.indexOf('admin@test.dev'));
+
+  // Sort by Last seen → admin (Jun 24) before alice (Jun 23); newbie (null) last.
+  await content.locator('#ppUsersSortBar [data-sort="seen"]').click();
+  t = await order();
+  expect(t.indexOf('admin@test.dev')).toBeLessThan(t.indexOf('alice@example.com'));
+  expect(t.indexOf('alice@example.com')).toBeLessThan(t.indexOf('newbie@example.com'));
+
+  // Click active Last seen again → flip to asc → alice before admin; newbie still last (null sinks).
+  await content.locator('#ppUsersSortBar [data-sort="seen"]').click();
+  t = await order();
+  expect(t.indexOf('alice@example.com')).toBeLessThan(t.indexOf('admin@test.dev'));
+  expect(t.indexOf('admin@test.dev')).toBeLessThan(t.indexOf('newbie@example.com'));
 });
