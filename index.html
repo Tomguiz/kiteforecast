@@ -1821,11 +1821,13 @@ function tdsSparkSVG(knArr,color){
   const W=58,H=26,MAXK=45;
   const pts=(knArr||[]).filter(v=>v!=null&&!isNaN(v));
   if(pts.length===0) return `<svg class="tds-spark" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"></svg>`;
-  // single point → flat line across the card
-  const n=pts.length, stepX=n>1?W/(n-1):0;
+  const n=pts.length;
   const y=kn=>H-Math.min(kn,MAXK)/MAXK*(H-2)-1; // 1px top/bottom inset
-  const line=pts.map((kn,i)=>`${(i*stepX).toFixed(1)},${y(kn).toFixed(1)}`).join(' ');
-  const area=`0,${H} `+line+` ${(n>1?W:0).toFixed(1)},${H}`;
+  // single point → flat line spanning the full card width; multi-point → profile
+  const line=n===1
+    ?`0,${y(pts[0]).toFixed(1)} ${W},${y(pts[0]).toFixed(1)}`
+    :pts.map((kn,i)=>`${(i*(W/(n-1))).toFixed(1)},${y(kn).toFixed(1)}`).join(' ');
+  const area=`0,${H} `+line+` ${W},${H}`;
   return `<svg class="tds-spark" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">`
     +`<polygon points="${area}" fill="${color}" fill-opacity="0.22"/>`
     +`<polyline points="${line}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>`
