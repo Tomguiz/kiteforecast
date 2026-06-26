@@ -48,9 +48,7 @@ test('16-day rail renders one day-card per day with min/max, emoji and session g
     // windDirs is a Set in this app (see index.html ~line 1676). Include NW (315°)
     // so day0's NW hours qualify.
     // @ts-expect-error app globals — let windDirs is not on window
-    if (!(windDirs instanceof Set)) windDirs = new Set();
-    // @ts-expect-error app globals
-    windDirs.add(315);
+    windDirs = new Set([315]);
 
     w.renderGrid();
   });
@@ -58,9 +56,10 @@ test('16-day rail renders one day-card per day with min/max, emoji and session g
   const cards = page.locator('#tdsCols .tds-day-card');
   await expect(cards).toHaveCount(2);
 
-  // Day 0: sunny session card shows max 25 and the clear emoji, with session glow
+  // Day 0: sunny session card shows min 14 and max 25 and the clear emoji, with session glow
   const card0 = cards.nth(0);
   await expect(card0).toHaveClass(/has-session/);
+  await expect(card0.locator('.tds-dc-range')).toContainText('14');
   await expect(card0.locator('.tds-dc-range')).toContainText('25');
   await expect(card0.locator('.tds-dc-wx')).toContainText('☀️');
 
@@ -91,15 +90,11 @@ test('tapping a day-card opens the day modal for that date', async ({ gotoApp, p
       sunrise: [`${D0}T05:54`], sunset: [`${D0}T21:29`],
     } };
     // @ts-expect-error app globals — let windDirs is not on window
-    if (!(windDirs instanceof Set)) windDirs = new Set();
-    // @ts-expect-error app globals
-    windDirs.add(315);
+    windDirs = new Set([315]);
 
     // spy on openModal
     w.__openedWith = null;
-    const orig = w.openModal;
     w.openModal = (dateStr: string, i: number) => { w.__openedWith = [dateStr, i]; };
-    w.__origOpenModal = orig;
 
     w.renderGrid();
   });
