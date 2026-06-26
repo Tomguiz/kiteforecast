@@ -1826,6 +1826,23 @@ function windBarColor(kn){
 }
 function windBarPct(kn){ return Math.min(Math.round(kn/45*100),100); }
 
+// Filled area sparkline of an array of knots, normalized to MAX_KN=45.
+// Returns an inline SVG string (~58×26 viewBox). Empty/blank if no data.
+function tdsSparkSVG(knArr,color){
+  const W=58,H=26,MAXK=45;
+  const pts=(knArr||[]).filter(v=>v!=null&&!isNaN(v));
+  if(pts.length===0) return `<svg class="tds-spark" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"></svg>`;
+  // single point → flat line across the card
+  const n=pts.length, stepX=n>1?W/(n-1):0;
+  const y=kn=>H-Math.min(kn,MAXK)/MAXK*(H-2)-1; // 1px top/bottom inset
+  const line=pts.map((kn,i)=>`${(i*stepX).toFixed(1)},${y(kn).toFixed(1)}`).join(' ');
+  const area=`0,${H} `+line+` ${(n>1?W:0).toFixed(1)},${H}`;
+  return `<svg class="tds-spark" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">`
+    +`<polygon points="${area}" fill="${color}" fill-opacity="0.22"/>`
+    +`<polyline points="${line}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>`
+    +`</svg>`;
+}
+
 function classifyHour(kn,dir,code,gustKn=0){
   const sp=speedTier(kn);
   if(isRainy(code)) return {type:'rain',qualifying:false};
@@ -4057,45 +4074,33 @@ function renderGrid(){
   if(strip){
     const MIN_KN=0, MAX_KN=45;
     const RANGE=MAX_KN-MIN_KN;
-    const BAR_H=90; // px — must match .tds-bar-wrap height in CSS
     const now2=new Date();
     const pad2=n=>String(n).padStart(2,'0');
     const localStr=`${now2.getFullYear()}-${pad2(now2.getMonth()+1)}-${pad2(now2.getDate())}`;
 
-    // y-axis labels and gridlines at 15 / 25 / 35 kn
-    const knTop=kn=>Math.round((1-kn/MAX_KN)*BAR_H);
-    $('tdsYAxis').innerHTML=
-      `<div class="tds-y-lbl" style="top:0px">45</div>`+
-      [35,25,15].map(kn=>`<div class="tds-y-lbl" style="top:${knTop(kn)}px">${kn}</div>`).join('')+
-      `<div class="tds-y-lbl" style="top:${BAR_H}px">kn</div>`;
-    $('tdsGrid').innerHTML=[15,25,35].map(kn=>{
-      const btm=Math.round(kn/MAX_KN*BAR_H);
-      return `<div class="tds-gridline" style="bottom:${btm}px"></div>`;
-    }).join('');
-
     $('tdsCols').innerHTML=daily.time.map((dateStr,i)=>{
-      const {goodHours:gh,peakKn}=buildDay(dateStr,daily.sunrise[i],daily.sunset[i]);
+      const {day,goodHours:gh}=buildDay(dateStr,daily.sunrise[i],daily.sunset[i]);
       const hasSession=gh>=2;
-      const kn=hasSession?peakKn:0;
-      const gustKn=hasSession?(toKnotsR(daily.windgusts_10m_max[i])||0):0;
-      // both bars only shown for qualifying sessions
-      const pct=hasSession?Math.round(Math.min(kn,MAX_KN)/MAX_KN*100):0;
-      const gustPct=hasSession&&gustKn>kn?Math.round(Math.min(gustKn,MAX_KN)/MAX_KN*100):0;
-      const gustExt=Math.max(0,gustPct-pct);
-      const col=kn>MAX_KN?'#ef4444':hasSession?windBarColor(kn):'transparent';
-      const knLabel=hasSession&&kn>0?`<div class="tds-kn-lbl">${kn}</div>`:'';
-      const gustLabel=hasSession&&gustExt>0&&gustKn>kn?`<div class="tds-gust-kn-lbl">↑${gustKn}</div>`:'';
+      const kns=day.map(h=>h.kn).filter(v=>v!=null&&!isNaN(v));
+      const hasData=kns.length>0;
+      const minKn=hasData?Math.round(Math.min(...kns)):null;
+      const maxKn=hasData?Math.round(Math.max(...kns)):null;
+      const [emoji]=wmoInfo(daily.weather_code[i]);
+      const sparkColor=hasData?windBarColor(maxKn):'#475569';
+      const spark=tdsSparkSVG(kns,sparkColor);
+
       const isNow=dateStr===localStr;
       const {short}=fmtDate(dateStr);
-      const lbl=isNow?'Now':(short==='Today'||short==='Tomorrow')?new Date(dateStr+'T12:00:00').toLocaleDateString('en',{weekday:'short'}):short;
+      const lbl=isNow?'Now':(short==='Today'||short==='Tomorrow')
+        ?new Date(dateStr+'T12:00:00').toLocaleDateString('en',{weekday:'short'}):short;
       const dayNum=dateStr.slice(8).replace(/^0/,'');
-      return `<div class="tds-col${isNow?' tds-now':''}" onclick="openModal('${dateStr}',${i})" title="${kn?kn+'kn':''} ${gustKn?'↑'+gustKn+'kn gust':''} · ${gh}h qualifying">
-        <div class="tds-bar-wrap">
-          <div class="tds-bar" style="height:${pct}%;background:${col}">${knLabel}</div>
-          ${gustExt>0?`<div class="tds-bar tds-gust-bar" style="height:${gustExt}%;bottom:${pct}%;background:rgba(255,255,255,.28)">${gustLabel}</div>`:''}
-        </div>
-        <div class="tds-num">${dayNum}</div>
-        <div class="tds-lbl">${lbl}</div>
+      const rangeTxt=hasData?`${minKn} <span class="tds-dc-sep">/</span> ${maxKn}`:`— <span class="tds-dc-sep">/</span> —`;
+      const titleTxt=hasData?`${minKn}-${maxKn}kn · ${gh}h qualifying`:'no data';
+
+      return `<div class="tds-day-card${hasSession?' has-session':''}${isNow?' tds-now':''}" onclick="openModal('${dateStr}',${i})" title="${titleTxt}">
+        <div class="tds-dc-head"><span class="tds-dc-day">${lbl} ${dayNum}</span><span class="tds-dc-wx">${emoji}</span></div>
+        <div class="tds-dc-range">${rangeTxt}</div>
+        <div class="tds-dc-spark">${spark}</div>
       </div>`;
     }).join('');
 
