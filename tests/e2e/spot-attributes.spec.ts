@@ -69,3 +69,49 @@ test('the spot-info card body shows the attributes block when set', async ({ got
   await expect(page.locator('.spot-attr-conditions')).toContainText('Flat');
   await expect(page.locator('.spot-attr-conditions')).toContainText('Quiet');
 });
+
+test('the admin edit form prefills + toggles attribute buttons', async ({ gotoApp, page }) => {
+  await gotoApp('admin');
+  // Open admin panel and wait for it to finish rendering (renderAdminPanel is async)
+  await page.evaluate(() => { openProfilePanel('admin'); });
+  await page.waitForFunction(() => !!document.getElementById('adminEditForm'));
+  const result = await page.evaluate(() => {
+    // render the form prefilled with a spot that has some attributes
+    adminOpenSpot(null, {
+      spot_name: 'Edit Me', _lat: 51, _lon: 3, _loc: 'BE',
+      disciplines: ['Twintip'], facilities: [],
+      water_type: 'Flat', tide_pref: null, crowd_level: null, skill_level: null,
+    });
+    // prefill: Twintip + Flat active
+    const twintipActive = !!document.querySelector('#adDisciplines .s-btn.active[data-val="Twintip"]');
+    const flatActive = !!document.querySelector('#adWaterType .s-btn.active[data-val="Flat"]');
+    // toggle: add Wing discipline, switch water to Choppy (radio)
+    (document.querySelector('#adDisciplines .s-btn[data-val="Wing"]') as HTMLButtonElement).click();
+    (document.querySelector('#adWaterType .s-btn[data-val="Choppy"]') as HTMLButtonElement).click();
+    return {
+      twintipActive, flatActive,
+      disciplines: readMultiAttr('adDisciplines'),
+      water: readSingleAttr('adWaterType'),
+      // single-select must have cleared 'Flat'
+      flatStillActive: !!document.querySelector('#adWaterType .s-btn.active[data-val="Flat"]'),
+    };
+  });
+  expect(result.twintipActive).toBe(true);
+  expect(result.flatActive).toBe(true);
+  expect(result.disciplines.sort()).toEqual(['Twintip', 'Wing']);
+  expect(result.water).toBe('Choppy');
+  expect(result.flatStillActive).toBe(false); // radio behaviour
+});
+
+test('read helpers return null when nothing selected', async ({ gotoApp, page }) => {
+  await gotoApp('admin');
+  // Open admin panel and wait for it to finish rendering (renderAdminPanel is async)
+  await page.evaluate(() => { openProfilePanel('admin'); });
+  await page.waitForFunction(() => !!document.getElementById('adminEditForm'));
+  const r = await page.evaluate(() => {
+    adminOpenSpot(null, { spot_name: 'Empty', _lat: 51, _lon: 3, _loc: 'BE' });
+    return { disc: readMultiAttr('adDisciplines'), water: readSingleAttr('adWaterType') };
+  });
+  expect(r.disc).toBeNull();
+  expect(r.water).toBeNull();
+});
