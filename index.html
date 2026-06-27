@@ -210,27 +210,26 @@
     }
     #tdsChart::-webkit-scrollbar { height:3px; }
     #tdsChart::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
-    /* day-card rail */
-    #tdsCols { display:flex; align-items:stretch; gap:8px; padding:2px 4px 4px; }
+    /* day-card rail — compact so ~5.5 cards show on mobile */
+    #tdsCols { display:flex; align-items:stretch; gap:5px; padding:2px 4px 4px; }
     .tds-day-card {
-      flex:0 0 auto; min-width:62px; display:flex; flex-direction:column; gap:5px;
-      padding:8px 8px 6px; border-radius:12px; background:var(--card);
+      flex:0 0 auto; min-width:44px; display:flex; flex-direction:column; gap:4px;
+      padding:6px 3px 5px; border-radius:10px; background:var(--card);
       border:1px solid var(--border); cursor:pointer; position:relative;
       transition:transform .15s ease, border-color .15s ease, box-shadow .15s ease;
     }
     .tds-day-card:active { transform:translateY(-1px); }
-    .tds-day-card.tds-now { border-color:var(--accent); }
     .tds-day-card.has-session {
       border-color:rgba(34,197,94,.55);
       box-shadow:0 0 0 1px rgba(34,197,94,.18), 0 4px 16px rgba(34,197,94,.10);
     }
-    .tds-dc-head { display:flex; align-items:center; justify-content:space-between; gap:4px; }
-    .tds-dc-day { font-size:.62rem; font-weight:600; color:var(--text); white-space:nowrap; letter-spacing:.01em; }
-    .tds-dc-wx  { font-size:.78rem; line-height:1; }
-    .tds-dc-range { font-size:.82rem; font-weight:700; color:var(--text); letter-spacing:.01em; }
-    .tds-dc-sep { color:var(--tdim); font-weight:400; margin:0 1px; }
+    .tds-dc-head { display:flex; align-items:center; justify-content:space-between; gap:1px; }
+    .tds-dc-day { font-size:.52rem; font-weight:600; color:var(--text); white-space:nowrap; letter-spacing:-.03em; }
+    .tds-dc-wx  { font-size:.64rem; line-height:1; }
+    .tds-dc-range { font-size:.64rem; font-weight:700; color:var(--text); letter-spacing:-.02em; white-space:nowrap; }
+    .tds-dc-gust { color:var(--tdim); font-weight:600; font-size:.57rem; }
     .tds-dc-spark { margin-top:auto; line-height:0; }
-    .tds-spark { display:block; width:100%; height:26px; }
+    .tds-spark { display:block; width:100%; height:24px; }
 
     .forecast-grid {
       display: grid;
@@ -4121,14 +4120,16 @@ function renderGrid(){
     const localStr=`${now2.getFullYear()}-${pad2(now2.getMonth()+1)}-${pad2(now2.getDate())}`;
 
     $('tdsCols').innerHTML=daily.time.map((dateStr,i)=>{
-      const {day,goodHours:gh}=buildDay(dateStr,daily.sunrise[i],daily.sunset[i]);
+      const {day,goodHours:gh,peakKn,peakDayKn}=buildDay(dateStr,daily.sunrise[i],daily.sunset[i]);
       const hasSession=gh>=2;
       // valid-kn daylight hours drive both the spark and the green-window mask,
       // so the two stay index-aligned even if some hours lack a windspeed
       const validHrs=day.filter(h=>h.kn!=null&&!isNaN(h.kn));
       const kns=validHrs.map(h=>h.kn);
       const hasData=kns.length>0;
-      const minKn=hasData?Math.round(Math.min(...kns)):null;
+      // same two numbers as the forecast cards below: peak qualifying wind ↑ max gust
+      const dispKn=peakKn||peakDayKn;
+      const gustKn=toKnotsR(daily.windgusts_10m_max[i]);
       const maxKn=hasData?Math.round(Math.max(...kns)):null;
       const [emoji]=wmoInfo(daily.weather_code[i]);
       const sparkColor=hasData?windBarColor(maxKn):'#475569';
@@ -4141,10 +4142,10 @@ function renderGrid(){
       const lbl=isNow?'Now':(short==='Today'||short==='Tomorrow')
         ?new Date(dateStr+'T12:00:00').toLocaleDateString('en',{weekday:'short'}):short;
       const dayNum=dateStr.slice(8).replace(/^0/,'');
-      const rangeTxt=hasData?`${minKn} <span class="tds-dc-sep">/</span> ${maxKn}`:`— <span class="tds-dc-sep">/</span> —`;
-      const titleTxt=hasData?`${minKn}-${maxKn}kn · ${gh}h qualifying`:'no data';
+      const rangeTxt=hasData?`${dispKn}<span class="tds-dc-gust"> ↑${gustKn}</span>`:'—';
+      const titleTxt=hasData?`${dispKn}kn · ↑${gustKn}kn gust · ${gh}h qualifying`:'no data';
 
-      return `<div class="tds-day-card${hasSession?' has-session':''}${isNow?' tds-now':''}" onclick="openModal('${dateStr}',${i})" title="${titleTxt}">
+      return `<div class="tds-day-card${hasSession?' has-session':''}" onclick="openModal('${dateStr}',${i})" title="${titleTxt}">
         <div class="tds-dc-head"><span class="tds-dc-day">${lbl} ${dayNum}</span><span class="tds-dc-wx">${emoji}</span></div>
         <div class="tds-dc-range">${rangeTxt}</div>
         <div class="tds-dc-spark">${spark}</div>

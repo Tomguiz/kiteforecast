@@ -56,11 +56,12 @@ test('16-day rail renders one day-card per day with min/max, emoji and session g
   const cards = page.locator('#tdsCols .tds-day-card');
   await expect(cards).toHaveCount(2);
 
-  // Day 0: sunny session card shows min 14 and max 25 and the clear emoji, with session glow
+  // Day 0: sunny session card shows peak wind 25 ↑ max gust 28, clear emoji, glow.
+  // (matches the forecast cards below: peakKn / toKnotsR(windgusts_10m_max)=28)
   const card0 = cards.nth(0);
   await expect(card0).toHaveClass(/has-session/);
-  await expect(card0.locator('.tds-dc-range')).toContainText('14');
-  await expect(card0.locator('.tds-dc-range')).toContainText('25');
+  await expect(card0.locator('.tds-dc-range')).toContainText('25'); // peak qualifying wind
+  await expect(card0.locator('.tds-dc-range')).toContainText('28'); // max gust (↑)
   await expect(card0.locator('.tds-dc-wx')).toContainText('☀️');
 
   // Day 1: light/rainy card — no session glow
