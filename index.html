@@ -4226,7 +4226,11 @@ function renderGrid(){
       // daylight weather (not the 24h daily code) so a night-only shower doesn't
       // mislabel the card — consistent with the forecast cards + hourly detail
       const [emoji]=wmoInfo(daylightWeatherCode(day,daily.weather_code[i]));
-      const sparkColor=hasData?windBarColor(maxKn):'#475569';
+      // colour the base line by strength ONLY when the day is actually rideable
+      // (a 2h+ qualifying window); otherwise grey, so a strong-but-wrong-dir or
+      // rainy day doesn't show a misleading green line. The green-window overlay
+      // still marks exactly when conditions are good.
+      const sparkColor=(hasData&&hasSession)?windBarColor(maxKn):'#475569';
       // mask the 2h+ consecutive good-wind window so the spark highlights it green
       const winMask=hasSession?dayGoodWindowMask(validHrs.map(h=>({hr:h.hour,kn:h.kn,dir:h.dir,code:h.code,gustKn:h.gustKn}))):null;
       const spark=tdsSparkSVG(kns,sparkColor,winMask);
