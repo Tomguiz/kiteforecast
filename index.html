@@ -841,6 +841,13 @@
     .spot-info-badge.verified { color:#4ade80; border-color:rgba(74,222,128,.3); background:rgba(74,222,128,.08); }
     .spot-info-badge.unverified { color:var(--tdim); border-color:var(--border); }
     .spot-info-body { padding:16px 18px; display:flex; flex-direction:column; gap:12px; }
+    .spot-attr-block { display:flex; flex-direction:column; gap:6px; }
+    .spot-attr-label { font-size:.62rem; font-weight:700; color:var(--tdim); text-transform:uppercase; letter-spacing:.04em; margin-top:4px; }
+    .spot-attr-chips { display:flex; flex-wrap:wrap; gap:5px; }
+    .spot-chip { background:rgba(255,255,255,.06); border:1px solid var(--border); border-radius:999px; padding:3px 9px; font-size:.7rem; color:var(--text); white-space:nowrap; }
+    .spot-chip-disc { background:rgba(0,212,255,.12); border-color:rgba(0,212,255,.3); color:#7dd3fc; }
+    .spot-attr-conditions { display:flex; flex-wrap:wrap; gap:12px; margin-top:4px; font-size:.72rem; color:var(--text); }
+    .spot-attr-cond-lbl { color:var(--tdim); }
     .spot-info-ctas { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
     .spot-cta-btn { display:flex; align-items:center; justify-content:center; gap:7px; padding:12px 10px; border-radius:10px; border:none; font-size:.82rem; font-weight:700; cursor:pointer; text-decoration:none; transition:opacity .15s; }
     .spot-cta-btn:hover { opacity:.85; }
@@ -3617,13 +3624,12 @@ function spotAttributesHTML(info){
   ].filter(Boolean);
   if(!disc.length&&!fac.length&&!conds.length) return '';
   let html='<div class="spot-attr-block">';
-  if(disc.length){
-    html+='<div class="spot-attr-label">🪁 Disciplines</div><div class="spot-attr-chips">'
-      +disc.map(d=>`<span class="spot-chip spot-chip-disc">${d}</span>`).join('')+'</div>';
-  }
-  if(fac.length){
-    html+='<div class="spot-attr-label">🏖️ Facilities</div><div class="spot-attr-chips">'
-      +fac.map(f=>`<span class="spot-chip">${FACILITY_EMOJI[f]?FACILITY_EMOJI[f]+' ':''}${f}</span>`).join('')+'</div>';
+  const allChips=[
+    ...disc.map(d=>`<span class="spot-chip spot-chip-disc">${d}</span>`),
+    ...fac.map(f=>`<span class="spot-chip">${FACILITY_EMOJI[f]?FACILITY_EMOJI[f]+' ':''}${f}</span>`),
+  ];
+  if(allChips.length){
+    html+='<div class="spot-attr-chips">'+allChips.join('')+'</div>';
   }
   if(conds.length){
     html+='<div class="spot-attr-conditions">'
@@ -3729,6 +3735,7 @@ async function renderSpotInfoCard(spotName) {
         </div>
       </div>
       <div class="spot-info-body" style="display:none">
+        ${spotAttributesHTML(info)}
         ${ctaGrid}
         ${metaHTML}
         ${descHTML}
@@ -3745,6 +3752,7 @@ async function renderSpotInfoCard(spotName) {
         </div>
       </div>
     </div>`;
+  if(typeof showOnly==='function') showOnly('results');
 }
 
 async function trackCtaClick(spotName, ctaType) {

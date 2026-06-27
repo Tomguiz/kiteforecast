@@ -39,3 +39,22 @@ test('spotAttributesHTML omits unset sub-parts (only disciplines set)', async ({
   expect(html).not.toContain('spot-attr-conditions'); // no scalar row
   expect(html).not.toContain('Facilities');
 });
+
+test('the spot-info card body shows the attributes block when set', async ({ gotoApp, page }) => {
+  await gotoApp('signedOut');
+  await page.evaluate(() => {
+    // stub fetchSpotInfo to return a populated info row, then render
+    (window as any).fetchSpotInfo = async () => ({
+      spot_name: 'Test Spot', verified: true,
+      disciplines: ['Twintip'], facilities: ['Kiteshop'],
+      water_type: 'Flat', tide_pref: null, crowd_level: 'Quiet', skill_level: null,
+    });
+  });
+  await page.evaluate(() => renderSpotInfoCard('Test Spot'));
+  // expand the card body (it starts collapsed)
+  await page.locator('.spot-info-header').click();
+  await expect(page.locator('.spot-attr-block')).toBeVisible();
+  await expect(page.locator('.spot-attr-chips')).toContainText('Twintip');
+  await expect(page.locator('.spot-attr-conditions')).toContainText('Flat');
+  await expect(page.locator('.spot-attr-conditions')).toContainText('Quiet');
+});
