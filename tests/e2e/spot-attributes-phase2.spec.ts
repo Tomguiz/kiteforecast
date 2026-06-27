@@ -44,3 +44,35 @@ test('an attributes-only suggestion (no dir/tip) is allowed', async ({ gotoApp, 
   const body = (await req).postData() || '';
   expect(body).toContain('Wing'); // submitted, not blocked by the dir/tip guard
 });
+
+test('suggestionAttrSummary joins present attributes and is empty when none', async ({ gotoApp, page }) => {
+  await gotoApp('signedOut');
+  const { full, empty } = await page.evaluate(() => ({
+    full: suggestionAttrSummary({ disciplines: ['Twintip','Wing'], facilities: ['Kiteshop'],
+      water_type: 'Flat', tide_pref: null, crowd_level: 'Crowded', skill_level: null }),
+    empty: suggestionAttrSummary({ disciplines: null, facilities: null, water_type: null,
+      tide_pref: null, crowd_level: null, skill_level: null }),
+  }));
+  expect(full).toContain('Twintip');
+  expect(full).toContain('Kiteshop');
+  expect(full).toContain('Flat');
+  expect(full).toContain('Crowded');
+  expect(empty).toBe('');
+});
+
+test('adminApplyUpdate writes the attribute fields to spot_info (replace, incl. clear)', async ({ gotoApp, page }) => {
+  await gotoApp('admin');
+  await page.waitForTimeout(300);
+  const req = page.waitForRequest(r =>
+    r.url().includes('/rest/v1/spot_info') && (r.method() === 'POST' || r.method() === 'PATCH'));
+  await page.evaluate(() => {
+    adminApplyUpdate({ id: 'x1', spot_name: 'Apply Spot',
+      disciplines: ['Twintip'], facilities: null, // facilities explicitly cleared → null
+      water_type: 'Flat', tide_pref: null, crowd_level: 'Crowded', skill_level: null });
+  });
+  const body = (await req).postData() || '';
+  expect(body).toContain('"disciplines"');
+  expect(body).toContain('Twintip');
+  expect(body).toContain('"facilities":null');     // cleared field applied as null
+  expect(body).toContain('"crowd_level":"Crowded"');
+});

@@ -6938,6 +6938,18 @@ function _renderUserSpots(detail,{favs,follows}){
   detail.appendChild(section('🔔','Following',follows,'Not following any spots'));
 }
 
+// Compact one-line summary of a suggestion's attributes for the admin review row.
+function suggestionAttrSummary(u){
+  const parts=[];
+  if(Array.isArray(u.disciplines)&&u.disciplines.length) parts.push('🪁 '+u.disciplines.join(', '));
+  if(Array.isArray(u.facilities)&&u.facilities.length)   parts.push('🏖️ '+u.facilities.join(', '));
+  if(u.water_type)  parts.push('🌊 '+u.water_type);
+  if(u.tide_pref)   parts.push('🌙 '+u.tide_pref);
+  if(u.crowd_level) parts.push('👥 '+u.crowd_level);
+  if(u.skill_level) parts.push('🟢 '+u.skill_level);
+  return parts.join(' · ');
+}
+
 async function renderAdminPanel(){
   const el=$('ppAdminContent'); if(!el) return;
   if(!loadProfile().isAdmin){ el.innerHTML='<div class="stats-empty">Access denied.</div>'; return; }
@@ -6997,6 +7009,7 @@ async function renderAdminPanel(){
       u.address&&`Address: ${u.address}`,
       u.suggested_dirs?.length&&`Dirs: ${dirsLabel}`,
       u.tip&&`Tip: "${u.tip}"`,
+      (()=>{const s=suggestionAttrSummary(u);return s?`Attrs: ${s}`:'';})(),
     ].filter(Boolean).join(' · ');
     return `<div style="background:rgba(0,212,255,.06);border:1px solid rgba(0,212,255,.2);border-radius:10px;padding:12px 14px;margin-bottom:8px;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
@@ -7292,6 +7305,17 @@ async function adminApplyUpdate(u){
   if(u.facebook_url)  updates.facebook_url=u.facebook_url;
   if(u.address)       updates.address=u.address;
   if(u.tip)           updates.spot_tip=u.tip;
+  // REPLACE semantics: if this suggestion carries attributes, apply all 6
+  // (including cleared → null) so the suggester's full intended state takes hold.
+  const _isAttrSugg=('disciplines' in u||'facilities' in u||'water_type' in u||'tide_pref' in u||'crowd_level' in u||'skill_level' in u);
+  if(_isAttrSugg){
+    updates.disciplines=u.disciplines??null;
+    updates.facilities =u.facilities ??null;
+    updates.water_type =u.water_type ??null;
+    updates.tide_pref  =u.tide_pref  ??null;
+    updates.crowd_level=u.crowd_level??null;
+    updates.skill_level=u.skill_level??null;
+  }
   if(Object.keys(updates).length){
     await sb.from('spot_info').upsert({spot_name:u.spot_name,...updates,updated_at:new Date().toISOString()},{onConflict:'spot_name'});
   }
@@ -7320,6 +7344,9 @@ async function adminApplyUpdate(u){
       }
     }
   }
+
+  // If this is an attribute suggestion and the spot is currently open, refresh the card
+  if(_isAttrSugg&&cachedLoc?.name===u.spot_name){ _cachedSpotInfo=null; renderSpotInfoCard(u.spot_name); }
 
   // Mark reviewed + approved
   await sb.from('spot_update_suggestions').update({reviewed:true,approved:true}).eq('id',u.id);
