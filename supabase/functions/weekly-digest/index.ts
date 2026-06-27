@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { pickDeal, buildDealAdHTML, type Deal } from './deals.ts'
 
 const SUPABASE_URL         = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_KEY = Deno.env.get('SB_SERVICE_ROLE_KEY')!
@@ -136,6 +137,12 @@ Deno.serve(async (req) => {
 
   const emails = (profiles ?? []).map((p: any) => p.email)
   if (!emails.length) return new Response(JSON.stringify({ sent: 0 }), { status: 200 })
+
+  // pick one deal for this whole digest run (service-role key bypasses RLS)
+  const { data: deals } = await supabase.from('email_deals').select('*')
+  const pickedDeal = pickDeal((deals ?? []) as Deal[], Date.now())
+  const adHtml = buildDealAdHTML(pickedDeal)
+  let dealImpressions = 0
 
   const { data: favs } = await supabase
     .from('favourites')
@@ -299,6 +306,7 @@ Deno.serve(async (req) => {
       spots_html: spotsHtml,
       no_sessions_html: noSessionsHtml,
       home_link: homeLink,
+      ad_html: adHtml,
     }
 
     await fetch(MAKE_WEBHOOK_URL, {
@@ -307,6 +315,13 @@ Deno.serve(async (req) => {
       body: JSON.stringify(payload),
     })
     sent++
+    if (adHtml) dealImpressions++
+  }
+
+  if (pickedDeal && dealImpressions > 0) {
+    await supabase.from('email_deals')
+      .update({ impressions: (pickedDeal.impressions ?? 0) + dealImpressions })
+      .eq('id', pickedDeal.id)
   }
 
   return new Response(JSON.stringify({ sent, total_users: emails.length }), {

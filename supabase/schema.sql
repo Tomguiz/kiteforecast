@@ -442,3 +442,38 @@ DO $$ BEGIN ALTER TABLE spot_update_suggestions ADD COLUMN skill_level text;   E
 DO $$ BEGIN ALTER TABLE profiles ADD COLUMN contribution_points integer NOT NULL DEFAULT 0; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE profiles ADD COLUMN premium_until timestamptz; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE spot_claims ADD COLUMN status text NOT NULL DEFAULT 'pending'; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+
+-- ─────────────────────────────────────────────────────────────────────────────
+-- Email deal ads (shop sponsorships shown in the weekly digest)
+-- ─────────────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS email_deals (
+  id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  shop_name   text        NOT NULL,
+  headline    text        NOT NULL,
+  body        text,
+  image_url   text,
+  cta_label   text        NOT NULL DEFAULT 'Shop the deal',
+  cta_url     text        NOT NULL,
+  active      boolean     NOT NULL DEFAULT true,
+  weight      integer     NOT NULL DEFAULT 1,
+  starts_at   timestamptz,
+  ends_at     timestamptz,
+  impressions integer     NOT NULL DEFAULT 0,
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+ALTER TABLE email_deals ENABLE ROW LEVEL SECURITY;
+DO $$ BEGIN
+  CREATE POLICY "all_select_email_deals" ON email_deals FOR SELECT TO anon, authenticated USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+-- writes are service-role / SQL only (no public write policy); the weekly-digest
+-- function uses the service-role key, which bypasses RLS.
+
+-- Seed the sponsor deal (idempotent: guarded on cta_url)
+INSERT INTO email_deals (shop_name, headline, body, cta_label, cta_url, active, weight)
+SELECT 'Billy Kite',
+       'Gear up at Billy Kite',
+       'Kites, boards & wetsuits from your local Belgian kite shop — sponsor of KiteForecast.',
+       'Shop Billy Kite →',
+       'https://billykite.be',
+       true, 1
+WHERE NOT EXISTS (SELECT 1 FROM email_deals WHERE cta_url = 'https://billykite.be');
