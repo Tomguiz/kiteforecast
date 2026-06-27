@@ -1830,17 +1830,27 @@ function windBarColor(kn){
 }
 function windBarPct(kn){ return Math.min(Math.round(kn/45*100),100); }
 
+// Day-card sparkline vertical mapping: knots → 0..1 height fraction. Non-linear
+// (power curve, γ<1) so the kiteable mid-range (good/green wind ~15-25kn) rises
+// noticeably higher than a plain linear 0..45 scale, while light wind stays low.
+// Anchored: 0kn → 0, ≥45kn → 1.
+function sparkYFrac(kn){
+  const MAXK=45, GAMMA=0.7;
+  const t=Math.max(0,Math.min(kn,MAXK))/MAXK;
+  return Math.pow(t,GAMMA);
+}
+
 // Filled area sparkline of an array of knots, normalized to MAX_KN=45.
 // Returns an inline SVG string (~58×26 viewBox). Empty/blank if no data.
 // mask (optional): boolean[] aligned to knArr; consecutive true runs are drawn
 // as a bright-green overlay segment on top of the base line (the good-wind
 // window), leaving the rest of the line its base `color`.
 function tdsSparkSVG(knArr,color,mask){
-  const W=58,H=26,MAXK=45,GREEN='#4ade80';
+  const W=58,H=26,GREEN='#4ade80';
   const pts=(knArr||[]).filter(v=>v!=null&&!isNaN(v));
   if(pts.length===0) return `<svg class="tds-spark" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"></svg>`;
   const n=pts.length;
-  const y=kn=>H-Math.min(kn,MAXK)/MAXK*(H-2)-1; // 1px top/bottom inset
+  const y=kn=>H-sparkYFrac(kn)*(H-2)-1; // non-linear lift, 1px top/bottom inset
   const px=i=>n===1?(i===0?0:W):i*(W/(n-1));
   // single point → flat line spanning the full card width; multi-point → profile
   const line=n===1
