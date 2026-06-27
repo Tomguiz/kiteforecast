@@ -50,11 +50,22 @@ test('the spot-info card body shows the attributes block when set', async ({ got
       water_type: 'Flat', tide_pref: null, crowd_level: 'Quiet', skill_level: null,
     });
   });
-  await page.evaluate(() => renderSpotInfoCard('Test Spot'));
+  // renderSpotInfoCard is async (awaits fetchSpotInfo); the #results view is
+  // hidden in this isolated test, so reveal it before interacting (this is a
+  // test-only setup, not an app change).
+  await page.evaluate(async () => {
+    await renderSpotInfoCard('Test Spot');
+    document.getElementById('results')!.style.display = 'block';
+  });
   // expand the card body (it starts collapsed)
   await page.locator('.spot-info-header').click();
   await expect(page.locator('.spot-attr-block')).toBeVisible();
-  await expect(page.locator('.spot-attr-chips')).toContainText('Twintip');
+  // disciplines + facilities each render their own labelled chip row; assert on
+  // the disciplines chips specifically (.spot-chip-disc) to avoid strict-mode
+  await expect(page.locator('.spot-chip-disc')).toContainText('Twintip');
+  await expect(page.locator('.spot-attr-block')).toContainText('🪁 Disciplines');
+  await expect(page.locator('.spot-attr-block')).toContainText('🏖️ Facilities');
+  await expect(page.locator('.spot-attr-block')).toContainText('Kiteshop');
   await expect(page.locator('.spot-attr-conditions')).toContainText('Flat');
   await expect(page.locator('.spot-attr-conditions')).toContainText('Quiet');
 });

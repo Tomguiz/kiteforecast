@@ -3624,12 +3624,13 @@ function spotAttributesHTML(info){
   ].filter(Boolean);
   if(!disc.length&&!fac.length&&!conds.length) return '';
   let html='<div class="spot-attr-block">';
-  const allChips=[
-    ...disc.map(d=>`<span class="spot-chip spot-chip-disc">${d}</span>`),
-    ...fac.map(f=>`<span class="spot-chip">${FACILITY_EMOJI[f]?FACILITY_EMOJI[f]+' ':''}${f}</span>`),
-  ];
-  if(allChips.length){
-    html+='<div class="spot-attr-chips">'+allChips.join('')+'</div>';
+  if(disc.length){
+    html+='<div class="spot-attr-label">🪁 Disciplines</div><div class="spot-attr-chips">'
+      +disc.map(d=>`<span class="spot-chip spot-chip-disc">${d}</span>`).join('')+'</div>';
+  }
+  if(fac.length){
+    html+='<div class="spot-attr-label">🏖️ Facilities</div><div class="spot-attr-chips">'
+      +fac.map(f=>`<span class="spot-chip">${FACILITY_EMOJI[f]?FACILITY_EMOJI[f]+' ':''}${f}</span>`).join('')+'</div>';
   }
   if(conds.length){
     html+='<div class="spot-attr-conditions">'
@@ -3752,7 +3753,6 @@ async function renderSpotInfoCard(spotName) {
         </div>
       </div>
     </div>`;
-  if(typeof showOnly==='function') showOnly('results');
 }
 
 async function trackCtaClick(spotName, ctaType) {
