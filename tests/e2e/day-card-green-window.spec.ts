@@ -79,3 +79,25 @@ test('the day-card sparkline gets a green window for a rideable day', async ({ g
   });
   expect(hasGreen).toBe(true);
 });
+
+test('a non-rideable day-card sparkline has no green window', async ({ gotoApp, page }) => {
+  await gotoApp('signedOut');
+  const hasGreen = await page.evaluate(() => {
+    windDirs = new Set([315]);
+    const D = '2026-06-27';
+    const m = new Map<number, any>();
+    // all light wind — no qualifying hours, so no 2h window
+    for (let hr = 9; hr <= 15; hr++) m.set(hr, { kn: 7 + (hr % 2), dir: 315, code: 0, gustKn: 10 });
+    cachedHrMap = new Map([[D, m]]);
+    cachedLoc = { name: 'T', latitude: 51.35, longitude: 3.28, country: 'BE' };
+    cachedWx = { daily: {
+      time: [D], weather_code: [0],
+      temperature_2m_max: [22], temperature_2m_min: [15], windgusts_10m_max: [13],
+      sunrise: [`${D}T05:54`], sunset: [`${D}T21:29`],
+    } };
+    renderGrid();
+    const card = document.querySelector('#tdsCols .tds-day-card')!;
+    return card.querySelector('.tds-dc-spark')!.innerHTML.includes('#4ade80');
+  });
+  expect(hasGreen).toBe(false);
+});

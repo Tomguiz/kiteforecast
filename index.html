@@ -1839,7 +1839,9 @@ function tdsSparkSVG(knArr,color,mask){
     while(i<n){
       if(!mask[i]){ i++; continue; }
       let j=i; while(j+1<n&&mask[j+1]) j++;
-      // a single masked point would draw nothing; nudge to include a neighbour
+      // defensive: a lone masked point can't draw a line, so extend to a
+      // neighbour. (dayGoodWindowMask never emits a lone point — every marked
+      // hour has a marked neighbour — but keep this for hand-built masks.)
       const a=i===j?Math.max(0,i-1):i, b=i===j?Math.min(n-1,i+1):j;
       const seg=[];
       for(let k=a;k<=b;k++) seg.push(`${px(k).toFixed(1)},${y(pts[k]).toFixed(1)}`);
