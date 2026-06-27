@@ -1817,20 +1817,42 @@ function windBarPct(kn){ return Math.min(Math.round(kn/45*100),100); }
 
 // Filled area sparkline of an array of knots, normalized to MAX_KN=45.
 // Returns an inline SVG string (~58×26 viewBox). Empty/blank if no data.
-function tdsSparkSVG(knArr,color){
-  const W=58,H=26,MAXK=45;
+// mask (optional): boolean[] aligned to knArr; consecutive true runs are drawn
+// as a bright-green overlay segment on top of the base line (the good-wind
+// window), leaving the rest of the line its base `color`.
+function tdsSparkSVG(knArr,color,mask){
+  const W=58,H=26,MAXK=45,GREEN='#4ade80';
   const pts=(knArr||[]).filter(v=>v!=null&&!isNaN(v));
   if(pts.length===0) return `<svg class="tds-spark" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"></svg>`;
   const n=pts.length;
   const y=kn=>H-Math.min(kn,MAXK)/MAXK*(H-2)-1; // 1px top/bottom inset
+  const px=i=>n===1?(i===0?0:W):i*(W/(n-1));
   // single point → flat line spanning the full card width; multi-point → profile
   const line=n===1
     ?`0,${y(pts[0]).toFixed(1)} ${W},${y(pts[0]).toFixed(1)}`
-    :pts.map((kn,i)=>`${(i*(W/(n-1))).toFixed(1)},${y(kn).toFixed(1)}`).join(' ');
+    :pts.map((kn,i)=>`${px(i).toFixed(1)},${y(kn).toFixed(1)}`).join(' ');
   const area=`0,${H} `+line+` ${W},${H}`;
+  // green overlay: one polyline per maximal run of consecutive masked points
+  let overlay='';
+  if(Array.isArray(mask)&&mask.length===pts.length&&n>1){
+    let i=0;
+    while(i<n){
+      if(!mask[i]){ i++; continue; }
+      let j=i; while(j+1<n&&mask[j+1]) j++;
+      // defensive: a lone masked point can't draw a line, so extend to a
+      // neighbour. (dayGoodWindowMask never emits a lone point — every marked
+      // hour has a marked neighbour — but keep this for hand-built masks.)
+      const a=i===j?Math.max(0,i-1):i, b=i===j?Math.min(n-1,i+1):j;
+      const seg=[];
+      for(let k=a;k<=b;k++) seg.push(`${px(k).toFixed(1)},${y(pts[k]).toFixed(1)}`);
+      overlay+=`<polyline points="${seg.join(' ')}" fill="none" stroke="${GREEN}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+      i=j+1;
+    }
+  }
   return `<svg class="tds-spark" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">`
     +`<polygon points="${area}" fill="${color}" fill-opacity="0.22"/>`
     +`<polyline points="${line}" fill="none" stroke="${color}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>`
+    +overlay
     +`</svg>`;
 }
 
@@ -1860,6 +1882,13 @@ function dayGoodHours(hours,dirOK=isWindDirOK){
   const good=hours.filter(h=>hourQualifies(h.kn,h.dir,h.code,h.gustKn||0,dirOK));
   const qualSet=new Set(good.map(h=>h.hr));
   return good.filter(h=>qualSet.has(h.hr-1)||qualSet.has(h.hr+1)).length;
+}
+// Per-hour boolean mask (aligned to `hours`) marking hours that are part of a
+// 2+ consecutive (by clock hour) qualifying run — i.e. the exact hours that
+// dayGoodHours counts. Used to paint the green good-window on a day-card spark.
+function dayGoodWindowMask(hours,dirOK=isWindDirOK){
+  const qualSet=new Set(hours.filter(h=>hourQualifies(h.kn,h.dir,h.code,h.gustKn||0,dirOK)).map(h=>h.hr));
+  return hours.map(h=>qualSet.has(h.hr)&&(qualSet.has(h.hr-1)||qualSet.has(h.hr+1)));
 }
 function conditionLabel(kn,dir,code,temp,gustKn=0){
   const sp=speedTier(kn);
@@ -4094,13 +4123,18 @@ function renderGrid(){
     $('tdsCols').innerHTML=daily.time.map((dateStr,i)=>{
       const {day,goodHours:gh}=buildDay(dateStr,daily.sunrise[i],daily.sunset[i]);
       const hasSession=gh>=2;
-      const kns=day.map(h=>h.kn).filter(v=>v!=null&&!isNaN(v));
+      // valid-kn daylight hours drive both the spark and the green-window mask,
+      // so the two stay index-aligned even if some hours lack a windspeed
+      const validHrs=day.filter(h=>h.kn!=null&&!isNaN(h.kn));
+      const kns=validHrs.map(h=>h.kn);
       const hasData=kns.length>0;
       const minKn=hasData?Math.round(Math.min(...kns)):null;
       const maxKn=hasData?Math.round(Math.max(...kns)):null;
       const [emoji]=wmoInfo(daily.weather_code[i]);
       const sparkColor=hasData?windBarColor(maxKn):'#475569';
-      const spark=tdsSparkSVG(kns,sparkColor);
+      // mask the 2h+ consecutive good-wind window so the spark highlights it green
+      const winMask=hasSession?dayGoodWindowMask(validHrs.map(h=>({hr:h.hour,kn:h.kn,dir:h.dir,code:h.code,gustKn:h.gustKn}))):null;
+      const spark=tdsSparkSVG(kns,sparkColor,winMask);
 
       const isNow=dateStr===localStr;
       const {short}=fmtDate(dateStr);
