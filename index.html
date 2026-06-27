@@ -1755,6 +1755,17 @@ const wmoInfo = c => WMO[c] ?? ['🌡','—'];
 const isRainy = c => c!=null && c>=51;
 // WMO snow codes (distinct from rain)
 const isSnowy = c => c!=null && ([71,73,75,77,85,86].includes(c));
+// Most significant weather code among a day's DAYLIGHT hours. The daily card
+// must use this (not Open-Meteo's 24h daily weather_code) for its icon + rating,
+// otherwise a night-only shower flags the card as "rain" while every daylight
+// (kiteable) hour is dry — disagreeing with the hourly detail. WMO codes rise
+// with severity (0 clear → 3 overcast → 51+ rain → 71+ snow → 95+ storm), so the
+// max daylight code is the most significant daytime weather. Falls back to
+// `fallbackCode` (the daily code) when there are no daylight hours.
+function daylightWeatherCode(dayHours,fallbackCode){
+  const codes=(dayHours||[]).map(h=>h.code).filter(c=>c!=null);
+  return codes.length?Math.max(...codes):fallbackCode;
+}
 
 // ══════════════════════════════════
 //  HELPERS
@@ -4039,12 +4050,14 @@ function renderGrid(){
   grid.innerHTML='';
 
   daily.time.forEach((dateStr,i)=>{
-    const code=daily.weather_code[i];
-    const[icon]=wmoInfo(code);
     const tMax=Math.round(daily.temperature_2m_max[i]);
     const tMin=Math.round(daily.temperature_2m_min[i]);
     const gust=toKnotsR(daily.windgusts_10m_max[i]);
     const{goodHours,peakKn,peakDayKn,hasBadDir,domDir,day}=buildDay(dateStr,daily.sunrise[i],daily.sunset[i]);
+    // icon + rating reflect the DAYLIGHT weather, not Open-Meteo's 24h daily
+    // code (which would flag night-only rain — see daylightWeatherCode)
+    const code=daylightWeatherCode(day,daily.weather_code[i]);
+    const[icon]=wmoInfo(code);
     const{short,num}=fmtDate(dateStr);
     const rating=rateDay(goodHours,peakKn,code,hasBadDir,peakDayKn);
     const _srH=parseInt(daily.sunrise[i].slice(11,13),10);
@@ -4136,7 +4149,9 @@ function renderGrid(){
       const dispKn=peakKn||peakDayKn;
       const gustKn=toKnotsR(daily.windgusts_10m_max[i]);
       const maxKn=hasData?Math.round(Math.max(...kns)):null;
-      const [emoji]=wmoInfo(daily.weather_code[i]);
+      // daylight weather (not the 24h daily code) so a night-only shower doesn't
+      // mislabel the card — consistent with the forecast cards + hourly detail
+      const [emoji]=wmoInfo(daylightWeatherCode(day,daily.weather_code[i]));
       const sparkColor=hasData?windBarColor(maxKn):'#475569';
       // mask the 2h+ consecutive good-wind window so the spark highlights it green
       const winMask=hasSession?dayGoodWindowMask(validHrs.map(h=>({hr:h.hour,kn:h.kn,dir:h.dir,code:h.code,gustKn:h.gustKn}))):null;
@@ -4190,7 +4205,7 @@ function openModal(dateStr,dayIdx){
   const{hours,day,good,goodHours,peakKn,domDir,hasBadDir}=buildDay(dateStr,sunrise,sunset);
   const{full}=fmtDate(dateStr);
   const loc=cachedLoc;
-  const rating=rateDay(goodHours,peakKn,daily.weather_code[dayIdx],hasBadDir);
+  const rating=rateDay(goodHours,peakKn,daylightWeatherCode(day,daily.weather_code[dayIdx]),hasBadDir);
 
   $('mTitle').textContent=full;
   const mBell=$('mNotifBtn');
@@ -5021,7 +5036,7 @@ function _buildSessionsForDates(spotName, dates){
     const i = daily.time.indexOf(dateStr);
     if(i === -1) return arr;
     const {good, peakKn, domDir, day} = buildDay(dateStr, daily.sunrise[i], daily.sunset[i]);
-    const code = daily.weather_code[i];
+    const code = daylightWeatherCode(day, daily.weather_code[i]);
     const [, weatherDesc] = wmoInfo(code);
     const rating = rateDay(good.length, peakKn, code, day.some(h=>h.type==='lightdir'), day.length?Math.max(...day.map(h=>h.kn)):0);
     const gusts = good.length ? Math.max(...good.map(h=>h.gustKn||0)) : 0;
@@ -6011,8 +6026,9 @@ async function confirmSessionFromModal(dateStr, startTime){
         const sessionEnd=goodAfterStart.length?goodAfterStart[goodAfterStart.length-1].tStr:dateStr+'T'+startTime+':00';
         const gusts=good.length?Math.max(...good.map(h=>h.gustKn||0)):0;
         const windMin=good.length?Math.min(...good.map(h=>h.kn)):0;
-        const[,weatherDesc]=wmoInfo(daily.weather_code[dayIdx]);
-        const rating=rateDay(good.length,peakKn,daily.weather_code[dayIdx],false,0);
+        const _dayCode=daylightWeatherCode(day,daily.weather_code[dayIdx]);
+        const[,weatherDesc]=wmoInfo(_dayCode);
+        const rating=rateDay(good.length,peakKn,_dayCode,false,0);
         const sessInfo={
           sessionStart,sessionEnd,duration_hours:good.length,
           peakKn,windMin,gusts,domDir:domDir!==null?compass(domDir):'—',
@@ -8998,7 +9014,7 @@ function getQualSessions(){
       const gusts=Math.max(...good.map(h=>h.gustKn||0));
       const windMin=Math.min(...good.map(h=>h.kn));
       const consistencyPct=day.length?Math.round(good.length/day.length*100):0;
-      const code=daily.weather_code[i];
+      const code=daylightWeatherCode(day,daily.weather_code[i]);
       const[,weatherDesc]=wmoInfo(code);
       const rating=rateDay(good.length,peakKn,code,day.some(h=>h.type==='lightdir'),day.length?Math.max(...day.map(h=>h.kn)):0);
       arr.push({
@@ -9032,7 +9048,7 @@ function toggleDayNotif(e,dateStr,dayIdx){
   const gusts=good.length?Math.max(...good.map(h=>h.gustKn||0)):0;
   const windMin=good.length?Math.min(...good.map(h=>h.kn)):0;
   const consistencyPct=day.length?Math.round(good.length/day.length*100):0;
-  const code=daily.weather_code[dayIdx];
+  const code=daylightWeatherCode(day,daily.weather_code[dayIdx]);
   const[,weatherDesc]=wmoInfo(code);
   const rating=rateDay(good.length,peakKn,code,day.some(h=>h.type==='lightdir'),day.length?Math.max(...day.map(h=>h.kn)):0);
   const sessInfo={
