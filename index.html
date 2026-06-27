@@ -841,6 +841,14 @@
     .spot-info-badge.verified { color:#4ade80; border-color:rgba(74,222,128,.3); background:rgba(74,222,128,.08); }
     .spot-info-badge.unverified { color:var(--tdim); border-color:var(--border); }
     .spot-info-body { padding:16px 18px; display:flex; flex-direction:column; gap:12px; }
+    .spot-attr-block { display:flex; flex-direction:column; gap:6px; }
+    .spot-attr-label { font-size:.62rem; font-weight:700; color:var(--tdim); text-transform:uppercase; letter-spacing:.04em; margin-top:4px; }
+    .spot-attr-chips { display:flex; flex-wrap:wrap; gap:5px; }
+    .spot-chip { background:rgba(255,255,255,.06); border:1px solid var(--border); border-radius:999px; padding:3px 9px; font-size:.7rem; color:var(--text); white-space:nowrap; }
+    .spot-chip-disc { background:rgba(0,212,255,.12); border-color:rgba(0,212,255,.3); color:#7dd3fc; }
+    .spot-attr-conditions { display:flex; flex-wrap:wrap; gap:12px; margin-top:4px; font-size:.72rem; color:var(--text); }
+    .spot-attr-cond { white-space:nowrap; }
+    .spot-attr-cond-lbl { color:var(--tdim); }
     .spot-info-ctas { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
     .spot-cta-btn { display:flex; align-items:center; justify-content:center; gap:7px; padding:12px 10px; border-radius:10px; border:none; font-size:.82rem; font-weight:700; cursor:pointer; text-decoration:none; transition:opacity .15s; }
     .spot-cta-btn:hover { opacity:.85; }
@@ -3594,6 +3602,44 @@ async function fetchSpotInfo(spotName) {
   return data;
 }
 
+const SPOT_DISCIPLINES = ['Twintip','Hydrofoil','Wave','Wing','Surf'];
+const SPOT_FACILITIES  = ['Free parking','Paid parking','Kiteshop','Kite rental','Lessons','Restaurant/bar','Showers','Toilets','Rescue','Storage'];
+const SPOT_WATER_TYPES = ['Flat','Choppy','Waves','Flat & choppy','Choppy & waves'];
+const SPOT_TIDE_PREFS  = ['All tides','Best at high','Best at low'];
+const SPOT_CROWD_LEVELS = ['Quiet','Moderate','Crowded','Extremely crowded'];
+const SPOT_SKILL_LEVELS = ['Beginner-friendly','Intermediate','Advanced'];
+const FACILITY_EMOJI = {'Free parking':'🅿️','Paid parking':'🅿️','Kiteshop':'🛍️','Kite rental':'🪁','Lessons':'🎓','Restaurant/bar':'🍽️','Showers':'🚿','Toilets':'🚻','Rescue':'🛟','Storage':'📦'};
+
+// Build the structured-attributes block for a spot-info card. Values come only
+// from the fixed option lists. Returns '' when nothing is set so dataless spots
+// are unchanged. (Phase 1 — display.)
+function spotAttributesHTML(info){
+  if(!info) return '';
+  const disc=Array.isArray(info.disciplines)?info.disciplines:[];
+  const fac =Array.isArray(info.facilities)?info.facilities:[];
+  const conds=[
+    info.water_type ?['🌊','Water',info.water_type]:null,
+    info.tide_pref  ?['🌙','Tide',info.tide_pref]:null,
+    info.crowd_level?['👥','Crowd',info.crowd_level]:null,
+    info.skill_level?['🟢','Level',info.skill_level]:null,
+  ].filter(Boolean);
+  if(!disc.length&&!fac.length&&!conds.length) return '';
+  let html='<div class="spot-attr-block">';
+  if(disc.length){
+    html+='<div class="spot-attr-label">🪁 Disciplines</div><div class="spot-attr-chips">'
+      +disc.map(d=>`<span class="spot-chip spot-chip-disc">${d}</span>`).join('')+'</div>';
+  }
+  if(fac.length){
+    html+='<div class="spot-attr-label">🏖️ Facilities</div><div class="spot-attr-chips">'
+      +fac.map(f=>`<span class="spot-chip">${FACILITY_EMOJI[f]?FACILITY_EMOJI[f]+' ':''}${f}</span>`).join('')+'</div>';
+  }
+  if(conds.length){
+    html+='<div class="spot-attr-conditions">'
+      +conds.map(([e,l,v])=>`<span class="spot-attr-cond">${e} <span class="spot-attr-cond-lbl">${l}</span> ${v}</span>`).join('')+'</div>';
+  }
+  return html+'</div>';
+}
+
 async function renderSpotInfoCard(spotName) {
   const el = $('spotInfoCard'); if(!el) return;
   // show collapsed header immediately while fetch is in flight
@@ -3691,6 +3737,7 @@ async function renderSpotInfoCard(spotName) {
         </div>
       </div>
       <div class="spot-info-body" style="display:none">
+        ${spotAttributesHTML(info)}
         ${ctaGrid}
         ${metaHTML}
         ${descHTML}
@@ -5449,6 +5496,20 @@ function openSuggestUpdate(){
     <textarea id="suTip" class="pp-input" rows="4" placeholder="e.g. Shallow at low tide, best at high tide. Avoid S swell. Parking on the north side." style="margin-bottom:6px;resize:vertical;min-height:88px;font-family:inherit;font-size:.85rem${info.spot_tip?';border-color:rgba(56,189,248,.4)':''}">${info.spot_tip||''}</textarea>
     <div style="font-size:.67rem;color:var(--tdim);margin-bottom:18px;">Want to update business info, booking links or contact details? <span style="color:var(--accent);cursor:pointer" onclick="closeSuggestUpdate();openClaimFlow()">Claim this spot →</span></div>
 
+    <label class="pp-label" style="margin-top:6px">🪁 Spot attributes <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">— what you can ride & what's here</span></label>
+    <label class="pp-label">Disciplines</label>
+    ${attrMultiHTML('suDisciplines',SPOT_DISCIPLINES,info.disciplines)}
+    <label class="pp-label">Facilities</label>
+    ${attrMultiHTML('suFacilities',SPOT_FACILITIES,info.facilities)}
+    <label class="pp-label">Water type</label>
+    ${attrSingleHTML('suWaterType',SPOT_WATER_TYPES,info.water_type)}
+    <label class="pp-label">Tide</label>
+    ${attrSingleHTML('suTidePref',SPOT_TIDE_PREFS,info.tide_pref)}
+    <label class="pp-label">Crowd</label>
+    ${attrSingleHTML('suCrowdLevel',SPOT_CROWD_LEVELS,info.crowd_level)}
+    <label class="pp-label">Suitable level</label>
+    ${attrSingleHTML('suSkillLevel',SPOT_SKILL_LEVELS,info.skill_level)}
+
     <button class="btn pp-save-btn" id="suSubmitBtn" onclick="submitSuggestUpdate()" style="width:100%">Send suggestion →</button>
   `;
   el.style.display='block';
@@ -5470,13 +5531,19 @@ async function submitSuggestUpdate(){
   const selDirs=[...document.querySelectorAll('#suDirBtns .s-btn.active')].map(b=>parseInt(b.dataset.deg));
   const tip=($('suTip')?.value||'').trim();
 
-  if(!selDirs.length&&!tip){ showToast('Add a wind direction or a tip before sending.'); return; }
+  const _disc=readMultiAttr('suDisciplines'), _fac=readMultiAttr('suFacilities');
+  const _water=readSingleAttr('suWaterType'), _tide=readSingleAttr('suTidePref');
+  const _crowd=readSingleAttr('suCrowdLevel'), _skill=readSingleAttr('suSkillLevel');
+  const _hasAttr=!!(_disc||_fac||_water||_tide||_crowd||_skill);
+  if(!selDirs.length&&!tip&&!_hasAttr){ showToast('Add a wind direction, a tip, or a spot attribute before sending.'); return; }
 
   btn.disabled=true; btn.textContent='Sending…';
   const sb=getSb(); if(!sb){ btn.disabled=false; btn.textContent='Send suggestion →'; return; }
   const{error}=await sb.from('spot_update_suggestions').insert({
     email, spot_name:spotName,
     suggested_dirs:selDirs.length?selDirs:null, tip:tip||null,
+    disciplines:_disc, facilities:_fac, water_type:_water,
+    tide_pref:_tide, crowd_level:_crowd, skill_level:_skill,
   });
   if(error){ showToast('Error: '+error.message); btn.disabled=false; btn.textContent='Send suggestion →'; return; }
 
@@ -6871,6 +6938,18 @@ function _renderUserSpots(detail,{favs,follows}){
   detail.appendChild(section('🔔','Following',follows,'Not following any spots'));
 }
 
+// Compact one-line summary of a suggestion's attributes for the admin review row.
+function suggestionAttrSummary(u){
+  const parts=[];
+  if(Array.isArray(u.disciplines)&&u.disciplines.length) parts.push('🪁 '+u.disciplines.join(', '));
+  if(Array.isArray(u.facilities)&&u.facilities.length)   parts.push('🏖️ '+u.facilities.join(', '));
+  if(u.water_type)  parts.push('🌊 '+u.water_type);
+  if(u.tide_pref)   parts.push('🌙 '+u.tide_pref);
+  if(u.crowd_level) parts.push('👥 '+u.crowd_level);
+  if(u.skill_level) parts.push('🟢 '+u.skill_level);
+  return parts.join(' · ');
+}
+
 async function renderAdminPanel(){
   const el=$('ppAdminContent'); if(!el) return;
   if(!loadProfile().isAdmin){ el.innerHTML='<div class="stats-empty">Access denied.</div>'; return; }
@@ -6930,6 +7009,7 @@ async function renderAdminPanel(){
       u.address&&`Address: ${u.address}`,
       u.suggested_dirs?.length&&`Dirs: ${dirsLabel}`,
       u.tip&&`Tip: "${u.tip}"`,
+      (()=>{const s=suggestionAttrSummary(u);return s?`Attrs: ${s}`:'';})(),
     ].filter(Boolean).join(' · ');
     return `<div style="background:rgba(0,212,255,.06);border:1px solid rgba(0,212,255,.2);border-radius:10px;padding:12px 14px;margin-bottom:8px;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
@@ -7073,6 +7153,20 @@ async function adminOpenSpot(spotName, prefill){
   el.dataset.suggId=s?._suggId||'';
 
   const isNew = !spotName;
+  const attrSectionHTML=`
+      <div style="margin:14px 0 4px;font-size:.78rem;font-weight:700;color:var(--accent)">🪁 Spot attributes</div>
+      <label class="pp-label">Disciplines</label>
+      ${attrMultiHTML('adDisciplines',SPOT_DISCIPLINES,s?.disciplines)}
+      <label class="pp-label">Facilities</label>
+      ${attrMultiHTML('adFacilities',SPOT_FACILITIES,s?.facilities)}
+      <label class="pp-label">Water type</label>
+      ${attrSingleHTML('adWaterType',SPOT_WATER_TYPES,s?.water_type)}
+      <label class="pp-label">Tide</label>
+      ${attrSingleHTML('adTidePref',SPOT_TIDE_PREFS,s?.tide_pref)}
+      <label class="pp-label">Crowd</label>
+      ${attrSingleHTML('adCrowdLevel',SPOT_CROWD_LEVELS,s?.crowd_level)}
+      <label class="pp-label">Suitable level</label>
+      ${attrSingleHTML('adSkillLevel',SPOT_SKILL_LEVELS,s?.skill_level)}`;
   const suggBanner=s?._suggId?`<div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:10px 14px;font-size:.78rem;color:#fbbf24;margin-bottom:14px">📥 Spot request from <strong>${s._submittedBy||'a user'}</strong> — review, adjust if needed, then save.</div>`:'';
   el.innerHTML=`
     <div style="background:rgba(0,212,255,.05);border:1px solid rgba(0,212,255,.2);border-radius:12px;padding:16px;">
@@ -7166,6 +7260,7 @@ async function adminOpenSpot(spotName, prefill){
         <button class="pp-toggle${s?.verified?' on':''}" id="adVerified" onclick="this.classList.toggle('on')"><span></span></button>
       </div>
 
+      ${attrSectionHTML}
       <div style="display:flex;gap:8px">
         <button class="btn pp-save-btn" id="adSaveBtn" onclick="adminSaveSpotInfo()" style="flex:1">${isNew?'Add spot':'Save changes'}</button>
         <button onclick="closeAdminEditForm()" style="flex-shrink:0;padding:10px 16px;background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:10px;color:var(--tdim);font-size:.82rem;cursor:pointer">Cancel</button>
@@ -7210,6 +7305,17 @@ async function adminApplyUpdate(u){
   if(u.facebook_url)  updates.facebook_url=u.facebook_url;
   if(u.address)       updates.address=u.address;
   if(u.tip)           updates.spot_tip=u.tip;
+  // REPLACE semantics: if this suggestion carries attributes, apply all 6
+  // (including cleared → null) so the suggester's full intended state takes hold.
+  const _isAttrSugg=(u.disciplines!=null||u.facilities!=null||u.water_type!=null||u.tide_pref!=null||u.crowd_level!=null||u.skill_level!=null);
+  if(_isAttrSugg){
+    updates.disciplines=u.disciplines??null;
+    updates.facilities =u.facilities ??null;
+    updates.water_type =u.water_type ??null;
+    updates.tide_pref  =u.tide_pref  ??null;
+    updates.crowd_level=u.crowd_level??null;
+    updates.skill_level=u.skill_level??null;
+  }
   if(Object.keys(updates).length){
     await sb.from('spot_info').upsert({spot_name:u.spot_name,...updates,updated_at:new Date().toISOString()},{onConflict:'spot_name'});
   }
@@ -7238,6 +7344,9 @@ async function adminApplyUpdate(u){
       }
     }
   }
+
+  // If this is an attribute suggestion and the spot is currently open, refresh the card
+  if(_isAttrSugg&&cachedLoc?.name===u.spot_name){ _cachedSpotInfo=null; renderSpotInfoCard(u.spot_name); }
 
   // Mark reviewed + approved
   await sb.from('spot_update_suggestions').update({reviewed:true,approved:true}).eq('id',u.id);
@@ -7332,6 +7441,38 @@ async function adminRejectClaim(id, spotName, email){
   renderAdminPanel();
 }
 
+// Shared attribute button-group builders — used by both the admin editor
+// (adOpenSpot) and the community suggest form (openSuggestUpdate). Multi:
+// click toggles active. Single: toggleAttrSingle gives radio behaviour.
+function attrMultiHTML(id,opts,sel){
+  const set=new Set(Array.isArray(sel)?sel:[]);
+  return `<div id="${id}" class="s-btns" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">`
+    +opts.map(o=>`<button type="button" class="s-btn${set.has(o)?' active':''}" data-val="${o}" onclick="this.classList.toggle('active')">${o}</button>`).join('')
+    +`</div>`;
+}
+function attrSingleHTML(id,opts,sel){
+  return `<div id="${id}" class="s-btns" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">`
+    +opts.map(o=>`<button type="button" class="s-btn${sel===o?' active':''}" data-val="${o}" onclick="toggleAttrSingle(this)">${o}</button>`).join('')
+    +`</div>`;
+}
+function readMultiAttr(id){
+  const el=$(id); if(!el) return null;
+  const vals=[...el.querySelectorAll('.s-btn.active')].map(b=>b.dataset.val);
+  return vals.length?vals:null;
+}
+function readSingleAttr(id){
+  const el=$(id); if(!el) return null;
+  const b=el.querySelector('.s-btn.active');
+  return b?b.dataset.val:null;
+}
+// radio behaviour for single-select attribute groups
+function toggleAttrSingle(btn){
+  const grp=btn.parentElement;
+  const wasActive=btn.classList.contains('active');
+  grp.querySelectorAll('.s-btn').forEach(b=>b.classList.remove('active'));
+  if(!wasActive) btn.classList.add('active'); // tapping the active one clears it
+}
+
 async function adminSaveSpotInfo(){
   const sb=getSb(); if(!sb) return;
   const _p=loadProfile();
@@ -7391,6 +7532,12 @@ async function adminSaveSpotInfo(){
     description:     ($('adDesc')?.value||'').trim()||null,
     spot_tip:        ($('adSpotTip')?.value||'').trim()||null,
     membership_note: ($('adMembershipNote')?.value||'').trim()||null,
+    disciplines: readMultiAttr('adDisciplines'),
+    facilities:  readMultiAttr('adFacilities'),
+    water_type:  readSingleAttr('adWaterType'),
+    tide_pref:   readSingleAttr('adTidePref'),
+    crowd_level: readSingleAttr('adCrowdLevel'),
+    skill_level: readSingleAttr('adSkillLevel'),
     verified:        !!$('adVerified')?.classList.contains('on'),
     updated_at:      new Date().toISOString(),
     city:            city||null,
