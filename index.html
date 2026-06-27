@@ -7120,29 +7120,20 @@ async function adminOpenSpot(spotName, prefill){
   el.dataset.suggId=s?._suggId||'';
 
   const isNew = !spotName;
-  const _attrMulti=(id,opts,sel)=>{
-    const set=new Set(Array.isArray(sel)?sel:[]);
-    return `<div id="${id}" class="s-btns" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">`
-      +opts.map(o=>`<button type="button" class="s-btn${set.has(o)?' active':''}" data-val="${o}" onclick="this.classList.toggle('active')">${o}</button>`).join('')
-      +`</div>`;
-  };
-  const _attrSingle=(id,opts,sel)=>`<div id="${id}" class="s-btns" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">`
-      +opts.map(o=>`<button type="button" class="s-btn${sel===o?' active':''}" data-val="${o}" onclick="toggleAttrSingle(this)">${o}</button>`).join('')
-      +`</div>`;
   const attrSectionHTML=`
       <div style="margin:14px 0 4px;font-size:.78rem;font-weight:700;color:var(--accent)">🪁 Spot attributes</div>
       <label class="pp-label">Disciplines</label>
-      ${_attrMulti('adDisciplines',SPOT_DISCIPLINES,s?.disciplines)}
+      ${attrMultiHTML('adDisciplines',SPOT_DISCIPLINES,s?.disciplines)}
       <label class="pp-label">Facilities</label>
-      ${_attrMulti('adFacilities',SPOT_FACILITIES,s?.facilities)}
+      ${attrMultiHTML('adFacilities',SPOT_FACILITIES,s?.facilities)}
       <label class="pp-label">Water type</label>
-      ${_attrSingle('adWaterType',SPOT_WATER_TYPES,s?.water_type)}
+      ${attrSingleHTML('adWaterType',SPOT_WATER_TYPES,s?.water_type)}
       <label class="pp-label">Tide</label>
-      ${_attrSingle('adTidePref',SPOT_TIDE_PREFS,s?.tide_pref)}
+      ${attrSingleHTML('adTidePref',SPOT_TIDE_PREFS,s?.tide_pref)}
       <label class="pp-label">Crowd</label>
-      ${_attrSingle('adCrowdLevel',SPOT_CROWD_LEVELS,s?.crowd_level)}
+      ${attrSingleHTML('adCrowdLevel',SPOT_CROWD_LEVELS,s?.crowd_level)}
       <label class="pp-label">Suitable level</label>
-      ${_attrSingle('adSkillLevel',SPOT_SKILL_LEVELS,s?.skill_level)}`;
+      ${attrSingleHTML('adSkillLevel',SPOT_SKILL_LEVELS,s?.skill_level)}`;
   const suggBanner=s?._suggId?`<div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:10px 14px;font-size:.78rem;color:#fbbf24;margin-bottom:14px">📥 Spot request from <strong>${s._submittedBy||'a user'}</strong> — review, adjust if needed, then save.</div>`:'';
   el.innerHTML=`
     <div style="background:rgba(0,212,255,.05);border:1px solid rgba(0,212,255,.2);border-radius:12px;padding:16px;">
@@ -7403,6 +7394,20 @@ async function adminRejectClaim(id, spotName, email){
   renderAdminPanel();
 }
 
+// Shared attribute button-group builders — used by both the admin editor
+// (adOpenSpot) and the community suggest form (openSuggestUpdate). Multi:
+// click toggles active. Single: toggleAttrSingle gives radio behaviour.
+function attrMultiHTML(id,opts,sel){
+  const set=new Set(Array.isArray(sel)?sel:[]);
+  return `<div id="${id}" class="s-btns" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">`
+    +opts.map(o=>`<button type="button" class="s-btn${set.has(o)?' active':''}" data-val="${o}" onclick="this.classList.toggle('active')">${o}</button>`).join('')
+    +`</div>`;
+}
+function attrSingleHTML(id,opts,sel){
+  return `<div id="${id}" class="s-btns" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px">`
+    +opts.map(o=>`<button type="button" class="s-btn${sel===o?' active':''}" data-val="${o}" onclick="toggleAttrSingle(this)">${o}</button>`).join('')
+    +`</div>`;
+}
 function readMultiAttr(id){
   const el=$(id); if(!el) return null;
   const vals=[...el.querySelectorAll('.s-btn.active')].map(b=>b.dataset.val);
