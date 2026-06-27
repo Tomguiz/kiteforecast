@@ -30,9 +30,12 @@ test('at least 5 full day-cards fit in the strip viewport on mobile', async ({ g
   const card = page.locator('#tdsCols .tds-day-card').first();
   const box = (await card.boundingBox())!;
   const chart = (await page.locator('#tdsChart').boundingBox())!;
+  // read the real flex gap from the rendered CSS so the math can't silently
+  // drift from the stylesheet
+  const gap = await page.evaluate(() =>
+    parseFloat(getComputedStyle(document.getElementById('tdsCols')!).columnGap) || 0);
   // cards visible = chartWidth / (cardWidth + gap). Must show 5 full cards plus
   // a visible slice of the 6th (Surfr-style), i.e. >= 5.25 on a 390px viewport.
-  const gap = 5; // matches #tdsCols gap
   const visible = chart.width / (box.width + gap);
   expect(visible).toBeGreaterThanOrEqual(5.25);
 });
