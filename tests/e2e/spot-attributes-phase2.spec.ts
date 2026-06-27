@@ -60,6 +60,24 @@ test('suggestionAttrSummary joins present attributes and is empty when none', as
   expect(empty).toBe('');
 });
 
+test('approving a legacy dirs-only suggestion does NOT clobber spot attributes', async ({ gotoApp, page }) => {
+  await gotoApp('admin');
+  await page.waitForTimeout(300);
+  // capture any spot_info write; if none fires that's also a pass
+  let body = '';
+  page.on('request', r => {
+    if (r.url().includes('/rest/v1/spot_info') && (r.method()==='POST'||r.method()==='PATCH')) body = r.postData() || '';
+  });
+  await page.evaluate(() => adminApplyUpdate({
+    id: 'legacy1', spot_name: 'Legacy Spot',
+    suggested_dirs: [270, 315], tip: 'nice spot',
+    disciplines: null, facilities: null, water_type: null,
+    tide_pref: null, crowd_level: null, skill_level: null,
+  }));
+  await page.waitForTimeout(500);
+  expect(body).not.toContain('"disciplines"'); // attributes NOT written for a dirs/tip-only suggestion
+});
+
 test('adminApplyUpdate writes the attribute fields to spot_info (replace, incl. clear)', async ({ gotoApp, page }) => {
   await gotoApp('admin');
   await page.waitForTimeout(300);

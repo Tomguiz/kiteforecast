@@ -7307,7 +7307,7 @@ async function adminApplyUpdate(u){
   if(u.tip)           updates.spot_tip=u.tip;
   // REPLACE semantics: if this suggestion carries attributes, apply all 6
   // (including cleared → null) so the suggester's full intended state takes hold.
-  const _isAttrSugg=('disciplines' in u||'facilities' in u||'water_type' in u||'tide_pref' in u||'crowd_level' in u||'skill_level' in u);
+  const _isAttrSugg=(u.disciplines!=null||u.facilities!=null||u.water_type!=null||u.tide_pref!=null||u.crowd_level!=null||u.skill_level!=null);
   if(_isAttrSugg){
     updates.disciplines=u.disciplines??null;
     updates.facilities =u.facilities ??null;
