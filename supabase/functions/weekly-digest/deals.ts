@@ -32,11 +32,18 @@ function esc(s: string | null | undefined): string {
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
+// Only allow http(s) URLs in email hrefs/img-src; anything else (javascript:,
+// data:, …) falls back to '#'. Then HTML-escape for safe attribute embedding.
+function safeUrl(s: string | null | undefined): string {
+  const u = String(s ?? '').trim();
+  return esc(/^https?:\/\//i.test(u) ? u : '#');
+}
+
 // Email-safe, table-based ad block matching the digest's dark theme. '' when no deal.
 export function buildDealAdHTML(deal: Deal | null): string {
   if (!deal) return '';
   const img = deal.image_url
-    ? `<tr><td style="padding:0 0 12px 0;"><img src="${esc(deal.image_url)}" width="100%" alt="${esc(deal.shop_name)}" style="display:block;border-radius:8px;max-width:100%;"/></td></tr>`
+    ? `<tr><td style="padding:0 0 12px 0;"><img src="${safeUrl(deal.image_url)}" width="100%" alt="${esc(deal.shop_name)}" style="display:block;border-radius:8px;max-width:100%;"/></td></tr>`
     : '';
   const body = deal.body ? `<p style="margin:6px 0 0 0;font-size:13px;color:#94a3b8;line-height:1.5;">${esc(deal.body)}</p>` : '';
   return `
@@ -50,7 +57,7 @@ export function buildDealAdHTML(deal: Deal | null): string {
             ${body}
           </td></tr>
           <tr><td style="padding-top:14px;">
-            <a href="${esc(deal.cta_url)}" style="display:inline-block;background:rgba(93,212,240,.12);border:1px solid rgba(93,212,240,.35);border-radius:8px;padding:10px 18px;font-family:'DM Sans',Arial,sans-serif;font-size:13px;font-weight:700;color:#5dd4f0;text-decoration:none;">${esc(deal.cta_label)}</a>
+            <a href="${safeUrl(deal.cta_url)}" style="display:inline-block;background:rgba(93,212,240,.12);border:1px solid rgba(93,212,240,.35);border-radius:8px;padding:10px 18px;font-family:'DM Sans',Arial,sans-serif;font-size:13px;font-weight:700;color:#5dd4f0;text-decoration:none;">${esc(deal.cta_label)}</a>
           </td></tr>
         </table>
       </td>

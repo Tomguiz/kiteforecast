@@ -46,3 +46,14 @@ test('buildDealAdHTML escapes HTML in fields', () => {
   expect(html).toContain('A &amp; B &lt;script&gt;');
   expect(html).not.toContain('<script>');
 });
+
+test('buildDealAdHTML neutralises a non-http cta_url scheme', () => {
+  const html = buildDealAdHTML({ ...base, cta_url: 'javascript:alert(1)' });
+  expect(html).not.toContain('javascript:');
+  expect(html).toContain('href="#"'); // falls back to a safe href
+});
+
+test('buildDealAdHTML keeps a normal https cta_url', () => {
+  const html = buildDealAdHTML({ ...base, cta_url: 'https://billykite.be/sale' });
+  expect(html).toContain('https://billykite.be/sale');
+});
