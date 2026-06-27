@@ -1845,6 +1845,22 @@ function classifyHour(kn,dir,code,gustKn=0){
   }
   return {type:['good','verygood','perfect'][sp-1],qualifying:true};
 }
+// Single shared definition of an hour being rideable, and of a day's "good
+// hours": the count of qualifying daylight hours that are part of a 2+
+// consecutive (by clock hour) run. A day is rideable when this is >= 2.
+// Used by BOTH the spot-detail "X of Y days rideable" header (via buildDay)
+// and the homepage "good days" badge (via fetchChipQualDays), so the two
+// views can never disagree.
+// `dirOK(dir)` defaults to the global isWindDirOK (current spot's windDirs);
+// the homepage passes a per-spot check so each favourite uses its own dirs.
+function hourQualifies(kn,dir,code,gustKn,dirOK){
+  return (speedTier(kn)>0||(kn>=12&&(gustKn||0)>=20))&&!isRainy(code)&&dirOK(dir);
+}
+function dayGoodHours(hours,dirOK=isWindDirOK){
+  const good=hours.filter(h=>hourQualifies(h.kn,h.dir,h.code,h.gustKn||0,dirOK));
+  const qualSet=new Set(good.map(h=>h.hr));
+  return good.filter(h=>qualSet.has(h.hr-1)||qualSet.has(h.hr+1)).length;
+}
 function conditionLabel(kn,dir,code,temp,gustKn=0){
   const sp=speedTier(kn);
   const light=sp===0;
@@ -2634,30 +2650,36 @@ async function fetchChipQualDays(spot){
       latitude:spot.lat,longitude:spot.lon,
       hourly:['weather_code','windspeed_10m','winddirection_10m','windgusts_10m'].join(','),
       daily:['sunrise','sunset'].join(','),
-      forecast_days:7,timezone:'auto',windspeed_unit:'ms',
+      forecast_days:10,timezone:'auto',windspeed_unit:'ms',
     });
     const wx=await safeFetch(`https://api.open-meteo.com/v1/forecast?${p}`,8000);
     if(wx.error) throw new Error(wx.reason);
     const dirs=new Set(spot.dirs&&spot.dirs.length?spot.dirs:[]);
     const isDirOK=d=>{ if(!dirs.size) return true; for(const sd of dirs) if(angleDiff(d,sd)<=22.5) return true; return false; };
+    // collect each day's daylight hours so both the badge count and the
+    // per-day breakdown share the one rideable-day definition (dayGoodHours)
+    const dayHoursOf=(dateStr,srH,ssH)=>{
+      const out=[];
+      wx.hourly.time.forEach((t,j)=>{
+        if(t.slice(0,10)!==dateStr) return;
+        const hr=parseInt(t.slice(11,13),10);
+        if(hr<srH||hr>ssH) return;
+        out.push({hr,kn:toKnotsR(wx.hourly.windspeed_10m[j]),dir:wx.hourly.winddirection_10m[j],
+                  code:wx.hourly.weather_code[j]??0,gustKn:toKnotsR(wx.hourly.windgusts_10m[j])||0});
+      });
+      return out;
+    };
     let qualDays=0;
     let bestDateStr=null, bestPeakKn=0, bestStartHr=null, nextDateStr=null, nextStartHr=null, nextPeakKn=0;
     wx.daily.time.forEach((dateStr,i)=>{
       const srH=parseInt(wx.daily.sunrise[i].slice(11,13),10);
       const ssH=parseInt(wx.daily.sunset[i].slice(11,13),10);
-      let qh=0, dayPeak=0, firstGoodHr=null;
-      wx.hourly.time.forEach((t,j)=>{
-        if(t.slice(0,10)!==dateStr) return;
-        const hr=parseInt(t.slice(11,13),10);
-        if(hr<srH||hr>ssH) return;
-        const kn=toKnotsR(wx.hourly.windspeed_10m[j]);
-        const gust=toKnotsR(wx.hourly.windgusts_10m[j])||0;
-        const dir=wx.hourly.winddirection_10m[j];
-        const code=wx.hourly.weather_code[j]??0;
-        const qualifying=(speedTier(kn)>0||(kn>=12&&gust>=20))&&!isRainy(code)&&isDirOK(dir);
-        if(qualifying){ if(firstGoodHr===null) firstGoodHr=hr; qh++; if(kn>dayPeak) dayPeak=kn; }
-      });
-      if(qh>=2){
+      const dayHours=dayHoursOf(dateStr,srH,ssH);
+      const gh=dayGoodHours(dayHours,isDirOK);
+      const goodHrs=dayHours.filter(h=>hourQualifies(h.kn,h.dir,h.code,h.gustKn,isDirOK));
+      const dayPeak=goodHrs.length?Math.max(...goodHrs.map(h=>h.kn)):0;
+      const firstGoodHr=goodHrs.length?goodHrs[0].hr:null;
+      if(gh>=2){
         qualDays++;
         if(!nextDateStr){ nextDateStr=dateStr; nextStartHr=firstGoodHr; nextPeakKn=dayPeak; }
         if(dayPeak>bestPeakKn){ bestPeakKn=dayPeak; bestDateStr=dateStr; bestStartHr=firstGoodHr; }
@@ -2669,23 +2691,16 @@ async function fetchChipQualDays(spot){
     wx.daily.time.forEach((dateStr,i)=>{
       const srH=parseInt(wx.daily.sunrise[i].slice(11,13),10);
       const ssH=parseInt(wx.daily.sunset[i].slice(11,13),10);
-      let qh=0,dayPeak=0,firstGoodHr=null,domDirSum=[0,0],domDirN=0;
-      wx.hourly.time.forEach((t,j)=>{
-        if(t.slice(0,10)!==dateStr) return;
-        const hr=parseInt(t.slice(11,13),10);
-        if(hr<srH||hr>ssH) return;
-        const kn=toKnotsR(wx.hourly.windspeed_10m[j]);
-        const dir=wx.hourly.winddirection_10m[j];
-        const code=wx.hourly.weather_code[j]??0;
-        const gust2=toKnotsR(wx.hourly.windgusts_10m[j])||0;
-        const qualifying2=(speedTier(kn)>0||(kn>=12&&gust2>=20))&&!isRainy(code)&&isDirOK(dir);
-        if(qualifying2){
-          if(firstGoodHr===null) firstGoodHr=hr; qh++; if(kn>dayPeak) dayPeak=kn;
-          domDirSum[0]+=Math.sin(dir*Math.PI/180); domDirSum[1]+=Math.cos(dir*Math.PI/180); domDirN++;
-        }
-      });
+      const dayHours=dayHoursOf(dateStr,srH,ssH);
+      const goodHrs=dayHours.filter(h=>hourQualifies(h.kn,h.dir,h.code,h.gustKn,isDirOK));
+      const goodHours=dayGoodHours(dayHours,isDirOK);
+      const qh=goodHrs.length;
+      const dayPeak=goodHrs.length?Math.max(...goodHrs.map(h=>h.kn)):0;
+      const firstGoodHr=goodHrs.length?goodHrs[0].hr:null;
+      let domDirSum=[0,0],domDirN=0;
+      goodHrs.forEach(h=>{ domDirSum[0]+=Math.sin(h.dir*Math.PI/180); domDirSum[1]+=Math.cos(h.dir*Math.PI/180); domDirN++; });
       const domDir=domDirN?['N','NE','E','SE','S','SW','W','NW'][Math.round((Math.atan2(domDirSum[0],domDirSum[1])*180/Math.PI+360)%360/45)%8]:null;
-      days10.push({dateStr,qh,peakKn:dayPeak,startHr:firstGoodHr,dir:domDir});
+      days10.push({dateStr,qh,goodHours,peakKn:dayPeak,startHr:firstGoodHr,dir:domDir});
     });
     chipBestCache[key]=bestDateStr?{dateStr:bestDateStr,peakKn:bestPeakKn,startHr:bestStartHr,nextDateStr,nextStartHr,nextPeakKn,spotName:spot.name,spot,days10}:null;
     if(!bestDateStr) chipBestCache[key]={dateStr:null,peakKn:0,startHr:null,nextDateStr:null,nextStartHr:null,nextPeakKn:0,spotName:spot.name,spot,days10};
@@ -2793,7 +2808,7 @@ function renderCompareBar(){
   }
 
   // Collect all unique dates across all spots that have at least 1 good date
-  const allDates=[...new Set(loadedEntries.flatMap(e=>e.days10.filter(d=>d.qh>=2).map(d=>d.dateStr)))].sort();
+  const allDates=[...new Set(loadedEntries.flatMap(e=>e.days10.filter(d=>(d.goodHours??d.qh)>=2).map(d=>d.dateStr)))].sort();
 
   // Build table header: sticky row label col + one col per spot
   const spotHeaders=loadedEntries.map(e=>`<th><div class="cmp-spot-hdr" onclick="pickSpot(${JSON.stringify(e.spot).replace(/"/g,'&quot;')})" title="${e.spotName}">${e.spotName}</div></th>`).join('');
@@ -2804,7 +2819,7 @@ function renderCompareBar(){
     const{short}=fmtDate(dateStr);
     const cells=loadedEntries.map(e=>{
       const d=e.days10.find(x=>x.dateStr===dateStr);
-      if(!d||d.qh<2) return {html:`<td class="cmp-none">—</td>`,peak:0};
+      if(!d||(d.goodHours??d.qh)<2) return {html:`<td class="cmp-none">—</td>`,peak:0};
       const cls=d.peakKn>=25?'cmp-good':d.peakKn>=20?'cmp-ok':'';
       return {html:`<td class="${cls}">${d.peakKn}kn · ${d.qh}h${d.dir?' · '+d.dir:''}</td>`,peak:d.peakKn};
     });
@@ -3583,7 +3598,7 @@ function shareSpot(){
   const entry=chipBestCache[key];
   let daysText='';
   if(entry?.days10){
-    const goodDays=entry.days10.filter(d=>d.qh>=2).slice(0,3);
+    const goodDays=entry.days10.filter(d=>(d.goodHours??d.qh)>=2).slice(0,3);
     if(goodDays.length){
       const labels=goodDays.map(d=>{
         const date=new Date(d.dateStr+'T12:00:00');
@@ -3937,9 +3952,8 @@ function buildDay(dateStr,sunrise,sunset){
   const sample=good.length?good:day;
   const domDir=sample.length?circMean(sample.map(h=>h.dir)):null;
   const hasBadDir=day.some(h=>h.type==='lightdir');
-  // only count qualifying hours that are part of a 2+ consecutive (by clock hour) run
-  const qualSet=new Set(good.map(h=>h.hour));
-  const goodHours=good.filter(h=>(qualSet.has(h.hour-1)||qualSet.has(h.hour+1))).length;
+  // shared definition: qualifying hours in a 2+ consecutive (by clock hour) run
+  const goodHours=dayGoodHours(day.map(h=>({hr:h.hour,kn:h.kn,dir:h.dir,code:h.code,gustKn:h.gustKn})));
   return{hours,day,good,goodHours,peakKn,peakDayKn,domDir,hasBadDir};
 }
 
