@@ -115,3 +115,26 @@ test('read helpers return null when nothing selected', async ({ gotoApp, page })
   expect(r.disc).toBeNull();
   expect(r.water).toBeNull();
 });
+
+test('saving the admin form sends the attribute fields to spot_info', async ({ gotoApp, page }) => {
+  await gotoApp('admin');
+  // Open admin panel and wait for it to finish rendering (renderAdminPanel is async)
+  await page.evaluate(() => { openProfilePanel('admin'); });
+  await page.waitForFunction(() => !!document.getElementById('adminEditForm'));
+  await page.evaluate(() => {
+    adminOpenSpot(null, { spot_name: 'Attr Spot', _lat: 51, _lon: 3, _loc: 'BE',
+      disciplines: ['Twintip'], facilities: null, water_type: null,
+      tide_pref: null, crowd_level: null, skill_level: null });
+    // also select a facility + crowd so the payload has both array + scalar
+    (document.querySelector('#adFacilities .s-btn[data-val="Kiteshop"]') as HTMLButtonElement).click();
+    (document.querySelector('#adCrowdLevel .s-btn[data-val="Crowded"]') as HTMLButtonElement).click();
+  });
+  const req = page.waitForRequest(r =>
+    r.url().includes('/rest/v1/spot_info') && (r.method() === 'POST' || r.method() === 'PATCH'));
+  await page.evaluate(() => adminSaveSpotInfo());
+  const body = (await req).postData() || '';
+  expect(body).toContain('"disciplines"');
+  expect(body).toContain('Twintip');
+  expect(body).toContain('Kiteshop');
+  expect(body).toContain('"crowd_level":"Crowded"');
+});
