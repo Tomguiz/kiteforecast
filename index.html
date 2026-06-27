@@ -201,6 +201,9 @@
     .tds-swipe-hint { font-size:.68rem; color:var(--tdim); display:flex; align-items:center; gap:4px; }
     .tds-swipe-hint::after { content:'→'; font-size:.8rem; animation:tds-nudge 1.8s ease-in-out infinite; display:inline-block; }
     @keyframes tds-nudge { 0%,100%{transform:translateX(0)} 50%{transform:translateX(4px)} }
+    /* days 11-16 are low-confidence GFS outlook — fade them in both views */
+    .tds-day-card.tds-lowconf, .day-card.day-lowconf { opacity:.5; }
+    .tds-lowconf-note { font-size:.6rem; color:var(--tdim); padding:0 2px 6px; }
     #tenDayStrip {
       background:var(--card); border:1px solid var(--border); border-radius:14px;
       overflow:hidden; display:flex; padding:12px 8px 10px 0;
@@ -1319,6 +1322,7 @@
         <span class="tds-title">16-day overview</span>
         <span class="tds-swipe-hint">swipe → for more</span>
       </div>
+      <div class="tds-lowconf-note">ⓘ days 11–16 are a lower-confidence outlook</div>
       <div id="tenDayStrip">
         <div id="tdsChart">
           <div id="tdsCols"></div>
@@ -4227,7 +4231,7 @@ function renderGrid(){
     </div>`;
 
     const card=document.createElement('div');
-    card.className='day-card'+(goodHours>=2?' has-session':'');
+    card.className='day-card'+(goodHours>=2?' has-session':'')+(i>=10?' day-lowconf':'');
     card.title='Tap for hourly detail';
     card.onclick=()=>openModal(dateStr,i);
     card.innerHTML=`
@@ -4290,7 +4294,7 @@ function renderGrid(){
       const rangeTxt=hasData?`${dispKn}<span class="tds-dc-gust"> ↑${gustKn}</span>`:'—';
       const titleTxt=hasData?`${dispKn}kn · ↑${gustKn}kn gust · ${gh}h qualifying`:'no data';
 
-      return `<div class="tds-day-card${hasSession?' has-session':''}" onclick="openModal('${dateStr}',${i})" title="${titleTxt}">
+      return `<div class="tds-day-card${hasSession?' has-session':''}${i>=10?' tds-lowconf':''}" onclick="openModal('${dateStr}',${i})" title="${titleTxt}">
         <div class="tds-dc-head"><span class="tds-dc-day">${lbl} ${dayNum}</span><span class="tds-dc-wx">${emoji}</span></div>
         <div class="tds-dc-range">${rangeTxt}</div>
         <div class="tds-dc-spark">${spark}</div>
