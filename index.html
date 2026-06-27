@@ -163,6 +163,8 @@
     .loc-hdr p  { font-size:.78rem; margin:0 0 10px; display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:4px; }
     /* line 3: wind dirs row */
     .loc-wind-dirs { padding:6px 0 2px; }
+    /* relocated under the spot-info card — group it visually with that card */
+    .sic-wind-dirs { margin:8px 0 4px; padding:10px 12px; border:1px solid var(--border); border-radius:14px; background:rgba(255,255,255,.015); }
     .lwd-panel { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:8px; padding:6px 0 2px; }
     .lwd-toggle { display:none; }
     .lwd-desktop-label { display:inline; }
@@ -1273,33 +1275,36 @@
       <h2 id="locName"></h2>
       <!-- Line 2: country + action icons + sessions count -->
       <p id="locSub"></p>
-      <!-- Line 3: wind dirs — collapsible on mobile -->
-      <div class="loc-wind-dirs" id="locWindDirs">
-        <!-- mobile toggle row (hidden on desktop) -->
-        <div class="lwd-toggle" id="lwdToggle" onclick="toggleWindDirsPanel()">
-          <span class="shore-bar-label">Good wind dirs</span>
-          <span class="lwd-toggle-dirs" id="lwdToggleDirs">—</span>
-          <span class="lwd-chevron" id="lwdChevron">▼</span>
-        </div>
-        <!-- buttons panel -->
-        <div class="lwd-panel" id="lwdPanel">
-          <span class="shore-bar-label lwd-desktop-label">Good wind dirs →</span>
-          <div class="shore-btns" id="shoreBtns">
-            <button class="s-btn" data-deg="0"   onclick="toggleWindDir(this)">N</button>
-            <button class="s-btn" data-deg="45"  onclick="toggleWindDir(this)">NE</button>
-            <button class="s-btn" data-deg="90"  onclick="toggleWindDir(this)">E</button>
-            <button class="s-btn" data-deg="135" onclick="toggleWindDir(this)">SE</button>
-            <button class="s-btn" data-deg="180" onclick="toggleWindDir(this)">S</button>
-            <button class="s-btn" data-deg="225" onclick="toggleWindDir(this)">SW</button>
-            <button class="s-btn" data-deg="270" onclick="toggleWindDir(this)">W</button>
-            <button class="s-btn" data-deg="315" onclick="toggleWindDir(this)">NW</button>
-          </div>
-          <span class="shore-hint" id="shoreHint"></span>
-        </div>
-      </div>
     </div>
 
     <div id="spotInfoCard"></div>
+
+    <!-- Good wind dirs — interactive selector, grouped with the spot-info card.
+         Kept as a stable standalone element (NOT inside spotInfoCard's async
+         innerHTML) so the buttons + wiring survive every spot-info re-render. -->
+    <div class="loc-wind-dirs sic-wind-dirs" id="locWindDirs">
+      <!-- mobile toggle row (hidden on desktop) -->
+      <div class="lwd-toggle" id="lwdToggle" onclick="toggleWindDirsPanel()">
+        <span class="shore-bar-label">Good wind dirs</span>
+        <span class="lwd-toggle-dirs" id="lwdToggleDirs">—</span>
+        <span class="lwd-chevron" id="lwdChevron">▼</span>
+      </div>
+      <!-- buttons panel -->
+      <div class="lwd-panel" id="lwdPanel">
+        <span class="shore-bar-label lwd-desktop-label">Good wind dirs →</span>
+        <div class="shore-btns" id="shoreBtns">
+          <button class="s-btn" data-deg="0"   onclick="toggleWindDir(this)">N</button>
+          <button class="s-btn" data-deg="45"  onclick="toggleWindDir(this)">NE</button>
+          <button class="s-btn" data-deg="90"  onclick="toggleWindDir(this)">E</button>
+          <button class="s-btn" data-deg="135" onclick="toggleWindDir(this)">SE</button>
+          <button class="s-btn" data-deg="180" onclick="toggleWindDir(this)">S</button>
+          <button class="s-btn" data-deg="225" onclick="toggleWindDir(this)">SW</button>
+          <button class="s-btn" data-deg="270" onclick="toggleWindDir(this)">W</button>
+          <button class="s-btn" data-deg="315" onclick="toggleWindDir(this)">NW</button>
+        </div>
+        <span class="shore-hint" id="shoreHint"></span>
+      </div>
+    </div>
 
     <div id="tenDayStripWrap" style="display:none">
       <div class="tds-header">
