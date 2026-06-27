@@ -9,3 +9,6 @@ supabase/.branches/
 .env
 .env.*
 *.local
+
+# Superpowers brainstorm/scratch artifacts
+.superpowers/
