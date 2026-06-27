@@ -60,10 +60,11 @@ test('buildDay().goodHours and dayGoodHours agree on the same data (one definiti
   expect(fromBuildDay).toBeGreaterThanOrEqual(2); // the NW run at 11-14 qualifies
 });
 
-test('the homepage good-days fetch requests 10 forecast days (same window as the spot page)', async ({ gotoApp, page }) => {
+test('the homepage good-days fetch uses the same forecast window as the spot page (16 days)', async ({ gotoApp, page }) => {
   await gotoApp('signedOut');
   // Capture the open-meteo forecast request fired by fetchChipQualDays and
-  // assert it asks for forecast_days=10, matching the spot detail page.
+  // assert it asks for the same window as the spot detail page (16 days), so
+  // the homepage badge and the spot header can never disagree on the count.
   const reqUrl = page.waitForRequest((req) =>
     req.url().includes('api.open-meteo.com/v1/forecast') &&
     req.url().includes('windspeed_10m'));
@@ -72,5 +73,5 @@ test('the homepage good-days fetch requests 10 forecast days (same window as the
     fetchChipQualDays({ name: 'T', loc: '', lat: 51.35, lon: 3.28, dirs: [270, 315] });
   });
   const url = (await reqUrl).url();
-  expect(url).toContain('forecast_days=10');
+  expect(url).toContain('forecast_days=16');
 });

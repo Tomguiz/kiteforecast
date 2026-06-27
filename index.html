@@ -1178,7 +1178,7 @@
   <div class="state-msg" id="loadingState" style="display:none">
     <div class="spinner"></div>
     <h3>Fetching forecast…</h3>
-    <p style="font-size:.85rem">Loading 10 days of hourly data</p>
+    <p style="font-size:.85rem">Loading 16 days of hourly data</p>
   </div>
 
   <!-- error -->
@@ -2650,7 +2650,7 @@ async function fetchChipQualDays(spot){
       latitude:spot.lat,longitude:spot.lon,
       hourly:['weather_code','windspeed_10m','winddirection_10m','windgusts_10m'].join(','),
       daily:['sunrise','sunset'].join(','),
-      forecast_days:10,timezone:'auto',windspeed_unit:'ms',
+      forecast_days:16,timezone:'auto',windspeed_unit:'ms',
     });
     const wx=await safeFetch(`https://api.open-meteo.com/v1/forecast?${p}`,8000);
     if(wx.error) throw new Error(wx.reason);
@@ -2798,7 +2798,12 @@ function renderCompareBar(){
   // Evict non-fav cache entries before building compare table
   const _favKeySet=new Set(favs.map(f=>`${f.lat},${f.lon}`));
   Object.keys(chipBestCache).forEach(k=>{ if(!_favKeySet.has(k.split('|')[0])){ delete chipBestCache[k]; delete chipFxCache[k]; } });
-  const loadedEntries=favs.map(f=>chipBestCache[`${f.lat},${f.lon}`]).filter(Boolean);
+  // match by lat,lon prefix — cache keys carry a "|dirs" suffix (see fetchChipQualDays)
+  const loadedEntries=favs.map(f=>{
+    const prefix=`${f.lat},${f.lon}`;
+    const k=Object.keys(chipBestCache).find(k=>k.startsWith(prefix+'|')||k===prefix);
+    return k?chipBestCache[k]:null;
+  }).filter(Boolean);
   if(loadedEntries.length<2){ el.style.display='none'; return; }
   el.style.display='block';
 
@@ -2967,9 +2972,9 @@ async function fetchForecastFromSpot(spot){
       latitude:spot.lat,longitude:spot.lon,
       hourly:['temperature_2m','weather_code','windspeed_10m','winddirection_10m','windgusts_10m'].join(','),
       daily:['weather_code','temperature_2m_max','temperature_2m_min','windgusts_10m_max','sunrise','sunset'].join(','),
-      forecast_days:10, timezone:'auto', windspeed_unit:'ms',
+      forecast_days:16, timezone:'auto', windspeed_unit:'ms',
     });
-    const mP=new URLSearchParams({latitude:spot.lat,longitude:spot.lon,hourly:'wave_height,wave_period,wave_direction',forecast_days:10,timezone:'auto'});
+    const mP=new URLSearchParams({latitude:spot.lat,longitude:spot.lon,hourly:'wave_height,wave_period,wave_direction',forecast_days:16,timezone:'auto'});
     const needsShore=spot._osm&&!manualShoreSet&&!(live?.dirs?.length||spot.dirs?.length);
     // Fire all requests in parallel; include shore detection only when needed
     const [wx, marineData, tidesData, shoreResult] = await Promise.all([
@@ -3346,7 +3351,7 @@ const _kiteFacts=[
   "📱 KiteForecast checks the wind so you don't have to stare at 7 different weather apps and still miss the session.",
   "🔔 Set a spot alert once. We email you when it's on. You show up. Everyone thinks you have a sixth sense.",
   "🏆 KiteForecast has a leaderboard. Your friends are already on it. Just saying.",
-  "📅 10-day forecasts, hourly breakdown, session windows. Your boss has no idea why you always 'have a thing' on windy days.",
+  "📅 16-day forecasts, hourly breakdown, session windows. Your boss has no idea why you always 'have a thing' on windy days.",
   "👫 Add your kite crew as friends. When they confirm a session, you get notified. No more 'why didn't you tell me?!'",
   "🌍 Spots from Dakhla to Duinbergen. If the wind blows there, we know about it.",
   "⏰ Morning reminder the day before a good session. So you can pack your kite the night before like a responsible adult.",
@@ -3623,7 +3628,7 @@ function shareSpot(){
 const APP_URL='https://tomguiz.github.io/kiteforecast/';
 function shareAppLink(){
   const title='KiteForecast — Never miss a session again';
-  const text=`✅ 10-day hourly wind forecast for your favorite spots
+  const text=`✅ 16-day hourly wind forecast for your favorite spots
 🔔 Email alerts 72h, 24h & 1h before your session
 🏄 Know when your crew plans to hit the water
 
@@ -3635,7 +3640,7 @@ function shareAppLink(){
   }
 }
 function copyAppLink(){
-  const txt=`✅ 10-day hourly wind forecast for your favorite spots\n🔔 Email alerts 72h, 24h & 1h before your session\n🏄 Know when your crew plans to hit the water\n\n${APP_URL}`;
+  const txt=`✅ 16-day hourly wind forecast for your favorite spots\n🔔 Email alerts 72h, 24h & 1h before your session\n🏄 Know when your crew plans to hit the water\n\n${APP_URL}`;
   navigator.clipboard.writeText(txt).then(()=>showToast('🔗 Link copied!')).catch(()=>showToast(APP_URL));
 }
 let _qrGenerated=false;
@@ -3878,9 +3883,9 @@ async function fetchForecast(query){
       latitude,longitude,
       hourly:['temperature_2m','weather_code','windspeed_10m','winddirection_10m','windgusts_10m'].join(','),
       daily:['weather_code','temperature_2m_max','temperature_2m_min','windgusts_10m_max','sunrise','sunset'].join(','),
-      forecast_days:10, timezone:'auto', windspeed_unit:'ms',
+      forecast_days:16, timezone:'auto', windspeed_unit:'ms',
     });
-    const mP2=new URLSearchParams({latitude,longitude,hourly:'wave_height,wave_period,wave_direction',forecast_days:10,timezone:'auto'});
+    const mP2=new URLSearchParams({latitude,longitude,hourly:'wave_height,wave_period,wave_direction',forecast_days:16,timezone:'auto'});
     // Fire all requests in parallel (including shore detection for unknown spots)
     const [wx2, marineData2, tidesData2, shoreResult] = await Promise.all([
       safeFetch(`https://api.open-meteo.com/v1/forecast?${p}`,10000),
