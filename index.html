@@ -5496,6 +5496,20 @@ function openSuggestUpdate(){
     <textarea id="suTip" class="pp-input" rows="4" placeholder="e.g. Shallow at low tide, best at high tide. Avoid S swell. Parking on the north side." style="margin-bottom:6px;resize:vertical;min-height:88px;font-family:inherit;font-size:.85rem${info.spot_tip?';border-color:rgba(56,189,248,.4)':''}">${info.spot_tip||''}</textarea>
     <div style="font-size:.67rem;color:var(--tdim);margin-bottom:18px;">Want to update business info, booking links or contact details? <span style="color:var(--accent);cursor:pointer" onclick="closeSuggestUpdate();openClaimFlow()">Claim this spot →</span></div>
 
+    <label class="pp-label" style="margin-top:6px">🪁 Spot attributes <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">— what you can ride & what's here</span></label>
+    <label class="pp-label">Disciplines</label>
+    ${attrMultiHTML('suDisciplines',SPOT_DISCIPLINES,info.disciplines)}
+    <label class="pp-label">Facilities</label>
+    ${attrMultiHTML('suFacilities',SPOT_FACILITIES,info.facilities)}
+    <label class="pp-label">Water type</label>
+    ${attrSingleHTML('suWaterType',SPOT_WATER_TYPES,info.water_type)}
+    <label class="pp-label">Tide</label>
+    ${attrSingleHTML('suTidePref',SPOT_TIDE_PREFS,info.tide_pref)}
+    <label class="pp-label">Crowd</label>
+    ${attrSingleHTML('suCrowdLevel',SPOT_CROWD_LEVELS,info.crowd_level)}
+    <label class="pp-label">Suitable level</label>
+    ${attrSingleHTML('suSkillLevel',SPOT_SKILL_LEVELS,info.skill_level)}
+
     <button class="btn pp-save-btn" id="suSubmitBtn" onclick="submitSuggestUpdate()" style="width:100%">Send suggestion →</button>
   `;
   el.style.display='block';
@@ -5517,13 +5531,19 @@ async function submitSuggestUpdate(){
   const selDirs=[...document.querySelectorAll('#suDirBtns .s-btn.active')].map(b=>parseInt(b.dataset.deg));
   const tip=($('suTip')?.value||'').trim();
 
-  if(!selDirs.length&&!tip){ showToast('Add a wind direction or a tip before sending.'); return; }
+  const _disc=readMultiAttr('suDisciplines'), _fac=readMultiAttr('suFacilities');
+  const _water=readSingleAttr('suWaterType'), _tide=readSingleAttr('suTidePref');
+  const _crowd=readSingleAttr('suCrowdLevel'), _skill=readSingleAttr('suSkillLevel');
+  const _hasAttr=!!(_disc||_fac||_water||_tide||_crowd||_skill);
+  if(!selDirs.length&&!tip&&!_hasAttr){ showToast('Add a wind direction, a tip, or a spot attribute before sending.'); return; }
 
   btn.disabled=true; btn.textContent='Sending…';
   const sb=getSb(); if(!sb){ btn.disabled=false; btn.textContent='Send suggestion →'; return; }
   const{error}=await sb.from('spot_update_suggestions').insert({
     email, spot_name:spotName,
     suggested_dirs:selDirs.length?selDirs:null, tip:tip||null,
+    disciplines:_disc, facilities:_fac, water_type:_water,
+    tide_pref:_tide, crowd_level:_crowd, skill_level:_skill,
   });
   if(error){ showToast('Error: '+error.message); btn.disabled=false; btn.textContent='Send suggestion →'; return; }
 
