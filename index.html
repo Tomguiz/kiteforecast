@@ -2636,6 +2636,16 @@ function _chipCacheGet(lat,lon,dirs){
   return null;
 }
 
+// Resolve a spot's best/breakdown entry from chipBestCache by lat,lon, ignoring
+// the "|dirs" suffix the cache keys carry. Single source of truth so callers
+// (compare bar, share snippet) can't reintroduce the bare-key lookup bug. The
+// "+'|'" guard prevents a shorter lat,lon from matching a longer one.
+function chipBestForSpot(lat,lon){
+  const prefix=`${lat},${lon}`;
+  const k=Object.keys(chipBestCache).find(k=>k.startsWith(prefix+'|')||k===prefix);
+  return k?chipBestCache[k]:null;
+}
+
 let _spotsIsReady=false; // flipped to true once _spotsReady resolves
 window._spotsReady?.then?.(()=>{ _spotsIsReady=true; });
 
@@ -2798,12 +2808,8 @@ function renderCompareBar(){
   // Evict non-fav cache entries before building compare table
   const _favKeySet=new Set(favs.map(f=>`${f.lat},${f.lon}`));
   Object.keys(chipBestCache).forEach(k=>{ if(!_favKeySet.has(k.split('|')[0])){ delete chipBestCache[k]; delete chipFxCache[k]; } });
-  // match by lat,lon prefix — cache keys carry a "|dirs" suffix (see fetchChipQualDays)
-  const loadedEntries=favs.map(f=>{
-    const prefix=`${f.lat},${f.lon}`;
-    const k=Object.keys(chipBestCache).find(k=>k.startsWith(prefix+'|')||k===prefix);
-    return k?chipBestCache[k]:null;
-  }).filter(Boolean);
+  // resolve each fav by lat,lon (cache keys carry a "|dirs" suffix)
+  const loadedEntries=favs.map(f=>chipBestForSpot(f.lat,f.lon)).filter(Boolean);
   if(loadedEntries.length<2){ el.style.display='none'; return; }
   el.style.display='block';
 
@@ -3599,8 +3605,7 @@ function shareSpot(){
   const url=`${location.origin}${location.pathname}?spot=${encodeURIComponent(cachedLoc.name)}&share=1`;
 
   // Build good-days snippet from cached forecast data
-  const key=`${cachedLoc.latitude},${cachedLoc.longitude}`;
-  const entry=chipBestCache[key];
+  const entry=chipBestForSpot(cachedLoc.latitude,cachedLoc.longitude);
   let daysText='';
   if(entry?.days10){
     const goodDays=entry.days10.filter(d=>(d.goodHours??d.qh)>=2).slice(0,3);
