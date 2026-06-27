@@ -421,6 +421,15 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 -- Add spot_tip column to spot_info for community tips
 DO $$ BEGIN ALTER TABLE spot_info ADD COLUMN spot_tip text; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
 
+-- Structured spot attributes (Surfr-style): disciplines/facilities (multi),
+-- water/tide/crowd/skill (single). All nullable. Idempotent.
+DO $$ BEGIN ALTER TABLE spot_info ADD COLUMN disciplines text[]; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE spot_info ADD COLUMN facilities  text[]; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE spot_info ADD COLUMN water_type  text;   EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE spot_info ADD COLUMN tide_pref   text;   EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE spot_info ADD COLUMN crowd_level text;   EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE spot_info ADD COLUMN skill_level text;   EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+
 -- Contribution points + earned premium
 DO $$ BEGIN ALTER TABLE spot_update_suggestions ADD COLUMN approved boolean NOT NULL DEFAULT false; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE profiles ADD COLUMN contribution_points integer NOT NULL DEFAULT 0; EXCEPTION WHEN duplicate_column THEN NULL; END $$;

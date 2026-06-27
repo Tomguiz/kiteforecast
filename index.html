@@ -3594,6 +3594,44 @@ async function fetchSpotInfo(spotName) {
   return data;
 }
 
+const SPOT_DISCIPLINES = ['Twintip','Hydrofoil','Wave','Wing','Surf'];
+const SPOT_FACILITIES  = ['Free parking','Paid parking','Kiteshop','Kite rental','Lessons','Restaurant/bar','Showers','Toilets','Rescue','Storage'];
+const SPOT_WATER_TYPES = ['Flat','Choppy','Waves','Flat & choppy','Choppy & waves'];
+const SPOT_TIDE_PREFS  = ['All tides','Best at high','Best at low'];
+const SPOT_CROWD_LEVELS = ['Quiet','Moderate','Crowded','Extremely crowded'];
+const SPOT_SKILL_LEVELS = ['Beginner-friendly','Intermediate','Advanced'];
+const FACILITY_EMOJI = {'Free parking':'🅿️','Paid parking':'🅿️','Kiteshop':'🛍️','Kite rental':'🪁','Lessons':'🎓','Restaurant/bar':'🍽️','Showers':'🚿','Toilets':'🚻','Rescue':'🛟','Storage':'📦'};
+
+// Build the structured-attributes block for a spot-info card. Values come only
+// from the fixed option lists. Returns '' when nothing is set so dataless spots
+// are unchanged. (Phase 1 — display.)
+function spotAttributesHTML(info){
+  if(!info) return '';
+  const disc=Array.isArray(info.disciplines)?info.disciplines:[];
+  const fac =Array.isArray(info.facilities)?info.facilities:[];
+  const conds=[
+    info.water_type ?['🌊','Water',info.water_type]:null,
+    info.tide_pref  ?['🌙','Tide',info.tide_pref]:null,
+    info.crowd_level?['👥','Crowd',info.crowd_level]:null,
+    info.skill_level?['🟢','Level',info.skill_level]:null,
+  ].filter(Boolean);
+  if(!disc.length&&!fac.length&&!conds.length) return '';
+  let html='<div class="spot-attr-block">';
+  if(disc.length){
+    html+='<div class="spot-attr-label">🪁 Disciplines</div><div class="spot-attr-chips">'
+      +disc.map(d=>`<span class="spot-chip spot-chip-disc">${d}</span>`).join('')+'</div>';
+  }
+  if(fac.length){
+    html+='<div class="spot-attr-label">🏖️ Facilities</div><div class="spot-attr-chips">'
+      +fac.map(f=>`<span class="spot-chip">${FACILITY_EMOJI[f]?FACILITY_EMOJI[f]+' ':''}${f}</span>`).join('')+'</div>';
+  }
+  if(conds.length){
+    html+='<div class="spot-attr-conditions">'
+      +conds.map(([e,l,v])=>`<span class="spot-attr-cond">${e} <span class="spot-attr-cond-lbl">${l}</span> ${v}</span>`).join('')+'</div>';
+  }
+  return html+'</div>';
+}
+
 async function renderSpotInfoCard(spotName) {
   const el = $('spotInfoCard'); if(!el) return;
   // show collapsed header immediately while fetch is in flight
