@@ -326,6 +326,38 @@ DO $$ BEGIN
   CREATE POLICY "all_select" ON reminders FOR SELECT TO anon, authenticated USING (true);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
+-- Confirmed "I'm going" sessions — the source of truth for the Stats section.
+-- Wind stats are written by process-reminders when the 1h reminder fires and a
+-- matching attendance exists. RLS lives in rls-hardening.sql.
+CREATE TABLE IF NOT EXISTS session_attendances (
+  id              uuid          PRIMARY KEY DEFAULT gen_random_uuid(),
+  email           text          NOT NULL,
+  nickname        text,
+  spot_name       text          NOT NULL,
+  spot_lat        double precision,
+  spot_lon        double precision,
+  session_date    date          NOT NULL,
+  start_time      text,
+  duration_h      integer,
+  note            text,
+  cancelled       boolean       NOT NULL DEFAULT false,
+  -- Ground-truth wind stats, populated when the 1h reminder fires
+  session_peak_kn    integer,
+  session_min_kn     integer,
+  session_hours      integer,
+  session_rating     text,
+  session_wind_dir   text,
+  created_at      timestamptz   NOT NULL DEFAULT now(),
+  UNIQUE (email, spot_name, session_date)
+);
+
+-- Add stat columns for tables created before they existed (idempotent)
+ALTER TABLE session_attendances ADD COLUMN IF NOT EXISTS session_peak_kn  integer;
+ALTER TABLE session_attendances ADD COLUMN IF NOT EXISTS session_min_kn   integer;
+ALTER TABLE session_attendances ADD COLUMN IF NOT EXISTS session_hours    integer;
+ALTER TABLE session_attendances ADD COLUMN IF NOT EXISTS session_rating   text;
+ALTER TABLE session_attendances ADD COLUMN IF NOT EXISTS session_wind_dir text;
+
 -- 5. pg_cron jobs
 
 -- Runs every 5 minutes — sends due reminders
