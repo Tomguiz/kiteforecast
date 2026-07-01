@@ -5012,8 +5012,13 @@ async function persistSpotSubscription(spot,spotLat,spotLon){
     .eq('email',p.email).eq('spot_name',spot.name).eq('session_date',sentinelDate)
     .eq('notif_type','spot').eq('reminder_hours',0).limit(1);
   if(existing&&existing.length){
-    // Row exists — just flip cancelled back to false
-    await sb.from('reminders').update({cancelled:false,spot_dirs:[...windDirs]})
+    // Row exists — flip cancelled back to false and (re)set app_link in case an
+    // older sentinel was stored without one.
+    await sb.from('reminders').update({
+      cancelled:false,
+      spot_dirs:[...windDirs],
+      app_link:`${location.origin}${location.pathname}?spot=${encodeURIComponent(spot.name)}&date=${sentinelDate}`,
+    })
       .eq('email',p.email).eq('spot_name',spot.name).eq('session_date',sentinelDate)
       .eq('notif_type','spot').eq('reminder_hours',0);
   } else {
@@ -5033,6 +5038,9 @@ async function persistSpotSubscription(spot,spotLat,spotLon){
       send_at:      '2099-12-31T00:00:00Z',
       sent:         false,
       cancelled:    false,
+      // check-new-sessions rewrites the date= per real session; the sentinel just
+      // needs a valid base URL so generated reminders inherit a working app_link.
+      app_link:     `${location.origin}${location.pathname}?spot=${encodeURIComponent(spot.name)}&date=${sentinelDate}`,
     });
   }
 }
