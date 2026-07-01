@@ -326,11 +326,18 @@ Deno.serve(async () => {
 
       const update: Record<string, unknown> = { sent: true }
       if (rh === 1) {
-        update.session_peak_kn  = peakKn
-        update.session_min_kn   = windMin
-        update.session_hours    = goodHours
-        update.session_rating   = rating
-        update.session_wind_dir = domDir !== null ? compass(domDir) : null
+        const sessionStats = {
+          session_peak_kn:  peakKn,
+          session_min_kn:   windMin,
+          session_hours:    goodHours,
+          session_rating:   rating,
+          session_wind_dir: domDir !== null ? compass(domDir) : null,
+        }
+        Object.assign(update, sessionStats)
+        // Also write ground-truth wind onto the confirmed-session row (the Stats
+        // source of truth) if the user actually confirmed they were going.
+        await supabase.from('session_attendances').update(sessionStats)
+          .eq('email', r.email).eq('spot_name', r.spot_name).eq('session_date', r.session_date)
       }
       await supabase.from('reminders').update(update).eq('id', r.id)
       processed++

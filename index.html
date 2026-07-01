@@ -8747,26 +8747,17 @@ async function renderStats(){
   const today=new Date().toISOString().slice(0,10);
   const thisMonth=today.slice(0,7);
   const[{data:rows,error},{data:friendships}]=await Promise.all([
-    sb.from('reminders')
-      .select('spot_name,session_date,session_peak_kn,session_min_kn,session_hours,session_rating,session_wind_dir,spot_dirs')
-      .eq('email',email).eq('reminder_hours',1).eq('sent',true).eq('skipped',false).eq('cancelled',false)
+    sb.from('session_attendances')
+      .select('spot_name,session_date,duration_h,session_peak_kn,session_min_kn,session_hours,session_rating,session_wind_dir')
+      .eq('email',email).eq('cancelled',false)
       .order('session_date',{ascending:false}),
     sb.from('friendships').select('requester,recipient').or(`requester.eq.${email},recipient.eq.${email}`).eq('status','accepted'),
   ]);
   if(error){el.innerHTML='<div class="stats-empty">Could not load stats</div>';return;}
 
-  // Filter sessions to fav spots + day filter
-  const favSpots=new Set(loadFavs().map(f=>f.name));
-  const favs=loadFavs();
-  const sessions=(rows||[]).filter(r=>{
-    if(!favSpots.has(r.spot_name)) return false;
-    const fav=favs.find(f=>f.name===r.spot_name);
-    if(fav?.days&&fav.days.length){
-      const dow=new Date(r.session_date+'T12:00:00').getDay();
-      if(!fav.days.includes(dow)) return false;
-    }
-    return true;
-  });
+  // Confirmed sessions count regardless of current favourites — a session you
+  // attended stays in your stats even if you later un-favourite the spot.
+  const sessions=rows||[];
 
   // Year selector
   const years=[...new Set(sessions.map(r=>r.session_date.slice(0,4)))].sort((a,b)=>b-a);
@@ -8774,7 +8765,7 @@ async function renderStats(){
   const yearBtns=['all',...years].map(y=>`<button class="stats-year-btn${_statsYear===y?' active':''}" onclick="_statsYear='${y}';renderStats()">${y==='all'?'All time':y}</button>`).join('');
 
   if(!filtered.length){
-    el.innerHTML=`<div class="stats-year-bar">${yearBtns}</div><div class="stats-empty">No sessions recorded yet${_statsYear!=='all'?' for '+_statsYear:''}.<br>Stats appear after your first 1h alert fires.</div>`;
+    el.innerHTML=`<div class="stats-year-bar">${yearBtns}</div><div class="stats-empty">No sessions recorded yet${_statsYear!=='all'?' for '+_statsYear:''}.<br>Confirm you're going on a day card to log a session.</div>`;
     return;
   }
 
@@ -8783,8 +8774,11 @@ async function renderStats(){
   const withPeak=filtered.filter(r=>r.session_peak_kn);
   const avgPeak=withPeak.length?Math.round(withPeak.reduce((s,r)=>s+r.session_peak_kn,0)/withPeak.length):null;
   const maxPeak=withPeak.length?Math.max(...withPeak.map(r=>r.session_peak_kn)):null;
-  const withHours=filtered.filter(r=>r.session_hours);
-  const totalHours=withHours.reduce((s,r)=>s+r.session_hours,0);
+  // Prefer wind-derived good-hours (ground truth from the fired reminder);
+  // fall back to the duration the user picked when confirming the session.
+  const hoursOf=r=>r.session_hours!=null?r.session_hours:(r.duration_h!=null?r.duration_h:null);
+  const withHours=filtered.filter(r=>hoursOf(r)!=null);
+  const totalHours=withHours.reduce((s,r)=>s+hoursOf(r),0);
   const avgHours=withHours.length?(totalHours/withHours.length).toFixed(1):null;
   const bestSession=withPeak.length?[...withPeak].sort((a,b)=>b.session_peak_kn-a.session_peak_kn)[0]:null;
 
@@ -8803,9 +8797,9 @@ async function renderStats(){
   const friendEmails=(friendships||[]).map(f=>f.requester===email?f.recipient:f.requester);
   let leaderboardHTML='';
   if(friendEmails.length){
-    const{data:friendRows}=await sb.from('reminders')
+    const{data:friendRows}=await sb.from('session_attendances')
       .select('email,session_date')
-      .in('email',friendEmails).eq('reminder_hours',1).eq('sent',true).eq('skipped',false).eq('cancelled',false)
+      .in('email',friendEmails).eq('cancelled',false)
       .gte('session_date',thisMonth+'-01');
     const myMonthCount=sessions.filter(r=>r.session_date.startsWith(thisMonth)).length;
     const friendCounts={};
