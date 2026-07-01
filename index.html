@@ -7843,7 +7843,7 @@ function updatePremiumUI(){
 
 async function syncPremiumFromSupabase(email){
   const sb=getSb(); if(!sb||!email) return;
-  const{data,error}=await sb.from('profiles').select('is_premium,sms_enabled,phone_number,is_admin,nickname,friend_session_notifs,notify_friends_on_confirm,avatar_url,contribution_points,premium_until').eq('email',email).single();
+  const{data,error}=await sb.from('profiles').select('is_premium,sms_enabled,phone_number,is_admin,nickname,friend_session_notifs,notify_friends_on_confirm,avatar_url,contribution_points,premium_until,notifs_enabled').eq('email',email).single();
   console.log('[syncPremium] email=',email,'data=',data,'error=',error?.message);
   const p=loadProfile();
   if(data){
@@ -7857,6 +7857,8 @@ async function syncPremiumFromSupabase(email){
       p.friendSessionNotifs=data.friend_session_notifs!==false;
     if(data.notify_friends_on_confirm!==null&&data.notify_friends_on_confirm!==undefined)
       p.notifyFriendsOnConfirm=data.notify_friends_on_confirm!==false;
+    if(data.notifs_enabled!==null&&data.notifs_enabled!==undefined)
+      p.notifsEnabled=data.notifs_enabled!==false;
     p.contributionPoints=data.contribution_points||0;
     p.premiumUntil=data.premium_until||null;
     saveProfile(p);
@@ -7864,6 +7866,12 @@ async function syncPremiumFromSupabase(email){
     if(fst) fst.classList.toggle('on', p.friendSessionNotifs!==false);
     const nft=$('ppNotifyFriendsToggle');
     if(nft) nft.classList.toggle('on', p.notifyFriendsOnConfirm!==false);
+    const mst=$('ppMasterToggle');
+    if(mst){
+      const on=p.notifsEnabled!==false;
+      mst.classList.toggle('on',on);
+      const note=$('ppMasterOffNote'); if(note) note.style.display=on?'none':'block';
+    }
   }
   updatePremiumUI();
   const adminTab=$('ppTabAdmin');
@@ -8667,13 +8675,16 @@ async function toggleNotifyFriends(){
   showToast(p.notifyFriendsOnConfirm===false ? 'Friends send alerts: off' : 'Friends send alerts: on');
 }
 
-function toggleMasterNotif(){
+async function toggleMasterNotif(){
   const p=loadProfile();
   p.notifsEnabled=!notifMasterEnabled();
   saveProfile(p);
   const on=p.notifsEnabled!==false;
   $('ppMasterToggle').classList.toggle('on',on);
   const note=$('ppMasterOffNote'); if(note) note.style.display=on?'none':'block';
+  // Persist server-side so process-reminders can skip sends while paused.
+  const sb=getSb();
+  if(sb&&p.email) await sb.from('profiles').upsert({email:p.email,notifs_enabled:on},{onConflict:'email'});
 }
 let _statsYear='all'; // 'all' or a 4-digit year string
 async function renderStats(){

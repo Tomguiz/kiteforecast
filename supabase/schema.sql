@@ -69,8 +69,12 @@ CREATE TABLE IF NOT EXISTS profiles (
   stripe_subscription_id  text,
   phone_number            text,       -- E.164 format e.g. +32478123456
   sms_enabled             boolean     NOT NULL DEFAULT false,
+  notifs_enabled          boolean     NOT NULL DEFAULT true,  -- master "Email reminders" toggle; false = pause all spot reminders
   is_admin                boolean     NOT NULL DEFAULT false
 );
+
+-- Backfill for existing profiles created before notifs_enabled existed
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS notifs_enabled boolean NOT NULL DEFAULT true;
 
 -- Grant admin to tom.guisgand@gmail.com (idempotent)
 INSERT INTO profiles (email, is_admin) VALUES ('tom.guisgand@gmail.com', true)
