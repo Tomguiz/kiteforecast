@@ -118,8 +118,26 @@ Deno.serve(async () => {
 
   let processed = 0
 
+  // Cache profiles.notifs_enabled per email so a paused user with many due
+  // reminders is only looked up once. Missing profile → treated as enabled.
+  const notifsEnabledCache = new Map<string, boolean>()
+  async function notifsEnabled(email: string): Promise<boolean> {
+    if (notifsEnabledCache.has(email)) return notifsEnabledCache.get(email)!
+    const { data } = await supabase
+      .from('profiles').select('notifs_enabled').eq('email', email).single()
+    const enabled = data?.notifs_enabled !== false
+    notifsEnabledCache.set(email, enabled)
+    return enabled
+  }
+
   for (const r of reminders ?? []) {
     try {
+      // Master toggle: user paused all spot reminders — skip without emailing.
+      if (!(await notifsEnabled(r.email))) {
+        await supabase.from('reminders').update({ sent: true, skipped: true }).eq('id', r.id)
+        continue
+      }
+
       // Re-fetch live forecast
       const params = new URLSearchParams({
         latitude:      String(r.spot_lat),
