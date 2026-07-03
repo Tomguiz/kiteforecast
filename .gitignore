@@ -12,3 +12,4 @@ supabase/.branches/
 
 # Superpowers brainstorm/scratch artifacts
 .superpowers/
+test-results/
