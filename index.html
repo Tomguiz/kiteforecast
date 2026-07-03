@@ -6774,7 +6774,7 @@ function _usersRelTime(iso){
 }
 
 let _adminUsers=null;                              // cached roster from admin_list_users
-let _adminUsersSort={key:'created',dir:'desc'};    // current sort
+let _adminUsersSort={key:'seen',dir:'desc'};       // current sort — default to last activity (most recently seen first)
 const _adminUserSpots={};                          // email → {favs, follows} cache
 let _adminUsersExpanded=null;                      // email of the one expanded card, or null
 
@@ -6807,7 +6807,15 @@ async function renderAdminUsers(){
   const{data,error}=await sb.rpc('admin_list_users');
   if(error){
     console.error('[admin] admin_list_users error:',error);
-    el.innerHTML='<div class="stats-empty">Couldn\'t load users.</div>';
+    const msg=(error.message||'Unknown error').replace(/</g,'&lt;');
+    const hint=error.code==='PGRST202'
+      ? '<div style="font-size:.68rem;color:var(--tdim);margin-top:4px">The admin_list_users function is missing or not exposed. Apply rls-hardening.sql, then reload the API schema.</div>'
+      : '';
+    el.innerHTML='<div class="stats-empty">Couldn\'t load users.'+
+      '<div style="font-size:.68rem;color:var(--tdim);margin-top:6px;word-break:break-word">'+msg+'</div>'+hint+
+      '<div style="margin-top:10px"><button type="button" onclick="renderAdminUsers()" '+
+      'style="font:inherit;cursor:pointer;border-radius:6px;padding:4px 12px;border:1px solid rgba(56,189,248,.5);'+
+      'background:rgba(56,189,248,.12);color:#38bdf8">Retry</button></div></div>';
     return;
   }
   _adminUsers=data||[];
