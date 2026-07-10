@@ -6086,25 +6086,14 @@ async function submitSpotSuggestion(){
   }
   ['suggestName','suggestLocation','suggestCountry','suggestLat','suggestLon'].forEach(id=>{ const el=$(id); if(el) el.style.border=''; });
 
-  // Fire-and-forget — never block the UI on network calls
-  const sb=getSb();
-  if(sb){
-    sb.from('spot_suggestions').insert({
-      suggested_name: name,
-      location: location+(country?', '+country:''),
-      country: country||null,
-      lat:  lat  ? parseFloat(lat)  : null,
-      lon:  lon  ? parseFloat(lon)  : null,
-      note: [dirs&&`Dirs: ${dirs}`, business&&`Business: ${business}`, website&&`Website: ${website}`, webcam&&`Webcam: ${webcam}`, note].filter(Boolean).join(' | ')||null,
-      submitted_by:  contactEmail||null,
-      contact_name:  profileName||null,
-    }).then(()=>{}).catch(()=>{});
-  }
-
+  // Persist + notify in one call. The DB insert happens server-side inside the
+  // edge function (service role) — the client no longer inserts directly,
+  // because spot_suggestions RLS silently rejected anon / mismatched-email
+  // inserts, leaving the admin with an email but no reviewable row.
   fetch('https://kpwmajtxmcfpakvonimf.supabase.co/functions/v1/spot-suggest-notify',{
     method:'POST',
     headers:{'Content-Type':'application/json','Authorization':'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwd21hanR4bWNmcGFrdm9uaW1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTcyMjYsImV4cCI6MjA5MDczMzIyNn0.QfQuIQbnfVUOApPbOdvCRbNsVdb0SBAwMX-hvioGJmg'},
-    body: JSON.stringify({ name, location, lat, lon, dirs, business, website, webcam, note, contact_email: contactEmail, contact_name: profileName||'—' }),
+    body: JSON.stringify({ name, location, country, lat, lon, dirs, business, website, webcam, note, contact_email: contactEmail, contact_name: profileName||'—' }),
   }).catch(()=>{});
 
   // Remember submitted spot name persistently so "pending review" shows on future visits
@@ -8033,7 +8022,10 @@ async function savePhone(){
   if(!reviewParam) return;
   history.replaceState({},'',location.pathname);
   try{
-    const spot=JSON.parse(atob(reviewParam));
+    // Mirror of the edge function's UTF-8-safe base64 (btoa(unescape(encodeURIComponent(x)))).
+    // Fall back to plain atob for any older links that predate the UTF-8 fix.
+    let json; try{ json=decodeURIComponent(escape(atob(reviewParam))); }catch(_){ json=atob(reviewParam); }
+    const spot=JSON.parse(json);
     window._pendingReviewSpot=spot;
   }catch(e){}
   // Sign out current session so the magic link auth session is active

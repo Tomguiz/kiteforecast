@@ -148,6 +148,21 @@ Deno.serve(async (req) => {
     favsByEmail.get(f.email)!.push(f)
   }
 
+  // Canonical wind directions live in spot_overrides (admin-maintained). The
+  // dirs copied into each favourites row are a point-in-time snapshot and go
+  // stale when an admin later corrects a spot's directions — which is what hid
+  // good sessions from the digest. Resolve dirs from the override at send time
+  // so forecasts always reflect the spot's current directions, mirroring the
+  // app's own precedence (index.html: override dirs win when non-empty).
+  const { data: overrides } = await supabase
+    .from('spot_overrides')
+    .select('name,dirs')
+    .eq('active', true)
+  const overrideDirs = new Map<string, number[]>()
+  for (const o of overrides ?? []) {
+    if (o.dirs?.length) overrideDirs.set(o.name, o.dirs)
+  }
+
   const wxCache = new Map<string, any>()
   let sent = 0
 
@@ -173,7 +188,8 @@ Deno.serve(async (req) => {
       }
       const wx = wxCache.get(key)
       if (!wx) continue
-      const sessions = getGoodSessions(wx, fav.spot_dirs ?? [], fav.spot_days ?? null)
+      const dirs = overrideDirs.get(fav.spot_name) ?? fav.spot_dirs ?? []
+      const sessions = getGoodSessions(wx, dirs, fav.spot_days ?? null)
       // Attach per-session magic links
       const sessionsWithLinks = await Promise.all(sessions.map(async sess => {
         const forecastUrl = `${APP_BASE}?spot=${encodeURIComponent(fav.spot_name)}&date=${sess.date}`
@@ -290,6 +306,11 @@ Deno.serve(async (req) => {
         </td>
       </tr>` : ''
 
+    // Footer CTA rendered here (not mapped in Make) so the button always has a
+    // valid href — a previously empty Make field left the button dead.
+    const ctaHtml = `
+      <a href="${homeLink}" style="display:inline-block;background:#2f6df6;border-radius:10px;padding:14px 28px;font-family:'DM Sans',Arial,sans-serif;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;">&#128202; Check the full forecast</a>`
+
     const payload = {
       notification_type: 'digest',
       email,
@@ -299,6 +320,7 @@ Deno.serve(async (req) => {
       spots_html: spotsHtml,
       no_sessions_html: noSessionsHtml,
       home_link: homeLink,
+      cta_html: ctaHtml,
     }
 
     await fetch(MAKE_WEBHOOK_URL, {
