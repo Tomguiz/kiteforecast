@@ -638,6 +638,13 @@
       display:flex; justify-content:flex-end; align-items:stretch;
       animation:mFadeIn .15s ease;
     }
+    /* Feature sections (Friends, Notifications, …) open on the LEFT — same side
+       as the burger menu they're launched from. Only the Profile sheet stays
+       right. Desktop-only: on mobile the panel is a bottom sheet. */
+    @media (min-width:600px) {
+      #profileOverlay.pp-left { justify-content:flex-start; }
+      #profileOverlay.pp-left #profilePanel { border-left:none; border-right:1px solid var(--border); }
+    }
     @media (max-width:599px) {
       #profileOverlay { align-items:flex-end; }
       /* Fixed height so every section/panel opens at the same size regardless of
@@ -5400,6 +5407,9 @@ function _showOnlyPanel(key){
   ids.forEach(id=>{ const el=$(id); if(el) el.style.display='none'; });
   const showId = key==='profile' ? 'ppPanelProfile' : (SECTIONS[key] && SECTIONS[key].panel);
   const showEl = showId ? $(showId) : null; if(showEl) showEl.style.display='block';
+  // Profile sheet stays on the right; every other section opens on the left
+  // (same side as the burger menu). See #profileOverlay.pp-left.
+  const _ov=$('profileOverlay'); if(_ov) _ov.classList.toggle('pp-left', key!=='profile');
   ppCurrentTab=key;
 }
 // Open the Profile sheet (from the profile bubble).
