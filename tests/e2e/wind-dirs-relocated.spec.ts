@@ -2,10 +2,9 @@ import { test, expect } from '../fixtures/auth';
 
 test.use({ viewport: { width: 390, height: 844 } });
 
-// The interactive "Good wind dirs" selector was moved out of the forecast
-// header to sit with the Spot info card (after #spotInfoCard in the DOM). It
-// must (a) live after the spot-info card, and (b) still work: toggling a
-// direction must update windDirs and re-render the forecast.
+// The "Good wind dirs" section sits with the Spot info card (after #spotInfoCard)
+// and is READ-ONLY: it shows ONLY the spot's selected directions as static chips.
+// There is no per-user toggle — direction changes go through "Edit for all" only.
 
 test('the wind-dirs selector sits after the spot-info card in the DOM', async ({ gotoApp, page }) => {
   await gotoApp('signedOut');
@@ -18,35 +17,49 @@ test('the wind-dirs selector sits after the spot-info card in the DOM', async ({
   expect(order).toBe(true);
 });
 
-test('the relocated selector still toggles a direction and re-filters the forecast', async ({ gotoApp, page }) => {
+test('renders ONLY the selected directions as chips (no unselected/hardcoded buttons)', async ({ gotoApp, page }) => {
+  await gotoApp('signedOut');
+
+  const chips = await page.evaluate(() => {
+    // Select W (270) and NW (315) only.
+    setWindDirs([270, 315]);
+    const els = Array.from(document.querySelectorAll('#shoreBtns .s-btn'));
+    return {
+      count: els.length,
+      labels: els.map((e) => e.textContent),
+      degs: els.map((e) => (e as HTMLElement).dataset.deg),
+      allActive: els.every((e) => e.classList.contains('active')),
+      allSpans: els.every((e) => e.tagName === 'SPAN'),      // static, not <button>
+      hasOnclick: els.some((e) => (e as HTMLElement).getAttribute('onclick')),
+    };
+  });
+
+  expect(chips.count).toBe(2);                     // only the 2 selected, not 8
+  expect(chips.labels).toEqual(['W', 'NW']);
+  expect(chips.degs).toEqual(['270', '315']);
+  expect(chips.allActive).toBe(true);              // all shown chips are "glowy"
+  expect(chips.allSpans).toBe(true);               // rendered as static spans
+  expect(chips.hasOnclick).toBeFalsy();            // no click handlers
+});
+
+test('the chips are non-interactive — clicking one does not change windDirs', async ({ gotoApp, page }) => {
   await gotoApp('signedOut');
 
   const result = await page.evaluate(() => {
-    // minimal forecast state so renderGrid has data and toggleWindDir re-renders
-    const D = '2026-06-27';
-    const m = new Map<number, any>();
-    for (let h = 9; h <= 16; h++) m.set(h, { kn: 20, dir: 315, code: 0, gustKn: 26 });
-    cachedHrMap = new Map([[D, m]]);
-    cachedLoc = { name: 'Test Spot', latitude: 51.35, longitude: 3.28, country: 'BE' };
-    cachedWx = { daily: {
-      time: [D], weather_code: [0],
-      temperature_2m_max: [22], temperature_2m_min: [15], windgusts_10m_max: [13],
-      sunrise: [`${D}T05:54`], sunset: [`${D}T21:29`],
-    } };
-    windDirs = new Set();
-    renderGrid();
-
-    // click the NW (315°) button in the relocated selector
-    const nw = document.querySelector('#shoreBtns .s-btn[data-deg="315"]') as HTMLButtonElement;
-    const before = windDirs.has(315);
-    nw.click();
-    const after = windDirs.has(315);
-    const active = nw.classList.contains('active');
-    return { found: !!nw, before, after, active };
+    setWindDirs([270, 315]);
+    const chip = document.querySelector('#shoreBtns .s-btn[data-deg="270"]') as HTMLElement;
+    const before = [...windDirs].sort((a, b) => a - b);
+    chip.click();                                   // must be a no-op
+    const after = [...windDirs].sort((a, b) => a - b);
+    return { before, after, stillTwoChips: document.querySelectorAll('#shoreBtns .s-btn').length };
   });
 
-  expect(result.found).toBe(true);
-  expect(result.before).toBe(false);
-  expect(result.after).toBe(true);     // toggle added the direction
-  expect(result.active).toBe(true);    // button reflects the active state
+  expect(result.after).toEqual(result.before);      // unchanged
+  expect(result.stillTwoChips).toBe(2);
+});
+
+test('toggleWindDir (the old per-user override) no longer exists', async ({ gotoApp, page }) => {
+  await gotoApp('signedOut');
+  const gone = await page.evaluate(() => typeof (window as any).toggleWindDir === 'undefined');
+  expect(gone).toBe(true);
 });

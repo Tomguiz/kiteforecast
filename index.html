@@ -192,6 +192,9 @@
     .s-btn:focus  { outline:none; }
     .s-btn.active { border-color:var(--accent); background:rgba(0,212,255,.13); color:var(--accent); }
     .s-btn:not(.active):focus { border-color:var(--border); }
+    /* Read-only wind-dir chips: display only, no interaction/hover. */
+    .s-btn-static { cursor:default; }
+    .s-btn-static:hover { border-color:var(--accent); color:var(--accent); } /* stay as active look */
     .shore-hint { font-size:.72rem; color:var(--tdim); }
     .lwd-edit-all { font-size:.72rem; color:var(--accent); cursor:pointer; white-space:nowrap; opacity:.85; }
     .lwd-edit-all:hover { opacity:1; text-decoration:underline; }
@@ -1305,18 +1308,9 @@
       <!-- buttons panel -->
       <div class="lwd-panel" id="lwdPanel">
         <span class="shore-bar-label lwd-desktop-label">Good wind dirs →</span>
-        <div class="shore-btns" id="shoreBtns">
-          <button class="s-btn" data-deg="0"   onclick="toggleWindDir(this)">N</button>
-          <button class="s-btn" data-deg="45"  onclick="toggleWindDir(this)">NE</button>
-          <button class="s-btn" data-deg="90"  onclick="toggleWindDir(this)">E</button>
-          <button class="s-btn" data-deg="135" onclick="toggleWindDir(this)">SE</button>
-          <button class="s-btn" data-deg="180" onclick="toggleWindDir(this)">S</button>
-          <button class="s-btn" data-deg="225" onclick="toggleWindDir(this)">SW</button>
-          <button class="s-btn" data-deg="270" onclick="toggleWindDir(this)">W</button>
-          <button class="s-btn" data-deg="315" onclick="toggleWindDir(this)">NW</button>
-        </div>
-        <span class="shore-hint" id="shoreHint"></span>
-        <!-- Toggles above are a personal view; this proposes the dirs for everyone (admin-reviewed). -->
+        <!-- Read-only: shows ONLY the spot's selected directions as static chips.
+             Changing directions happens exclusively via "Edit for all" (admin-reviewed). -->
+        <div class="shore-btns" id="shoreBtns"></div>
         <span class="lwd-edit-all" onclick="openSuggestUpdate()" title="Propose these directions for all riders — an admin reviews before it goes live">✏️ Edit for all →</span>
       </div>
     </div>
@@ -1809,12 +1803,22 @@ function isWindDirOK(deg){
   for(const d of windDirs){ if(angleDiff(deg,d)<=22.5) return true; }
   return false;
 }
-function updateShoreHint(){
-  const hint=$('shoreHint');
-  const dirs=windDirs.size>0?[...windDirs].sort((a,b)=>a-b).map(d=>compass(d)).join(' / '):'—';
-  if(hint) hint.textContent=windDirs.size>0?dirs:'';
-  const lbl=$('lwdToggleDirs'); if(lbl) lbl.textContent=dirs;
+// Render the wind-dir section as READ-ONLY chips: only the spot's selected
+// directions are shown, as static (non-clickable) chips. Direction changes are
+// made solely through "Edit for all" (admin-reviewed) — there is no per-user
+// toggle here anymore.
+function renderWindDirChips(){
+  const box=$('shoreBtns');
+  if(box){
+    const degs=[...windDirs].sort((a,b)=>a-b);
+    box.innerHTML=degs.map(d=>`<span class="s-btn s-btn-static active" data-deg="${d}">${compass(d)}</span>`).join('');
+  }
+  // Collapsed-panel (mobile) peek label still summarises the selected dirs.
+  const lbl=$('lwdToggleDirs');
+  if(lbl) lbl.textContent=windDirs.size>0?[...windDirs].sort((a,b)=>a-b).map(d=>compass(d)).join(' / '):'—';
 }
+// Back-compat alias — older call sites still invoke updateShoreHint().
+function updateShoreHint(){ renderWindDirChips(); }
 function toggleWindDirsPanel(){
   const tog=$('lwdToggle'), panel=$('lwdPanel');
   if(!tog||!panel) return;
@@ -2066,38 +2070,11 @@ async function autoDetectShore(lat,lon){
 // ══════════════════════════════════
 //  SHORE PICKER
 // ══════════════════════════════════
-let _windDirToggleLock=false;
-function toggleWindDir(btn){
-  // Prevent double-fire from touchstart+click on mobile
-  if(_windDirToggleLock) return;
-  _windDirToggleLock=true; setTimeout(()=>_windDirToggleLock=false, 350);
-  btn.blur();
-  const deg=Number(btn.dataset.deg);
-  manualShoreSet=true;
-  if(windDirs.has(deg)){
-    windDirs.delete(deg);
-    if(windDirs.size===0) manualShoreSet=false;
-  } else {
-    windDirs.add(deg);
-  }
-  // sync all buttons (not just the clicked one) to avoid stale active states
-  document.querySelectorAll('.s-btn').forEach(b=>b.classList.toggle('active',windDirs.has(Number(b.dataset.deg))));
-  updateShoreHint();
-  if(cachedWx&&cachedHrMap) renderGrid();
-  // persist user override and invalidate chip cache so home screen updates
-  if(cachedLoc){
-    if(windDirs.size>0) saveUserDirsForSpot(cachedLoc.name,[...windDirs]);
-    const key=`${cachedLoc.latitude},${cachedLoc.longitude}`;
-    Object.keys(chipFxCache).forEach(k=>{ if(k.startsWith(key)) delete chipFxCache[k]; });
-    Object.keys(chipBestCache).forEach(k=>{ if(k.startsWith(key)) delete chipBestCache[k]; });
-    _saveChipCacheToLS();
-    renderHintChips();
-  }
-}
+// NOTE: the per-user direction toggle (toggleWindDir) was removed. The wind-dir
+// section is now read-only; direction changes go through "Edit for all" only.
 function setWindDirs(degs){
   windDirs=new Set(degs);
-  document.querySelectorAll('.s-btn').forEach(b=>b.classList.toggle('active',windDirs.has(Number(b.dataset.deg))));
-  updateShoreHint();
+  renderWindDirChips();
   if(cachedWx&&cachedHrMap) renderGrid();
 }
 // keep for backward-compat (auto-detect still calls this with a single deg)
@@ -3482,8 +3459,7 @@ function resetSearch(){
   requestAnimationFrame(()=>{ if($('searchInput')) $('searchInput').value=''; });
   cachedWx=null; cachedLoc=null; cachedHrMap=new Map(); cachedTideExtremes=null;
   windDirs=new Set(); manualShoreSet=false;
-  document.querySelectorAll('.s-btn').forEach(b=>b.classList.remove('active'));
-  updateShoreHint();
+  renderWindDirChips();
   renderHintChips();
   $('searchInput').blur();
 }
@@ -7364,7 +7340,7 @@ async function adminApplyUpdate(u){
       // If this is the currently open spot, refresh wind dirs + spot card
       if(cachedLoc?.name===u.spot_name){
         windDirs=new Set(u.suggested_dirs);
-        document.querySelectorAll('.s-btn').forEach(b=>b.classList.toggle('active',windDirs.has(Number(b.dataset.deg))));
+        renderWindDirChips();
         renderSpotInfoCard(u.spot_name);
       }
     }
@@ -7644,7 +7620,7 @@ async function adminSaveSpotInfo(){
     const _allDirs=loadAllUserDirs(); delete _allDirs[spotName]; localStorage.setItem('kf_dirs',JSON.stringify(_allDirs));
     if(cachedLoc?.name===spotName){
       windDirs=new Set(dirsArr);
-      document.querySelectorAll('.s-btn').forEach(b=>b.classList.toggle('active',windDirs.has(Number(b.dataset.deg))));
+      renderWindDirChips();
     }
   }
 
