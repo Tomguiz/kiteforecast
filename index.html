@@ -193,6 +193,8 @@
     .s-btn.active { border-color:var(--accent); background:rgba(0,212,255,.13); color:var(--accent); }
     .s-btn:not(.active):focus { border-color:var(--border); }
     .shore-hint { font-size:.72rem; color:var(--tdim); }
+    .lwd-edit-all { font-size:.72rem; color:var(--accent); cursor:pointer; white-space:nowrap; opacity:.85; }
+    .lwd-edit-all:hover { opacity:1; text-decoration:underline; }
 
     /* ── FORECAST GRID ── */
     #tenDayStripWrap { margin:24px 0 20px; }
@@ -1314,6 +1316,8 @@
           <button class="s-btn" data-deg="315" onclick="toggleWindDir(this)">NW</button>
         </div>
         <span class="shore-hint" id="shoreHint"></span>
+        <!-- Toggles above are a personal view; this proposes the dirs for everyone (admin-reviewed). -->
+        <span class="lwd-edit-all" onclick="openSuggestUpdate()" title="Propose these directions for all riders — an admin reviews before it goes live">✏️ Edit for all →</span>
       </div>
     </div>
 
@@ -7329,12 +7333,24 @@ async function adminApplyUpdate(u){
     await sb.from('spot_info').upsert({spot_name:u.spot_name,...updates,updated_at:new Date().toISOString()},{onConflict:'spot_name'});
   }
 
-  // Apply dirs to spot_overrides (upsert so it works even if no row exists yet)
+  // Apply dirs to spot_overrides (upsert so it works even if no row exists yet).
+  // spot_overrides requires loc/lat/lon (NOT NULL) — for a built-in spot with no
+  // existing override row the upsert becomes an INSERT, so include coords from
+  // the SPOTS catalog. Without them the insert was silently rejected and approved
+  // dir updates never reached anyone (only the admin's in-memory SPOTS changed).
   if(u.suggested_dirs?.length){
+    const _catalog=SPOTS.find(s=>s.name===u.spot_name);
+    const _ovRow={name:u.spot_name, dirs:u.suggested_dirs, active:true};
+    if(_catalog){
+      _ovRow.loc=_catalog.loc||'';
+      _ovRow.lat=_catalog.lat;
+      _ovRow.lon=_catalog.lon;
+    }
     const{error:dirErr}=await sb.from('spot_overrides').upsert(
-      {name:u.spot_name, dirs:u.suggested_dirs, active:true},
+      _ovRow,
       {onConflict:'name', ignoreDuplicates:false}
     );
+    if(dirErr) console.error('spot_overrides dirs upsert failed:',dirErr);
     if(!dirErr){
       // Update in-memory SPOTS so UI reflects immediately without reload
       const si=SPOTS.findIndex(s=>s.name===u.spot_name);
