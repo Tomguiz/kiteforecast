@@ -9413,6 +9413,21 @@ if(_confirmBtn) _confirmBtn.onclick=function(){
 setTimeout(updateFetchTimestamp, 0);
 
 // ── INIT: handle deep-link (?spot=&date=) only — always show homepage on fresh open ──
+async function handleSpotDeepLink(spotParam,dateParam){
+  if(!spotParam) return;
+  // Admin-added spots (spot_overrides) are merged into SPOTS asynchronously —
+  // wait for that before resolving, else a shared link to an override spot
+  // (e.g. Sycod) falls back to null coords and the forecast render crashes.
+  try{ await window._spotsReady; }catch(e){}
+  const found=SPOTS.find(s=>s.name.toLowerCase()===spotParam.toLowerCase());
+  window._deepLinkDate=dateParam||null;
+  if(found){
+    pickSpot(found);
+  }else{
+    // Unknown spot name — show the search page rather than a broken forecast.
+    showToast(`Couldn't find "${spotParam}" — try searching`);
+  }
+}
 (function(){
   const params=new URLSearchParams(location.search);
   const spotParam=params.get('spot');
@@ -9420,9 +9435,7 @@ setTimeout(updateFetchTimestamp, 0);
   if(spotParam){
     // Clear ?spot= and ?date= from URL so a hard refresh doesn't re-trigger the deep link
     history.replaceState({},'',location.pathname);
-    const found=SPOTS.find(s=>s.name.toLowerCase()===spotParam.toLowerCase())||{name:spotParam,loc:spotParam,lat:null,lon:null,dirs:[]};
-    window._deepLinkDate=dateParam||null;
-    pickSpot(found);
+    handleSpotDeepLink(spotParam,dateParam);
   }
   // No auto-load of last spot — user always starts on the homepage
 })();

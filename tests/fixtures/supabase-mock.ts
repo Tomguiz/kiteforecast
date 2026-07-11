@@ -12,6 +12,7 @@ export type MockOptions = {
   usersRpc?: unknown[];   // rows returned by the admin_list_users RPC
   adminFavourites?: Record<string, unknown[]>;
   adminReminders?: Record<string, unknown[]>;
+  overrides?: unknown[];  // rows returned for spot_overrides (admin-added spots)
 };
 
 const json = (route: Route, body: unknown, status = 200) =>
@@ -31,8 +32,9 @@ function tableResponse(table: string, opts: MockOptions): unknown {
       return opts.favourites ?? emptyArray;
     case 'spot_suggestions':
       return opts.isAdmin ? spotSuggestionRows : emptyArray;
-    case 'spot_info':
     case 'spot_overrides':
+      return opts.overrides ?? emptyArray;
+    case 'spot_info':
     case 'spot_update_suggestions':
     case 'spot_claims':
     case 'reminders':
