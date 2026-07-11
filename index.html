@@ -1472,7 +1472,7 @@
             <button onclick="$('ppAvatarInput').click()" style="position:absolute;bottom:-2px;right:-2px;width:18px;height:18px;border-radius:50%;background:#38bdf8;border:2px solid var(--surface);color:#000;font-size:.6rem;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0" title="Upload photo">✎</button>
           </div>
           <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:5px;">
-            <label class="pp-label" style="margin:0">Nickname <span style="color:#f87171;font-weight:400;text-transform:none;letter-spacing:0">* required</span></label>
+            <label class="pp-label" style="margin:0">Nickname <span id="ppNicknameReq" style="color:#f87171;font-weight:400;text-transform:none;letter-spacing:0">* required</span></label>
             <div style="display:flex;gap:6px;align-items:center;width:100%">
               <input type="text" id="ppNicknameInput" class="pp-input" placeholder="e.g. TomKite" maxlength="32" oninput="onNicknameInput()" style="margin:0;flex:1 1 0;width:0;min-width:0"/>
               <button class="btn pp-save-btn" id="ppNicknameSaveBtn" onclick="saveNickname(false)" style="margin:0;white-space:nowrap;flex:0 0 auto;width:auto;padding:11px 16px">Save</button>
@@ -5348,6 +5348,7 @@ function openProfilePanel(tab){
     openProfileSheet();
     const _p=loadProfile();
     const _ni=$('ppNicknameInput'); if(_ni) _ni.value=_p.nickname||'';
+    updateNicknameReq();
     // Set save button initial state: dim if nickname already saved, default if not yet set
     (function(){ const btn=$('ppNicknameSaveBtn'); if(!btn) return;
       const hasSaved=!!_p.nickname;
@@ -8077,7 +8078,13 @@ function openAdminReview(){
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Show the "* required" hint only while the nickname field is empty.
+function updateNicknameReq(){
+  const req=$('ppNicknameReq');
+  if(req) req.style.display=($('ppNicknameInput')?.value||'').trim()?'none':'';
+}
 function onNicknameInput(){
+  updateNicknameReq();
   const btn=$('ppNicknameSaveBtn');
   if(!btn) return;
   const current=loadProfile().nickname||'';
