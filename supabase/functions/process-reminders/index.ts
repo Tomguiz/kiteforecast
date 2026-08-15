@@ -1,4 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import {
+  toKnots, isRainy, speedTier, isWindDirOK, hourQualifies, consecutiveRuns,
+} from '../_shared/rideability.ts'
 
 const SUPABASE_URL            = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_KEY    = Deno.env.get('SB_SERVICE_ROLE_KEY')!
@@ -24,25 +27,19 @@ const WMO: Record<number, [string, string]> = {
 }
 const wmoInfo = (c: number): [string, string] => WMO[c] ?? ['🌡', '—']
 
-// ── FORECAST HELPERS (mirrors app logic exactly) ──
-const toKnots  = (ms: number) => Math.round(ms * 1.94384)
-const isRainy  = (code: number) => code >= 51
-const speedTier = (kn: number) => kn >= 25 ? 3 : kn >= 20 ? 2 : kn >= 15 ? 1 : 0
-
-function angleDiff(a: number, b: number): number {
-  const d = Math.abs(a - b) % 360
-  return d > 180 ? 360 - d : d
-}
-function isWindDirOK(dir: number, spotDirs: number[]): boolean {
-  if (!spotDirs.length) return true
-  return spotDirs.some(sd => angleDiff(dir, sd) <= 22.5)
-}
-function classifyHour(kn: number, dir: number, code: number, spotDirs: number[]) {
+// ── FORECAST HELPERS ──
+// The rideability rule is shared with the app and the other edge functions.
+// `type` drives the email's per-hour wording; `qualifying` comes straight from
+// the shared rule so this function can never disagree with the app about what
+// counts as rideable.
+function classifyHour(kn: number, dir: number, code: number, gustKn: number, spotDirs: number[]) {
   const sp = speedTier(kn)
-  if (sp === 0)           return { type: 'light',   qualifying: false }
-  if (isRainy(code))      return { type: 'rain',    qualifying: false }
+  if (hourQualifies(kn, dir, code, gustKn, spotDirs)) {
+    return { type: ['good','verygood','perfect'][Math.max(sp, 1) - 1], qualifying: true }
+  }
+  if (isRainy(code))               return { type: 'rain',     qualifying: false }
   if (!isWindDirOK(dir, spotDirs)) return { type: 'lightdir', qualifying: false }
-  return { type: ['good','verygood','perfect'][sp - 1], qualifying: true }
+  return { type: 'light', qualifying: false }
 }
 function circMean(angles: number[]): number {
   const s = angles.reduce((a, d) => a + Math.sin(d * Math.PI / 180), 0)
@@ -62,10 +59,10 @@ function buildDay(dateStr: string, sunrise: string, sunset: string, hourlyMap: M
   for (let hr = srHour; hr <= ssHour; hr++) {
     const d = hourlyMap.get(hr)
     if (!d) continue
-    const cl = classifyHour(d.kn, d.dir, d.code, spotDirs)
+    const cl = classifyHour(d.kn, d.dir, d.code, d.gustKn, spotDirs)
     day.push({ ...d, ...cl, hour: hr })
   }
-  const good    = day.filter(h => h.qualifying)
+  const good    = consecutiveRuns(day.filter(h => h.qualifying), h => h.hour)
   const peakKn  = good.length ? Math.max(...good.map(h => h.kn)) : 0
   const peakDayKn = day.length ? Math.max(...day.map(h => h.kn)) : 0
   const sample  = good.length ? good : day

@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { toKnots, hourQualifies, consecutiveRuns } from '../_shared/rideability.ts'
 
 const SUPABASE_URL         = Deno.env.get('SUPABASE_URL')
 const SUPABASE_SERVICE_KEY = Deno.env.get('SB_SERVICE_ROLE_KEY')
@@ -6,39 +7,22 @@ const REMINDER_HOURS       = [72, 48, 24, 6, 1]
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
-// ── FORECAST HELPERS (mirrors process-reminders exactly) ──
-const toKnots   = (ms) => Math.round(ms * 1.94384)
-const isRainy   = (code) => code >= 51
-const speedTier = (kn) => kn >= 25 ? 3 : kn >= 20 ? 2 : kn >= 15 ? 1 : 0
-
-function angleDiff(a, b) {
-  const d = Math.abs(a - b) % 360
-  return d > 180 ? 360 - d : d
-}
-function isWindDirOK(dir, spotDirs) {
-  if (!spotDirs || !spotDirs.length) return true
-  return spotDirs.some(sd => angleDiff(dir, sd) <= 22.5)
-}
-function classifyHour(kn, dir, code, spotDirs) {
-  const sp = speedTier(kn)
-  if (sp === 0)                    return { qualifying: false }
-  if (isRainy(code))               return { qualifying: false }
-  if (!isWindDirOK(dir, spotDirs)) return { qualifying: false }
-  return { qualifying: true }
-}
+// ── FORECAST HELPERS ──
+// The rideability rule is shared with the app and the other edge functions.
 
 function buildDay(dateStr, sunrise, sunset, hourlyMap, spotDirs) {
   const srHour = parseInt(sunrise.slice(11, 13), 10)
   const ssHour = parseInt(sunset.slice(11, 13), 10)
-  const good = []
+  const qual = []
   for (let hr = srHour; hr <= ssHour; hr++) {
     const d = hourlyMap.get(hr)
     if (!d) continue
-    if (classifyHour(d.kn, d.dir, d.code, spotDirs).qualifying) {
-      good.push({ ...d, hour: hr })
+    if (hourQualifies(d.kn, d.dir, d.code, d.gustKn, spotDirs)) {
+      qual.push({ ...d, hour: hr })
     }
   }
-  return { good }
+  // Same 2+ consecutive-hour rule the app uses for "rideable".
+  return { good: consecutiveRuns(qual, h => h.hour) }
 }
 
 async function fetchForecast(lat, lon) {

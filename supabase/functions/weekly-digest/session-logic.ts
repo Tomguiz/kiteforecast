@@ -1,39 +1,19 @@
-// Pure session-detection logic for the weekly digest.
+// Session detection for the weekly digest.
 //
-// Extracted from index.ts so it can be unit-tested without deploying: a
-// silent divergence between this rule and the app's own rideability rule
-// (index.html `hourQualifies`/`dayGoodHours`) is exactly what made the
-// digest mail "No sessions this week" for days the app showed as rideable.
-// Keep the two definitions in lockstep — see rule notes on hourQualifies().
+// The rideability rule itself lives in ../_shared/rideability.ts so the digest,
+// check-new-sessions and process-reminders can never disagree again. This file
+// is the digest-specific part: turning a forecast into mailable sessions.
 
-export const toKnots   = (ms: number) => Math.round(ms * 1.94384)
-export const isRainy   = (code: number) => code >= 51
-export const speedTier = (kn: number) => kn >= 25 ? 3 : kn >= 20 ? 2 : kn >= 15 ? 1 : 0
+import {
+  hourQualifies, consecutiveRuns, toKnots, isRainy, speedTier, angleDiff, isWindDirOK,
+} from '../_shared/rideability.ts'
+
+export { hourQualifies, consecutiveRuns, toKnots, isRainy, speedTier, angleDiff, isWindDirOK }
 
 const DIRS8   = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW']
-const ARROWS8 = ['↓', '↙', '←', '↖', '↑', '↗', '→', '↘']
+const ARROWS8 = ['\u2193', '\u2199', '\u2190', '\u2196', '\u2191', '\u2197', '\u2192', '\u2198']
 export const compass  = (deg: number) => DIRS8[Math.round(((deg % 360) + 360) % 360 / 45) % 8]
 export const dirArrow = (deg: number) => ARROWS8[Math.round(((deg % 360) + 360) % 360 / 45) % 8]
-
-export function angleDiff(a: number, b: number): number {
-  const d = Math.abs(a - b) % 360
-  return d > 180 ? 360 - d : d
-}
-
-export function isWindDirOK(dir: number, spotDirs: number[]): boolean {
-  if (!spotDirs.length) return true
-  return spotDirs.some(sd => angleDiff(dir, sd) <= 22.5)
-}
-
-// Mirrors index.html `hourQualifies`. The gusty clause matters: a 13 kn day
-// gusting 22 is rideable in the app, and dropping it here hid real sessions.
-export function hourQualifies(
-  kn: number, dir: number, code: number, gustKn: number, spotDirs: number[],
-): boolean {
-  return (speedTier(kn) > 0 || (kn >= 12 && (gustKn || 0) >= 20))
-    && !isRainy(code)
-    && isWindDirOK(dir, spotDirs)
-}
 
 export async function fetchForecast(lat: number, lon: number) {
   const params = new URLSearchParams({
@@ -53,9 +33,7 @@ export interface Hour { hr: number; kn: number; gust: number; dir: number; code:
 // Mirrors index.html `dayGoodHours`: only qualifying hours that sit in a run of
 // 2+ consecutive clock hours count. A lone qualifying hour is not a session.
 export function goodHours(hours: Hour[], spotDirs: number[]): Hour[] {
-  const qual = hours.filter(h => hourQualifies(h.kn, h.dir, h.code, h.gust, spotDirs))
-  const qualSet = new Set(qual.map(h => h.hr))
-  return qual.filter(h => qualSet.has(h.hr - 1) || qualSet.has(h.hr + 1))
+  return consecutiveRuns(hours.filter(h => hourQualifies(h.kn, h.dir, h.code, h.gust, spotDirs)), h => h.hr)
 }
 
 export interface Session {
