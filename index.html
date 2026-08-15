@@ -1612,6 +1612,14 @@
           </div>
           <button class="pp-toggle" id="ppNotifyFriendsToggle" onclick="toggleNotifyFriends()"><span></span></button>
         </div>
+        <!-- Who actually gets it: accepted friends minus those whose own
+             "Receive" toggle is off. Populated by renderFriendsReach(). -->
+        <div class="notif-row" id="ppFriendsReachRow" style="display:none;padding-top:0">
+          <div class="notif-info" style="width:100%">
+            <div id="ppFriendsReachSummary" class="notif-sub" style="cursor:pointer" onclick="toggleFriendsReach()"></div>
+            <div id="ppFriendsReachList" style="display:none;margin-top:8px"></div>
+          </div>
+        </div>
       </div>
 
       <!-- SMS alerts -->
@@ -1636,12 +1644,12 @@
         <div class="notif-row" id="ppDigestRow">
           <div class="notif-info">
             <div class="notif-title">📬 Weekly digest <span id="ppDigestPremiumBadge" style="display:none" class="premium-badge">PREMIUM</span></div>
-            <div class="notif-sub">Every Monday — your week's kite sessions at a glance</div>
+            <div class="notif-sub">Every Monday — the next 10 days of kite sessions at your favourite spots only</div>
           </div>
           <button class="pp-toggle" id="ppDigestToggle" onclick="toggleDigest()"><span></span></button>
         </div>
         <div style="padding:0 14px 14px">
-          <button class="btn pp-save-btn" id="ppDigestNowBtn" onclick="sendDigestNow()" style="width:100%">📩 Send me this week's forecast now</button>
+          <button class="btn pp-save-btn" id="ppDigestNowBtn" onclick="sendDigestNow()" style="width:100%">📩 Send me the next 10 days forecast</button>
         </div>
       </div>
 
@@ -7828,6 +7836,8 @@ function updatePremiumUI(){
   // Gate "Send" notify-friends toggle behind premium
   const notifyFriendsToggle=$('ppNotifyFriendsToggle');
   const notifyFriendsBadge=$('ppNotifyFriendsBadge');
+  // Show who actually receives the alerts (premium-only, same as the toggle).
+  renderFriendsReach();
   if(notifyFriendsToggle){
     notifyFriendsToggle.onclick=premium?toggleNotifyFriends:()=>{ showToast('⚡ Premium only — upgrade to notify friends when you hit the water', 4000, '#f59e0b'); openProfilePanel('profile'); };
     notifyFriendsToggle.style.opacity=premium?'':'0.4';
@@ -8664,7 +8674,7 @@ async function sendDigestNow(){
     if(resp.ok){ btn.textContent='✓ Sent! Check your inbox'; }
     else { btn.textContent='Error — try again'; }
   }catch{ btn.textContent='Error — try again'; }
-  setTimeout(()=>{ btn.disabled=false; btn.textContent='📩 Send me this week\'s forecast now'; },4000);
+  setTimeout(()=>{ btn.disabled=false; btn.textContent='📩 Send me the next 10 days forecast'; },4000);
 }
 async function toggleDigest(){
   if(!isPremium()){ showToast('⚡ Premium only — upgrade to unlock the weekly digest', 4000, '#f59e0b'); return; }
@@ -8693,6 +8703,59 @@ async function toggleNotifyFriends(){
   const sb=getSb(); if(!sb||!p.email) return;
   await sb.from('profiles').upsert({email:p.email, notify_friends_on_confirm:p.notifyFriendsOnConfirm!==false},{onConflict:'email'});
   showToast(p.notifyFriendsOnConfirm===false ? 'Friends send alerts: off' : 'Friends send alerts: on');
+  renderFriendsReach();
+}
+
+// ── Who actually receives my session alerts ────────────────────────────────
+// session-attend-notify mails accepted friends whose own friend_session_notifs
+// is true or NULL, so "my friends" and "my friends who get the email" are not
+// the same list. friends_notif_status() (SECURITY DEFINER, scoped to the
+// caller's accepted friendships) is the only way the client can see the
+// difference — profiles is own-row under RLS and public_profiles doesn't
+// expose the setting.
+let _friendsReachCache=null;
+// Nicknames are user-supplied and go into innerHTML below — escape them.
+const escFriendName=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function toggleFriendsReach(){
+  const list=$('ppFriendsReachList');
+  if(!list) return;
+  const open=list.style.display!=='none';
+  list.style.display=open?'none':'block';
+  renderFriendsReachSummary(open?'▾':'▴');
+}
+function renderFriendsReachSummary(caret){
+  const el=$('ppFriendsReachSummary');
+  if(!el||!_friendsReachCache) return;
+  const yes=_friendsReachCache.filter(f=>f.receives).length;
+  const total=_friendsReachCache.length;
+  const sendingOff=isPremium()&&loadProfile().notifyFriendsOnConfirm===false;
+  el.innerHTML = sendingOff
+    ? `<span style="color:var(--gray)">Nobody — sending is off</span> ${caret}`
+    : `<strong style="color:var(--text)">${yes} of ${total}</strong> friend${total===1?'':'s'} will be notified ${caret}`;
+}
+async function renderFriendsReach(){
+  const row=$('ppFriendsReachRow');
+  if(!row) return;
+  const sb=getSb(), p=loadProfile();
+  if(!sb||!p.email||!isPremium()){ row.style.display='none'; return; }
+
+  if(!_friendsReachCache){
+    const{data,error}=await sb.rpc('friends_notif_status');
+    if(error){ console.error('[friends-reach]',error); row.style.display='none'; return; }
+    _friendsReachCache=data||[];
+  }
+  if(!_friendsReachCache.length){ row.style.display='none'; return; }
+
+  row.style.display='';
+  const open=$('ppFriendsReachList').style.display!=='none';
+  renderFriendsReachSummary(open?'▴':'▾');
+
+  const name=f=>escFriendName(f.nickname||f.email.split('@')[0]);
+  const on =_friendsReachCache.filter(f=>f.receives);
+  const off=_friendsReachCache.filter(f=>!f.receives);
+  $('ppFriendsReachList').innerHTML =
+    (on.length ?`<div class="notif-sub" style="color:#4ade80">✅ ${on.map(name).join(', ')}</div>`:'')+
+    (off.length?`<div class="notif-sub" style="color:var(--gray);margin-top:4px">⊘ ${off.map(name).join(', ')} — their “Receive” alerts are off</div>`:'');
 }
 
 async function toggleMasterNotif(){
