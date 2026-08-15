@@ -18,9 +18,17 @@ describe('spots catalogue', () => {
     }
   })
 
-  it('has no duplicate spot names (name is the table primary key)', () => {
-    const names = parseSpotsArray(html).map(s => s.name)
-    expect(new Set(names).size).toBe(names.length)
+  it('has no duplicate (name, loc) pairs (the table\'s unique key)', () => {
+    const keys = parseSpotsArray(html).map(s => `${s.name}|${s.loc}`)
+    expect(new Set(keys).size).toBe(keys.length)
+  })
+
+  it('tolerates the same name at different locations', () => {
+    // 'Surfers Paradise' exists in both Koksijde, Belgium and Queensland,
+    // Australia — which is why the key is (name, loc), not name.
+    const dupes = parseSpotsArray(html).filter(s => s.name === 'Surfers Paradise')
+    expect(dupes.length).toBe(2)
+    expect(new Set(dupes.map(s => s.loc)).size).toBe(2)
   })
 
   // The committed seed must match the array. If someone edits SPOTS without

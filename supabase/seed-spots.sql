@@ -390,6 +390,6 @@ INSERT INTO spots (name, loc, lat, lon, dirs, active) VALUES
   ('Mui Ne', 'Bình Thuận, Vietnam', 10.9333, 108.2833, '{315,0,45}', true),
   ('Boracay', 'Aklan, Philippines', 11.9667, 121.9167, '{315,0}', true),
   ('Arugam Bay', 'Eastern Province, Sri Lanka', 6.8393, 81.8394, '{225,270}', true)
-ON CONFLICT (name) DO UPDATE SET
-  loc = EXCLUDED.loc, lat = EXCLUDED.lat, lon = EXCLUDED.lon,
+ON CONFLICT (name, loc) DO UPDATE SET
+  lat = EXCLUDED.lat, lon = EXCLUDED.lon,
   dirs = EXCLUDED.dirs, active = EXCLUDED.active;

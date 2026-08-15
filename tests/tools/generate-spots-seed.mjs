@@ -28,8 +28,8 @@ export function toSeedSql(spots) {
     `  (${q(s.name)}, ${q(s.loc)}, ${s.lat}, ${s.lon}, '{${s.dirs.join(',')}}', true)`
   ).join(',\n')
   return `INSERT INTO spots (name, loc, lat, lon, dirs, active) VALUES\n${rows}\n` +
-    `ON CONFLICT (name) DO UPDATE SET\n` +
-    `  loc = EXCLUDED.loc, lat = EXCLUDED.lat, lon = EXCLUDED.lon,\n` +
+    `ON CONFLICT (name, loc) DO UPDATE SET\n` +
+    `  lat = EXCLUDED.lat, lon = EXCLUDED.lon,\n` +
     `  dirs = EXCLUDED.dirs, active = EXCLUDED.active;\n`
 }
 
