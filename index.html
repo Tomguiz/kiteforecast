@@ -1927,6 +1927,9 @@ function classifyHour(kn,dir,code,gustKn=0){
 // views can never disagree.
 // `dirOK(dir)` defaults to the global isWindDirOK (current spot's windDirs);
 // the homepage passes a per-spot check so each favourite uses its own dirs.
+// MIRRORED in supabase/functions/weekly-digest/session-logic.ts — the digest
+// email must call the same days rideable as the app. Change both together;
+// tests/unit/session-logic.test.ts pins the edge-function side.
 function hourQualifies(kn,dir,code,gustKn,dirOK){
   return (speedTier(kn)>0||(kn>=12&&(gustKn||0)>=20))&&!isRainy(code)&&dirOK(dir);
 }

@@ -1,116 +1,11 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { fetchForecast, getGoodSessions } from './session-logic.ts'
 
 const SUPABASE_URL         = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_KEY = Deno.env.get('SB_SERVICE_ROLE_KEY')!
 const MAKE_WEBHOOK_URL     = 'https://hook.eu1.make.com/6t9fgm6btixri2wf5lnx47requf416vs'
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
-
-const toKnots   = (ms: number) => Math.round(ms * 1.94384)
-const isRainy   = (code: number) => code >= 51
-const speedTier = (kn: number) => kn >= 25 ? 3 : kn >= 20 ? 2 : kn >= 15 ? 1 : 0
-
-const DIRS8   = ['N','NE','E','SE','S','SW','W','NW']
-const ARROWS8 = ['↓','↙','←','↖','↑','↗','→','↘']
-const compass  = (deg: number) => DIRS8[Math.round(((deg % 360) + 360) % 360 / 45) % 8]
-const dirArrow = (deg: number) => ARROWS8[Math.round(((deg % 360) + 360) % 360 / 45) % 8]
-
-function angleDiff(a: number, b: number): number {
-  const d = Math.abs(a - b) % 360
-  return d > 180 ? 360 - d : d
-}
-function isWindDirOK(dir: number, spotDirs: number[]): boolean {
-  if (!spotDirs.length) return true
-  return spotDirs.some(sd => angleDiff(dir, sd) <= 22.5)
-}
-
-async function fetchForecast(lat: number, lon: number) {
-  const params = new URLSearchParams({
-    latitude: String(lat), longitude: String(lon),
-    hourly: 'weather_code,windspeed_10m,windgusts_10m,winddirection_10m',
-    daily: 'sunrise,sunset',
-    forecast_days: '10', timezone: 'auto', windspeed_unit: 'ms',
-  })
-  const resp = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`)
-  const wx = await resp.json()
-  if (wx.error) throw new Error(wx.reason)
-  return wx
-}
-
-function getGoodSessions(wx: any, spotDirs: number[], spotDays: number[] | null) {
-  const { daily, hourly } = wx
-  const sessions = []
-  for (let i = 0; i < daily.time.length; i++) {
-    const dateStr = daily.time[i]
-    if (spotDays && spotDays.length) {
-      const dow = new Date(dateStr + 'T12:00:00').getDay()
-      if (!spotDays.includes(dow)) continue
-    }
-    const srH = parseInt(daily.sunrise[i].slice(11, 13), 10)
-    const ssH = parseInt(daily.sunset[i].slice(11, 13), 10)
-
-    let qh = 0, firstHr: number | null = null
-    let sumKn = 0, maxGust = 0
-    const dirCounts: Record<number, number> = {}
-    // track qualifying hours in order for best-window computation
-    const qualHours: number[] = []
-
-    hourly.time.forEach((t: string, j: number) => {
-      if (t.slice(0, 10) !== dateStr) return
-      const hr = parseInt(t.slice(11, 13), 10)
-      if (hr < srH || hr > ssH) return
-      const kn   = toKnots(hourly.windspeed_10m[j])
-      const gust = toKnots(hourly.windgusts_10m[j] ?? 0)
-      const dir  = hourly.winddirection_10m[j]
-      const code = hourly.weather_code[j] ?? 0
-      if (speedTier(kn) > 0 && !isRainy(code) && isWindDirOK(dir, spotDirs)) {
-        if (firstHr === null) firstHr = hr
-        qh++
-        sumKn += kn
-        if (gust > maxGust) maxGust = gust
-        const bucket = Math.round(((dir % 360) + 360) % 360 / 45) * 45 % 360
-        dirCounts[bucket] = (dirCounts[bucket] ?? 0) + 1
-        qualHours.push(hr)
-      }
-    })
-
-    if (qh >= 2) {
-      const avgKn = Math.round(sumKn / qh)
-      const domDir = parseInt(Object.entries(dirCounts).sort((a, b) => b[1] - a[1])[0][0])
-
-      // Best consecutive window: longest run of hours where each step is +1h
-      let bestStart = qualHours[0], bestLen = 1
-      let curStart = qualHours[0], curLen = 1
-      for (let k = 1; k < qualHours.length; k++) {
-        if (qualHours[k] === qualHours[k - 1] + 1) {
-          curLen++
-          if (curLen > bestLen) { bestLen = curLen; bestStart = curStart }
-        } else {
-          curStart = qualHours[k]; curLen = 1
-        }
-      }
-      const bestEnd = bestStart + bestLen
-      const winStart = `${String(bestStart).padStart(2, '0')}h00`
-      const winEnd   = `${String(bestEnd).padStart(2, '0')}h00`
-
-      sessions.push({
-        date: dateStr,
-        date_label: new Date(dateStr + 'T12:00:00').toLocaleDateString('en', { weekday: 'long', day: 'numeric', month: 'long' }),
-        day_of_week: new Date(dateStr + 'T12:00:00').toLocaleDateString('en', { weekday: 'long' }),
-        start_time: firstHr !== null ? `${String(firstHr).padStart(2, '0')}h00` : '',
-        duration_hours: qh,
-        avg_kn: avgKn,
-        max_gust: maxGust,
-        dom_dir: compass(domDir),
-        dir_arrow: dirArrow(domDir),
-        win_start: winStart,
-        win_end: winEnd,
-        win_hours: bestLen,
-      })
-    }
-  }
-  return sessions
-}
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
