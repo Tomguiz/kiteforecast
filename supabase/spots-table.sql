@@ -12,7 +12,11 @@ CREATE TABLE IF NOT EXISTS spots (
 );
 
 ALTER TABLE spots ENABLE ROW LEVEL SECURITY;
-SELECT _drop_all_policies('spots');
+-- Idempotent: this file is re-runnable, and `spots` is new so there is nothing
+-- to clean up on a first run. Explicit drops rather than the _drop_all_policies
+-- helper from rls-hardening.sql — that helper is not present in the live DB.
+DROP POLICY IF EXISTS "spots_select_all" ON spots;
+DROP POLICY IF EXISTS "spots_write_admin" ON spots;
 
 CREATE POLICY "spots_select_all" ON spots FOR SELECT TO authenticated USING (true);
 CREATE POLICY "spots_write_admin" ON spots FOR ALL TO authenticated
