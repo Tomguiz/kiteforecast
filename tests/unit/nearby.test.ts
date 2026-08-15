@@ -24,9 +24,18 @@ describe('haversineKm', () => {
     expect(Math.abs(a - b)).toBeLessThan(1e-9)
   })
 
-  it('is finite for near-antipodal points (~180° apart)', () => {
-    const d = haversineKm(0, 0, 0.0001, 179.9999)
+  it('is finite for antipodal points where floating-point error pushes h above 1', () => {
+    // These specific coordinates produce h = 1.0000000000000004 in the haversine
+    // intermediate, and critically Math.sqrt(h) itself still rounds to a value
+    // strictly greater than 1 (1.0000000000000002) rather than rounding back down
+    // to 1 — verified directly against this project's Node runtime, since nearby
+    // near-antipodal pairs round back to sqrt(h) === 1 and don't actually exercise
+    // the guard. Without the Math.min(1, ...) clamp, Math.asin receives a value
+    // outside its domain and returns NaN. Do not "simplify" these numbers — most
+    // near-antipodal pairs would pass with the clamp removed.
+    const d = haversineKm(-51.97962031476099, 160.89394411720957, 51.97962018640434, -19.106056096629914)
     expect(Number.isFinite(d)).toBe(true)
+    expect(d).toBeGreaterThan(19000) // ~half the Earth's circumference
   })
 })
 
@@ -94,5 +103,12 @@ describe('selectNearbySpots', () => {
     const { selected } = selectNearbySpots(spots, HOME,
       { radiusKm: 120, exclude: [{ name: 'Near1', lat: 51.365, lon: 3.305 }], limit: 10 })
     expect(selected.map(s => s.name)).not.toContain('Near1')
+  })
+
+  it('does not exclude a same-named spot beyond SAME_SPOT_KM', () => {
+    // ~11 km from Near1 (51.36, 3.30) — same name, too far to be the same spot.
+    const { selected } = selectNearbySpots(spots, HOME,
+      { radiusKm: 120, exclude: [{ name: 'Near1', lat: 51.46, lon: 3.30 }], limit: 10 })
+    expect(selected.map(s => s.name)).toContain('Near1')
   })
 })
