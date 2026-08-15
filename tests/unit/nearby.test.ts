@@ -23,6 +23,11 @@ describe('haversineKm', () => {
     const b = haversineKm(43.09, 6.15, 51.35, 3.28)
     expect(Math.abs(a - b)).toBeLessThan(1e-9)
   })
+
+  it('is finite for near-antipodal points (~180° apart)', () => {
+    const d = haversineKm(0, 0, 0.0001, 179.9999)
+    expect(Number.isFinite(d)).toBe(true)
+  })
 })
 
 describe('selectNearbySpots', () => {
@@ -46,7 +51,7 @@ describe('selectNearbySpots', () => {
   })
 
   it('excludes spots the user already favourites', () => {
-    const { selected } = selectNearbySpots(spots, HOME, { radiusKm: 120, exclude: ['Near1'], limit: 10 })
+    const { selected } = selectNearbySpots(spots, HOME, { radiusKm: 120, exclude: [{ name: 'Near1', lat: 51.36, lon: 3.30 }], limit: 10 })
     expect(selected.map(s => s.name)).toEqual(['Near2', 'Mid'])
   })
 
@@ -67,7 +72,27 @@ describe('selectNearbySpots', () => {
   })
 
   it('matches excluded names exactly, not by prefix', () => {
-    const { selected } = selectNearbySpots(spots, HOME, { radiusKm: 120, exclude: ['Near'], limit: 10 })
+    const { selected } = selectNearbySpots(spots, HOME, { radiusKm: 120, exclude: [{ name: 'Near', lat: 51.36, lon: 3.30 }], limit: 10 })
     expect(selected.map(s => s.name)).toEqual(['Near1', 'Near2', 'Mid'])
+  })
+
+  it('excludes a favourite that matches by name and position', () => {
+    const { selected } = selectNearbySpots(spots, HOME,
+      { radiusKm: 120, exclude: [{ name: 'Near1', lat: 51.36, lon: 3.30 }], limit: 10 })
+    expect(selected.map(s => s.name)).toEqual(['Near2', 'Mid'])
+  })
+
+  it('does NOT exclude a same-named spot on the other side of the world', () => {
+    // Favouriting Queensland's 'Surfers Paradise' must not hide the Belgian one.
+    const catalogue = [spot('Surfers Paradise', 51.1150, 2.6350)]
+    const { selected } = selectNearbySpots(catalogue, HOME,
+      { radiusKm: 120, exclude: [{ name: 'Surfers Paradise', lat: -28.0022, lon: 153.4309 }], limit: 10 })
+    expect(selected.map(s => s.name)).toEqual(['Surfers Paradise'])
+  })
+
+  it('tolerates small coordinate drift between a favourite and the catalogue row', () => {
+    const { selected } = selectNearbySpots(spots, HOME,
+      { radiusKm: 120, exclude: [{ name: 'Near1', lat: 51.365, lon: 3.305 }], limit: 10 })
+    expect(selected.map(s => s.name)).not.toContain('Near1')
   })
 })
