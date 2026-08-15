@@ -20,7 +20,7 @@ export async function fetchForecast(lat: number, lon: number) {
     latitude: String(lat), longitude: String(lon),
     hourly: 'weather_code,windspeed_10m,windgusts_10m,winddirection_10m',
     daily: 'sunrise,sunset',
-    forecast_days: '10', timezone: 'auto', windspeed_unit: 'ms',
+    forecast_days: '7', timezone: 'auto', windspeed_unit: 'ms',
   })
   const resp = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`)
   const wx = await resp.json()

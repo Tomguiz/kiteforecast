@@ -1644,12 +1644,12 @@
         <div class="notif-row" id="ppDigestRow">
           <div class="notif-info">
             <div class="notif-title">📬 Weekly digest <span id="ppDigestPremiumBadge" style="display:none" class="premium-badge">PREMIUM</span></div>
-            <div class="notif-sub">Every Monday — the next 10 days of kite sessions at your favourite spots only</div>
+            <div class="notif-sub">Every Monday — the next 7 days of kite sessions at your favourite spots only</div>
           </div>
           <button class="pp-toggle" id="ppDigestToggle" onclick="toggleDigest()"><span></span></button>
         </div>
         <div style="padding:0 14px 14px">
-          <button class="btn pp-save-btn" id="ppDigestNowBtn" onclick="sendDigestNow()" style="width:100%">📩 Send me the next 10 days forecast</button>
+          <button class="btn pp-save-btn" id="ppDigestNowBtn" onclick="sendDigestNow()" style="width:100%">📩 Send me the next 7 days forecast</button>
         </div>
       </div>
 
@@ -8674,7 +8674,7 @@ async function sendDigestNow(){
     if(resp.ok){ btn.textContent='✓ Sent! Check your inbox'; }
     else { btn.textContent='Error — try again'; }
   }catch{ btn.textContent='Error — try again'; }
-  setTimeout(()=>{ btn.disabled=false; btn.textContent='📩 Send me the next 10 days forecast'; },4000);
+  setTimeout(()=>{ btn.disabled=false; btn.textContent='📩 Send me the next 7 days forecast'; },4000);
 }
 async function toggleDigest(){
   if(!isPremium()){ showToast('⚡ Premium only — upgrade to unlock the weekly digest', 4000, '#f59e0b'); return; }
