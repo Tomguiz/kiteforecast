@@ -1858,12 +1858,17 @@ function _rwsParseFeed(json){
   for(const f of feats){
     const p=f&&f.properties, c=f&&f.geometry&&f.geometry.coordinates;
     if(!p||typeof p.id!=='string'||!Array.isArray(c)||c.length<2) continue;
+    // Validate coordinates are actually numbers, then check they are finite.
+    // Rejects null (Number(null)=0 is wrong), non-numeric strings, objects, etc.
+    if(typeof c[0]!=='number'||typeof c[1]!=='number') continue;
+    const lon=Number(c[0]), lat=Number(c[1]);
+    if(!Number.isFinite(lon)||!Number.isFinite(lat)) continue;
     const ev=Array.isArray(p.events)?p.events:[];
     const last=ev.length?ev[ev.length-1]:null;
     out.set(p.id,{
       id:p.id,
       name:String(p.locationName||p.id).split(',').pop().trim(),
-      lon:Number(c[0]), lat:Number(c[1]),
+      lon, lat,
       value:last&&typeof last.value==='number'?last.value:null,
       ts:last&&typeof last.timeStamp==='string'?last.timeStamp:null,
     });
@@ -1895,6 +1900,8 @@ async function _rwsNearest(lat,lon){
   const sts=await _rwsFetchStations();
   let best=null;
   for(const st of sts){
+    // Skip malformed stations with NaN coordinates to avoid poison-pill scenario.
+    if(!Number.isFinite(st.lat)||!Number.isFinite(st.lon)) continue;
     const d=_rwsHaversineKm(lat,lon,st.lat,st.lon);
     if(d>RWS_MAX_KM) continue;
     if(!best||d<best.distanceKm) best={station:st,distanceKm:d};
@@ -1931,12 +1938,17 @@ async function renderLiveWindPanel(spot){
   const el=$('liveWindPanel'); if(!el) return;
   el.innerHTML='';
   if(!spot||typeof spot.latitude!=='number'||typeof spot.longitude!=='number') return;
+  // Guard against a slow response landing after the user moved to another spot.
+  // Same generation counter fetchForecastFromSpot uses to cancel its own
+  // in-flight requests — bumped on every new spot fetch and on resetSearch.
+  // Re-checked after EVERY await below, so a response delayed past either
+  // network call is discarded rather than painting into the wrong spot's view.
+  const myGen=_fetchGen;
   const live=await _rwsNearest(spot.latitude,spot.longitude);
   if(!live) return;                       // no station, stale, or fetch failed
-  // Guard against a slow response landing after the user moved to another spot.
-  // cachedLoc/spot carry {latitude,longitude} (not lat/lon) — match that shape.
-  if(!cachedLoc||cachedLoc.latitude!==spot.latitude||cachedLoc.longitude!==spot.longitude) return;
+  if(myGen!==_fetchGen) return;           // spot changed while this request was in flight
   const trend=await _rwsTrend(live.stationId);
+  if(myGen!==_fetchGen) return;           // spot changed while the trend request was in flight
   const spark=trend.length>1?tdsSparkSVG(trend,'#5dd4f0',null):'';
   const dir=live.dirDeg===null?'':` ${['N','NE','E','SE','S','SW','W','NW'][Math.round(((live.dirDeg%360)+360)%360/45)%8]}`;
   const gust=live.gustKn===null?'':` · gusts ${live.gustKn} kn`;
