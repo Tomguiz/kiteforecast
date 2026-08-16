@@ -72,9 +72,9 @@ test('Users section lists each account with created + last-seen', async ({ gotoA
   await expect(content).toContainText('Users (3)');
   await expect(content).toContainText('newbie@example.com');
   await expect(content).toContainText('alice@example.com');
-  // newest signup first: newbie (Jun 22) appears before alice (Jun 20)
+  // default sort is last activity: alice (seen Jun 23) appears before newbie (never seen → sinks last)
   const text = await content.innerText();
-  expect(text.indexOf('newbie@example.com')).toBeLessThan(text.indexOf('alice@example.com'));
+  expect(text.indexOf('alice@example.com')).toBeLessThan(text.indexOf('newbie@example.com'));
   // a user who never logged in shows "never"
   await expect(content).toContainText('never');
 });
@@ -110,7 +110,7 @@ test('Users cards show the nickname when present, email-only when null', async (
   await expect(content.locator('[data-email="newbie@example.com"] .pp-user-email')).toHaveText('newbie@example.com');
 });
 
-test('Users list sorts by created (default) then by last seen, and flips direction', async ({ gotoApp, page }) => {
+test('Users list sorts by last seen (default) then by created, and flips direction', async ({ gotoApp, page }) => {
   await gotoApp('admin', { usersRpc: adminUserRows });
   await page.waitForTimeout(300);
   await page.locator('#burgerBtn').click();
@@ -118,22 +118,22 @@ test('Users list sorts by created (default) then by last seen, and flips directi
   const content = page.locator('#ppAdminUsersContent');
 
   const order = async () => (await content.innerText());
-  // Default: created desc → newbie (Jun 22) before alice (Jun 20) before admin (Jan 1)
+  // Default: last seen desc → admin (Jun 24) before alice (Jun 23); newbie (null) last.
   let t = await order();
-  expect(t.indexOf('newbie@example.com')).toBeLessThan(t.indexOf('alice@example.com'));
-  expect(t.indexOf('alice@example.com')).toBeLessThan(t.indexOf('admin@test.dev'));
-
-  // Sort by Last seen → admin (Jun 24) before alice (Jun 23); newbie (null) last.
-  await content.locator('#ppUsersSortBar [data-sort="seen"]').click();
-  t = await order();
   expect(t.indexOf('admin@test.dev')).toBeLessThan(t.indexOf('alice@example.com'));
   expect(t.indexOf('alice@example.com')).toBeLessThan(t.indexOf('newbie@example.com'));
 
-  // Click active Last seen again → flip to asc → alice before admin; newbie still last (null sinks).
-  await content.locator('#ppUsersSortBar [data-sort="seen"]').click();
+  // Sort by Created → newbie (Jun 22) before alice (Jun 20) before admin (Jan 1)
+  await content.locator('#ppUsersSortBar [data-sort="created"]').click();
   t = await order();
+  expect(t.indexOf('newbie@example.com')).toBeLessThan(t.indexOf('alice@example.com'));
   expect(t.indexOf('alice@example.com')).toBeLessThan(t.indexOf('admin@test.dev'));
-  expect(t.indexOf('admin@test.dev')).toBeLessThan(t.indexOf('newbie@example.com'));
+
+  // Click active Created again → flip to asc → admin (Jan 1) before alice before newbie.
+  await content.locator('#ppUsersSortBar [data-sort="created"]').click();
+  t = await order();
+  expect(t.indexOf('admin@test.dev')).toBeLessThan(t.indexOf('alice@example.com'));
+  expect(t.indexOf('alice@example.com')).toBeLessThan(t.indexOf('newbie@example.com'));
 });
 
 test('clicking a user expands their favourites and following spots', async ({ gotoApp, page }) => {

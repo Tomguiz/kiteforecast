@@ -192,7 +192,12 @@
     .s-btn:focus  { outline:none; }
     .s-btn.active { border-color:var(--accent); background:rgba(0,212,255,.13); color:var(--accent); }
     .s-btn:not(.active):focus { border-color:var(--border); }
+    /* Read-only wind-dir chips: display only, no interaction/hover. */
+    .s-btn-static { cursor:default; }
+    .s-btn-static:hover { border-color:var(--accent); color:var(--accent); } /* stay as active look */
     .shore-hint { font-size:.72rem; color:var(--tdim); }
+    .lwd-edit-all { font-size:.72rem; color:var(--accent); cursor:pointer; white-space:nowrap; opacity:.85; }
+    .lwd-edit-all:hover { opacity:1; text-decoration:underline; }
 
     /* ── FORECAST GRID ── */
     #tenDayStripWrap { margin:24px 0 20px; }
@@ -376,6 +381,13 @@
     .chip:hover { border-color:var(--accent); color:var(--accent); }
     .chip-dirs { font-size:.65rem; color:var(--tdim); font-weight:600; }
     .chip-days { font-size:.65rem; font-weight:700; padding:1px 5px; border-radius:99px; margin-left:2px; line-height:1.5; }
+    /* "Firing now" — measured wind, not forecast. Warm against the green
+       forecast badge so the two never read as the same kind of claim. */
+    /* One bubble per friend confirmed for today - initial only. Separate from
+       the firing bubble on purpose: a friend going is worth surfacing whatever
+       the wind is doing, and the wind is worth surfacing with nobody going. */
+    .chip-friend { display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border-radius:50%; margin-left:3px; font-size:.58rem; font-weight:800; line-height:1; background:rgba(56,189,248,.22); color:#7dd3fc; border:1px solid rgba(56,189,248,.45); flex-shrink:0; }
+    .chip-firing { font-size:.65rem; font-weight:700; padding:1px 5px; border-radius:99px; margin-left:3px; line-height:1.5; background:rgba(249,115,22,.18); color:#fb923c; white-space:nowrap; }
     .chip-days.cd-good    { background:rgba(34,197,94,.15);  color:#4ade80; }
     .chip-days.cd-ok      { background:rgba(34,197,94,.15);  color:#4ade80; }
     .chip-days.cd-none    { background:rgba(148,163,184,.1); color:var(--tdim); }
@@ -536,8 +548,18 @@
     }
     .m-row:last-child { border-bottom:none; }
     .m-row:hover { background:rgba(37,52,80,.35); }
-    .m-row.kite-on { background:rgba(34,197,94,.04); border-left:3px solid rgba(34,197,94,.4); padding-left:15px; }
-    .m-row.kite-on:hover { background:rgba(34,197,94,.09); }
+    /* Rideable hours get a full green surround, not just a faint left edge —
+       at .04 alpha the old tint was invisible against the row background, so
+       users could not tell at a glance which hours were actually rideable. */
+    .m-row.kite-on {
+      background:rgba(34,197,94,.11);
+      border:1px solid rgba(74,222,128,.42);
+      border-left:3px solid #4ade80;
+      border-radius:8px;
+      padding-left:15px;
+      box-shadow:0 0 12px rgba(34,197,94,.10) inset, 0 1px 6px rgba(34,197,94,.08);
+    }
+    .m-row.kite-on:hover { background:rgba(34,197,94,.18); border-color:rgba(74,222,128,.6); border-left-color:#4ade80; }
     .m-row.night { opacity:.38; }
     .m-row.rain-row { border-left:3px solid rgba(96,165,250,.35); padding-left:15px; }
 
@@ -632,6 +654,13 @@
       background:rgba(4,7,16,.7); backdrop-filter:blur(6px);
       display:flex; justify-content:flex-end; align-items:stretch;
       animation:mFadeIn .15s ease;
+    }
+    /* Feature sections (Friends, Notifications, …) open on the LEFT — same side
+       as the burger menu they're launched from. Only the Profile sheet stays
+       right. Desktop-only: on mobile the panel is a bottom sheet. */
+    @media (min-width:600px) {
+      #profileOverlay.pp-left { justify-content:flex-start; }
+      #profileOverlay.pp-left #profilePanel { border-left:none; border-right:1px solid var(--border); }
     }
     @media (max-width:599px) {
       #profileOverlay { align-items:flex-end; }
@@ -813,6 +842,9 @@
     .premium-badge { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:99px; background:linear-gradient(135deg,#f59e0b,#d97706); color:#000; font-size:.65rem; font-weight:800; letter-spacing:.05em; vertical-align:middle; margin-left:6px; position:relative; cursor:pointer; }
     .premium-badge::before { content:'👑'; font-size:.55rem; position:absolute; top:-7px; right:-4px; line-height:1; }
     .premium-badge.no-crown::before { display:none; }
+    /* Marks a feature that is visible but not released yet. Deliberately
+       neutral so it never reads as a premium/paid marker. */
+    .soon-badge { display:inline-flex; align-items:center; padding:2px 8px; border-radius:99px; background:rgba(148,163,184,.18); color:var(--gray); border:1px solid var(--border); font-size:.6rem; font-weight:800; letter-spacing:.06em; vertical-align:middle; margin-left:6px; }
     .premium-card { background:linear-gradient(135deg,rgba(245,158,11,.1),rgba(217,119,6,.06)); border:1px solid rgba(245,158,11,.3); border-radius:12px; padding:16px; }
     .btn-premium { display:block; width:100%; padding:13px; background:linear-gradient(135deg,#f59e0b,#d97706); color:#000; border:none; border-radius:9px; font-size:.88rem; font-weight:800; cursor:pointer; text-align:center; letter-spacing:.03em; transition:opacity .15s; margin-top:10px; }
     .btn-premium:hover { opacity:.9; }
@@ -835,6 +867,12 @@
     .share-btn:hover { border-color:rgba(0,212,255,.6); color:var(--accent); background:rgba(0,212,255,.08); transform:scale(1.08); }
     .share-btn:focus { outline:none; }
     /* ── Spot Info card ── */
+    /* Inside the spot-info card the card is already the disclosure, so the
+       block's own mobile toggle row and outer chrome are redundant. */
+    .lwd-in-card { margin:0 0 10px 0 !important; border:none !important; background:none !important; padding:0 !important; }
+    .lwd-in-card .lwd-toggle { display:none !important; }
+    .lwd-in-card .lwd-panel { display:flex !important; flex-wrap:wrap; align-items:center; gap:8px; }
+    .lwd-in-card .lwd-desktop-label { display:inline !important; }
     .spot-info-card { margin:16px 0; border-radius:14px; border:1px solid var(--border); background:rgba(255,255,255,.03); overflow:hidden; }
     .spot-info-header { display:flex; align-items:center; gap:10px; padding:14px 18px; border-bottom:1px solid var(--border); cursor:pointer; }
     .spot-info-header:hover { background:rgba(255,255,255,.04); }
@@ -1290,6 +1328,11 @@
 
     <div id="spotInfoCard"></div>
 
+    <!-- Live measured wind from the nearest RWS mast. Stable standalone element
+         (NOT inside spotInfoCard's async innerHTML) for the same reason as
+         locWindDirs below: it must survive every spot-info re-render. -->
+    <div id="liveWindPanel"></div>
+
     <!-- Good wind dirs — interactive selector, grouped with the spot-info card.
          Kept as a stable standalone element (NOT inside spotInfoCard's async
          innerHTML) so the buttons + wiring survive every spot-info re-render. -->
@@ -1303,17 +1346,10 @@
       <!-- buttons panel -->
       <div class="lwd-panel" id="lwdPanel">
         <span class="shore-bar-label lwd-desktop-label">Good wind dirs →</span>
-        <div class="shore-btns" id="shoreBtns">
-          <button class="s-btn" data-deg="0"   onclick="toggleWindDir(this)">N</button>
-          <button class="s-btn" data-deg="45"  onclick="toggleWindDir(this)">NE</button>
-          <button class="s-btn" data-deg="90"  onclick="toggleWindDir(this)">E</button>
-          <button class="s-btn" data-deg="135" onclick="toggleWindDir(this)">SE</button>
-          <button class="s-btn" data-deg="180" onclick="toggleWindDir(this)">S</button>
-          <button class="s-btn" data-deg="225" onclick="toggleWindDir(this)">SW</button>
-          <button class="s-btn" data-deg="270" onclick="toggleWindDir(this)">W</button>
-          <button class="s-btn" data-deg="315" onclick="toggleWindDir(this)">NW</button>
-        </div>
-        <span class="shore-hint" id="shoreHint"></span>
+        <!-- Read-only: shows ONLY the spot's selected directions as static chips.
+             Changing directions happens exclusively via "Edit for all" (admin-reviewed). -->
+        <div class="shore-btns" id="shoreBtns"></div>
+        <span class="lwd-edit-all" onclick="openSuggestUpdate()" title="Propose these directions for all riders — an admin reviews before it goes live">✏️ Edit for all →</span>
       </div>
     </div>
 
@@ -1474,7 +1510,7 @@
             <button onclick="$('ppAvatarInput').click()" style="position:absolute;bottom:-2px;right:-2px;width:18px;height:18px;border-radius:50%;background:#38bdf8;border:2px solid var(--surface);color:#000;font-size:.6rem;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0" title="Upload photo">✎</button>
           </div>
           <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:5px;">
-            <label class="pp-label" style="margin:0">Nickname <span style="color:#f87171;font-weight:400;text-transform:none;letter-spacing:0">* required</span></label>
+            <label class="pp-label" style="margin:0">Nickname <span id="ppNicknameReq" style="color:#f87171;font-weight:400;text-transform:none;letter-spacing:0">* required</span></label>
             <div style="display:flex;gap:6px;align-items:center;width:100%">
               <input type="text" id="ppNicknameInput" class="pp-input" placeholder="e.g. TomKite" maxlength="32" oninput="onNicknameInput()" style="margin:0;flex:1 1 0;width:0;min-width:0"/>
               <button class="btn pp-save-btn" id="ppNicknameSaveBtn" onclick="saveNickname(false)" style="margin:0;white-space:nowrap;flex:0 0 auto;width:auto;padding:11px 16px">Save</button>
@@ -1484,6 +1520,13 @@
         </div>
         <input type="file" id="ppAvatarInput" accept="image/*" style="display:none" onchange="uploadAvatar(this)"/>
         <p class="pp-note" style="margin-top:0;margin-bottom:6px">Unique username — visible to friends. Letters, numbers, _ . - allowed.</p>
+        <label class="pp-label" style="margin:8px 0 0 0">Home location</label>
+        <div style="display:flex;gap:6px;align-items:center;width:100%">
+          <input type="text" id="ppHomeInput" class="pp-input" placeholder="e.g. Knokke-Heist" maxlength="80" style="margin:0;flex:1 1 0;width:0;min-width:0"/>
+          <button class="btn pp-save-btn" id="ppHomeFindBtn" onclick="findHomeLocation()" style="margin:0;white-space:nowrap;flex:0 0 auto;width:auto;padding:11px 16px">📍 Find</button>
+        </div>
+        <span id="ppHomeStatus" style="font-size:.65rem;color:var(--tdim);display:block;margin-top:4px"></span>
+        <p class="pp-note" style="margin-top:4px;margin-bottom:6px">Used to find good sessions near you in the weekly digest.</p>
         <div style="border-top:1px solid var(--border);margin:4px 0 8px"></div>
 
         <!-- Share card -->
@@ -1607,13 +1650,21 @@
           </div>
           <button class="pp-toggle" id="ppNotifyFriendsToggle" onclick="toggleNotifyFriends()"><span></span></button>
         </div>
+        <!-- Who actually gets it: accepted friends minus those whose own
+             "Receive" toggle is off. Populated by renderFriendsReach(). -->
+        <div class="notif-row" id="ppFriendsReachRow" style="display:none;padding-top:0">
+          <div class="notif-info" style="width:100%">
+            <div id="ppFriendsReachSummary" class="notif-sub" style="cursor:pointer" onclick="toggleFriendsReach()"></div>
+            <div id="ppFriendsReachList" style="display:none;margin-top:8px"></div>
+          </div>
+        </div>
       </div>
 
       <!-- SMS alerts -->
       <div class="notif-card">
         <div class="notif-row">
           <div class="notif-info">
-            <div class="notif-title">📱 SMS alerts <span class="premium-badge">PREMIUM</span></div>
+            <div class="notif-title">📱 SMS alerts <span class="premium-badge">PREMIUM</span> <span class="soon-badge" id="ppSmsSoonBadge">SOON</span></div>
             <div class="notif-sub">Text message 1h before your session</div>
           </div>
           <button class="pp-toggle" id="ppSmsToggle" onclick="toggleSms()"><span></span></button>
@@ -1631,12 +1682,24 @@
         <div class="notif-row" id="ppDigestRow">
           <div class="notif-info">
             <div class="notif-title">📬 Weekly digest <span id="ppDigestPremiumBadge" style="display:none" class="premium-badge">PREMIUM</span></div>
-            <div class="notif-sub">Every Monday — your week's kite sessions at a glance</div>
+            <div class="notif-sub">Every Monday — the next 7 days of kite sessions at your favourite spots only</div>
           </div>
           <button class="pp-toggle" id="ppDigestToggle" onclick="toggleDigest()"><span></span></button>
         </div>
         <div style="padding:0 14px 14px">
-          <button class="btn pp-save-btn" id="ppDigestNowBtn" onclick="sendDigestNow()" style="width:100%">📩 Send me this week's forecast now</button>
+          <button class="btn pp-save-btn" id="ppDigestNowBtn" onclick="sendDigestNow()" style="width:100%">📩 Send me the next 7 days forecast</button>
+        </div>
+        <div class="notif-row" id="ppNearbyRow" style="border-top:1px solid var(--border);margin-top:10px;padding-top:12px">
+          <div class="notif-info">
+            <div class="notif-title">Also include sessions near home <span class="soon-badge" id="ppNearbySoonBadge">SOON</span></div>
+            <div class="notif-sub" id="ppNearbyHint"></div>
+            <div style="margin-top:8px;display:flex;align-items:center;gap:8px">
+              <label class="pp-label" style="margin:0">Radius</label>
+              <input type="number" id="ppNearbyKm" class="pp-input" min="25" max="200" step="5" style="margin:0;width:80px;padding:6px 8px" onchange="setDigestNearbyKm(this.value)"/>
+              <span style="font-size:.7rem;color:var(--tdim)">km</span>
+            </div>
+          </div>
+          <button class="pp-toggle" id="ppNearbyToggle" onclick="toggleDigestNearby()"><span></span></button>
         </div>
       </div>
 
@@ -1783,6 +1846,210 @@ function daylightWeatherCode(dayHours,fallbackCode){
 //  HELPERS
 // ══════════════════════════════════
 const toKnotsR = ms => Math.round(ms * 1.944);
+
+// ── RWS live wind ──────────────────────────────────────────────────────────
+// Hand-mirrored from supabase/functions/_shared/rws.ts, the same way the
+// rideability rule is mirrored. Change both together — that file's header
+// carries the explicit parity checklist (per-feed failure isolation, both
+// bounds of the age gate, the station-name fallback, the knots constant).
+//
+// Knots constant: this mirror uses the app's existing toKnotsR (1.944) while
+// the module uses toKnots (1.94384). That divergence is DELIBERATE — each
+// surface stays self-consistent with its own conventions — but it means a
+// reading straddling a .5 boundary can render 1 kn apart between the app and
+// the reminder email. Do not "fix" one side in isolation.
+const RWS_BASE='https://rwsos.rws.nl/wb-api';
+const RWS_BBOX='[2,48.56,7.5,57]';
+const RWS_MAX_KM=30, RWS_MAX_AGE_MIN=30;
+// Clock skew tolerance for the lower bound of the age gate. See rws.ts.
+const RWS_MAX_FUTURE_MIN=2;
+const RWS_FEEDS=[
+  {path:'/sp/dd/2.0/locations/geojson',src:'datapush-1min', obs:'WS1'},
+  {path:'/sp/dd/2.0/locations/geojson',src:'datapush-1min', obs:'WR1'},
+  {path:'/sp/dd/2.0/locations/geojson',src:'datapush-10min',obs:'WS10MXS3'},
+];
+function _rwsHaversineKm(aLat,aLon,bLat,bLon){
+  const R=6371,rad=d=>d*Math.PI/180;
+  const dLat=rad(bLat-aLat),dLon=rad(bLon-aLon);
+  const h=Math.sin(dLat/2)**2+Math.cos(rad(aLat))*Math.cos(rad(bLat))*Math.sin(dLon/2)**2;
+  return 2*R*Math.asin(Math.min(1,Math.sqrt(h)));
+}
+function _rwsParseFeed(json){
+  const out=new Map();
+  const feats=json&&json.features;
+  if(!Array.isArray(feats)) return out;
+  for(const f of feats){
+    const p=f&&f.properties, c=f&&f.geometry&&f.geometry.coordinates;
+    if(!p||typeof p.id!=='string'||!Array.isArray(c)||c.length<2) continue;
+    // Validate coordinates are actually numbers, then check they are finite.
+    // Rejects null (Number(null)=0 is wrong), non-numeric strings, objects, etc.
+    if(typeof c[0]!=='number'||typeof c[1]!=='number') continue;
+    const lon=Number(c[0]), lat=Number(c[1]);
+    if(!Number.isFinite(lon)||!Number.isFinite(lat)) continue;
+    const ev=Array.isArray(p.events)?p.events:[];
+    const last=ev.length?ev[ev.length-1]:null;
+    out.set(p.id,{
+      id:p.id,
+      name:String(p.locationName||p.id).split(',').pop().trim(),
+      lon, lat,
+      value:last&&typeof last.value==='number'?last.value:null,
+      ts:last&&typeof last.timeStamp==='string'?last.timeStamp:null,
+    });
+  }
+  return out;
+}
+const RWS_TTL_MS=60000;        // the feed only updates every 1-2 minutes
+const RWS_TTL_FAIL_MS=30000;   // shorter, so an outage recovers quickly
+let _rwsStations=null, _rwsStationsTs=0;
+async function _rwsFetchStations(){
+  if(_rwsStations&&Date.now()-_rwsStationsTs<(_rwsStations.length?RWS_TTL_MS:RWS_TTL_FAIL_MS))
+    return _rwsStations;
+  // Per-feed isolation, matching getFeed() in _shared/rws.ts: each feed
+  // degrades to an empty Map on its own. safeFetch throws on any non-ok
+  // response, so a bare Promise.all would let one failing feed take down all
+  // three — a gust-feed outage would hide the whole panel, when the spec
+  // requires "Reading shown, gust omitted".
+  const maps=await Promise.all(RWS_FEEDS.map(async f=>{
+    try{
+      const q=new URLSearchParams({sourceName:f.src,observationTypeId:f.obs,boundingBox:RWS_BBOX});
+      return _rwsParseFeed(await safeFetch(`${RWS_BASE}${f.path}?${q}`,8000));
+    }catch{ return new Map(); }
+  }));
+  const [speed,dir,gust]=maps;
+  const out=[];
+  // The speed feed defines the station set: no speed, nothing worth showing.
+  for(const [id,s] of speed) out.push({
+    id,name:s.name,lat:s.lat,lon:s.lon,speedMs:s.value,ts:s.ts,
+    dirDeg:(dir.get(id)||{}).value??null, gustMs:(gust.get(id)||{}).value??null,
+  });
+  // Cache the empty result too, under the shorter TTL. Without this a
+  // persistent upstream failure meant 3 feed requests (6 with safeFetch's
+  // retry) on EVERY renderGrid — and renderGrid fires from ~10 unrelated
+  // interactions — forever, for every user.
+  _rwsStations=out; _rwsStationsTs=Date.now();
+  return out;
+}
+// Mirrors isFiringNow in _shared/rws.ts. Reuses the app's own rideability rule
+// rather than a fresh 15: the badge counts from 15 kn, and it is already what
+// the "good days" badge counts, so the bubble and the badge cannot drift apart.
+// Direction is part of the rule — 25 kn from the wrong quarter is not firing,
+// and a false "firing" bubble is the one that costs someone a drive. A null
+// direction cannot be confirmed as onshore, so it reads as not firing.
+const FIRING_MIN_KN=18;
+function _rwsIsFiringNow(speedKn,dirDeg,spotDirs){
+  if(dirDeg===null||dirDeg===undefined) return false;
+  if(speedKn<FIRING_MIN_KN) return false;
+  if(!spotDirs||!spotDirs.length) return true;   // spot works in any direction
+  return spotDirs.some(sd=>angleDiff(dirDeg,sd)<=22.5);
+}
+async function _rwsNearest(lat,lon){
+  const sts=await _rwsFetchStations();
+  let best=null;
+  for(const st of sts){
+    // Skip malformed stations with NaN coordinates to avoid poison-pill scenario.
+    if(!Number.isFinite(st.lat)||!Number.isFinite(st.lon)) continue;
+    const d=_rwsHaversineKm(lat,lon,st.lat,st.lon);
+    if(d>RWS_MAX_KM) continue;
+    if(!best||d<best.distanceKm) best={station:st,distanceKm:d};
+  }
+  if(!best) return null;
+  const st=best.station;
+  if(st.speedMs===null||!st.ts) return null;
+  const t=Date.parse(st.ts);
+  if(isNaN(t)) return null;
+  const ageMin=Math.round((Date.now()-t)/60000);
+  // Two-sided, mirroring toLiveWind in _shared/rws.ts. A future timestamp is
+  // not fresh, it is broken — and it would otherwise hit `ageMin<=1` below and
+  // render as "just now". Concretely: if the feed's timeStamp ever loses its
+  // timezone designator, Date.parse treats the bare ISO form as LOCAL, so a
+  // Dutch user in CEST sees every reading 2h ahead — permanently "just now",
+  // permanently wrong, and never rejected by an upper bound alone.
+  if(ageMin<-RWS_MAX_FUTURE_MIN||ageMin>RWS_MAX_AGE_MIN) return null;
+  return {
+    stationId:st.id, stationName:st.name, distanceKm:best.distanceKm,
+    speedKn:toKnotsR(st.speedMs), dirDeg:st.dirDeg,
+    gustKn:st.gustMs===null?null:toKnotsR(st.gustMs), ageMin,
+    viewerUrl:`https://rwsos.rws.nl/viewer/map/noordzee/meteo/location/${encodeURIComponent(st.id)}`,
+  };
+}
+// tdsSparkSVG is built for ~24 hourly points in a 58x26px box. The 1-minute
+// feed yields ~180 points over 3h — 0.3px apart, an unreadable hairline.
+// Downsample to evenly spaced samples so the sparkline reads as a trend. The
+// first and last points are always kept, so the line still ends on the most
+// recent reading.
+const RWS_SPARK_POINTS=36;
+function _rwsDownsample(arr,target=RWS_SPARK_POINTS){
+  if(!Array.isArray(arr)||arr.length<=target) return arr||[];
+  const step=(arr.length-1)/(target-1), out=[];
+  for(let i=0;i<target;i++) out.push(arr[Math.round(i*step)]);
+  return out;
+}
+// 3h trend for the matched station, for the sparkline. Failure yields [].
+// Cached per station under the same 60s scheme as the station feed, INCLUDING
+// the empty result (shorter TTL): renderGrid fires from ~10 unrelated
+// interactions and each one used to issue a fresh uncached request.
+let _rwsTrendCache=new Map();
+async function _rwsTrend(stationId){
+  const hit=_rwsTrendCache.get(stationId);
+  if(hit&&Date.now()-hit.ts<(hit.data.length?RWS_TTL_MS:RWS_TTL_FAIL_MS)) return hit.data;
+  let data=[];
+  try{
+    const end=new Date(), start=new Date(Date.now()-3*3600*1000);
+    const q=new URLSearchParams({
+      observationTypeId:'WS1', sourceName:'datapush-1min', locationCode:stationId,
+      startTime:start.toISOString().slice(0,19)+'Z', endTime:end.toISOString().slice(0,19)+'Z',
+    });
+    const j=await safeFetch(`${RWS_BASE}/sp/dd/2.0/timeseries?${q}`,8000);
+    const ev=j&&j.results&&j.results[0]&&j.results[0].events;
+    if(Array.isArray(ev)) data=_rwsDownsample(ev.filter(e=>e&&typeof e.value==='number').map(e=>toKnotsR(e.value)));
+  }catch{ data=[]; }
+  _rwsTrendCache.set(stationId,{data,ts:Date.now()});
+  return data;
+}
+// Which spot the panel currently shows, and the exact markup it shows. Both
+// are needed because renderGrid() — which calls this — fires from ~10 unrelated
+// interactions (bell toggles, attendance confirm/cancel, notification changes,
+// wind-dir set, auth callbacks). Blanking up front made every one of those
+// flash the panel empty for two awaits; comparing the resolved markup instead
+// means an unchanged panel is never touched at all.
+let _liveWindKey=null, _liveWindHtml='';
+function _liveWindSpotKey(spot){
+  return spot?`${spot.name||''}|${spot.latitude},${spot.longitude}`:null;
+}
+async function renderLiveWindPanel(spot){
+  const el=$('liveWindPanel'); if(!el) return;
+  const key=_liveWindSpotKey(spot);
+  // Only blank when the spot actually changed — otherwise the old spot's
+  // reading would linger while the new one's lookup is in flight.
+  if(key!==_liveWindKey){ el.innerHTML=''; _liveWindKey=key; _liveWindHtml=''; }
+  const paint=html=>{ if(html!==_liveWindHtml){ el.innerHTML=html; _liveWindHtml=html; } };
+  if(!spot||typeof spot.latitude!=='number'||typeof spot.longitude!=='number'){ paint(''); return; }
+  // Guard against a slow response landing after the user moved to another spot.
+  // Same generation counter fetchForecastFromSpot uses to cancel its own
+  // in-flight requests — bumped on every new spot fetch and on resetSearch.
+  // Re-checked after EVERY await below, so a response delayed past either
+  // network call is discarded rather than painting into the wrong spot's view.
+  const myGen=_fetchGen;
+  const live=await _rwsNearest(spot.latitude,spot.longitude);
+  if(myGen!==_fetchGen) return;           // spot changed while this request was in flight
+  if(!live){ paint(''); return; }         // no station, stale, or fetch failed
+  const trend=await _rwsTrend(live.stationId);
+  if(myGen!==_fetchGen) return;           // spot changed while the trend request was in flight
+  const spark=trend.length>1?tdsSparkSVG(trend,'#5dd4f0',null):'';
+  const dir=live.dirDeg===null?'':` ${['N','NE','E','SE','S','SW','W','NW'][Math.round(((live.dirDeg%360)+360)%360/45)%8]}`;
+  const gust=live.gustKn===null?'':` · gusts ${live.gustKn} kn`;
+  const age=live.ageMin<=1?'just now':`${live.ageMin} min ago`;
+  // stationName is the ONLY untrusted value here — it comes from a third-party
+  // feed. dir, gust and age are generated numerals and literals from this
+  // function; escaping them too would only hide where the real boundary is.
+  paint(`<div class="spot-info-card" style="padding:14px 16px">
+    <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#4a5568;margin-bottom:6px">🌬 Measured right now</div>
+    <div style="font-size:22px;font-weight:700;color:#5dd4f0">${live.speedKn} kn${dir}${gust}</div>
+    ${spark?`<div style="margin:8px 0">${spark}</div>`:''}
+    <div style="font-size:11px;color:#4a5568">${escFriendName(live.stationName)} · ${live.distanceKm.toFixed(1)} km away · ${age}</div>
+  </div>`);
+}
+
 const DIRS8 = ['N','NE','E','SE','S','SW','W','NW'];
 const compass = deg => DIRS8[Math.round(((deg%360)+360)%360/45)%8];
 const ARROWS8 = ['↓','↙','←','↖','↑','↗','→','↘'];
@@ -1805,11 +2072,51 @@ function isWindDirOK(deg){
   for(const d of windDirs){ if(angleDiff(deg,d)<=22.5) return true; }
   return false;
 }
-function updateShoreHint(){
-  const hint=$('shoreHint');
-  const dirs=windDirs.size>0?[...windDirs].sort((a,b)=>a-b).map(d=>compass(d)).join(' / '):'—';
-  if(hint) hint.textContent=windDirs.size>0?dirs:'';
-  const lbl=$('lwdToggleDirs'); if(lbl) lbl.textContent=dirs;
+// Render the wind-dir section as READ-ONLY chips: only the spot's selected
+// directions are shown, as static (non-clickable) chips. Direction changes are
+// made solely through "Edit for all" (admin-reviewed) — there is no per-user
+// toggle here anymore.
+function renderWindDirChips(){
+  const box=$('shoreBtns');
+  if(box){
+    const degs=[...windDirs].sort((a,b)=>a-b);
+    box.innerHTML=degs.map(d=>`<span class="s-btn s-btn-static active" data-deg="${d}">${compass(d)}</span>`).join('');
+  mountWindDirs();
+  }
+  // Collapsed-panel (mobile) peek label still summarises the selected dirs.
+  const lbl=$('lwdToggleDirs');
+  if(lbl) lbl.textContent=windDirs.size>0?[...windDirs].sort((a,b)=>a-b).map(d=>compass(d)).join(' / '):'—';
+}
+// Back-compat alias — older call sites still invoke updateShoreHint().
+function updateShoreHint(){ renderWindDirChips(); }
+// The good-wind-dirs block used to sit in its own full-width band under the
+// spot-info card, costing a whole row of vertical space on mobile to show five
+// short chips. It now lives INSIDE the card body, with a summary in the card's
+// collapsed subtitle so the directions are still glanceable without expanding.
+//
+// The element is MOVED, never re-created: index.html keeps #locWindDirs outside
+// #spotInfoCard's async innerHTML so its chips survive re-renders, and
+// appendChild relocates the same node with its wiring intact. If the card has
+// not rendered a mount yet (empty/unclaimed state), it stays where it was.
+// Park the wind-dirs block back outside #spotInfoCard before the card rewrites
+// its innerHTML. Without this, moving the block inside the card means the next
+// re-render destroys it — the exact hazard the original standalone placement
+// was there to avoid.
+function unmountWindDirs(){
+  const dirs=$('locWindDirs'); const card=$('spotInfoCard');
+  if(!dirs||!card||!card.contains(dirs)) return;
+  card.parentElement.insertBefore(dirs, card.nextSibling);
+  dirs.classList.remove('lwd-in-card');
+}
+function mountWindDirs(){
+  const dirs=$('locWindDirs'); if(!dirs) return;
+  const mount=$('windDirsMount');
+  if(mount){
+    if(dirs.parentElement!==mount) mount.appendChild(dirs);
+    dirs.classList.add('lwd-in-card');
+  }else{
+    dirs.classList.remove('lwd-in-card');
+  }
 }
 function toggleWindDirsPanel(){
   const tog=$('lwdToggle'), panel=$('lwdPanel');
@@ -1912,6 +2219,9 @@ function classifyHour(kn,dir,code,gustKn=0){
 // views can never disagree.
 // `dirOK(dir)` defaults to the global isWindDirOK (current spot's windDirs);
 // the homepage passes a per-spot check so each favourite uses its own dirs.
+// MIRRORED in supabase/functions/weekly-digest/session-logic.ts — the digest
+// email must call the same days rideable as the app. Change both together;
+// tests/unit/session-logic.test.ts pins the edge-function side.
 function hourQualifies(kn,dir,code,gustKn,dirOK){
   return (speedTier(kn)>0||(kn>=12&&(gustKn||0)>=20))&&!isRainy(code)&&dirOK(dir);
 }
@@ -2062,38 +2372,11 @@ async function autoDetectShore(lat,lon){
 // ══════════════════════════════════
 //  SHORE PICKER
 // ══════════════════════════════════
-let _windDirToggleLock=false;
-function toggleWindDir(btn){
-  // Prevent double-fire from touchstart+click on mobile
-  if(_windDirToggleLock) return;
-  _windDirToggleLock=true; setTimeout(()=>_windDirToggleLock=false, 350);
-  btn.blur();
-  const deg=Number(btn.dataset.deg);
-  manualShoreSet=true;
-  if(windDirs.has(deg)){
-    windDirs.delete(deg);
-    if(windDirs.size===0) manualShoreSet=false;
-  } else {
-    windDirs.add(deg);
-  }
-  // sync all buttons (not just the clicked one) to avoid stale active states
-  document.querySelectorAll('.s-btn').forEach(b=>b.classList.toggle('active',windDirs.has(Number(b.dataset.deg))));
-  updateShoreHint();
-  if(cachedWx&&cachedHrMap) renderGrid();
-  // persist user override and invalidate chip cache so home screen updates
-  if(cachedLoc){
-    if(windDirs.size>0) saveUserDirsForSpot(cachedLoc.name,[...windDirs]);
-    const key=`${cachedLoc.latitude},${cachedLoc.longitude}`;
-    Object.keys(chipFxCache).forEach(k=>{ if(k.startsWith(key)) delete chipFxCache[k]; });
-    Object.keys(chipBestCache).forEach(k=>{ if(k.startsWith(key)) delete chipBestCache[k]; });
-    _saveChipCacheToLS();
-    renderHintChips();
-  }
-}
+// NOTE: the per-user direction toggle (toggleWindDir) was removed. The wind-dir
+// section is now read-only; direction changes go through "Edit for all" only.
 function setWindDirs(degs){
   windDirs=new Set(degs);
-  document.querySelectorAll('.s-btn').forEach(b=>b.classList.toggle('active',windDirs.has(Number(b.dataset.deg))));
-  updateShoreHint();
+  renderWindDirChips();
   if(cachedWx&&cachedHrMap) renderGrid();
 }
 // keep for backward-compat (auto-detect still calls this with a single deg)
@@ -2914,10 +3197,10 @@ function updateBestWindowBar(){
   const bestTime=best.startHr!==null?String(best.startHr).padStart(2,'0')+'h00':'';
 
   const bestPill=showBest?`<div class="best-window-bar bw-pill" id="bwBest">
-    <span>🏆 Best:</span><span class="bw-spot">${best.spotName}</span><span>·</span><span>${bestLabel}${bestTime?' · '+bestTime:''}</span><span>·</span><span>${best.peakKn}kn</span>
+    <span>🏆 Best:</span><span class="bw-spot">${escFriendName(best.spotName)}</span><span>·</span><span>${bestLabel}${bestTime?' · '+bestTime:''}</span><span>·</span><span>${best.peakKn}kn</span>
   </div>`:'';
   const nextPill=nextLabel?`<div class="best-window-bar bw-pill" id="bwNext">
-    <span>⏭ Next:</span><span class="bw-spot">${next.spotName}</span><span>·</span><span>${nextLabel}${nextTime?' · '+nextTime:''}</span><span>·</span><span>${next.nextPeakKn}kn</span>
+    <span>⏭ Next:</span><span class="bw-spot">${escFriendName(next.spotName)}</span><span>·</span><span>${nextLabel}${nextTime?' · '+nextTime:''}</span><span>·</span><span>${next.nextPeakKn}kn</span>
   </div>`:'';
 
   bar.innerHTML=`<div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;width:100%;padding:2px 0;">${nextPill}${bestPill}</div>`;
@@ -2951,8 +3234,10 @@ function renderCompareBar(){
   // Collect all unique dates across all spots that have at least 1 good date
   const allDates=[...new Set(loadedEntries.flatMap(e=>e.days10.filter(d=>(d.goodHours??d.qh)>=2).map(d=>d.dateStr)))].sort();
 
-  // Build table header: sticky row label col + one col per spot
-  const spotHeaders=loadedEntries.map(e=>`<th><div class="cmp-spot-hdr" onclick="pickSpot(${JSON.stringify(e.spot).replace(/"/g,'&quot;')})" title="${e.spotName}">${e.spotName}</div></th>`).join('');
+  // Build table header: sticky row label col + one col per spot.
+  // The spot is passed to pickSpot by index through a listener below: serialising
+  // it into an inline onclick put a user-influenced spot name inside a JS string.
+  const spotHeaders=loadedEntries.map((e,i)=>`<th><div class="cmp-spot-hdr" data-cmp-i="${i}" title="${escFriendName(e.spotName)}">${escFriendName(e.spotName)}</div></th>`).join('');
 
   // Build rows — one per date
   // Find best peakKn per row to highlight it
@@ -2985,6 +3270,8 @@ function renderCompareBar(){
         <tbody>${rows}${noSessionsRow}</tbody>
       </table>
     </div>`;
+  el.querySelectorAll('.cmp-spot-hdr').forEach(node=>
+    node.addEventListener('click',()=>pickSpot(loadedEntries[+node.dataset.cmpI].spot)));
 }
 async function searchOsmSpots(q){
   if(q.length<3) return [];
@@ -3014,15 +3301,17 @@ function renderAC(items, query=''){
   const dd=$('acDropdown');
   const q=(query||$('searchInput').value||'').trim();
   if(!items.length&&q.length<2){dd.innerHTML='';dd.classList.remove('open');acActive=-1;return;}
+  // Names/locations come from SPOTS, spot_overrides and the OSM search — all
+  // user-influenced, so they are text, never markup.
   const spotRows=items.map((s,i)=>
-    `<div class="ac-item" data-i="${i}"><strong>${s.alias||s.name}</strong><span>${s.alias?s.name+' · ':''  }${s.loc}</span></div>`
+    `<div class="ac-item" data-i="${i}"><strong>${escFriendName(s.alias||s.name)}</strong><span>${s.alias?escFriendName(s.name)+' · ':''  }${escFriendName(s.loc||'')}</span></div>`
   ).join('');
   // Show pending spots that match the query, excluding any that are now live in SPOTS
   const liveNames=new Set((SPOTS||[]).map(s=>(s.name||'').toLowerCase()));
   const pendingMatches=q.length>=2?getPendingSpots().filter(p=>p.nameLower.includes(q.toLowerCase())&&!liveNames.has(p.nameLower)):[];
-  const pendingRows=pendingMatches.map(p=>`<div class="ac-item" style="border-top:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:8px;opacity:.75;cursor:default"><span style="font-size:.85rem">⏳</span><span style="flex:1"><span style="font-weight:600;font-size:.82rem;color:#fbbf24">${p.name}</span><span style="display:block;font-size:.72rem;color:var(--tdim);margin-top:1px">Requested — under review by the team</span></span></div>`).join('');
+  const pendingRows=pendingMatches.map(p=>`<div class="ac-item" style="border-top:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:8px;opacity:.75;cursor:default"><span style="font-size:.85rem">⏳</span><span style="flex:1"><span style="font-weight:600;font-size:.82rem;color:#fbbf24">${escFriendName(p.name)}</span><span style="display:block;font-size:.72rem;color:var(--tdim);margin-top:1px">Requested — under review by the team</span></span></div>`).join('');
   const addHint=q.length>=2&&!pendingMatches.some(p=>p.nameLower===q.toLowerCase())
-    ? `<div class="ac-item ac-item-add" style="border-top:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:8px;color:var(--accent);opacity:.8"><span style="font-size:1rem;line-height:1">＋</span><span style="flex:1"><span style="font-weight:600;font-size:.82rem">Add "${q}" as a new spot</span><span style="display:block;font-size:.72rem;color:var(--tdim);margin-top:1px">Not listed? Request it — we'll review and add it</span></span></div>`
+    ? `<div class="ac-item ac-item-add" style="border-top:1px solid rgba(255,255,255,.06);display:flex;align-items:center;gap:8px;color:var(--accent);opacity:.8"><span style="font-size:1rem;line-height:1">＋</span><span style="flex:1"><span style="font-weight:600;font-size:.82rem">Add "${escFriendName(q)}" as a new spot</span><span style="display:block;font-size:.72rem;color:var(--tdim);margin-top:1px">Not listed? Request it — we'll review and add it</span></span></div>`
     : '';
   dd.innerHTML=spotRows+pendingRows+addHint;
   dd.classList.add('open');
@@ -3292,13 +3581,37 @@ function setChipDayBadge(el,n,isFav=false){
   }
   $('apiErrorBanner').style.display='none';
   el.className='chip-days '+(n>=5?'cd-good':n>=1?'cd-ok':'cd-none');
-  el.textContent=n>0?`${n} good days 💨`:'no wind this week';
+  // Pluralise like the title attribute on the next line already does.
+  el.textContent=n>0?`${n} good day${n!==1?'s':''} 💨`:'no wind this week';
   el.title=`${n} day${n!==1?'s':''} with qualifying wind in the next 10`;
 }
 
 const FREE_FAV_LIMIT = 1;
 const _chipQueue={running:0,max:1,queue:[]};
 
+// Who else is going today, per spot. ONE query for every favourite, not one per
+// chip. RLS on session_attendances restricts reads to your own rows and your
+// friends', so this is inherently "friends" without picking a policy here. Own
+// rows are dropped: the bubble answers "who else is going", not "am I going".
+let _todayAttendCache=null, _todayAttendTs=0;
+async function _friendsGoingToday(){
+  if(_todayAttendCache&&Date.now()-_todayAttendTs<60000) return _todayAttendCache;
+  const sb=getSb(); const me=loadProfile().email;
+  const out={};
+  if(sb&&me){
+    const today=new Date().toISOString().slice(0,10);
+    const{data,error}=await sb.from('session_attendances')
+      .select('email,nickname,spot_name')
+      .eq('session_date',today).eq('cancelled',false);
+    if(error) console.error('[chips] attendance lookup failed:',error);
+    for(const r of data||[]){
+      if(r.email===me) continue;
+      (out[r.spot_name]=out[r.spot_name]||[]).push(r.nickname||r.email.split('@')[0]);
+    }
+  }
+  _todayAttendCache=out; _todayAttendTs=Date.now();
+  return out;
+}
 function renderHintChips(){
   // Always clear search bar when rendering home screen chips
   const _si=$('searchInput'); if(_si&&!cachedLoc) _si.value='';
@@ -3340,6 +3653,30 @@ function renderHintChips(){
       if(_spotsIsReady){
         fetchChipQualDays({name:f.name,loc:f.label||'',lat:f.lat,lon:f.lon,dirs:_liveDirs}).then(n=>{setChipDayBadge(fbadge,n,true);updateBestWindowBar();});
       }
+      // "Firing now" bubble, from the nearest RWS mast. Favourites carry
+      // .lat/.lon (NOT .latitude/.longitude like cachedLoc — see
+      // renderLiveWindPanel). Costs no extra request: _rwsNearest reads the
+      // 60s station cache, so every favourite is a pure comparison after the
+      // first one. Absent unless the spot is genuinely firing.
+      const fire=document.createElement('span');
+      label.appendChild(fire);
+      _rwsNearest(f.lat,f.lon).then(live=>{
+        if(!live||!_rwsIsFiringNow(live.speedKn,live.dirDeg,_liveDirs)) return;
+        fire.className='chip-firing';
+        fire.textContent=`🔥 ${live.speedKn} kn`;
+        fire.title=`Measured now at ${live.stationName} · ${live.distanceKm.toFixed(1)} km away`;
+      }).catch(()=>{});
+      // Friend bubbles are independent of wind: a mate going is worth knowing
+      // even on a light day, so this is NOT gated on the firing check above.
+      _friendsGoingToday().then(map=>{
+        for(const nick of (map[f.name]||[])){
+          const b=document.createElement('span');
+          b.className='chip-friend';
+          b.textContent=(String(nick).trim()[0]||'?').toUpperCase();
+          b.title=nick+' is going today';
+          label.appendChild(b);
+        }
+      }).catch(()=>{});
       const rm=document.createElement('span');
       rm.className='fav-chip-remove'; rm.textContent='✕'; rm.title='Remove from your spots';
       rm.addEventListener('click',e=>{e.stopPropagation();removeFav(f);});
@@ -3478,8 +3815,7 @@ function resetSearch(){
   requestAnimationFrame(()=>{ if($('searchInput')) $('searchInput').value=''; });
   cachedWx=null; cachedLoc=null; cachedHrMap=new Map(); cachedTideExtremes=null;
   windDirs=new Set(); manualShoreSet=false;
-  document.querySelectorAll('.s-btn').forEach(b=>b.classList.remove('active'));
-  updateShoreHint();
+  renderWindDirChips();
   renderHintChips();
   $('searchInput').blur();
 }
@@ -3590,6 +3926,24 @@ function youtubeId(url) {
   return m ? m[1] : null;
 }
 
+// Spot-info links (website, booking, gear, socials, webcam) are typed by a
+// business owner in their claim. An admin approves the *claim*, not the URL
+// scheme — HTML-escaping an href stops it breaking out of the attribute but a
+// `javascript:` URL would still run when clicked. Only http(s) reaches the DOM;
+// a scheme-less value ("kiteclub.be/book") is read as https rather than as a
+// link relative to our own origin. Returns '' when nothing safe is left.
+function safeHttpUrl(raw){
+  const s=String(raw==null?'':raw).trim();
+  if(!s) return '';
+  const parse=v=>{ try{ return new URL(v); }catch(e){ return null; } };
+  const isHttp=u=>!!u&&(u.protocol==='http:'||u.protocol==='https:');
+  const direct=parse(s);
+  if(isHttp(direct)) return direct.href;
+  if(direct) return '';            // an explicit non-http scheme is never rescued
+  const prefixed=parse('https://'+s.replace(/^\/+/,''));
+  return isHttp(prefixed)?prefixed.href:'';
+}
+
 async function fetchSpotInfo(spotName) {
   const sb = getSb(); if(!sb) return null;
   const [{ data }, { data: claim }] = await Promise.all([
@@ -3614,9 +3968,10 @@ const SPOT_CROWD_LEVELS = ['Quiet','Moderate','Crowded','Extremely crowded'];
 const SPOT_SKILL_LEVELS = ['Beginner-friendly','Intermediate','Advanced'];
 const FACILITY_EMOJI = {'Free parking':'🅿️','Paid parking':'🅿️','Kiteshop':'🛍️','Kite rental':'🪁','Lessons':'🎓','Restaurant/bar':'🍽️','Showers':'🚿','Toilets':'🚻','Rescue':'🛟','Storage':'📦'};
 
-// Build the structured-attributes block for a spot-info card. Values come only
-// from the fixed option lists. Returns '' when nothing is set so dataless spots
-// are unchanged. (Phase 1 — display.)
+// Build the structured-attributes block for a spot-info card. The UI only offers
+// the fixed option lists below, but the values arrive from spot_info rather than
+// from those constants, so they are escaped like any other stored field.
+// Returns '' when nothing is set so dataless spots are unchanged. (Phase 1 — display.)
 function spotAttributesHTML(info){
   if(!info) return '';
   const disc=Array.isArray(info.disciplines)?info.disciplines:[];
@@ -3631,21 +3986,53 @@ function spotAttributesHTML(info){
   let html='<div class="spot-attr-block">';
   if(disc.length){
     html+='<div class="spot-attr-label">🪁 Disciplines</div><div class="spot-attr-chips">'
-      +disc.map(d=>`<span class="spot-chip spot-chip-disc">${d}</span>`).join('')+'</div>';
+      +disc.map(d=>`<span class="spot-chip spot-chip-disc">${escFriendName(d)}</span>`).join('')+'</div>';
   }
   if(fac.length){
     html+='<div class="spot-attr-label">🏖️ Facilities</div><div class="spot-attr-chips">'
-      +fac.map(f=>`<span class="spot-chip">${FACILITY_EMOJI[f]?FACILITY_EMOJI[f]+' ':''}${f}</span>`).join('')+'</div>';
+      +fac.map(f=>`<span class="spot-chip">${FACILITY_EMOJI[f]?FACILITY_EMOJI[f]+' ':''}${escFriendName(f)}</span>`).join('')+'</div>';
   }
   if(conds.length){
     html+='<div class="spot-attr-conditions">'
-      +conds.map(([e,l,v])=>`<span class="spot-attr-cond">${e} <span class="spot-attr-cond-lbl">${l}</span> ${v}</span>`).join('')+'</div>';
+      +conds.map(([e,l,v])=>`<span class="spot-attr-cond">${e} <span class="spot-attr-cond-lbl">${l}</span> ${escFriendName(v)}</span>`).join('')+'</div>';
   }
   return html+'</div>';
 }
 
+// Live-wind link: the RWS station page, or no button at all. The RWS lookup
+// reuses the cache the panel already populated, so this costs no extra request.
+//
+// PHASE 1 ONLY — the `info.live_wind_url` branch (a user-submitted URL, which
+// takes precedence over the station link) is deliberately NOT here. Rendering
+// it needs safeHttpUrl(), which does not exist in this file yet: PR #19 has not
+// landed. escFriendName escapes quotes and angle brackets and does nothing to
+// the URL scheme, so a `javascript:` URL would still execute on click. See the
+// spec's "Phase 2 — Security" section: "phase 2 must not merge before PR #19"
+// and "The new button must call safeHttpUrl(), not escFriendName() alone".
+// Reintroduce the branch together with safeHttpUrl, not before:
+//   if(info&&info.live_wind_url){ const u=safeHttpUrl(info.live_wind_url);
+//     if(u) return {url:u,label:'Live wind readings'} }
+// docs/superpowers/specs/2026-08-16-rws-live-wind-design.md
+async function _liveWindHref(info,spot){
+  // cachedLoc (what `spot` is called with here) carries .latitude/.longitude,
+  // not .lat/.lon — see renderLiveWindPanel above for the same shape.
+  if(!spot||typeof spot.latitude!=='number'||typeof spot.longitude!=='number') return null;
+  const live=await _rwsNearest(spot.latitude,spot.longitude);
+  return live?{url:live.viewerUrl,label:`Live wind — ${live.stationName}`}:null;
+}
 async function renderSpotInfoCard(spotName) {
   const el = $('spotInfoCard'); if(!el) return;
+  // Park the wind-dirs block outside the card before its innerHTML is
+  // rewritten below — it now lives INSIDE the card and would be destroyed.
+  unmountWindDirs();
+  // Generation guard: renderSpotInfoCard is fired-and-forgotten (not awaited)
+  // by fetchForecastFromSpot, and this function now awaits two network calls
+  // (fetchSpotInfo, then _rwsNearest via _liveWindHref) before its final
+  // write. If the user navigates to another spot while either is in flight,
+  // _fetchGen has already been bumped and cachedLoc already points at the
+  // new spot — without this guard we'd paint the old spot's card using the
+  // new spot's coordinates. Re-checked after every await below.
+  const myGen=_fetchGen;
   // show collapsed header immediately while fetch is in flight
   el.innerHTML = `<div class="spot-info-card"><div class="spot-info-header" style="opacity:.5;pointer-events:none"><div style="flex:1"><div class="spot-info-title">📍 Spot info &amp; bookings</div><div class="spot-info-subtitle">Lessons · Gear rental · Contact</div></div><svg class="spot-info-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg></div></div>`;
   _spotInfoOpen = false;
@@ -3658,11 +4045,12 @@ async function renderSpotInfoCard(spotName) {
         <div class="spot-info-header" onclick="_spotInfoOpen=!_spotInfoOpen;this.nextElementSibling.style.display=_spotInfoOpen?'flex':'none';this.querySelector('.sic-claim-btn').style.display=_spotInfoOpen?'none':'inline-flex'">
           <div style="flex:1">
             <div class="spot-info-title">📍 Spot info &amp; bookings</div>
-            <div class="spot-info-subtitle">Lessons · Gear rental · Contact</div>
+            <div class="spot-info-subtitle">Lessons · Gear rental · Contact${windDirs.size ? ` · <span style="color:var(--accent);font-weight:700">&#129517; ${[...windDirs].sort((a,b)=>a-b).map(compass).join('/')}</span>` : ''}</div>
           </div>
           <button class="sic-claim-btn spot-info-open-btn" onclick="event.stopPropagation();_spotInfoOpen=true;this.closest('.spot-info-card').querySelector('.spot-info-unclaimed').style.display='flex';this.style.display='none'">🏴 Claim this spot</button>
         </div>
         <div class="spot-info-unclaimed" style="display:none">
+          <div id="windDirsMount" style="width:100%"></div>
           <div class="spot-info-unclaimed-icon">🏴</div>
           <div class="spot-info-unclaimed-title">No info yet for this spot</div>
           <div class="spot-info-unclaimed-sub">Are you the owner or manager here? Claim this spot to add lesson bookings, gear rental, and contact details.</div>
@@ -3673,6 +4061,9 @@ async function renderSpotInfoCard(spotName) {
           </div>
         </div>
       </div>`;
+    // Unclaimed spots take this early return, so mount here too — otherwise
+    // the majority of spots keep the old full-width band.
+    mountWindDirs();
     return;
   }
 
@@ -3680,52 +4071,80 @@ async function renderSpotInfoCard(spotName) {
     ? `<span class="spot-info-badge unverified">⚠️ Unclaimed spot</span>`
     : '';
 
-  const ytId = youtubeId(info.livecam_url);
-  const webcamBtn = info.livecam_url
+  // Every info.* field below is public-facing (shown to every visitor of
+  // this spot, not just admins) and can originate from a business owner's
+  // own spot-claim submission — reviewed by an admin for legitimacy, but not
+  // proofread character-by-character before hitting "Verify". Escape every
+  // field for the same reason as the admin panel above: the trust boundary
+  // is "did an admin approve this business as the spot's owner", not "is
+  // every field free of markup".
+  // Links get the same treatment plus a scheme allowlist (safeHttpUrl): escaping
+  // an href stops it breaking out of the attribute, it does not stop a
+  // javascript: URL from running on click. A URL that survives neither check is
+  // dropped along with its button.
+  // The CTA-tracking click is a real listener wired below, not an inline
+  // onclick — spotName is user-influenced and would otherwise be spliced into a
+  // JS string literal, where HTML-escaping is no defence.
+  const livecamUrl = safeHttpUrl(info.livecam_url);
+  const lessonUrl  = safeHttpUrl(info.lesson_url);
+  const gearUrl    = safeHttpUrl(info.gear_url);
+  const websiteUrl = safeHttpUrl(info.website);
+  const ytId = youtubeId(livecamUrl);
+  const webcamBtn = livecamUrl
     ? ytId
       ? `<div>
            <div class="webcam-embed-label"><span class="webcam-dot"></span> Live action on the spot — webcam</div>
-           <div class="webcam-embed" onclick="trackCtaClick('${spotName}','livecam')">
+           <div class="webcam-embed" data-cta="livecam">
              <iframe src="https://www.youtube.com/embed/${ytId}?autoplay=0&rel=0&modestbranding=1" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>
            </div>
          </div>`
-      : `<a href="${info.livecam_url}" target="_blank" rel="noopener" class="spot-cta-btn spot-cta-webcam" onclick="trackCtaClick('${spotName}','livecam')">🎥 Live action on the spot — webcam</a>`
+      : `<a href="${escFriendName(livecamUrl)}" target="_blank" rel="noopener" class="spot-cta-btn spot-cta-webcam" data-cta="livecam">🎥 Live action on the spot — webcam</a>`
     : '';
-  const lessonBtn = info.lesson_url
-    ? `<a href="${info.lesson_url}" target="_blank" rel="noopener" class="spot-cta-btn spot-cta-lesson" onclick="trackCtaClick('${spotName}','lesson')">🎓 Book a lesson</a>`
+  const lessonBtn = lessonUrl
+    ? `<a href="${escFriendName(lessonUrl)}" target="_blank" rel="noopener" class="spot-cta-btn spot-cta-lesson" data-cta="lesson">🎓 Book a lesson</a>`
     : '';
-  const gearBtn = info.gear_url
-    ? `<a href="${info.gear_url}" target="_blank" rel="noopener" class="spot-cta-btn spot-cta-gear" onclick="trackCtaClick('${spotName}','gear')">🪁 Rent kite gear</a>`
+  const gearBtn = gearUrl
+    ? `<a href="${escFriendName(gearUrl)}" target="_blank" rel="noopener" class="spot-cta-btn spot-cta-gear" data-cta="gear">🪁 Rent kite gear</a>`
     : '';
-  const websiteBtn = info.website
-    ? `<a href="${info.website}" target="_blank" rel="noopener" class="spot-cta-btn spot-cta-website" onclick="trackCtaClick('${spotName}','website')">🌐 Visit website</a>`
+  const liveWind = await _liveWindHref(info, cachedLoc);
+  if(myGen!==_fetchGen) return;      // spot changed while the RWS lookup was in flight
+  // Same treatment as every other CTA on main: scheme-allowlisted href and a
+  // data-cta hook, so spotName is never spliced into an inline handler.
+  const liveWindUrl = liveWind ? safeHttpUrl(liveWind.url) : '';
+  const liveWindBtn = liveWindUrl
+    ? `<a href="${escFriendName(liveWindUrl)}" target="_blank" rel="noopener" class="spot-cta-btn" data-cta="live_wind">🌬 ${escFriendName(liveWind.label)} ↗</a>`
+    : '';
+  const websiteBtn = websiteUrl
+    ? `<a href="${escFriendName(websiteUrl)}" target="_blank" rel="noopener" class="spot-cta-btn spot-cta-website" data-cta="website">🌐 Visit website</a>`
     : '';
 
   const ctaGrid = [
     webcamBtn ? `<div>${webcamBtn}</div>` : '',
-    (lessonBtn || gearBtn) ? `<div class="spot-info-ctas">${lessonBtn}${gearBtn}</div>` : '',
+    (lessonBtn || gearBtn || liveWindBtn) ? `<div class="spot-info-ctas">${lessonBtn}${gearBtn}${liveWindBtn}</div>` : '',
     websiteBtn ? `<div>${websiteBtn}</div>` : '',
   ].filter(Boolean).join('');
 
   const metaRows = [];
-  if(info.address) metaRows.push(`<div class="spot-info-meta-row">📍 <span>${info.address}</span></div>`);
-  if(info.phone && info.phone_public) metaRows.push(`<div class="spot-info-meta-row">📞 <a href="tel:${info.phone}">${info.phone}</a></div>`);
-  if(info.email && info.email_public) metaRows.push(`<div class="spot-info-meta-row">✉️ <a href="mailto:${info.email}">${info.email}</a></div>`);
-  if(info.contact_name) metaRows.push(`<div class="spot-info-meta-row">👤 <span>${info.contact_name}</span></div>`);
+  if(info.address) metaRows.push(`<div class="spot-info-meta-row">📍 <span>${escFriendName(info.address)}</span></div>`);
+  if(info.phone && info.phone_public) metaRows.push(`<div class="spot-info-meta-row">📞 <a href="tel:${escFriendName(info.phone)}">${escFriendName(info.phone)}</a></div>`);
+  if(info.email && info.email_public) metaRows.push(`<div class="spot-info-meta-row">✉️ <a href="mailto:${escFriendName(info.email)}">${escFriendName(info.email)}</a></div>`);
+  if(info.contact_name) metaRows.push(`<div class="spot-info-meta-row">👤 <span>${escFriendName(info.contact_name)}</span></div>`);
   const metaHTML = metaRows.length ? `<div class="spot-info-meta">${metaRows.join('')}</div>` : '';
 
   const socialLinks = [];
-  if(info.instagram_url) socialLinks.push(`<a href="${info.instagram_url}" target="_blank" rel="noopener" onclick="trackCtaClick('${spotName}','instagram')">📸 Instagram</a>`);
-  if(info.facebook_url) socialLinks.push(`<a href="${info.facebook_url}" target="_blank" rel="noopener" onclick="trackCtaClick('${spotName}','facebook')">👥 Facebook</a>`);
-  if(info.livecam_url) socialLinks.push(`<a href="${info.livecam_url}" target="_blank" rel="noopener" onclick="trackCtaClick('${spotName}','livecam')">📷 Live cam</a>`);
+  const instagramUrl = safeHttpUrl(info.instagram_url);
+  const facebookUrl  = safeHttpUrl(info.facebook_url);
+  if(instagramUrl) socialLinks.push(`<a href="${escFriendName(instagramUrl)}" target="_blank" rel="noopener" data-cta="instagram">📸 Instagram</a>`);
+  if(facebookUrl) socialLinks.push(`<a href="${escFriendName(facebookUrl)}" target="_blank" rel="noopener" data-cta="facebook">👥 Facebook</a>`);
+  if(livecamUrl) socialLinks.push(`<a href="${escFriendName(livecamUrl)}" target="_blank" rel="noopener" data-cta="livecam">📷 Live cam</a>`);
   const socialHTML = socialLinks.length ? `<div class="spot-info-social">${socialLinks.join('')}</div>` : '';
 
-  const descHTML = info.description ? `<p style="margin:0;font-size:.78rem;color:var(--gray);line-height:1.6;">${info.description}</p>` : '';
-  const noteHTML = info.membership_note ? `<div class="spot-info-note">ℹ️ ${info.membership_note}</div>` : '';
+  const descHTML = info.description ? `<p style="margin:0;font-size:.78rem;color:var(--gray);line-height:1.6;">${escFriendName(info.description)}</p>` : '';
+  const noteHTML = info.membership_note ? `<div class="spot-info-note">ℹ️ ${escFriendName(info.membership_note)}</div>` : '';
   const tipHTML = info.spot_tip ? `
     <div class="spot-tip-block">
       <div class="spot-tip-label">🤙 Local riders tips</div>
-      <p class="spot-tip-text">${info.spot_tip}</p>
+      <p class="spot-tip-text">${escFriendName(info.spot_tip)}</p>
     </div>` : '';
 
   el.innerHTML = `
@@ -3733,7 +4152,7 @@ async function renderSpotInfoCard(spotName) {
       <div class="spot-info-header" onclick="_spotInfoOpen=!_spotInfoOpen;this.nextElementSibling.style.display=_spotInfoOpen?'flex':'none';this.querySelector('.spot-info-open-btn').textContent=_spotInfoOpen?'▲ Less':'More details ↓'">
         <div style="flex:1">
           <div class="spot-info-title">📍 Spot info &amp; bookings</div>
-          <div class="spot-info-subtitle">Lessons · Gear rental · Contact${info.livecam_url ? ' · <span style="display:inline-flex;align-items:center;gap:4px;color:#f87171;font-weight:700"><span class="webcam-dot" style="width:5px;height:5px"></span>Live cam</span>' : ''}</div>
+          <div class="spot-info-subtitle">Lessons · Gear rental · Contact${livecamUrl ? ' · <span style="display:inline-flex;align-items:center;gap:4px;color:#f87171;font-weight:700"><span class="webcam-dot" style="width:5px;height:5px"></span>Live cam</span>' : ''}${windDirs.size ? ` · <span style="color:var(--accent);font-weight:700">&#129517; ${[...windDirs].sort((a,b)=>a-b).map(compass).join('/')}</span>` : ''}</div>
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
           ${unclaimedBadge}
@@ -3741,6 +4160,7 @@ async function renderSpotInfoCard(spotName) {
         </div>
       </div>
       <div class="spot-info-body" style="display:none">
+        <div id="windDirsMount"></div>
         ${spotAttributesHTML(info)}
         ${ctaGrid}
         ${metaHTML}
@@ -3750,14 +4170,23 @@ async function renderSpotInfoCard(spotName) {
         ${socialHTML}
         ${!info.verified ? `<div style="font-size:.68rem;color:var(--tdim);text-align:center;margin-top:4px;">Owner of this spot? <span style="color:var(--accent);cursor:pointer;" onclick="openClaimFlow()">Claim it to manage and verify your info →</span></div>` : ''}
         ${info.added_by||info._owner_name ? `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:.68rem;color:var(--tdim);text-align:center;">
-          ${info.added_by ? `🌍 Spot added by community member <strong style="color:var(--gray)">${info.added_by}</strong>` : ''}
-          ${info._owner_name ? `${info.added_by?'<br>':''}🏴 Spot owned by <strong style="color:var(--gray)">${info._owner_name}</strong>` : ''}
+          ${info.added_by ? `🌍 Spot added by community member <strong style="color:var(--gray)">${escFriendName(info.added_by)}</strong>` : ''}
+          ${info._owner_name ? `${info.added_by?'<br>':''}🏴 Spot owned by <strong style="color:var(--gray)">${escFriendName(info._owner_name)}</strong>` : ''}
         </div>` : ''}
         <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;">
           ${(()=>{const p=loadProfile();const isOwner=p.email&&info._owner_email&&p.email===info._owner_email;const isAdmin=p.isAdmin;return isOwner?`<span style="font-size:.68rem;color:var(--accent);cursor:pointer;display:inline-flex;align-items:center;gap:4px;font-weight:600" onclick="openAdminEditFromSpot()">✏️ Edit my spot info</span>`:`<span style="font-size:.68rem;color:var(--tdim);cursor:pointer;display:inline-flex;align-items:center;gap:4px;" onclick="openSuggestUpdate()">✏️ Suggest an update</span>${isAdmin?`<span style="font-size:.68rem;color:#fb923c;cursor:pointer;display:inline-flex;align-items:center;gap:4px;font-weight:700" onclick="openAdminEditFromSpot()">⚡ Admin: Edit directly</span>`:''}`;})()}
         </div>
       </div>
     </div>`;
+
+  // CTA tracking: spotName stays a JS value in this closure instead of being
+  // spliced into an inline onclick.
+  el.querySelectorAll('[data-cta]').forEach(node =>
+    node.addEventListener('click', () => trackCtaClick(spotName, node.dataset.cta)));
+
+  // The card is async: mount (or re-mount) the wind-dirs block once its
+  // container exists, whichever of the two rendered first.
+  mountWindDirs();
 }
 
 async function trackCtaClick(spotName, ctaType) {
@@ -4164,7 +4593,10 @@ function renderGrid(){
     :`<span style="${qdCls};font-size:.8rem;font-weight:700;margin-left:10px">${qualDaysCount} of ${totalDays} days rideable</span>`;
   // Line 1: name + maps icon
   // Line 1: name + country
-  $('locName').innerHTML=`${loc.name}${loc.admin1&&loc.admin1!==loc.name?', '+loc.admin1:''} <span style="color:var(--tdim);font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em;vertical-align:middle">${loc.country}</span>`;
+  // loc.* comes from SPOTS / spot_overrides (a community-requested spot name an
+  // admin approved) or from the geocoder — never trusted markup, and this header
+  // is shown to every visitor of the spot. Escape it.
+  $('locName').innerHTML=`${escFriendName(loc.name)}${loc.admin1&&loc.admin1!==loc.name?', '+escFriendName(loc.admin1):''} <span style="color:var(--tdim);font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em;vertical-align:middle">${escFriendName(loc.country)}</span>`;
   // Line 2: maps + icons + sessions
   $('locSub').innerHTML=`<a class="map-link" href="${mapsUrl}" target="_blank" rel="noopener" title="Open in Google Maps"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Maps</a><button class="fav-btn${isFav?' active':''}" id="favBtn" title="${isFav?'Remove from favourites':'Add to favourites'}">${isFav?'★':'☆'}</button><button class="notif-btn${hasSpotNotif(loc.name)?' active':''}" id="notifBtn" title="Get notified">${bellSVG(16)}</button><button class="share-btn" id="shareBtn" onclick="shareSpot()" title="Share this spot"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></button>${qdLabel}`;
   $('locHdr').style.display='block';
@@ -4310,6 +4742,7 @@ function renderGrid(){
 
   showOnly('results');
   renderSpotInfoCard(loc.name);
+  renderLiveWindPanel(loc);
   if(_authSession?.user) loadAttendances();
 
   // ── deep-link: open the modal for the target date directly ──
@@ -4345,7 +4778,7 @@ function openModal(dateStr,dayIdx){
   const mBell=$('mNotifBtn');
   if(mBell) mBell.className='notif-btn m-notif-btn'+(hasDayNotif(loc.name,dateStr)?' active':'');
   updateModalFavBtn();
-  $('mSub').innerHTML=`${loc.name}${loc.admin1?', '+loc.admin1:''} · ${loc.country}`
+  $('mSub').innerHTML=`${escFriendName(loc.name)}${loc.admin1?', '+escFriendName(loc.admin1):''} · ${escFriendName(loc.country)}`
     +(windDirs.size>0?` · Good: <strong style="color:var(--accent)">${[...windDirs].sort((a,b)=>a-b).map(d=>compass(d)).join(' / ')}</strong>`:'');
 
   // session chips
@@ -4610,6 +5043,27 @@ function closeSpotsMap(){
   $('spotsMapOverlay').style.display='none';
   document.body.style.overflow='';
 }
+// Leaflet's bindPopup takes a DOM node as well as an HTML string. Building the
+// node keeps the spot name/location as text and the "check forecast" click as a
+// real listener — a crafted spot name (SPOTS / spot_overrides) can neither
+// become markup nor break out of an inline onclick.
+function spotMapPopupNode(s,idx){
+  const wrap=document.createElement('div');
+  wrap.style.minWidth='140px';
+  const name=document.createElement('b');
+  name.style.fontSize='.95rem';
+  name.textContent=s.name||'';
+  const loc=document.createElement('span');
+  loc.style.cssText='font-size:.8rem;color:#666';
+  loc.textContent=s.loc||'';
+  const btn=document.createElement('button');
+  btn.type='button';
+  btn.textContent='→ Check forecast';
+  btn.style.cssText='background:#00d4ff;color:#000;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:.8rem;font-weight:600;';
+  btn.addEventListener('click',()=>{ closeSpotsMap(); setTimeout(()=>pickSpot(SPOTS[idx]),80); });
+  wrap.append(name,document.createElement('br'),loc,document.createElement('br'),document.createElement('br'),btn);
+  return wrap;
+}
 function initSpotsMap(){
   if(window._spotsMap){ window._spotsMap.invalidateSize(); return; }
   const map=L.map('spotsMapContainer',{zoomControl:true}).setView([30,10],2);
@@ -4618,9 +5072,9 @@ function initSpotsMap(){
     maxZoom:18
   }).addTo(map);
   const icon=L.divIcon({className:'',html:'<div style="width:10px;height:10px;background:#00d4ff;border-radius:50%;border:2px solid rgba(0,212,255,.4);box-shadow:0 0 6px rgba(0,212,255,.6)"></div>',iconSize:[10,10],iconAnchor:[5,5]});
-  SPOTS.forEach(s=>{
+  SPOTS.forEach((s,i)=>{
     const m=L.marker([s.lat,s.lon],{icon}).addTo(map);
-    m.bindPopup(`<div style="font-family:system-ui;min-width:140px"><b style="font-size:.9rem">${s.name}</b><br><span style="color:#666;font-size:.78rem">${s.loc}</span><br><br><button onclick="closeSpotsMap();setTimeout(()=>pickSpot(SPOTS.find(x=>x.lat===${s.lat}&&x.lon===${s.lon})),80)" style="background:#00d4ff;color:#000;border:none;border-radius:6px;padding:5px 10px;font-size:.78rem;font-weight:700;cursor:pointer;width:100%">→ Check forecast</button></div>`);
+    m.bindPopup(spotMapPopupNode(s,i));
   });
   window._spotsMap=map;
 }
@@ -5012,8 +5466,13 @@ async function persistSpotSubscription(spot,spotLat,spotLon){
     .eq('email',p.email).eq('spot_name',spot.name).eq('session_date',sentinelDate)
     .eq('notif_type','spot').eq('reminder_hours',0).limit(1);
   if(existing&&existing.length){
-    // Row exists — just flip cancelled back to false
-    await sb.from('reminders').update({cancelled:false,spot_dirs:[...windDirs]})
+    // Row exists — flip cancelled back to false and (re)set app_link in case an
+    // older sentinel was stored without one.
+    await sb.from('reminders').update({
+      cancelled:false,
+      spot_dirs:[...windDirs],
+      app_link:`${location.origin}${location.pathname}?spot=${encodeURIComponent(spot.name)}&date=${sentinelDate}`,
+    })
       .eq('email',p.email).eq('spot_name',spot.name).eq('session_date',sentinelDate)
       .eq('notif_type','spot').eq('reminder_hours',0);
   } else {
@@ -5033,6 +5492,9 @@ async function persistSpotSubscription(spot,spotLat,spotLon){
       send_at:      '2099-12-31T00:00:00Z',
       sent:         false,
       cancelled:    false,
+      // check-new-sessions rewrites the date= per real session; the sentinel just
+      // needs a valid base URL so generated reminders inherit a working app_link.
+      app_link:     `${location.origin}${location.pathname}?spot=${encodeURIComponent(spot.name)}&date=${sentinelDate}`,
     });
   }
 }
@@ -5360,6 +5822,8 @@ function openProfilePanel(tab){
     openProfileSheet();
     const _p=loadProfile();
     const _ni=$('ppNicknameInput'); if(_ni) _ni.value=_p.nickname||'';
+    const _hi=$('ppHomeInput'); if(_hi) _hi.value=_p.homeLabel||'';
+    updateNicknameReq();
     // Set save button initial state: dim if nickname already saved, default if not yet set
     (function(){ const btn=$('ppNicknameSaveBtn'); if(!btn) return;
       const hasSaved=!!_p.nickname;
@@ -5411,6 +5875,9 @@ function _showOnlyPanel(key){
   ids.forEach(id=>{ const el=$(id); if(el) el.style.display='none'; });
   const showId = key==='profile' ? 'ppPanelProfile' : (SECTIONS[key] && SECTIONS[key].panel);
   const showEl = showId ? $(showId) : null; if(showEl) showEl.style.display='block';
+  // Profile sheet stays on the right; every other section opens on the left
+  // (same side as the burger menu). See #profileOverlay.pp-left.
+  const _ov=$('profileOverlay'); if(_ov) _ov.classList.toggle('pp-left', key!=='profile');
   ppCurrentTab=key;
 }
 // Open the Profile sheet (from the profile bubble).
@@ -5490,14 +5957,14 @@ function openSuggestUpdate(){
   }).join('');
 
   $('suggestUpdateContent').innerHTML=`
-    <div style="font-size:.75rem;color:var(--tdim);margin-bottom:18px;">Spot: <strong style="color:var(--text)">${cachedLoc.name}</strong> — community suggestions, reviewed by admin before going live.</div>
+    <div style="font-size:.75rem;color:var(--tdim);margin-bottom:18px;">Spot: <strong style="color:var(--text)">${escFriendName(cachedLoc.name)}</strong> — community suggestions, reviewed by admin before going live.</div>
 
     <label class="pp-label">Good wind directions <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(tap to toggle)</span></label>
     <div id="suDirBtns" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:18px">${dirBtns}</div>
 
     <label class="pp-label">Local riders tips <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">— visible to all kiters on this spot</span></label>
     ${info.spot_tip?`<div style="font-size:.68rem;color:#38bdf8;margin-bottom:6px;display:flex;align-items:center;gap:4px">✏️ Current tip shown below — edit freely and submit your update</div>`:''}
-    <textarea id="suTip" class="pp-input" rows="4" placeholder="e.g. Shallow at low tide, best at high tide. Avoid S swell. Parking on the north side." style="margin-bottom:6px;resize:vertical;min-height:88px;font-family:inherit;font-size:.85rem${info.spot_tip?';border-color:rgba(56,189,248,.4)':''}">${info.spot_tip||''}</textarea>
+    <textarea id="suTip" class="pp-input" rows="4" placeholder="e.g. Shallow at low tide, best at high tide. Avoid S swell. Parking on the north side." style="margin-bottom:6px;resize:vertical;min-height:88px;font-family:inherit;font-size:.85rem${info.spot_tip?';border-color:rgba(56,189,248,.4)':''}">${escFriendName(info.spot_tip||'')}</textarea>
     <div style="font-size:.67rem;color:var(--tdim);margin-bottom:18px;">Want to update business info, booking links or contact details? <span style="color:var(--accent);cursor:pointer" onclick="closeSuggestUpdate();openClaimFlow()">Claim this spot →</span></div>
 
     <label class="pp-label" style="margin-top:6px">🪁 Spot attributes <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">— what you can ride & what's here</span></label>
@@ -5642,7 +6109,7 @@ async function openOwnerEditFromMySpot(spotName){
   if(ownerEl&&contentEl){
     contentEl.style.display='none';
     ownerEl.style.display='block';
-    ownerEl.innerHTML=`<div style="font-size:.8rem;font-weight:700;color:var(--text);margin-bottom:12px;">✏️ Edit — ${spotName}</div>`;
+    ownerEl.innerHTML=`<div style="font-size:.8rem;font-weight:700;color:var(--text);margin-bottom:12px;">✏️ Edit — ${escFriendName(spotName)}</div>`;
     // Temporarily swap id so adminOpenSpot writes into ownerEditForm
     ownerEl.id='adminEditForm';
     const realAdminForm=$('adminEditForm'); // this is now the one in admin panel (may not exist if not rendered)
@@ -5681,25 +6148,27 @@ async function renderMySpot(){
         ?`<span style="background:rgba(74,222,128,.15);border:1px solid rgba(74,222,128,.3);border-radius:99px;padding:2px 10px;font-size:.7rem;font-weight:700;color:#4ade80;">✓ Verified</span>`
         :`<span style="background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);border-radius:99px;padding:2px 10px;font-size:.7rem;font-weight:700;color:#f59e0b;">⏳ Pending verification</span>`;
       claimFormHTML=`
+        <div class="stats-section-title" style="margin-bottom:8px">Your claim on the spot you're viewing</div>
         <div style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-            <div style="font-weight:700;color:var(--text);font-size:.85rem;">📍 ${existing.spot_name}</div>
+            <div style="font-weight:700;color:var(--text);font-size:.85rem;">📍 ${escFriendName(existing.spot_name)}</div>
             ${badge}
           </div>
           ${existing.verified?`
           <div style="font-size:.75rem;color:var(--gray);line-height:1.6;margin-bottom:12px;">
-            ${existing.business_name?`<div><strong>Business:</strong> ${existing.business_name}</div>`:''}
-            ${existing.website?`<div><strong>Website:</strong> <a href="${existing.website}" target="_blank" style="color:var(--accent)">${existing.website}</a></div>`:''}
-            ${existing.description?`<div style="margin-top:4px">${existing.description}</div>`:''}
+            ${existing.business_name?`<div><strong>Business:</strong> ${escFriendName(existing.business_name)}</div>`:''}
+            ${(()=>{const u=safeHttpUrl(existing.website);return u?`<div><strong>Website:</strong> <a href="${escFriendName(u)}" target="_blank" rel="noopener" style="color:var(--accent)">${escFriendName(u)}</a></div>`:'';})()}
+            ${existing.description?`<div style="margin-top:4px">${escFriendName(existing.description)}</div>`:''}
           </div>
-          <button onclick="openOwnerEditFromMySpot('${existing.spot_name.replace(/'/g,"\\'")}')" style="width:100%;padding:10px;background:rgba(56,189,248,.08);border:1px solid rgba(56,189,248,.25);border-radius:10px;color:var(--accent);font-size:.8rem;font-weight:600;cursor:pointer;">✏️ Edit spot info</button>
+          <button class="owner-edit-btn" data-spot="${escFriendName(existing.spot_name)}" style="width:100%;padding:10px;background:rgba(56,189,248,.08);border:1px solid rgba(56,189,248,.25);border-radius:10px;color:var(--accent);font-size:.8rem;font-weight:600;cursor:pointer;">✏️ Edit spot info</button>
           `:`<div style="font-size:.75rem;color:var(--tdim);">We'll verify your claim and get back to you within 48h.</div>`}
         </div>`;
     } else {
       claimFormHTML=`
+        <div class="stats-section-title" style="margin-bottom:8px">Own or manage a spot?</div>
         <div style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">
-          <div style="font-size:.82rem;font-weight:700;color:var(--text);margin-bottom:4px;">🏴 Claim <span style="color:var(--accent)">${spotName}</span></div>
-          <div style="font-size:.72rem;color:var(--tdim);margin-bottom:14px;">Are you the owner or manager of this spot? Claim it to add your business info.</div>
+          <div style="font-size:.82rem;font-weight:700;color:var(--text);margin-bottom:4px;">🏴 Claim <span style="color:var(--accent)">${escFriendName(spotName)}</span></div>
+          <div style="font-size:.72rem;color:var(--tdim);margin-bottom:14px;">This is the spot you have open right now — open a different spot to claim that one instead. Claim it to add your business info.</div>
 
           <label class="pp-label">Spot display name <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(optional — rename how this spot appears)</span></label>
           <input type="text" id="claimDisplayName" class="pp-input" placeholder="e.g. RBSC Duinbergen" style="margin-bottom:12px"/>
@@ -5756,11 +6225,13 @@ async function renderMySpot(){
           <label class="pp-label">Membership / access note <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(optional)</span></label>
           <input type="text" id="claimMembershipNote" class="pp-input" placeholder="e.g. Day pass €15 incl. insurance · Members free" style="margin-bottom:14px"/>
 
-          <button class="btn pp-save-btn" id="claimSubmitBtn" onclick="submitClaim('${spotName.replace(/'/g,"\\'")}')">Submit claim</button>
+          <button class="btn pp-save-btn" id="claimSubmitBtn">Submit claim</button>
         </div>`;
     }
   } else {
-    claimFormHTML=`<div style="font-size:.78rem;color:var(--tdim);margin-bottom:16px;">Open a spot forecast page first, claim that spot. If accepted, you'll be able to manage it here.</div>`;
+    claimFormHTML=`
+      <div class="stats-section-title" style="margin-bottom:8px">Own or manage a spot?</div>
+      <div style="font-size:.78rem;color:var(--tdim);margin-bottom:16px;">Open that spot's forecast page first, then come back here to claim it. Once accepted you can manage it from this panel.</div>`;
   }
 
   // All user's claims
@@ -5772,11 +6243,11 @@ async function renderMySpot(){
     </div>
     ${otherClaims.map(c=>{
       const badge=c.verified
-        ?`<div style="display:flex;align-items:center;gap:8px"><span style="color:#4ade80;font-size:.68rem;font-weight:700;">✓ Verified</span><button class="owner-edit-btn" data-spot="${c.spot_name.replace(/"/g,'&quot;')}" style="background:rgba(56,189,248,.08);border:1px solid rgba(56,189,248,.25);border-radius:6px;color:var(--accent);font-size:.65rem;font-weight:600;cursor:pointer;padding:3px 8px;">✏️ Edit</button></div>`
+        ?`<div style="display:flex;align-items:center;gap:8px"><span style="color:#4ade80;font-size:.68rem;font-weight:700;">✓ Verified</span><button class="owner-edit-btn" data-spot="${escFriendName(c.spot_name)}" style="background:rgba(56,189,248,.08);border:1px solid rgba(56,189,248,.25);border-radius:6px;color:var(--accent);font-size:.65rem;font-weight:600;cursor:pointer;padding:3px 8px;">✏️ Edit</button></div>`
         :c.status==='rejected'
         ?`<div style="display:flex;align-items:center;gap:8px"><span style="color:#f87171;font-size:.68rem;font-weight:700;">✕ Rejected</span><button class="claim-withdraw-btn" data-wid="${c.id}" style="background:none;border:none;color:var(--tdim);font-size:.65rem;cursor:pointer;padding:2px 4px;text-decoration:underline">Remove</button></div>`
         :`<div style="display:flex;align-items:center;gap:8px"><span style="color:#f59e0b;font-size:.68rem;font-weight:700;">⏳ Pending</span><button class="claim-withdraw-btn" data-wid="${c.id}" style="background:none;border:none;color:var(--tdim);font-size:.65rem;cursor:pointer;padding:2px 4px;text-decoration:underline">Withdraw</button></div>`;
-      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><span style="font-size:.78rem;color:var(--text)">${c.spot_name}</span>${badge}</div>`;
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><span style="font-size:.78rem;color:var(--text)">${escFriendName(c.spot_name)}</span>${badge}</div>`;
     }).join('')}`:'';
 
   const approvedReqsHTML=(approvedReqs&&approvedReqs.length)?`
@@ -5784,7 +6255,7 @@ async function renderMySpot(){
       <div class="stats-section-title" style="margin-bottom:8px">Spots you requested</div>
       ${approvedReqs.map(r=>`
         <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:rgba(74,222,128,.06);border:1px solid rgba(74,222,128,.2);border-radius:10px;margin-bottom:8px;">
-          <span style="font-size:.82rem;font-weight:600;color:var(--text)">📍 ${r.suggested_name}</span>
+          <span style="font-size:.82rem;font-weight:600;color:var(--text)">📍 ${escFriendName(r.suggested_name)}</span>
           <span style="background:rgba(74,222,128,.15);border:1px solid rgba(74,222,128,.3);border-radius:99px;padding:2px 10px;font-size:.7rem;font-weight:700;color:#4ade80;">✓ Added</span>
         </div>`).join('')}
     </div>`:'' ;
@@ -5794,6 +6265,9 @@ async function renderMySpot(){
 
   const refreshBtn=el.querySelector('#mySpotRefreshBtn');
   if(refreshBtn) refreshBtn.onclick=()=>renderMySpot();
+  // spotName is user-influenced: pass it as a JS value, not inside an onclick.
+  const claimBtn=el.querySelector('#claimSubmitBtn');
+  if(claimBtn) claimBtn.onclick=()=>submitClaim(spotName);
   el.querySelectorAll('.claim-withdraw-btn').forEach(btn=>{ btn.onclick=()=>withdrawClaim(btn.dataset.wid); });
   el.querySelectorAll('.owner-edit-btn').forEach(btn=>{ btn.onclick=()=>openOwnerEditFromMySpot(btn.dataset.spot); });
 }
@@ -5841,8 +6315,8 @@ async function renderMyContributions(){
       :`<span style="color:#f59e0b;font-size:.68rem;font-weight:700;white-space:nowrap;">⏳ Pending</span>`;
     return `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:10px 0;border-bottom:1px solid var(--border)">
       <div style="flex:1;min-width:0">
-        <div style="font-size:.82rem;font-weight:600;color:var(--text)">${s.spot_name}</div>
-        ${detail?`<div style="font-size:.72rem;color:var(--tdim);margin-top:2px">${detail}</div>`:''}
+        <div style="font-size:.82rem;font-weight:600;color:var(--text)">${escFriendName(s.spot_name)}</div>
+        ${detail?`<div style="font-size:.72rem;color:var(--tdim);margin-top:2px">${escFriendName(detail)}</div>`:''}
         <div style="font-size:.65rem;color:var(--tdim);margin-top:2px">${new Date(s.created_at).toLocaleDateString('en',{day:'numeric',month:'short',year:'numeric'})}</div>
       </div>
       ${badge}
@@ -5857,7 +6331,7 @@ async function renderMyContributions(){
       :`<span style="color:#f59e0b;font-size:.68rem;font-weight:700;white-space:nowrap;">⏳ Pending review</span>`;
     return `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:10px 0;border-bottom:1px solid var(--border)">
       <div style="flex:1;min-width:0">
-        <div style="font-size:.82rem;font-weight:600;color:var(--text)">${r.suggested_name}</div>
+        <div style="font-size:.82rem;font-weight:600;color:var(--text)">${escFriendName(r.suggested_name)}</div>
         <div style="font-size:.65rem;color:var(--tdim);margin-top:2px">${new Date(r.created_at).toLocaleDateString('en',{day:'numeric',month:'short',year:'numeric'})}</div>
       </div>
       ${badge}
@@ -6078,25 +6552,14 @@ async function submitSpotSuggestion(){
   }
   ['suggestName','suggestLocation','suggestCountry','suggestLat','suggestLon'].forEach(id=>{ const el=$(id); if(el) el.style.border=''; });
 
-  // Fire-and-forget — never block the UI on network calls
-  const sb=getSb();
-  if(sb){
-    sb.from('spot_suggestions').insert({
-      suggested_name: name,
-      location: location+(country?', '+country:''),
-      country: country||null,
-      lat:  lat  ? parseFloat(lat)  : null,
-      lon:  lon  ? parseFloat(lon)  : null,
-      note: [dirs&&`Dirs: ${dirs}`, business&&`Business: ${business}`, website&&`Website: ${website}`, webcam&&`Webcam: ${webcam}`, note].filter(Boolean).join(' | ')||null,
-      submitted_by:  contactEmail||null,
-      contact_name:  profileName||null,
-    }).then(()=>{}).catch(()=>{});
-  }
-
+  // Persist + notify in one call. The DB insert happens server-side inside the
+  // edge function (service role) — the client no longer inserts directly,
+  // because spot_suggestions RLS silently rejected anon / mismatched-email
+  // inserts, leaving the admin with an email but no reviewable row.
   fetch('https://kpwmajtxmcfpakvonimf.supabase.co/functions/v1/spot-suggest-notify',{
     method:'POST',
     headers:{'Content-Type':'application/json','Authorization':'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwd21hanR4bWNmcGFrdm9uaW1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTcyMjYsImV4cCI6MjA5MDczMzIyNn0.QfQuIQbnfVUOApPbOdvCRbNsVdb0SBAwMX-hvioGJmg'},
-    body: JSON.stringify({ name, location, lat, lon, dirs, business, website, webcam, note, contact_email: contactEmail, contact_name: profileName||'—' }),
+    body: JSON.stringify({ name, location, country, lat, lon, dirs, business, website, webcam, note, contact_email: contactEmail, contact_name: profileName||'—' }),
   }).catch(()=>{});
 
   // Remember submitted spot name persistently so "pending review" shows on future visits
@@ -6297,7 +6760,7 @@ async function loadAttendances(){
       let html='';
       if(myAttend) html+=`✓ Going · ${myAttend.start_time}`;
       if(theirList.length){
-        const names=theirList.map(r=>r.nickname).join(', ');
+        const names=theirList.map(r=>escFriendName(r.nickname)).join(', ');
         html+=(html?'<br>':'')+`<span style="font-size:.58rem;color:#4ade80">👥 ${names}</span>`;
       }
       ind.innerHTML=html;
@@ -6329,7 +6792,7 @@ function openAttendSheet(dateStr, dayIdx, spotName, lat, lon){
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
         <div>
           <div style="font-size:1rem;font-weight:800;color:#f1f5f9">🏄 I'm going kiting!</div>
-          <div style="font-size:.8rem;color:#64748b;margin-top:2px">${spotName} · ${label}</div>
+          <div style="font-size:.8rem;color:#64748b;margin-top:2px">${escFriendName(spotName)} · ${label}</div>
         </div>
         <button onclick="closeAttendSheet()" style="background:none;border:none;color:#64748b;font-size:1.2rem;cursor:pointer;padding:4px">✕</button>
       </div>
@@ -6347,12 +6810,17 @@ function openAttendSheet(dateStr, dayIdx, spotName, lat, lon){
           </select>
         </div>
       </div>
-      <input type="text" id="attendNote" class="pp-input" placeholder="Add a note… (optional)" maxlength="100" value="${existing?.note||''}" style="margin-bottom:16px"/>
-      <button onclick="confirmAttendance('${dateStr}','${spotName}',${lat},${lon})" class="btn pp-save-btn" style="width:100%;font-size:.95rem">
+      <input type="text" id="attendNote" class="pp-input" placeholder="Add a note… (optional)" maxlength="100" value="${escFriendName(existing?.note||'')}" style="margin-bottom:16px"/>
+      <button id="attendConfirmBtn" class="btn pp-save-btn" style="width:100%;font-size:.95rem">
         ${existing?'Update session':'Confirm — notify my friends'}
       </button>
-      ${existing?`<button onclick="cancelAttendance('${dateStr}')" style="width:100%;margin-top:8px;background:none;border:none;color:#f87171;font-size:.8rem;cursor:pointer;padding:6px">Cancel my attendance</button>`:''}
+      ${existing?`<button id="attendCancelBtn" style="width:100%;margin-top:8px;background:none;border:none;color:#f87171;font-size:.8rem;cursor:pointer;padding:6px">Cancel my attendance</button>`:''}
     </div>`;
+  // The spot name is user-influenced, so it stays a JS value in this closure
+  // instead of being spliced into an inline onclick.
+  overlay.querySelector('#attendConfirmBtn').addEventListener('click',()=>confirmAttendance(dateStr,spotName,lat,lon));
+  const _attendCancelBtn=overlay.querySelector('#attendCancelBtn');
+  if(_attendCancelBtn) _attendCancelBtn.addEventListener('click',()=>cancelAttendance(dateStr));
   document.body.appendChild(overlay);
   setTimeout(()=>{ const s=$('attendStartTime'); if(s) s.focus(); },100);
 }
@@ -6486,12 +6954,15 @@ async function renderFriendsPanel(){
     reqSection.style.display='block';
     // Fetch nicknames for requesters
     const emails=incoming.map(r=>r.requester);
-    const{data:profiles}=await sb.from('public_profiles').select('email,nickname').in('email',emails);
+    // is_premium too: the outer premiumMap is declared further down, so
+    // referencing it here would hit the temporal dead zone.
+    const{data:profiles}=await sb.from('public_profiles').select('email,nickname,is_premium').in('email',emails);
     const nickMap=Object.fromEntries((profiles||[]).map(p=>[p.email,p.nickname||p.email]));
+    const reqPremium=Object.fromEntries((profiles||[]).map(p=>[p.email,!!p.is_premium]));
     reqList.innerHTML=incoming.map(r=>`
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.2);border-radius:10px;padding:10px 12px;">
         <div>
-          <div style="font-size:.82rem;font-weight:700;color:#fbbf24">${nickMap[r.requester]||r.requester}</div>
+          <div style="font-size:.82rem;font-weight:700;color:#fbbf24">${escFriendName(nickMap[r.requester]||r.requester)}${reqPremium[r.requester]?' <span title="Premium member" style="font-size:.8rem">👑</span>':''}</div>
           <div style="font-size:.7rem;color:var(--tdim)">wants to be your friend</div>
         </div>
         <div style="display:flex;gap:6px">
@@ -6515,11 +6986,21 @@ async function renderFriendsPanel(){
     if(npErr) console.error('[friends] public_profiles lookup error:',npErr);
     (allProfiles||[]).forEach(p=>{ nickMap[p.email]=p.nickname||'someone'; premiumMap[p.email]=!!p.is_premium; });
   }
+  // Which friends actually receive my session alerts. public_profiles cannot
+  // answer this (it exposes only email/nickname/is_premium), so use the
+  // friend-scoped SECURITY DEFINER RPC. A friend with their "Receive" toggle
+  // off never gets my alerts — showing it here stops that being invisible.
+  const receivesMap={};
+  {
+    const{data:reach,error:rErr}=await sb.rpc('friends_notif_status');
+    if(rErr) console.error('[friends] friends_notif_status error:',rErr);
+    (reach||[]).forEach(f=>{ receivesMap[f.email]=f.receives!==false; });
+  }
 
   // Outgoing pending requests (always shown if any)
   const outgoingHtml = outgoing.map(r=>`
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 0;border-bottom:1px solid var(--border);font-size:.8rem;color:var(--tdim)">
-      <span>⏳ Request sent to <strong style="color:var(--text)">${nickMap[r.recipient]||'someone'}</strong></span>
+      <span>⏳ Request sent to <strong style="color:var(--text)">${escFriendName(nickMap[r.recipient]||'someone')}</strong>${premiumMap[r.recipient]?' <span title="Premium member" style="font-size:.8rem">👑</span>':''}</span>
       <button class="btn-reset" data-frid="${r.id}" style="font-size:.7rem;color:#f87171;padding:4px 8px;border:1px solid rgba(248,113,113,.3);border-radius:6px;white-space:nowrap" onclick="cancelFriendRequest('${r.id}')">Cancel</button>
     </div>`).join('');
 
@@ -6529,10 +7010,10 @@ async function renderFriendsPanel(){
       const fe=r.requester===email?r.recipient:r.requester;
       return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 0;border-bottom:1px solid var(--border);">
         <div style="display:flex;align-items:center;gap:10px">
-          <div style="width:34px;height:34px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:800;color:#000;flex-shrink:0">${(nickMap[fe]||'?')[0].toUpperCase()}</div>
+          <div style="width:34px;height:34px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:800;color:#000;flex-shrink:0">${escFriendName((nickMap[fe]||'?')[0].toUpperCase())}</div>
           <div>
-            <div style="font-size:.82rem;font-weight:700;color:var(--text)">${nickMap[fe]||fe}${premiumMap[fe]?' <span title="Premium member" style="font-size:.8rem">👑</span>':''}</div>
-            <div style="font-size:.7rem;color:var(--tdim)">${premiumMap[fe]?'premium friend':'friend'}</div>
+            <div style="font-size:.82rem;font-weight:700;color:var(--text)">${escFriendName(nickMap[fe]||fe)}${premiumMap[fe]?' <span title="Premium member" style="font-size:.8rem">👑</span>':''}</div>
+            <div style="font-size:.7rem;color:var(--tdim)">${premiumMap[fe]?'premium friend':'friend'}${receivesMap[fe]===false?' · <span style="color:#f59e0b" title="This friend turned off &quot;Receive&quot; friend session alerts, so they will not get your session emails">🔕 alerts off</span>':''}</div>
           </div>
         </div>
         <button class="btn-reset" style="font-size:.7rem;color:var(--tdim);padding:4px 8px;border:1px solid var(--border);border-radius:6px" onclick="removeFriend('${r.id}')">Remove</button>
@@ -6575,11 +7056,20 @@ async function doFriendSearch(query){
       ?`<span style="font-size:.72rem;color:#4ade80">✓ Friends</span>`
       :isPending
       ?`<span style="font-size:.72rem;color:var(--tdim)">⏳ Pending</span>`
-      :`<button class="btn pp-save-btn" style="font-size:.72rem;padding:5px 12px" onclick="sendFriendRequest('${u.email}','${u.nickname}')">Add friend</button>`;
+      // Untrusted values (email, nickname) must not be spliced into the JS
+      // source of an inline onclick: HTML-escaping a nickname does not stop
+      // it breaking out of the single-quoted JS string argument here, since
+      // the browser HTML-decodes the attribute BEFORE handing it to the JS
+      // parser — a nickname containing a raw or &#39;-escaped apostrophe
+      // still terminates the string either way. Route them through
+      // data-* attributes instead (properly protected by HTML-attribute
+      // escaping) and read them back via .dataset in a static onclick body
+      // that contains no interpolated attacker data at all.
+      :`<button class="btn pp-save-btn" style="font-size:.72rem;padding:5px 12px" data-email="${escFriendName(u.email)}" data-nick="${escFriendName(u.nickname||'')}" onclick="sendFriendRequest(this.dataset.email,this.dataset.nick)">Add friend</button>`;
     return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">
       <div style="display:flex;align-items:center;gap:8px">
-        <div style="width:30px;height:30px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:800;color:#000;flex-shrink:0">${(u.nickname||'?')[0].toUpperCase()}</div>
-        <span style="font-size:.82rem;font-weight:600;color:var(--text)">${u.nickname}</span>
+        <div style="width:30px;height:30px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:800;color:#000;flex-shrink:0">${escFriendName((u.nickname||'?')[0].toUpperCase())}</div>
+        <span style="font-size:.82rem;font-weight:600;color:var(--text)">${escFriendName(u.nickname)}</span>
       </div>
       ${btn}
     </div>`;
@@ -6766,7 +7256,7 @@ function _usersRelTime(iso){
 }
 
 let _adminUsers=null;                              // cached roster from admin_list_users
-let _adminUsersSort={key:'created',dir:'desc'};    // current sort
+let _adminUsersSort={key:'seen',dir:'desc'};       // current sort — default to last activity (most recently seen first)
 const _adminUserSpots={};                          // email → {favs, follows} cache
 let _adminUsersExpanded=null;                      // email of the one expanded card, or null
 
@@ -6799,7 +7289,15 @@ async function renderAdminUsers(){
   const{data,error}=await sb.rpc('admin_list_users');
   if(error){
     console.error('[admin] admin_list_users error:',error);
-    el.innerHTML='<div class="stats-empty">Couldn\'t load users.</div>';
+    const msg=(error.message||'Unknown error').replace(/</g,'&lt;');
+    const hint=error.code==='PGRST202'
+      ? '<div style="font-size:.68rem;color:var(--tdim);margin-top:4px">The admin_list_users function is missing or not exposed. Apply rls-hardening.sql, then reload the API schema.</div>'
+      : '';
+    el.innerHTML='<div class="stats-empty">Couldn\'t load users.'+
+      '<div style="font-size:.68rem;color:var(--tdim);margin-top:6px;word-break:break-word">'+msg+'</div>'+hint+
+      '<div style="margin-top:10px"><button type="button" onclick="renderAdminUsers()" '+
+      'style="font:inherit;cursor:pointer;border-radius:6px;padding:4px 12px;border:1px solid rgba(56,189,248,.5);'+
+      'background:rgba(56,189,248,.12);color:#38bdf8">Retry</button></div></div>';
     return;
   }
   _adminUsers=data||[];
@@ -6842,18 +7340,39 @@ function _renderAdminUsersList(){
     card.dataset.email=u.email;
     card.style.cssText='background:rgba(56,189,248,.06);border:1px solid rgba(56,189,248,.2);border-radius:10px;padding:10px 12px;margin-bottom:8px;cursor:pointer';
 
+    // Header row: the email element keeps ONLY the email/nickname text — the
+    // plan badge is a sibling, so `.pp-user-email` stays assertable on its own.
+    const hdr=document.createElement('div');
+    hdr.style.cssText='display:flex;align-items:center;gap:6px;flex-wrap:wrap';
+
     const emailEl=document.createElement('div');
     emailEl.className='pp-user-email';
     emailEl.style.cssText='font-size:.82rem;font-weight:700;color:#38bdf8;word-break:break-all';
     emailEl.textContent = u.nickname ? `${u.email} · ${u.nickname}` : u.email;
-    card.appendChild(emailEl);
+    hdr.appendChild(emailEl);
+    // Premium at a glance — previously you had to open Stripe to know.
+    const plan=document.createElement('span');
+    plan.className='pp-user-plan';
+    if(u.is_premium){
+      plan.textContent='PREMIUM';
+      plan.style.cssText='font-size:.58rem;font-weight:800;letter-spacing:.08em;padding:2px 6px;border-radius:5px;background:rgba(245,158,11,.18);color:#fbbf24;border:1px solid rgba(245,158,11,.4)';
+    }else{
+      plan.textContent='FREE';
+      plan.style.cssText='font-size:.58rem;font-weight:800;letter-spacing:.08em;padding:2px 6px;border-radius:5px;background:rgba(148,163,184,.12);color:var(--tdim);border:1px solid var(--border)';
+    }
+    hdr.appendChild(plan);
+    card.appendChild(hdr);
 
     const created=u.created_at
       ? new Date(u.created_at).toLocaleDateString('en',{day:'numeric',month:'short',year:'numeric'})
       : '—';
     const meta=document.createElement('div');
     meta.style.cssText='font-size:.7rem;color:var(--tdim);margin-top:2px';
-    meta.textContent=`created ${created} · last seen ${_usersRelTime(u.last_seen_at)}`;
+    // Counts on the collapsed row: the detail panel only renders for the
+    // expanded user, which made every other card look like it had no
+    // favourites or follows at all.
+    const favN=u.fav_count??0, folN=u.follow_count??0;
+    meta.textContent=`created ${created} · last seen ${_usersRelTime(u.last_seen_at)} · ★ ${favN} · 🔔 ${folN}`;
     card.appendChild(meta);
 
     // Detail container (filled lazily in Task 4)
@@ -6976,14 +7495,19 @@ async function renderAdminPanel(){
   const pendingUpdates = updateSuggData||[];
   const pendingClaims = (claimData||[]).filter(c=>!c.verified);
 
+  // Everything in suggRows/rows/updateRows/claims below can originate from a
+  // public, unauthenticated submission (suggest-a-spot, claim-a-spot, or
+  // suggest-an-update) that the admin has not reviewed yet — so every string
+  // field from those rows must be escaped before landing in this admin-only
+  // innerHTML. An admin session is a much higher-value target than a friend's.
   const suggRows = pendingSuggs.map(s=>`
     <div style="background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.25);border-radius:10px;padding:12px 14px;margin-bottom:8px;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
         <div style="flex:1">
-          <div style="font-size:.82rem;font-weight:700;color:#fbbf24">${s.suggested_name}</div>
-          <div style="font-size:.72rem;color:var(--tdim);margin-top:2px">${s.location||'—'} · ${s.lat&&s.lon?`${s.lat}, ${s.lon}`:'no coords'}</div>
-          ${s.note?`<div style="font-size:.72rem;color:var(--tdim);margin-top:3px">${s.note}</div>`:''}
-          <div style="font-size:.7rem;color:var(--tdim);margin-top:3px">By: ${s.submitted_by||'anonymous'} · ${new Date(s.created_at).toLocaleDateString()}</div>
+          <div style="font-size:.82rem;font-weight:700;color:#fbbf24">${escFriendName(s.suggested_name)}</div>
+          <div style="font-size:.72rem;color:var(--tdim);margin-top:2px">${escFriendName(s.location||'—')} · ${s.lat&&s.lon?`${s.lat}, ${s.lon}`:'no coords'}</div>
+          ${s.note?`<div style="font-size:.72rem;color:var(--tdim);margin-top:3px">${escFriendName(s.note)}</div>`:''}
+          <div style="font-size:.7rem;color:var(--tdim);margin-top:3px">By: ${escFriendName(s.submitted_by||'anonymous')} · ${new Date(s.created_at).toLocaleDateString()}</div>
         </div>
         <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
           <button class="btn pp-save-btn" style="font-size:.72rem;padding:6px 12px;white-space:nowrap" onclick="adminApproveRequest('${s.id}')">Review &amp; add →</button>
@@ -6992,11 +7516,17 @@ async function renderAdminPanel(){
       </div>
     </div>`).join('');
 
+  // spot_name can trace back to an approved suggestion's suggested_name, so
+  // it is not purely admin-authored either. Route the click through a
+  // data-attribute (escaped, safe in any HTML attribute) and a wired
+  // listener instead of splicing it into an inline onclick's JS string — the
+  // previous `.replace(/'/g,...)` only defused the JS-string quote, not a
+  // raw `"` breaking out of the onclick="..." attribute itself.
   const rows=_adminSpots.map(s=>`
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="adminOpenSpot('${s.spot_name.replace(/'/g,"\\'")}')">
+    <div class="admin-spot-row" data-spot="${escFriendName(s.spot_name)}" style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer">
       <div>
-        <div style="font-size:.82rem;font-weight:700;color:var(--text)">${s.display_name||s.business_name||s.spot_name}</div>
-        <div style="font-size:.7rem;color:var(--tdim)">${s.spot_name}${s.verified?' · ✓ Verified':' · ⚠️ Unverified'}</div>
+        <div style="font-size:.82rem;font-weight:700;color:var(--text)">${escFriendName(s.display_name||s.business_name||s.spot_name)}</div>
+        <div style="font-size:.7rem;color:var(--tdim)">${escFriendName(s.spot_name)}${s.verified?' · ✓ Verified':' · ⚠️ Unverified'}</div>
       </div>
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color:var(--tdim)"><polyline points="9 18 15 12 9 6"/></svg>
     </div>`).join('');
@@ -7018,9 +7548,9 @@ async function renderAdminPanel(){
     return `<div style="background:rgba(0,212,255,.06);border:1px solid rgba(0,212,255,.2);border-radius:10px;padding:12px 14px;margin-bottom:8px;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
         <div style="flex:1">
-          <div style="font-size:.82rem;font-weight:700;color:var(--accent)">${u.spot_name}</div>
-          <div style="font-size:.7rem;color:var(--tdim);margin-top:3px;line-height:1.5">${fields||'(no changes noted)'}</div>
-          <div style="font-size:.7rem;color:var(--tdim);margin-top:3px">By: ${u.email} · ${new Date(u.created_at).toLocaleDateString()}</div>
+          <div style="font-size:.82rem;font-weight:700;color:var(--accent)">${escFriendName(u.spot_name)}</div>
+          <div style="font-size:.7rem;color:var(--tdim);margin-top:3px;line-height:1.5">${escFriendName(fields)||'(no changes noted)'}</div>
+          <div style="font-size:.7rem;color:var(--tdim);margin-top:3px">By: ${escFriendName(u.email)} · ${new Date(u.created_at).toLocaleDateString()}</div>
         </div>
         <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
           <button class="btn pp-save-btn" style="font-size:.7rem;padding:5px 10px;white-space:nowrap" onclick="adminApplyUpdate(${JSON.stringify(u).replace(/"/g,'&quot;')})">Apply →</button>
@@ -7041,14 +7571,14 @@ async function renderAdminPanel(){
     <div style="background:rgba(56,189,248,.06);border:1px solid rgba(56,189,248,.2);border-radius:10px;padding:12px 14px;margin-bottom:8px;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
         <div style="flex:1;min-width:0">
-          <div style="font-size:.82rem;font-weight:700;color:#38bdf8">${c.spot_name}</div>
-          <div style="font-size:.72rem;color:var(--tdim);margin-top:2px">${c.business_name||'—'} · <a href="mailto:${c.email}" style="color:var(--tdim)">${c.email}</a></div>
-          ${c.website?`<div style="font-size:.7rem;color:var(--tdim);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.website}</div>`:''}
+          <div style="font-size:.82rem;font-weight:700;color:#38bdf8">${escFriendName(c.spot_name)}</div>
+          <div style="font-size:.72rem;color:var(--tdim);margin-top:2px">${escFriendName(c.business_name||'—')} · <a href="mailto:${escFriendName(c.email)}" style="color:var(--tdim)">${escFriendName(c.email)}</a></div>
+          ${c.website?`<div style="font-size:.7rem;color:var(--tdim);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escFriendName(c.website)}</div>`:''}
           <div style="font-size:.7rem;color:var(--tdim);margin-top:3px">${new Date(c.created_at).toLocaleDateString()}</div>
         </div>
         <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
-          <button class="btn pp-save-btn admin-verify-btn" data-id="${c.id}" data-spot="${c.spot_name}" data-email="${c.email}" style="font-size:.7rem;padding:5px 12px;white-space:nowrap">✓ Verify</button>
-          <button class="admin-reject-btn" data-id="${c.id}" data-spot="${c.spot_name}" data-email="${c.email}" style="font-size:.7rem;padding:5px 12px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-radius:8px;color:#f87171;cursor:pointer;white-space:nowrap">✕ Reject</button>
+          <button class="btn pp-save-btn admin-verify-btn" data-id="${c.id}" data-spot="${escFriendName(c.spot_name)}" data-email="${escFriendName(c.email)}" style="font-size:.7rem;padding:5px 12px;white-space:nowrap">✓ Verify</button>
+          <button class="admin-reject-btn" data-id="${c.id}" data-spot="${escFriendName(c.spot_name)}" data-email="${escFriendName(c.email)}" style="font-size:.7rem;padding:5px 12px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-radius:8px;color:#f87171;cursor:pointer;white-space:nowrap">✕ Reject</button>
         </div>
       </div>
     </div>`).join('')}
@@ -7061,6 +7591,13 @@ async function renderAdminPanel(){
     <button class="btn pp-save-btn" onclick="adminOpenSpot(null)" style="margin-bottom:14px;width:100%">+ Add new spot</button>
     ${rows||'<div class="stats-empty">No spots yet.</div>'}
     <div id="adminEditForm" style="display:none;margin-top:16px"></div>`;
+
+  // Wire spot-list row clicks (data-spot is HTML-escaped above; .dataset
+  // decodes it back to the real name, so this never re-parses attacker text
+  // as an inline onclick's JS source).
+  el.querySelectorAll('.admin-spot-row').forEach(row=>{
+    row.onclick=()=>adminOpenSpot(row.dataset.spot);
+  });
 
   // Wire claim action buttons (avoids CSP issues with inline onclick)
   const verifyBtns=el.querySelectorAll('.admin-verify-btn');
@@ -7150,7 +7687,16 @@ async function adminApproveRequest(suggId, sugg){
 
 async function adminOpenSpot(spotName, prefill){
   const el=$('adminEditForm'); if(!el) return;
-  const s=prefill||(spotName?(_adminSpots||[]).find(x=>x.spot_name===spotName):null);
+  const raw=prefill||(spotName?(_adminSpots||[]).find(x=>x.spot_name===spotName):null);
+  // Every string field below lands in an HTML attribute (value="...") or a
+  // <textarea> body. `prefill` can come straight from a public "suggest a
+  // spot" submission (adminApproveRequest) — a request the admin has not yet
+  // reviewed — so escape every string field up front rather than chasing
+  // each interpolation site individually. HTML-attribute/textarea escaping
+  // round-trips correctly: the browser decodes entities back to the original
+  // characters when it populates .value, so this does not corrupt what the
+  // admin sees or ultimately saves.
+  const s=raw?Object.fromEntries(Object.entries(raw).map(([k,v])=>[k,typeof v==='string'?escFriendName(v):v])):raw;
   el.style.display='block';
   el.scrollIntoView({behavior:'smooth',block:'start'});
   el.dataset.origSpotName=spotName||'';
@@ -7160,17 +7706,17 @@ async function adminOpenSpot(spotName, prefill){
   const attrSectionHTML=`
       <div style="margin:14px 0 4px;font-size:.78rem;font-weight:700;color:var(--accent)">🪁 Spot attributes</div>
       <label class="pp-label">Disciplines</label>
-      ${attrMultiHTML('adDisciplines',SPOT_DISCIPLINES,s?.disciplines)}
+      ${attrMultiHTML('adDisciplines',SPOT_DISCIPLINES,raw?.disciplines)}
       <label class="pp-label">Facilities</label>
-      ${attrMultiHTML('adFacilities',SPOT_FACILITIES,s?.facilities)}
+      ${attrMultiHTML('adFacilities',SPOT_FACILITIES,raw?.facilities)}
       <label class="pp-label">Water type</label>
-      ${attrSingleHTML('adWaterType',SPOT_WATER_TYPES,s?.water_type)}
+      ${attrSingleHTML('adWaterType',SPOT_WATER_TYPES,raw?.water_type)}
       <label class="pp-label">Tide</label>
-      ${attrSingleHTML('adTidePref',SPOT_TIDE_PREFS,s?.tide_pref)}
+      ${attrSingleHTML('adTidePref',SPOT_TIDE_PREFS,raw?.tide_pref)}
       <label class="pp-label">Crowd</label>
-      ${attrSingleHTML('adCrowdLevel',SPOT_CROWD_LEVELS,s?.crowd_level)}
+      ${attrSingleHTML('adCrowdLevel',SPOT_CROWD_LEVELS,raw?.crowd_level)}
       <label class="pp-label">Suitable level</label>
-      ${attrSingleHTML('adSkillLevel',SPOT_SKILL_LEVELS,s?.skill_level)}`;
+      ${attrSingleHTML('adSkillLevel',SPOT_SKILL_LEVELS,raw?.skill_level)}`;
   const suggBanner=s?._suggId?`<div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:10px 14px;font-size:.78rem;color:#fbbf24;margin-bottom:14px">📥 Spot request from <strong>${s._submittedBy||'a user'}</strong> — review, adjust if needed, then save.</div>`:'';
   el.innerHTML=`
     <div style="background:rgba(0,212,255,.05);border:1px solid rgba(0,212,255,.2);border-radius:12px;padding:16px;">
@@ -7324,12 +7870,24 @@ async function adminApplyUpdate(u){
     await sb.from('spot_info').upsert({spot_name:u.spot_name,...updates,updated_at:new Date().toISOString()},{onConflict:'spot_name'});
   }
 
-  // Apply dirs to spot_overrides (upsert so it works even if no row exists yet)
+  // Apply dirs to spot_overrides (upsert so it works even if no row exists yet).
+  // spot_overrides requires loc/lat/lon (NOT NULL) — for a built-in spot with no
+  // existing override row the upsert becomes an INSERT, so include coords from
+  // the SPOTS catalog. Without them the insert was silently rejected and approved
+  // dir updates never reached anyone (only the admin's in-memory SPOTS changed).
   if(u.suggested_dirs?.length){
+    const _catalog=SPOTS.find(s=>s.name===u.spot_name);
+    const _ovRow={name:u.spot_name, dirs:u.suggested_dirs, active:true};
+    if(_catalog){
+      _ovRow.loc=_catalog.loc||'';
+      _ovRow.lat=_catalog.lat;
+      _ovRow.lon=_catalog.lon;
+    }
     const{error:dirErr}=await sb.from('spot_overrides').upsert(
-      {name:u.spot_name, dirs:u.suggested_dirs, active:true},
+      _ovRow,
       {onConflict:'name', ignoreDuplicates:false}
     );
+    if(dirErr) console.error('spot_overrides dirs upsert failed:',dirErr);
     if(!dirErr){
       // Update in-memory SPOTS so UI reflects immediately without reload
       const si=SPOTS.findIndex(s=>s.name===u.spot_name);
@@ -7343,7 +7901,7 @@ async function adminApplyUpdate(u){
       // If this is the currently open spot, refresh wind dirs + spot card
       if(cachedLoc?.name===u.spot_name){
         windDirs=new Set(u.suggested_dirs);
-        document.querySelectorAll('.s-btn').forEach(b=>b.classList.toggle('active',windDirs.has(Number(b.dataset.deg))));
+        renderWindDirChips();
         renderSpotInfoCard(u.spot_name);
       }
     }
@@ -7623,7 +8181,7 @@ async function adminSaveSpotInfo(){
     const _allDirs=loadAllUserDirs(); delete _allDirs[spotName]; localStorage.setItem('kf_dirs',JSON.stringify(_allDirs));
     if(cachedLoc?.name===spotName){
       windDirs=new Set(dirsArr);
-      document.querySelectorAll('.s-btn').forEach(b=>b.classList.toggle('active',windDirs.has(Number(b.dataset.deg))));
+      renderWindDirChips();
     }
   }
 
@@ -7817,6 +8375,10 @@ function updatePremiumUI(){
   // Gate "Send" notify-friends toggle behind premium
   const notifyFriendsToggle=$('ppNotifyFriendsToggle');
   const notifyFriendsBadge=$('ppNotifyFriendsBadge');
+  // Show who actually receives the alerts (premium-only, same as the toggle).
+  renderFriendsReach();
+  renderSmsGate();
+  renderNearbyToggle();
   if(notifyFriendsToggle){
     notifyFriendsToggle.onclick=premium?toggleNotifyFriends:()=>{ showToast('⚡ Premium only — upgrade to notify friends when you hit the water', 4000, '#f59e0b'); openProfilePanel('profile'); };
     notifyFriendsToggle.style.opacity=premium?'':'0.4';
@@ -7843,7 +8405,7 @@ function updatePremiumUI(){
 
 async function syncPremiumFromSupabase(email){
   const sb=getSb(); if(!sb||!email) return;
-  const{data,error}=await sb.from('profiles').select('is_premium,sms_enabled,phone_number,is_admin,nickname,friend_session_notifs,notify_friends_on_confirm,avatar_url,contribution_points,premium_until').eq('email',email).single();
+  const{data,error}=await sb.from('profiles').select('is_premium,sms_enabled,phone_number,is_admin,nickname,friend_session_notifs,notify_friends_on_confirm,avatar_url,contribution_points,premium_until,notifs_enabled,home_lat,home_lon,home_label,digest_nearby_enabled,digest_nearby_km').eq('email',email).single();
   console.log('[syncPremium] email=',email,'data=',data,'error=',error?.message);
   const p=loadProfile();
   if(data){
@@ -7857,13 +8419,24 @@ async function syncPremiumFromSupabase(email){
       p.friendSessionNotifs=data.friend_session_notifs!==false;
     if(data.notify_friends_on_confirm!==null&&data.notify_friends_on_confirm!==undefined)
       p.notifyFriendsOnConfirm=data.notify_friends_on_confirm!==false;
+    if(data.notifs_enabled!==null&&data.notifs_enabled!==undefined)
+      p.notifsEnabled=data.notifs_enabled!==false;
     p.contributionPoints=data.contribution_points||0;
     p.premiumUntil=data.premium_until||null;
+    p.homeLat=data.home_lat; p.homeLon=data.home_lon; p.homeLabel=data.home_label;
+    p.digestNearbyEnabled=data.digest_nearby_enabled===true;
+    p.digestNearbyKm=data.digest_nearby_km||120;
     saveProfile(p);
     const fst=$('ppFriendSessionToggle');
     if(fst) fst.classList.toggle('on', p.friendSessionNotifs!==false);
     const nft=$('ppNotifyFriendsToggle');
     if(nft) nft.classList.toggle('on', p.notifyFriendsOnConfirm!==false);
+    const mst=$('ppMasterToggle');
+    if(mst){
+      const on=p.notifsEnabled!==false;
+      mst.classList.toggle('on',on);
+      const note=$('ppMasterOffNote'); if(note) note.style.display=on?'none':'block';
+    }
   }
   updatePremiumUI();
   const adminTab=$('ppTabAdmin');
@@ -7919,7 +8492,12 @@ async function manageSubscription(){
   }
 }
 
+// SMS is NOT live: production has no TWILIO_* secrets, so process-reminders
+// skips the send. Letting the toggle save a preference would promise a text
+// that never arrives. Flip this one constant once Twilio is configured.
+let SMS_RELEASED = false;
 async function toggleSms(){
+  if(!SMS_RELEASED){ showToast('🔜 SMS alerts are coming soon'); return; }
   if(!isPremium()){ showToast('⚡ Premium only — upgrade to unlock SMS alerts', 4000, '#f59e0b'); return; }
   const p=loadProfile(); p.smsEnabled=!p.smsEnabled; saveProfile(p);
   const sb=getSb();
@@ -8009,7 +8587,10 @@ async function savePhone(){
   if(!reviewParam) return;
   history.replaceState({},'',location.pathname);
   try{
-    const spot=JSON.parse(atob(reviewParam));
+    // Mirror of the edge function's UTF-8-safe base64 (btoa(unescape(encodeURIComponent(x)))).
+    // Fall back to plain atob for any older links that predate the UTF-8 fix.
+    let json; try{ json=decodeURIComponent(escape(atob(reviewParam))); }catch(_){ json=atob(reviewParam); }
+    const spot=JSON.parse(json);
     window._pendingReviewSpot=spot;
   }catch(e){}
   // Sign out current session so the magic link auth session is active
@@ -8069,7 +8650,13 @@ function openAdminReview(){
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Show the "* required" hint only while the nickname field is empty.
+function updateNicknameReq(){
+  const req=$('ppNicknameReq');
+  if(req) req.style.display=($('ppNicknameInput')?.value||'').trim()?'none':'';
+}
 function onNicknameInput(){
+  updateNicknameReq();
   const btn=$('ppNicknameSaveBtn');
   if(!btn) return;
   const current=loadProfile().nickname||'';
@@ -8215,6 +8802,49 @@ async function saveNickname(fromModal){
 
   // Dismiss modal if called from it
   if(fromModal){ const m=$('nicknameModal'); if(m) m.remove(); showToast('👋 Welcome, '+val+'!'); }
+}
+// ── HOME LOCATION ──────────────────────────────────────────────────────────
+// Feeds the digest's "near you" section. Reuses the same Nominatim geocoder as
+// the spot-suggestion form; coordinates are stored, the label is for display.
+async function findHomeLocation(){
+  const q=($('ppHomeInput')?.value||'').trim();
+  const status=$('ppHomeStatus'); const btn=$('ppHomeFindBtn');
+  if(!q){ showToast('Enter a town or city first'); return; }
+  if(btn){ btn.disabled=true; btn.textContent='⏳'; }
+  if(status){ status.style.color='var(--tdim)'; status.textContent='Searching…'; }
+  try{
+    const url='https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(q);
+    const res=await fetch(url,{headers:{'Accept':'application/json'},signal:AbortSignal.timeout(10000)});
+    if(!res.ok) throw new Error('http '+res.status);
+    const arr=await res.json();
+    if(!Array.isArray(arr)||!arr.length){
+      if(status){ status.textContent='⚠️ Couldn\'t find that place — try adding the country.'; status.style.color='#f59e0b'; }
+      return;
+    }
+    const top=arr[0];
+    const lat=parseFloat(top.lat), lon=parseFloat(top.lon);
+    if(isNaN(lat)||isNaN(lon)){ if(status){ status.textContent='⚠️ No coordinates returned — try another search.'; status.style.color='#f59e0b'; } return; }
+    // Nominatim's display_name is the full postal string. Store the place and
+    // the country, which is what a header needs; show the full match in the
+    // status line so the user can still tell whether it found the right place.
+    const full=top.display_name||q;
+    const parts=full.split(',').map(x=>x.trim()).filter(Boolean);
+    const shortLabel=parts.length>1 ? `${parts[0]}, ${parts[parts.length-1].split('/')[0].trim()}` : (parts[0]||q);
+    await saveHomeLocation(lat, lon, shortLabel);
+    if(status){ status.textContent='✓ '+full; status.style.color='#4ade80'; }
+  }catch(e){
+    if(status){ status.textContent='⚠️ Couldn\'t reach the geocoder — try again.'; status.style.color='#f59e0b'; }
+  }finally{
+    if(btn){ btn.disabled=false; btn.textContent='📍 Find'; }
+  }
+}
+async function saveHomeLocation(lat, lon, label){
+  const p=loadProfile();
+  p.homeLat=lat; p.homeLon=lon; p.homeLabel=label;
+  saveProfile(p);
+  const sb=getSb(); if(!sb||!p.email) return;
+  await sb.from('profiles').upsert({email:p.email, home_lat:lat, home_lon:lon, home_label:label},{onConflict:'email'});
+  if(typeof renderNearbyToggle==='function') renderNearbyToggle();
 }
 // ── AUTH ──
 async function initAuth(){
@@ -8588,12 +9218,20 @@ function updateAuthUI(){
     // Profile avatar: prefer user-uploaded, fall back to OAuth provider avatar
     const avatarUrl=p.avatar_url||_authSession.user.user_metadata?.avatar_url||_authSession.user.user_metadata?.picture||'';
     const displayName=p.nickname||_authSession.user.user_metadata?.full_name||_authSession.user.user_metadata?.name||'';
+    // avatar_url is normally set by the upload flow (a data: URL) but the
+    // profile row can be PATCHed directly, so escape it the same way as any
+    // other user-controlled value landing in an HTML attribute.
     const avatarHtml=avatarUrl
-      ?`<img src="${avatarUrl}" alt="" style="width:40px;height:40px;border-radius:50%;object-fit:cover;flex-shrink:0;border:2px solid rgba(255,255,255,.15);" onerror="this.style.display='none'">`
+      ?`<img src="${escFriendName(avatarUrl)}" alt="" style="width:40px;height:40px;border-radius:50%;object-fit:cover;flex-shrink:0;border:2px solid rgba(255,255,255,.15);" onerror="this.style.display='none'">`
       :`<span style="font-size:1.3rem;line-height:1;flex-shrink:0">${isPremium()?'👑':'✅'}</span>`;
+    // displayName is the signed-in user's own nickname — only ever shown back
+    // to themselves here, so this is self-XSS at worst, not cross-user. Still
+    // escaped for defense in depth since it's the same unescaped-into-innerHTML
+    // shape as the cross-user cases above.
+    const displayNameSafe=displayName?escFriendName(displayName):'';
     if(signedInCard) signedInCard.innerHTML=isPremium()
-      ?`${avatarHtml}<div style="flex:1;min-width:0">${displayName?`<p style="margin:0 0 1px;font-size:.85rem;font-weight:700;color:#f59e0b;">${displayName} 👑</p>`:'<p style="margin:0 0 1px;font-size:.85rem;font-weight:700;color:#f59e0b;">Premium</p>'}<p id="ppLoggedEmail" style="margin:0;font-size:.78rem;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_authSession.user.email}</p></div>`
-      :`${avatarHtml}<div style="flex:1;min-width:0">${displayName?`<p style="margin:0 0 1px;font-size:.85rem;font-weight:700;color:#f1f5f9;">${displayName}</p>`:'<p style="margin:0 0 1px;font-size:.85rem;font-weight:700;color:#f1f5f9;">Signed in</p>'}<p id="ppLoggedEmail" style="margin:0;font-size:.78rem;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_authSession.user.email}</p></div>`;
+      ?`${avatarHtml}<div style="flex:1;min-width:0">${displayNameSafe?`<p style="margin:0 0 1px;font-size:.85rem;font-weight:700;color:#f59e0b;">${displayNameSafe} 👑</p>`:'<p style="margin:0 0 1px;font-size:.85rem;font-weight:700;color:#f59e0b;">Premium</p>'}<p id="ppLoggedEmail" style="margin:0;font-size:.78rem;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_authSession.user.email}</p></div>`
+      :`${avatarHtml}<div style="flex:1;min-width:0">${displayNameSafe?`<p style="margin:0 0 1px;font-size:.85rem;font-weight:700;color:#f1f5f9;">${displayNameSafe}</p>`:'<p style="margin:0 0 1px;font-size:.85rem;font-weight:700;color:#f1f5f9;">Signed in</p>'}<p id="ppLoggedEmail" style="margin:0;font-size:.78rem;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_authSession.user.email}</p></div>`;
     // Populate avatar upload preview widget
     _setAvatarPreview(avatarUrl);
     const initEl=$('ppAvatarInitials'); if(initEl&&!avatarUrl) initEl.textContent=getInitials(_authSession.user.email);
@@ -8606,7 +9244,7 @@ function updateAuthUI(){
     btn.classList.add('logged-in');
     const crownBadge=isPremium()?`<span style="position:absolute;top:-8px;left:-8px;font-size:20px;line-height:1;filter:drop-shadow(0 1px 3px rgba(0,0,0,.6));">👑</span>`:'';
     if(avatarUrl){
-      btn.innerHTML=`<img src="${avatarUrl}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'profile-btn-initials',textContent:'${initials}'}))"/>${crownBadge}<span class="profile-btn-dot" id="profileDot"></span>`;
+      btn.innerHTML=`<img src="${escFriendName(avatarUrl)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'profile-btn-initials',textContent:'${initials}'}))"/>${crownBadge}<span class="profile-btn-dot" id="profileDot"></span>`;
     } else {
       btn.innerHTML=`<span class="profile-btn-initials">${initials}</span>${crownBadge}<span class="profile-btn-dot" id="profileDot"></span>`;
     }
@@ -8636,7 +9274,7 @@ async function sendDigestNow(){
     if(resp.ok){ btn.textContent='✓ Sent! Check your inbox'; }
     else { btn.textContent='Error — try again'; }
   }catch{ btn.textContent='Error — try again'; }
-  setTimeout(()=>{ btn.disabled=false; btn.textContent='📩 Send me this week\'s forecast now'; },4000);
+  setTimeout(()=>{ btn.disabled=false; btn.textContent='📩 Send me the next 7 days forecast'; },4000);
 }
 async function toggleDigest(){
   if(!isPremium()){ showToast('⚡ Premium only — upgrade to unlock the weekly digest', 4000, '#f59e0b'); return; }
@@ -8665,15 +9303,151 @@ async function toggleNotifyFriends(){
   const sb=getSb(); if(!sb||!p.email) return;
   await sb.from('profiles').upsert({email:p.email, notify_friends_on_confirm:p.notifyFriendsOnConfirm!==false},{onConflict:'email'});
   showToast(p.notifyFriendsOnConfirm===false ? 'Friends send alerts: off' : 'Friends send alerts: on');
+  renderFriendsReach();
+}
+// ── DIGEST: SESSIONS NEAR HOME ─────────────────────────────────────────────
+// Opt-in: it changes what the weekly email contains, so it never turns itself
+// on. Gated on a home location — without coordinates there is nothing to
+// search around.
+//
+// NOT RELEASED YET. The row is visible so users know it is coming, but the
+// toggle is inert and writes nothing. Flip this one constant to release.
+// `let`, not `const`: releasing is still a one-line change, but tests can flip
+// it to prove the released path actually renders as released.
+let NEARBY_RELEASED = true;
+function hasHomeLocation(){
+  const p=loadProfile();
+  return typeof p.homeLat==='number' && typeof p.homeLon==='number';
+}
+function renderSmsGate(){
+  const badge=$('ppSmsSoonBadge'); const toggle=$('ppSmsToggle');
+  if(badge) badge.style.display = SMS_RELEASED ? 'none' : 'inline-flex';
+  if(!SMS_RELEASED){
+    if(toggle){ toggle.classList.remove('on'); toggle.style.opacity='0.4'; }
+    const phoneSection=$('ppPhoneSection'); if(phoneSection) phoneSection.style.display='none';
+  }else if(toggle){ toggle.style.opacity=''; }
+}
+function renderNearbyToggle(){
+  const row=$('ppNearbyRow'); if(!row) return;
+  const p=loadProfile();
+  const hint=$('ppNearbyHint'), toggle=$('ppNearbyToggle'), km=$('ppNearbyKm');
+  const soon=$('ppNearbySoonBadge');
+  if(soon) soon.style.display = NEARBY_RELEASED ? 'none' : 'inline-flex';
+  if(km) km.value=String(p.digestNearbyKm||120);
+  if(!NEARBY_RELEASED){
+    if(hint) hint.textContent='Coming soon — we are still building this';
+    if(toggle){ toggle.classList.remove('on'); toggle.style.opacity='0.4'; }
+    if(km) km.disabled=true;
+    return;
+  }
+  if(km) km.disabled=false;
+  if(hasHomeLocation()){
+    if(hint) hint.textContent='Good sessions around '+(p.homeLabel||'your home location');
+    if(toggle){ toggle.classList.toggle('on', p.digestNearbyEnabled===true); toggle.style.opacity=''; }
+  }else{
+    if(hint) hint.textContent='Set a home location in your profile to use this';
+    if(toggle){ toggle.classList.remove('on'); toggle.style.opacity='0.4'; }
+  }
+}
+async function toggleDigestNearby(){
+  if(!NEARBY_RELEASED){ showToast('🔜 Sessions near home is coming soon'); return; }
+  if(!hasHomeLocation()){ showToast('Set a home location in your profile first'); openProfilePanel('profile'); return; }
+  const p=loadProfile();
+  p.digestNearbyEnabled = p.digestNearbyEnabled===true ? false : true;
+  saveProfile(p);
+  renderNearbyToggle();
+  const sb=getSb(); if(!sb||!p.email) return;
+  await sb.from('profiles').upsert({email:p.email, digest_nearby_enabled:p.digestNearbyEnabled},{onConflict:'email'});
+  showToast(p.digestNearbyEnabled ? 'Nearby sessions: on' : 'Nearby sessions: off');
+}
+async function setDigestNearbyKm(val){
+  if(!NEARBY_RELEASED) return;
+  const km=Math.max(25, Math.min(200, parseInt(val,10)||120));
+  const p=loadProfile(); p.digestNearbyKm=km; saveProfile(p);
+  const el=$('ppNearbyKm'); if(el) el.value=String(km);
+  const sb=getSb(); if(!sb||!p.email) return;
+  await sb.from('profiles').upsert({email:p.email, digest_nearby_km:km},{onConflict:'email'});
 }
 
-function toggleMasterNotif(){
+// ── Who actually receives my session alerts ────────────────────────────────
+// session-attend-notify mails accepted friends whose own friend_session_notifs
+// is true or NULL, so "my friends" and "my friends who get the email" are not
+// the same list. friends_notif_status() (SECURITY DEFINER, scoped to the
+// caller's accepted friendships) is the only way the client can see the
+// difference — profiles is own-row under RLS and public_profiles doesn't
+// expose the setting.
+let _friendsReachCache=null;
+let _friendsPendingCount=0;   // pending requests: listed in the panel, but not notified
+// Nicknames are user-supplied and go into innerHTML below — escape them.
+const escFriendName=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function toggleFriendsReach(){
+  const list=$('ppFriendsReachList');
+  if(!list) return;
+  const open=list.style.display!=='none';
+  list.style.display=open?'none':'block';
+  renderFriendsReachSummary(open?'▾':'▴');
+}
+function renderFriendsReachSummary(caret){
+  const el=$('ppFriendsReachSummary');
+  if(!el||!_friendsReachCache) return;
+  const yes=_friendsReachCache.filter(f=>f.receives).length;
+  const total=_friendsReachCache.length;
+  const sendingOff=isPremium()&&loadProfile().notifyFriendsOnConfirm===false;
+  // Say "accepted friends" explicitly. Pending requests are listed in the
+  // Friends panel too, so a bare "0 of 1" next to a dozen rows reads as a bug
+  // rather than as "only one of those people has actually accepted".
+  el.innerHTML = sendingOff
+    ? `<span style="color:var(--gray)">Nobody — sending is off</span> ${caret}`
+    : `<strong style="color:var(--text)">${yes} of ${total}</strong> accepted friend${total===1?'':'s'} will be notified ${caret}`;
+}
+async function renderFriendsReach(){
+  const row=$('ppFriendsReachRow');
+  if(!row) return;
+  const sb=getSb(), p=loadProfile();
+  if(!sb||!p.email||!isPremium()){ row.style.display='none'; return; }
+
+  if(!_friendsReachCache){
+    const{data,error}=await sb.rpc('friends_notif_status');
+    if(error){ console.error('[friends-reach]',error); row.style.display='none'; return; }
+    _friendsReachCache=data||[];
+    // Count pending requests separately. Read it here rather than from
+    // _friendsCache: the Notifications panel can be opened before the Friends
+    // panel has ever populated that cache.
+    // Both directions: incoming requests (someone asked to be your friend) are
+    // listed in the Friends panel just like outgoing ones, so counting only
+    // outgoing left a user with 5 incoming / 0 outgoing seeing "0 of N".
+    const{count}=await sb.from('friendships')
+      .select('id',{count:'exact',head:true})
+      .or(`requester.eq.${p.email},recipient.eq.${p.email}`).eq('status','pending');
+    _friendsPendingCount=count||0;
+  }
+  if(!_friendsReachCache.length){ row.style.display='none'; return; }
+
+  row.style.display='';
+  const open=$('ppFriendsReachList').style.display!=='none';
+  renderFriendsReachSummary(open?'▴':'▾');
+
+  const name=f=>escFriendName(f.nickname||f.email.split('@')[0]);
+  const on =_friendsReachCache.filter(f=>f.receives);
+  const off=_friendsReachCache.filter(f=>!f.receives);
+  $('ppFriendsReachList').innerHTML =
+    (on.length ?`<div class="notif-sub" style="color:#4ade80">✅ ${on.map(name).join(', ')}</div>`:'')+
+    (off.length?`<div class="notif-sub" style="color:var(--gray);margin-top:4px">⊘ ${off.map(name).join(', ')} — their “Receive” alerts are off</div>`:'')+
+    // Pending requests are not friends yet and receive nothing. Without this
+    // line the count looks wrong next to a panel full of pending names.
+    (_friendsPendingCount>0?`<div class="notif-sub" style="color:var(--tdim);margin-top:6px">${_friendsPendingCount} pending request${_friendsPendingCount===1?'':'s'} — they are notified once they accept.</div>`:'');
+}
+
+async function toggleMasterNotif(){
   const p=loadProfile();
   p.notifsEnabled=!notifMasterEnabled();
   saveProfile(p);
   const on=p.notifsEnabled!==false;
   $('ppMasterToggle').classList.toggle('on',on);
   const note=$('ppMasterOffNote'); if(note) note.style.display=on?'none':'block';
+  // Persist server-side so process-reminders can skip sends while paused.
+  const sb=getSb();
+  if(sb&&p.email) await sb.from('profiles').upsert({email:p.email,notifs_enabled:on},{onConflict:'email'});
 }
 let _statsYear='all'; // 'all' or a 4-digit year string
 async function renderStats(){
@@ -8728,26 +9502,17 @@ async function renderStats(){
   const today=new Date().toISOString().slice(0,10);
   const thisMonth=today.slice(0,7);
   const[{data:rows,error},{data:friendships}]=await Promise.all([
-    sb.from('reminders')
-      .select('spot_name,session_date,session_peak_kn,session_min_kn,session_hours,session_rating,session_wind_dir,spot_dirs')
-      .eq('email',email).eq('reminder_hours',1).eq('sent',true).eq('skipped',false).eq('cancelled',false)
+    sb.from('session_attendances')
+      .select('spot_name,session_date,duration_h,session_peak_kn,session_min_kn,session_hours,session_rating,session_wind_dir')
+      .eq('email',email).eq('cancelled',false)
       .order('session_date',{ascending:false}),
     sb.from('friendships').select('requester,recipient').or(`requester.eq.${email},recipient.eq.${email}`).eq('status','accepted'),
   ]);
   if(error){el.innerHTML='<div class="stats-empty">Could not load stats</div>';return;}
 
-  // Filter sessions to fav spots + day filter
-  const favSpots=new Set(loadFavs().map(f=>f.name));
-  const favs=loadFavs();
-  const sessions=(rows||[]).filter(r=>{
-    if(!favSpots.has(r.spot_name)) return false;
-    const fav=favs.find(f=>f.name===r.spot_name);
-    if(fav?.days&&fav.days.length){
-      const dow=new Date(r.session_date+'T12:00:00').getDay();
-      if(!fav.days.includes(dow)) return false;
-    }
-    return true;
-  });
+  // Confirmed sessions count regardless of current favourites — a session you
+  // attended stays in your stats even if you later un-favourite the spot.
+  const sessions=rows||[];
 
   // Year selector
   const years=[...new Set(sessions.map(r=>r.session_date.slice(0,4)))].sort((a,b)=>b-a);
@@ -8755,7 +9520,7 @@ async function renderStats(){
   const yearBtns=['all',...years].map(y=>`<button class="stats-year-btn${_statsYear===y?' active':''}" onclick="_statsYear='${y}';renderStats()">${y==='all'?'All time':y}</button>`).join('');
 
   if(!filtered.length){
-    el.innerHTML=`<div class="stats-year-bar">${yearBtns}</div><div class="stats-empty">No sessions recorded yet${_statsYear!=='all'?' for '+_statsYear:''}.<br>Stats appear after your first 1h alert fires.</div>`;
+    el.innerHTML=`<div class="stats-year-bar">${yearBtns}</div><div class="stats-empty">No sessions recorded yet${_statsYear!=='all'?' for '+_statsYear:''}.<br>Confirm you're going on a day card to log a session.</div>`;
     return;
   }
 
@@ -8764,8 +9529,11 @@ async function renderStats(){
   const withPeak=filtered.filter(r=>r.session_peak_kn);
   const avgPeak=withPeak.length?Math.round(withPeak.reduce((s,r)=>s+r.session_peak_kn,0)/withPeak.length):null;
   const maxPeak=withPeak.length?Math.max(...withPeak.map(r=>r.session_peak_kn)):null;
-  const withHours=filtered.filter(r=>r.session_hours);
-  const totalHours=withHours.reduce((s,r)=>s+r.session_hours,0);
+  // Prefer wind-derived good-hours (ground truth from the fired reminder);
+  // fall back to the duration the user picked when confirming the session.
+  const hoursOf=r=>r.session_hours!=null?r.session_hours:(r.duration_h!=null?r.duration_h:null);
+  const withHours=filtered.filter(r=>hoursOf(r)!=null);
+  const totalHours=withHours.reduce((s,r)=>s+hoursOf(r),0);
   const avgHours=withHours.length?(totalHours/withHours.length).toFixed(1):null;
   const bestSession=withPeak.length?[...withPeak].sort((a,b)=>b.session_peak_kn-a.session_peak_kn)[0]:null;
 
@@ -8784,9 +9552,9 @@ async function renderStats(){
   const friendEmails=(friendships||[]).map(f=>f.requester===email?f.recipient:f.requester);
   let leaderboardHTML='';
   if(friendEmails.length){
-    const{data:friendRows}=await sb.from('reminders')
+    const{data:friendRows}=await sb.from('session_attendances')
       .select('email,session_date')
-      .in('email',friendEmails).eq('reminder_hours',1).eq('sent',true).eq('skipped',false).eq('cancelled',false)
+      .in('email',friendEmails).eq('cancelled',false)
       .gte('session_date',thisMonth+'-01');
     const myMonthCount=sessions.filter(r=>r.session_date.startsWith(thisMonth)).length;
     const friendCounts={};
@@ -8806,8 +9574,8 @@ async function renderStats(){
       const barColor=e.isYou?'linear-gradient(90deg,#38bdf8,#0ea5e9)':'linear-gradient(90deg,#64748b,#475569)';
       return`<div class="stats-lb-row${e.isYou?' you':''}">
         <div class="stats-lb-rank${i<3?' '+rankClasses[i]:''}">${i<3?rankIcons[i]:i+1}</div>
-        <div class="stats-lb-avatar">${initials}</div>
-        <div class="stats-lb-name">${e.name}${e.isYou?'<span class="stats-lb-you-tag">you</span>':''}</div>
+        <div class="stats-lb-avatar">${escFriendName(initials)}</div>
+        <div class="stats-lb-name">${escFriendName(e.name)}${e.isYou?'<span class="stats-lb-you-tag">you</span>':''}</div>
         <div class="stats-lb-bar-wrap"><div class="stats-lb-bar-track"><div class="stats-lb-bar-fill" style="width:${pct}%;background:${barColor}"></div></div></div>
         <div class="stats-lb-count">${e.count}</div>
       </div>`;
@@ -8864,15 +9632,15 @@ async function renderStats(){
   <div class="stats-best-session">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap">
       <div>
-        <div style="font-weight:700;color:var(--text);font-size:.85rem">${bestSession.spot_name}</div>
+        <div style="font-weight:700;color:var(--text);font-size:.85rem">${escFriendName(bestSession.spot_name)}</div>
         <div style="color:var(--tdim);font-size:.68rem;margin-top:2px">${new Date(bestSession.session_date+'T12:00:00').toLocaleDateString('en',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</div>
       </div>
       ${bestSession.session_peak_kn?`<div style="font-size:1.4rem;font-weight:900;color:#38bdf8;line-height:1">${bestSession.session_peak_kn}<span style="font-size:.7rem;color:var(--tdim);font-weight:400"> kn</span></div>`:''}
     </div>
     <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
       ${bestSession.session_hours?`<span style="background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.2);border-radius:6px;padding:3px 8px;font-size:.7rem;color:#38bdf8">⏱ ${bestSession.session_hours}h</span>`:''}
-      ${bestSession.session_wind_dir?`<span style="background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.2);border-radius:6px;padding:3px 8px;font-size:.7rem;color:#38bdf8">🧭 ${bestSession.session_wind_dir}</span>`:''}
-      ${bestSession.session_rating?`<span style="background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.2);border-radius:6px;padding:3px 8px;font-size:.7rem;color:#38bdf8">${bestSession.session_rating}</span>`:''}
+      ${bestSession.session_wind_dir?`<span style="background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.2);border-radius:6px;padding:3px 8px;font-size:.7rem;color:#38bdf8">🧭 ${escFriendName(bestSession.session_wind_dir)}</span>`:''}
+      ${bestSession.session_rating?`<span style="background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.2);border-radius:6px;padding:3px 8px;font-size:.7rem;color:#38bdf8">${escFriendName(bestSession.session_rating)}</span>`:''}
     </div>
   </div>`:'';
 
@@ -8882,7 +9650,7 @@ async function renderStats(){
   const spotRanked=Object.entries(bySpot).sort((a,b)=>b[1]-a[1]);
   const maxSpotCount=spotRanked[0]?.[1]||1;
   const spotBars=spotRanked.map(([name,count],i)=>`<div class="stats-bar-row">
-    <div class="stats-bar-label" title="${name}">${i===0?'⭐ ':''}${name}</div>
+    <div class="stats-bar-label" title="${escFriendName(name)}">${i===0?'⭐ ':''}${escFriendName(name)}</div>
     <div class="stats-bar-track"><div class="stats-bar-fill" style="width:${Math.round(count/maxSpotCount*100)}%"></div></div>
     <div class="stats-bar-count">${count}</div>
   </div>`).join('');
@@ -8904,7 +9672,7 @@ async function renderStats(){
   for(const r of filtered) if(r.session_wind_dir){dirCounts[r.session_wind_dir]=(dirCounts[r.session_wind_dir]||0)+1;}
   const dirRanked=Object.entries(dirCounts).sort((a,b)=>b[1]-a[1]).slice(0,5);
   const dirHTML=dirRanked.length?`<div class="stats-section-title">🧭 Wind directions</div>
-  <div style="display:flex;gap:8px;flex-wrap:wrap">${dirRanked.map(([d,c],i)=>`<div style="padding:5px 12px;border-radius:99px;background:rgba(56,189,248,${i===0?.18:.08});border:1px solid rgba(56,189,248,${i===0?.35:.2});font-size:.75rem;color:#38bdf8;font-weight:700">${d} <span style="opacity:.6;font-weight:400">${c}×</span></div>`).join('')}</div>`:'';
+  <div style="display:flex;gap:8px;flex-wrap:wrap">${dirRanked.map(([d,c],i)=>`<div style="padding:5px 12px;border-radius:99px;background:rgba(56,189,248,${i===0?.18:.08});border:1px solid rgba(56,189,248,${i===0?.35:.2});font-size:.75rem;color:#38bdf8;font-weight:700">${escFriendName(d)} <span style="opacity:.6;font-weight:400">${c}×</span></div>`).join('')}</div>`:'';
 
   el.innerHTML=`
     <div class="stats-year-bar">${yearBtns}</div>
@@ -9032,7 +9800,9 @@ async function renderNotifList(){
     const DAY_LABELS=['Su','Mo','Tu','We','Th','Fr','Sa'];
     const dayChips=DAY_LABELS.map((lbl,i)=>{
       const isOn=!activeDays||activeDays.has(i);
-      return `<span class="pp-day-chip${isOn?' on':''}" onclick="toggleSpotDay('${n.spotName}',${i})">${lbl}</span>`;
+      // spotName travels as a data attribute, not inside an inline handler's
+      // JS string — a name with a quote in it broke the handler outright.
+      return `<span class="pp-day-chip${isOn?' on':''}" data-spot="${escFriendName(n.spotName)}" data-day="${i}">${lbl}</span>`;
     }).join('');
     const dayFilterHTML=n.type==='spot'
       ?`<div class="pp-day-filter"><span class="pp-day-filter-label">Days:</span>${dayChips}</div>`
@@ -9048,7 +9818,7 @@ async function renderNotifList(){
     return `<div class="pp-notif-item" style="flex-direction:column;align-items:stretch;padding:0;overflow:hidden;">
       <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;" onclick="(function(el){var b=el.closest('.pp-notif-item').querySelector('.pp-notif-body');var open=b.style.display==='none'||!b.style.display;b.style.display=open?'block':'none';el.querySelector('.pp-notif-chevron').style.transform=open?'rotate(180deg)':'rotate(0deg)';})(this)">
         <div class="pp-notif-info" style="flex:1;min-width:0;">
-          <div class="pp-notif-spot">🔔 ${n.spotName}</div>
+          <div class="pp-notif-spot">🔔 ${escFriendName(n.spotName)}</div>
           <div class="pp-notif-day" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${upcomingDates}</div>
         </div>
         <span class="pp-notif-chevron" style="font-size:.7rem;color:var(--tdim);flex-shrink:0;transition:transform .2s;margin-right:12px;">▼</span>
@@ -9060,6 +9830,8 @@ async function renderNotifList(){
       </div>
     </div>`;
   }).join('');
+  list.querySelectorAll('.pp-day-chip').forEach(chip=>
+    chip.addEventListener('click',()=>toggleSpotDay(chip.dataset.spot,+chip.dataset.day)));
 }
 function confirmDeleteNotif(btn,id){
   if(btn.dataset.confirming){
@@ -9360,7 +10132,7 @@ function initSpotsMap(){
   SPOTS.forEach((s,i)=>{
     if(!s.lat||!s.lon)return;
     L.marker([s.lat,s.lon],{icon}).addTo(map)
-      .bindPopup(`<div style="min-width:140px"><b style="font-size:.95rem">${s.name}</b><br><span style="font-size:.8rem;color:#666">${s.loc||''}</span><br><br><button onclick="closeSpotsMap();setTimeout(()=>pickSpot(SPOTS[${i}]),80)" style="background:#00d4ff;color:#000;border:none;border-radius:6px;padding:5px 10px;cursor:pointer;font-size:.8rem;font-weight:600;">→ Check forecast</button></div>`);
+      .bindPopup(spotMapPopupNode(s,i));
   });
   window._spotsMap=map;
 }
@@ -9384,6 +10156,21 @@ if(_confirmBtn) _confirmBtn.onclick=function(){
 setTimeout(updateFetchTimestamp, 0);
 
 // ── INIT: handle deep-link (?spot=&date=) only — always show homepage on fresh open ──
+async function handleSpotDeepLink(spotParam,dateParam){
+  if(!spotParam) return;
+  // Admin-added spots (spot_overrides) are merged into SPOTS asynchronously —
+  // wait for that before resolving, else a shared link to an override spot
+  // (e.g. Sycod) falls back to null coords and the forecast render crashes.
+  try{ await window._spotsReady; }catch(e){}
+  const found=SPOTS.find(s=>s.name.toLowerCase()===spotParam.toLowerCase());
+  window._deepLinkDate=dateParam||null;
+  if(found){
+    pickSpot(found);
+  }else{
+    // Unknown spot name — show the search page rather than a broken forecast.
+    showToast(`Couldn't find "${spotParam}" — try searching`);
+  }
+}
 (function(){
   const params=new URLSearchParams(location.search);
   const spotParam=params.get('spot');
@@ -9391,9 +10178,7 @@ setTimeout(updateFetchTimestamp, 0);
   if(spotParam){
     // Clear ?spot= and ?date= from URL so a hard refresh doesn't re-trigger the deep link
     history.replaceState({},'',location.pathname);
-    const found=SPOTS.find(s=>s.name.toLowerCase()===spotParam.toLowerCase())||{name:spotParam,loc:spotParam,lat:null,lon:null,dirs:[]};
-    window._deepLinkDate=dateParam||null;
-    pickSpot(found);
+    handleSpotDeepLink(spotParam,dateParam);
   }
   // No auto-load of last spot — user always starts on the homepage
 })();

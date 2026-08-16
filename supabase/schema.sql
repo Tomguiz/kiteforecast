@@ -69,8 +69,12 @@ CREATE TABLE IF NOT EXISTS profiles (
   stripe_subscription_id  text,
   phone_number            text,       -- E.164 format e.g. +32478123456
   sms_enabled             boolean     NOT NULL DEFAULT false,
+  notifs_enabled          boolean     NOT NULL DEFAULT true,  -- master "Email reminders" toggle; false = pause all spot reminders
   is_admin                boolean     NOT NULL DEFAULT false
 );
+
+-- Backfill for existing profiles created before notifs_enabled existed
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS notifs_enabled boolean NOT NULL DEFAULT true;
 
 -- Grant admin to tom.guisgand@gmail.com (idempotent)
 INSERT INTO profiles (email, is_admin) VALUES ('tom.guisgand@gmail.com', true)
@@ -217,11 +221,11 @@ DO $$ BEGIN
   CREATE POLICY "all_delete_suggestions" ON spot_suggestions FOR DELETE TO authenticated USING (true);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
--- CTA click tracking (lesson, gear, website, instagram, facebook, livecam)
+-- CTA click tracking (lesson, gear, website, instagram, facebook, livecam, live_wind)
 CREATE TABLE IF NOT EXISTS spot_cta_clicks (
   id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
   spot_name   text        NOT NULL,
-  cta_type    text        NOT NULL,  -- 'lesson' | 'gear' | 'website' | 'instagram' | 'facebook' | 'livecam'
+  cta_type    text        NOT NULL,  -- 'lesson' | 'gear' | 'website' | 'instagram' | 'facebook' | 'livecam' | 'live_wind'
   user_email  text,                  -- null for anonymous users
   clicked_at  timestamptz NOT NULL DEFAULT now()
 );
@@ -321,6 +325,38 @@ EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN
   CREATE POLICY "all_select" ON reminders FOR SELECT TO anon, authenticated USING (true);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- Confirmed "I'm going" sessions — the source of truth for the Stats section.
+-- Wind stats are written by process-reminders when the 1h reminder fires and a
+-- matching attendance exists. RLS lives in rls-hardening.sql.
+CREATE TABLE IF NOT EXISTS session_attendances (
+  id              uuid          PRIMARY KEY DEFAULT gen_random_uuid(),
+  email           text          NOT NULL,
+  nickname        text,
+  spot_name       text          NOT NULL,
+  spot_lat        double precision,
+  spot_lon        double precision,
+  session_date    date          NOT NULL,
+  start_time      text,
+  duration_h      integer,
+  note            text,
+  cancelled       boolean       NOT NULL DEFAULT false,
+  -- Ground-truth wind stats, populated when the 1h reminder fires
+  session_peak_kn    integer,
+  session_min_kn     integer,
+  session_hours      integer,
+  session_rating     text,
+  session_wind_dir   text,
+  created_at      timestamptz   NOT NULL DEFAULT now(),
+  UNIQUE (email, spot_name, session_date)
+);
+
+-- Add stat columns for tables created before they existed (idempotent)
+ALTER TABLE session_attendances ADD COLUMN IF NOT EXISTS session_peak_kn  integer;
+ALTER TABLE session_attendances ADD COLUMN IF NOT EXISTS session_min_kn   integer;
+ALTER TABLE session_attendances ADD COLUMN IF NOT EXISTS session_hours    integer;
+ALTER TABLE session_attendances ADD COLUMN IF NOT EXISTS session_rating   text;
+ALTER TABLE session_attendances ADD COLUMN IF NOT EXISTS session_wind_dir text;
 
 -- 5. pg_cron jobs
 
@@ -442,3 +478,13 @@ DO $$ BEGIN ALTER TABLE spot_update_suggestions ADD COLUMN skill_level text;   E
 DO $$ BEGIN ALTER TABLE profiles ADD COLUMN contribution_points integer NOT NULL DEFAULT 0; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE profiles ADD COLUMN premium_until timestamptz; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE spot_claims ADD COLUMN status text NOT NULL DEFAULT 'pending'; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+
+-- Home location for the digest's "near you" section. Nullable: most users
+-- never set one, and the nearby section stays off without it.
+DO $$ BEGIN ALTER TABLE profiles ADD COLUMN home_lat double precision; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE profiles ADD COLUMN home_lon double precision; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE profiles ADD COLUMN home_label text; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+-- Defaults to false on purpose: this changes what an existing user's weekly
+-- email contains, so it is opt-in rather than a surprise.
+DO $$ BEGIN ALTER TABLE profiles ADD COLUMN digest_nearby_enabled boolean NOT NULL DEFAULT false; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE profiles ADD COLUMN digest_nearby_km integer NOT NULL DEFAULT 120; EXCEPTION WHEN duplicate_column THEN NULL; END $$;

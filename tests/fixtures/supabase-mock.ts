@@ -10,8 +10,13 @@ export type MockOptions = {
   isAdmin?: boolean;
   favourites?: unknown[];
   usersRpc?: unknown[];   // rows returned by the admin_list_users RPC
+  friendsNotifRpc?: unknown[]; // rows returned by the friends_notif_status RPC
   adminFavourites?: Record<string, unknown[]>;
   adminReminders?: Record<string, unknown[]>;
+  overrides?: unknown[];  // rows returned for spot_overrides (admin-added spots)
+  sessions?: unknown[];   // rows returned for session_attendances (stats)
+  spotInfo?: unknown;     // row returned for spot_info (.single() → one object)
+  claims?: unknown[];     // rows returned for spot_claims (My Spot panel)
 };
 
 const json = (route: Route, body: unknown, status = 200) =>
@@ -31,12 +36,16 @@ function tableResponse(table: string, opts: MockOptions): unknown {
       return opts.favourites ?? emptyArray;
     case 'spot_suggestions':
       return opts.isAdmin ? spotSuggestionRows : emptyArray;
-    case 'spot_info':
     case 'spot_overrides':
-    case 'spot_update_suggestions':
-    case 'spot_claims':
-    case 'reminders':
+      return opts.overrides ?? emptyArray;
+    case 'spot_info':
+      return opts.spotInfo ? [opts.spotInfo] : emptyArray;
     case 'session_attendances':
+      return opts.sessions ?? emptyArray;
+    case 'spot_claims':
+      return opts.claims ?? emptyArray;
+    case 'spot_update_suggestions':
+    case 'reminders':
     case 'tide_cache':
     case 'spot_cta_clicks':
       return emptyArray;
@@ -109,9 +118,12 @@ export async function mockSupabase(page: Page, opts: MockOptions = {}) {
         body: method === 'HEAD' ? '' : body,
       });
     }
-    // RPC calls POST to /rest/v1/rpc/<fn>. Answer admin_list_users explicitly.
+    // RPC calls POST to /rest/v1/rpc/<fn>. Answer the ones the app calls explicitly.
     if (method === 'POST' && path.endsWith('/rpc/admin_list_users')) {
       return json(route, opts.usersRpc ?? []);
+    }
+    if (method === 'POST' && path.endsWith('/rpc/friends_notif_status')) {
+      return json(route, opts.friendsNotifRpc ?? []);
     }
     // INSERT/UPDATE/DELETE — return an empty 200/201
     return json(route, [], method === 'POST' ? 201 : 200);

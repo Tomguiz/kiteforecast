@@ -1,4 +1,11 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import {
+  toKnots, isRainy, speedTier, isWindDirOK, hourQualifies, consecutiveRuns,
+} from '../_shared/rideability.ts'
+import {
+  fetchStations, nearestStation, toLiveWind,
+  type LiveWind, type RwsStation, type FetchLike,
+} from '../_shared/rws.ts'
 
 const SUPABASE_URL            = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_KEY    = Deno.env.get('SB_SERVICE_ROLE_KEY')!
@@ -24,25 +31,19 @@ const WMO: Record<number, [string, string]> = {
 }
 const wmoInfo = (c: number): [string, string] => WMO[c] ?? ['🌡', '—']
 
-// ── FORECAST HELPERS (mirrors app logic exactly) ──
-const toKnots  = (ms: number) => Math.round(ms * 1.94384)
-const isRainy  = (code: number) => code >= 51
-const speedTier = (kn: number) => kn >= 25 ? 3 : kn >= 20 ? 2 : kn >= 15 ? 1 : 0
-
-function angleDiff(a: number, b: number): number {
-  const d = Math.abs(a - b) % 360
-  return d > 180 ? 360 - d : d
-}
-function isWindDirOK(dir: number, spotDirs: number[]): boolean {
-  if (!spotDirs.length) return true
-  return spotDirs.some(sd => angleDiff(dir, sd) <= 22.5)
-}
-function classifyHour(kn: number, dir: number, code: number, spotDirs: number[]) {
+// ── FORECAST HELPERS ──
+// The rideability rule is shared with the app and the other edge functions.
+// `type` drives the email's per-hour wording; `qualifying` comes straight from
+// the shared rule so this function can never disagree with the app about what
+// counts as rideable.
+function classifyHour(kn: number, dir: number, code: number, gustKn: number, spotDirs: number[]) {
   const sp = speedTier(kn)
-  if (sp === 0)           return { type: 'light',   qualifying: false }
-  if (isRainy(code))      return { type: 'rain',    qualifying: false }
+  if (hourQualifies(kn, dir, code, gustKn, spotDirs)) {
+    return { type: ['good','verygood','perfect'][Math.max(sp, 1) - 1], qualifying: true }
+  }
+  if (isRainy(code))               return { type: 'rain',     qualifying: false }
   if (!isWindDirOK(dir, spotDirs)) return { type: 'lightdir', qualifying: false }
-  return { type: ['good','verygood','perfect'][sp - 1], qualifying: true }
+  return { type: 'light', qualifying: false }
 }
 function circMean(angles: number[]): number {
   const s = angles.reduce((a, d) => a + Math.sin(d * Math.PI / 180), 0)
@@ -62,10 +63,10 @@ function buildDay(dateStr: string, sunrise: string, sunset: string, hourlyMap: M
   for (let hr = srHour; hr <= ssHour; hr++) {
     const d = hourlyMap.get(hr)
     if (!d) continue
-    const cl = classifyHour(d.kn, d.dir, d.code, spotDirs)
+    const cl = classifyHour(d.kn, d.dir, d.code, d.gustKn, spotDirs)
     day.push({ ...d, ...cl, hour: hr })
   }
-  const good    = day.filter(h => h.qualifying)
+  const good    = consecutiveRuns(day.filter(h => h.qualifying), h => h.hour)
   const peakKn  = good.length ? Math.max(...good.map(h => h.kn)) : 0
   const peakDayKn = day.length ? Math.max(...day.map(h => h.kn)) : 0
   const sample  = good.length ? good : day
@@ -102,6 +103,39 @@ function fmtDateLabel(dateStr: string): string {
   })
 }
 
+const COMPASS_8 = ['N','NE','E','SE','S','SW','W','NW']
+const dirLabel = (deg: number | null) =>
+  deg === null ? '' : COMPASS_8[Math.round(((deg % 360) + 360) % 360 / 45) % 8]
+
+// stationName is the one genuinely untrusted value in this payload: it comes
+// from a third-party feed via cleanName(), which does no sanitisation. Every
+// other interpolation below is a generated numeral or a literal from this file.
+function escHtml(s: string): string {
+  return String(s)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+}
+
+// Rendered server-side and injected whole, because the Make.com template is a
+// flat replace() chain with no conditional logic — an empty string here makes
+// the block vanish. See docs/superpowers/specs/2026-08-16-rws-live-wind-design.md
+//
+// The label is deliberately neutral: this same block renders inside the SESSION
+// OFF 1h email too ("the wind never showed"), where "Measured right now — 22 kn"
+// would read as a self-contradiction. One label serves both, no ON/OFF branch.
+function renderLiveHtml(live: LiveWind): string {
+  const gust = live.gustKn === null ? '' : ` &middot; gusts ${live.gustKn} kn`
+  const dir  = live.dirDeg === null ? '' : ` ${dirLabel(live.dirDeg)}`
+  const age  = live.ageMin <= 1 ? 'just now' : `${live.ageMin} min ago`
+  return `<tr>
+          <td style="background-color:#0f1520;border:1px solid #1e2535;border-top:none;padding:16px 32px;">
+            <p style="margin:0 0 10px 0;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#4a5568;">&#127788; Current reading at the nearest mast</p>
+            <p style="margin:0;font-family:'DM Sans',Arial,sans-serif;font-size:22px;font-weight:700;color:#5dd4f0;">${live.speedKn} kn${dir}${gust}</p>
+            <p style="margin:6px 0 0 0;font-size:11px;color:#4a5568;">${escHtml(live.stationName)} &middot; ${live.distanceKm.toFixed(1)} km away &middot; ${age}</p>
+          </td>
+        </tr>`
+}
+
 // ── MAIN HANDLER ──
 Deno.serve(async () => {
   const { data: reminders, error } = await supabase
@@ -118,8 +152,41 @@ Deno.serve(async () => {
 
   let processed = 0
 
+  // Cache profiles.notifs_enabled per email so a paused user with many due
+  // reminders is only looked up once. Missing profile → treated as enabled.
+  const notifsEnabledCache = new Map<string, boolean>()
+
+  // ── RWS live wind, fetched at most ONCE per invocation ──────────────────
+  // Deno's bare fetch has no default timeout, and a try/catch cannot bound a
+  // hang: a socket that accepts and never responds never rejects. The reminder
+  // loop is strictly sequential, so one hung connection would stall every
+  // remaining reminder in the batch — fatal for a 1h reminder, which is
+  // worthless once the session has started. AbortSignal.timeout is the only
+  // thing that actually bounds it.
+  const rwsFetch: FetchLike = (url) => fetch(url, { signal: AbortSignal.timeout(5000) })
+  // The three feeds return EVERY station with its latest value inline, so one
+  // fetch serves the whole batch. Fetching per reminder row would mean 150
+  // requests for 50 due reminders, against an undocumented internal API.
+  let stationsP: Promise<RwsStation[]> | null = null
+  const getStations = () => (stationsP ??= fetchStations(rwsFetch))
+
+  async function notifsEnabled(email: string): Promise<boolean> {
+    if (notifsEnabledCache.has(email)) return notifsEnabledCache.get(email)!
+    const { data } = await supabase
+      .from('profiles').select('notifs_enabled').eq('email', email).single()
+    const enabled = data?.notifs_enabled !== false
+    notifsEnabledCache.set(email, enabled)
+    return enabled
+  }
+
   for (const r of reminders ?? []) {
     try {
+      // Master toggle: user paused all spot reminders — skip without emailing.
+      if (!(await notifsEnabled(r.email))) {
+        await supabase.from('reminders').update({ sent: true, skipped: true }).eq('id', r.id)
+        continue
+      }
+
       // Re-fetch live forecast
       const params = new URLSearchParams({
         latitude:      String(r.spot_lat),
@@ -243,6 +310,21 @@ Deno.serve(async () => {
           </td>
         </tr>`
 
+      // 1h reminder only — a measured reading is meaningless 24h out. Never let
+      // a slow or broken RWS response delay or drop the reminder itself: the
+      // fetch is timeout-bounded (see rwsFetch above) and this try/catch keeps
+      // one bad row from stopping the loop.
+      let live_html = ''
+      if (rh === 1) {
+        try {
+          const hit = nearestStation(await getStations(), Number(r.spot_lat), Number(r.spot_lon))
+          const live = hit ? toLiveWind(hit.station, hit.distanceKm, new Date()) : null
+          if (live) live_html = renderLiveHtml(live)
+        } catch (e) {
+          console.error('rws live wind failed', e)
+        }
+      }
+
       const payload = {
         notification_type:  r.notif_type,
         reminder_label:     rh === 1 ? '1 hour before' : `${rh} hours before`,
@@ -256,6 +338,7 @@ Deno.serve(async () => {
         date_label:         fmtDateLabel(r.session_date),
         app_link:           r.app_link,
         calendar_html,
+        live_html,
         session: {
           start_time:           sessionStart,
           end_time:             sessionEnd,
@@ -308,11 +391,18 @@ Deno.serve(async () => {
 
       const update: Record<string, unknown> = { sent: true }
       if (rh === 1) {
-        update.session_peak_kn  = peakKn
-        update.session_min_kn   = windMin
-        update.session_hours    = goodHours
-        update.session_rating   = rating
-        update.session_wind_dir = domDir !== null ? compass(domDir) : null
+        const sessionStats = {
+          session_peak_kn:  peakKn,
+          session_min_kn:   windMin,
+          session_hours:    goodHours,
+          session_rating:   rating,
+          session_wind_dir: domDir !== null ? compass(domDir) : null,
+        }
+        Object.assign(update, sessionStats)
+        // Also write ground-truth wind onto the confirmed-session row (the Stats
+        // source of truth) if the user actually confirmed they were going.
+        await supabase.from('session_attendances').update(sessionStats)
+          .eq('email', r.email).eq('spot_name', r.spot_name).eq('session_date', r.session_date)
       }
       await supabase.from('reminders').update(update).eq('id', r.id)
       processed++

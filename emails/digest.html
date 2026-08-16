@@ -57,7 +57,7 @@
           <!-- Subheadline -->
           <tr>
             <td style="padding:0 32px 28px 32px;">
-              <p style="margin:0;font-size:15px;line-height:1.5;color:rgba(255,255,255,0.7);">Here's what's looking good across your favourite spots for the week of <strong style="color:#ffffff;">[[week_start]]</strong>.</p>
+              <p style="margin:0;font-size:15px;line-height:1.5;color:rgba(255,255,255,0.7);">Your kite week starting <strong style="color:#ffffff;">[[week_start]]</strong>.</p>
             </td>
           </tr>
 
@@ -67,6 +67,12 @@
 
     <!-- SPOTS BLOCK — pre-rendered HTML injected here -->
     [[spots_html]]
+
+    <!-- NEAR YOU — good sessions at spots around the user's home location.
+         Sits AFTER favourites deliberately: favourites are what the reader
+         came for, nearby is the suggestion. Empty string when the user has
+         not opted in or nothing qualifies, so it needs no conditional. -->
+    [[nearby_html]]
 
     <!-- NO SESSIONS STATE -->
     [[no_sessions_html]]
