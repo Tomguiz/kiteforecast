@@ -1315,6 +1315,11 @@
 
     <div id="spotInfoCard"></div>
 
+    <!-- Live measured wind from the nearest RWS mast. Stable standalone element
+         (NOT inside spotInfoCard's async innerHTML) for the same reason as
+         locWindDirs below: it must survive every spot-info re-render. -->
+    <div id="liveWindPanel"></div>
+
     <!-- Good wind dirs — interactive selector, grouped with the spot-info card.
          Kept as a stable standalone element (NOT inside spotInfoCard's async
          innerHTML) so the buttons + wiring survive every spot-info re-render. -->
@@ -1828,6 +1833,122 @@ function daylightWeatherCode(dayHours,fallbackCode){
 //  HELPERS
 // ══════════════════════════════════
 const toKnotsR = ms => Math.round(ms * 1.944);
+
+// ── RWS live wind ──────────────────────────────────────────────────────────
+// Hand-mirrored from supabase/functions/_shared/rws.ts, the same way the
+// rideability rule is mirrored. Change both together.
+const RWS_BASE='https://rwsos.rws.nl/wb-api';
+const RWS_BBOX='[2,48.56,7.5,57]';
+const RWS_MAX_KM=30, RWS_MAX_AGE_MIN=30;
+const RWS_FEEDS=[
+  {path:'/sp/dd/2.0/locations/geojson',src:'datapush-1min', obs:'WS1'},
+  {path:'/sp/dd/2.0/locations/geojson',src:'datapush-1min', obs:'WR1'},
+  {path:'/sp/dd/2.0/locations/geojson',src:'datapush-10min',obs:'WS10MXS3'},
+];
+function _rwsHaversineKm(aLat,aLon,bLat,bLon){
+  const R=6371,rad=d=>d*Math.PI/180;
+  const dLat=rad(bLat-aLat),dLon=rad(bLon-aLon);
+  const h=Math.sin(dLat/2)**2+Math.cos(rad(aLat))*Math.cos(rad(bLat))*Math.sin(dLon/2)**2;
+  return 2*R*Math.asin(Math.min(1,Math.sqrt(h)));
+}
+function _rwsParseFeed(json){
+  const out=new Map();
+  const feats=json&&json.features;
+  if(!Array.isArray(feats)) return out;
+  for(const f of feats){
+    const p=f&&f.properties, c=f&&f.geometry&&f.geometry.coordinates;
+    if(!p||typeof p.id!=='string'||!Array.isArray(c)||c.length<2) continue;
+    const ev=Array.isArray(p.events)?p.events:[];
+    const last=ev.length?ev[ev.length-1]:null;
+    out.set(p.id,{
+      id:p.id,
+      name:String(p.locationName||p.id).split(',').pop().trim(),
+      lon:Number(c[0]), lat:Number(c[1]),
+      value:last&&typeof last.value==='number'?last.value:null,
+      ts:last&&typeof last.timeStamp==='string'?last.timeStamp:null,
+    });
+  }
+  return out;
+}
+let _rwsStations=null, _rwsStationsTs=0;
+async function _rwsFetchStations(){
+  // 60s cache: the underlying feed only updates every 1-2 minutes.
+  if(_rwsStations&&Date.now()-_rwsStationsTs<60000) return _rwsStations;
+  try{
+    const maps=await Promise.all(RWS_FEEDS.map(async f=>{
+      const q=new URLSearchParams({sourceName:f.src,observationTypeId:f.obs,boundingBox:RWS_BBOX});
+      const j=await safeFetch(`${RWS_BASE}${f.path}?${q}`,8000);
+      return _rwsParseFeed(j);
+    }));
+    const [speed,dir,gust]=maps;
+    if(!speed.size) return [];
+    const out=[];
+    for(const [id,s] of speed) out.push({
+      id,name:s.name,lat:s.lat,lon:s.lon,speedMs:s.value,ts:s.ts,
+      dirDeg:(dir.get(id)||{}).value??null, gustMs:(gust.get(id)||{}).value??null,
+    });
+    _rwsStations=out; _rwsStationsTs=Date.now();
+    return out;
+  }catch{ return []; }
+}
+async function _rwsNearest(lat,lon){
+  const sts=await _rwsFetchStations();
+  let best=null;
+  for(const st of sts){
+    const d=_rwsHaversineKm(lat,lon,st.lat,st.lon);
+    if(d>RWS_MAX_KM) continue;
+    if(!best||d<best.distanceKm) best={station:st,distanceKm:d};
+  }
+  if(!best) return null;
+  const st=best.station;
+  if(st.speedMs===null||!st.ts) return null;
+  const t=Date.parse(st.ts);
+  if(isNaN(t)) return null;
+  const ageMin=Math.round((Date.now()-t)/60000);
+  if(ageMin>RWS_MAX_AGE_MIN) return null;
+  return {
+    stationId:st.id, stationName:st.name, distanceKm:best.distanceKm,
+    speedKn:toKnotsR(st.speedMs), dirDeg:st.dirDeg,
+    gustKn:st.gustMs===null?null:toKnotsR(st.gustMs), ageMin,
+    viewerUrl:`https://rwsos.rws.nl/viewer/map/noordzee/meteo/location/${encodeURIComponent(st.id)}`,
+  };
+}
+// 3h trend for the matched station, for the sparkline. Failure yields [].
+async function _rwsTrend(stationId){
+  try{
+    const end=new Date(), start=new Date(Date.now()-3*3600*1000);
+    const q=new URLSearchParams({
+      observationTypeId:'WS1', sourceName:'datapush-1min', locationCode:stationId,
+      startTime:start.toISOString().slice(0,19)+'Z', endTime:end.toISOString().slice(0,19)+'Z',
+    });
+    const j=await safeFetch(`${RWS_BASE}/sp/dd/2.0/timeseries?${q}`,8000);
+    const ev=j&&j.results&&j.results[0]&&j.results[0].events;
+    if(!Array.isArray(ev)) return [];
+    return ev.filter(e=>e&&typeof e.value==='number').map(e=>toKnotsR(e.value));
+  }catch{ return []; }
+}
+async function renderLiveWindPanel(spot){
+  const el=$('liveWindPanel'); if(!el) return;
+  el.innerHTML='';
+  if(!spot||typeof spot.latitude!=='number'||typeof spot.longitude!=='number') return;
+  const live=await _rwsNearest(spot.latitude,spot.longitude);
+  if(!live) return;                       // no station, stale, or fetch failed
+  // Guard against a slow response landing after the user moved to another spot.
+  // cachedLoc/spot carry {latitude,longitude} (not lat/lon) — match that shape.
+  if(!cachedLoc||cachedLoc.latitude!==spot.latitude||cachedLoc.longitude!==spot.longitude) return;
+  const trend=await _rwsTrend(live.stationId);
+  const spark=trend.length>1?tdsSparkSVG(trend,'#5dd4f0',null):'';
+  const dir=live.dirDeg===null?'':` ${['N','NE','E','SE','S','SW','W','NW'][Math.round(((live.dirDeg%360)+360)%360/45)%8]}`;
+  const gust=live.gustKn===null?'':` · gusts ${live.gustKn} kn`;
+  const age=live.ageMin<=1?'just now':`${live.ageMin} min ago`;
+  el.innerHTML=`<div class="spot-info-card" style="padding:14px 16px">
+    <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#4a5568;margin-bottom:6px">🌬 Measured right now</div>
+    <div style="font-size:22px;font-weight:700;color:#5dd4f0">${live.speedKn} kn${escFriendName(dir)}${escFriendName(gust)}</div>
+    ${spark?`<div style="margin:8px 0">${spark}</div>`:''}
+    <div style="font-size:11px;color:#4a5568">${escFriendName(live.stationName)} · ${live.distanceKm.toFixed(1)} km away · ${escFriendName(age)}</div>
+  </div>`;
+}
+
 const DIRS8 = ['N','NE','E','SE','S','SW','W','NW'];
 const compass = deg => DIRS8[Math.round(((deg%360)+360)%360/45)%8];
 const ARROWS8 = ['↓','↙','←','↖','↑','↗','→','↘'];
@@ -4351,6 +4472,7 @@ function renderGrid(){
 
   showOnly('results');
   renderSpotInfoCard(loc.name);
+  renderLiveWindPanel(loc);
   if(_authSession?.user) loadAttendances();
 
   // ── deep-link: open the modal for the target date directly ──
