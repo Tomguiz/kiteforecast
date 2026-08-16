@@ -1935,6 +1935,22 @@ async function _rwsFetchStations(){
 // Direction is part of the rule — 25 kn from the wrong quarter is not firing,
 // and a false "firing" bubble is the one that costs someone a drive. A null
 // direction cannot be confirmed as onshore, so it reads as not firing.
+// ── RELEASE FLAGS ───────────────────────────────────────────────────────────
+// Declared HERE, near the top, and not beside the functions that use them.
+// initAuth() is called at top level, and reaches renderSmsGate() and
+// renderNearbyToggle() via updateAuthUI -> updatePremiumUI while the script is
+// still evaluating. A `let` declared further down the file is in its temporal
+// dead zone at that moment, so reading it throws ReferenceError — which killed
+// updateAuthUI before it repainted the profile button, leaving a signed-in user
+// looking signed out on every refresh (2026-08-16).
+//
+// SMS is NOT live: production has no TWILIO_* secrets, so process-reminders
+// skips the send. Letting the toggle save a preference would promise a text
+// that never arrives. Flip this once Twilio is configured.
+let SMS_RELEASED = false;
+// Sessions-near-home IS live.
+let NEARBY_RELEASED = true;
+
 const FIRING_MIN_KN=18;
 function _rwsIsFiringNow(speedKn,dirDeg,spotDirs){
   if(dirDeg===null||dirDeg===undefined) return false;
@@ -4428,7 +4444,13 @@ function queuedFetch(fn){
       _chipQueue.running++;
       fn().then(resolve,reject).finally(()=>{
         _chipQueue.running--;
-        if(_chipQueue.queue.length) setTimeout(()=>_chipQueue.queue.shift()(),400);
+        // Take the job NOW, run it later. Checking length here and shifting
+        // 400ms later is a race: another completion can drain the queue in
+        // between, leaving shift() undefined and calling undefined().
+        if(_chipQueue.queue.length){
+          const next=_chipQueue.queue.shift();
+          setTimeout(()=>{ if(next) next(); },400);
+        }
       });
     };
     if(_chipQueue.running<_chipQueue.max) run(); else _chipQueue.queue.push(run);
@@ -8492,10 +8514,6 @@ async function manageSubscription(){
   }
 }
 
-// SMS is NOT live: production has no TWILIO_* secrets, so process-reminders
-// skips the send. Letting the toggle save a preference would promise a text
-// that never arrives. Flip this one constant once Twilio is configured.
-let SMS_RELEASED = false;
 async function toggleSms(){
   if(!SMS_RELEASED){ showToast('🔜 SMS alerts are coming soon'); return; }
   if(!isPremium()){ showToast('⚡ Premium only — upgrade to unlock SMS alerts', 4000, '#f59e0b'); return; }
@@ -9314,7 +9332,6 @@ async function toggleNotifyFriends(){
 // toggle is inert and writes nothing. Flip this one constant to release.
 // `let`, not `const`: releasing is still a one-line change, but tests can flip
 // it to prove the released path actually renders as released.
-let NEARBY_RELEASED = true;
 function hasHomeLocation(){
   const p=loadProfile();
   return typeof p.homeLat==='number' && typeof p.homeLon==='number';
@@ -9379,7 +9396,15 @@ async function setDigestNearbyKm(val){
 let _friendsReachCache=null;
 let _friendsPendingCount=0;   // pending requests: listed in the panel, but not notified
 // Nicknames are user-supplied and go into innerHTML below — escape them.
-const escFriendName=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// A `function` declaration, deliberately, NOT `const escFriendName = t => …`.
+// It is called from 84 places, including updateAuthUI, which runs during
+// top-level evaluation via initAuth(). A const arrow is in its temporal dead
+// zone until this line executes, so the arrow form threw ReferenceError there
+// and left signed-in users looking signed out. Function declarations hoist, so
+// call order stops mattering.
+function escFriendName(t){
+  return String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
 function toggleFriendsReach(){
   const list=$('ppFriendsReachList');
   if(!list) return;
