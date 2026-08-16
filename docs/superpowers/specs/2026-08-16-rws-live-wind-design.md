@@ -1,7 +1,18 @@
-# Live measured wind from Rijkswaterstaat masts
+# Live wind: measured readings and per-spot live-wind links
 
 **Date:** 2026-08-16
 **Status:** design, awaiting review
+
+Delivered in two phases:
+
+- **Phase 1** — live measured wind from the Rijkswaterstaat mast network, in
+  the spot detail view and the 1h reminder, plus an auto-derived "live wind"
+  link in *Spot info & bookings*. Touches no database.
+- **Phase 2** — a user-submitted `live_wind_url` per spot, so spots outside
+  RWS coverage get a live-wind link too. Touches the suggestion pipeline.
+
+Phase 1 stands alone and ships first. Phase 2 supersedes the auto link where a
+user has submitted one.
 
 ## Problem
 
@@ -16,6 +27,11 @@ beach. A 1h reminder that says "18 kn forecast" is weaker than one that says
 Rijkswaterstaat runs the measurement masts along the Dutch and Belgian coast
 and publishes them through an open API. This design wires that into two
 surfaces: the spot detail view and the 1h session reminder.
+
+Separately, *Spot info & bookings* already collects the places a rider goes for
+a spot — lessons, gear, webcam, socials. The one obvious omission is "where do
+I check the live wind here", which for most spots is a page some local already
+knows. Phase 2 lets riders contribute that.
 
 ## The data source
 
@@ -74,8 +90,10 @@ Knokke Beach 4.1 km; the spots this serves are the ones actually ridden.
 | Other reminders (72/48/24/6h) | Unchanged — "live" wind is meaningless that far out |
 | Max station distance | 30 km, with distance always shown |
 | Max reading age | 30 minutes, age always shown |
-| Storage | None — fetch direct on both surfaces |
+| Storage (phase 1) | None — fetch direct on both surfaces |
 | Units | Convert m/s → knots in the module, not the UI |
+| Live-wind link | One button in *Spot info & bookings* |
+| Link precedence | User-submitted URL wins; RWS station link is the fallback |
 
 ### Why 30 km with the distance visible
 
@@ -97,7 +115,7 @@ If the feature proves itself, the cached variant is a clean follow-up that
 reuses the same module unchanged. Accumulating history for per-spot wind
 *statistics* is a genuinely separate project and explicitly out of scope here.
 
-## Architecture
+## Phase 1 architecture
 
 ### 1. `supabase/functions/_shared/rws.ts`
 
@@ -218,7 +236,36 @@ Reversing steps 2 and 3 is the failure case.
 SMS is deliberately untouched — it is length-constrained and already carries
 the peak forecast figure.
 
-### 4. Failure handling
+### 4. Live-wind link in *Spot info & bookings*
+
+A single CTA button alongside the existing lesson / gear / webcam buttons,
+built in the same `spot-cta-btn` style at `index.html:3735`:
+
+```
+🌬 Live wind readings
+```
+
+Its `href` resolves in this order, and the button is omitted entirely when
+nothing resolves:
+
+1. `info.live_wind_url` — user-submitted (phase 2)
+2. RWS deep link for the matched station, when one is within 30 km:
+   `https://rwsos.rws.nl/viewer/map/noordzee/meteo/location/<stationId>`
+   (verified 2026-08-16: renders the correct station, e.g. `BG2` →
+   "Wind in Brouwershavensegat 02")
+3. Nothing — no button
+
+Because the station is matched by the same `nearestStation` call that feeds the
+reading panel, the fallback costs no extra request.
+
+The RWS viewer is **Dutch-only**. Acceptable for the Zeeland and Belgian spots
+this covers, but it is a link off the app into another language, so the button
+label must make clear it leaves the app rather than promising an in-app view.
+
+Click tracking reuses `trackCtaClick(spotName, 'live_wind')`, extending the
+`cta_type` values already listed in `schema.sql:228`.
+
+### 5. Failure handling
 
 Every failure mode resolves to "show nothing", never to a wrong number:
 
@@ -233,6 +280,73 @@ The reminder must not be delayed or dropped by a slow RWS response: the call is
 wrapped with a short timeout and its rejection swallowed, exactly as the
 existing `marine-api` call is at `index.html:3149`.
 
+## Phase 2 — user-submitted live-wind URL
+
+Phase 1 covers 46 spots. Every other spot has a live-wind page somewhere that a
+local already knows; this lets them contribute it.
+
+### Data model
+
+`spot_info` is the row the detail view reads (`index.html:3626`) and is where
+the displayed value must live. `spot_overrides` holds geo and directions only
+and is not involved.
+
+```sql
+ALTER TABLE spot_info               ADD COLUMN live_wind_url text;
+ALTER TABLE spot_update_suggestions ADD COLUMN live_wind_url text;
+ALTER TABLE spot_suggestions        ADD COLUMN live_wind_url text;
+```
+
+`spot_update_suggestions` already carries `website`, `livecam_url`, `lesson_url`
+and `gear_url` columns that the form never populates, so this follows the shape
+already there rather than inventing one.
+
+`spot_claims` is deliberately untouched: a live-wind page is community
+knowledge, not a business asset an owner claims.
+
+**Schema is applied by hand in this project** — these statements must be run
+against the live database via `supabase db query --linked` and verified, not
+assumed from the file.
+
+### Where it is submitted
+
+| Surface | Change |
+|---|---|
+| Suggest-update form (`index.html:5546`) | New URL input; include in the `spot_update_suggestions` insert at `5600` |
+| New-spot form | Same input, into `spot_suggestions` |
+| Admin panel (`index.html:7355`) | New input beside lesson/gear/livecam, writing `spot_info` |
+| `update-notify` | Include the submitted URL in the admin email body |
+
+### Security — this is the app's first user-submitted URL
+
+Every URL rendered today comes from an admin or from a business owner whose
+claim an admin verified. This introduces a path where any signed-in user
+proposes a URL that, once approved, is shown to every visitor.
+
+Two controls, both required:
+
+1. **Admin review already gates display.** A row in `spot_update_suggestions`
+   is inert; nothing reaches `spot_info` without an admin applying it. This
+   feature adds no new auto-publish path.
+2. **Scheme validation on render.** `index.html:3720` documents a known open
+   gap: hrefs are HTML-escaped, but `javascript:` still executes on click.
+   PR #19 introduces `safeHttpUrl()` (http/https only, bare domains prefixed).
+
+**Dependency: phase 2 must not merge before PR #19.** Adding a user-submitted
+URL to a renderer that lacks scheme validation would widen the exact hole that
+PR is closing. The new button must call `safeHttpUrl()`, not `escFriendName()`
+alone.
+
+Validation at submit time is a convenience, not a control — reject anything
+`safeHttpUrl()` rejects, cap length, and treat the render-side call as the
+real boundary.
+
+### Interaction with phase 1
+
+Precedence is `live_wind_url` → RWS station link → no button, implemented in
+the single resolver in section 4. Phase 2 adds a source to that resolver and
+changes nothing else about it.
+
 ## Testing
 
 `tests/unit/rws.test.ts`, following `tests/unit/nearby.test.ts`:
@@ -246,6 +360,14 @@ existing `marine-api` call is at `index.html:3149`.
 
 Fixtures are captured RWS responses, so tests run offline. A separate
 throwaway script may verify live response shape, but no test hits the network.
+
+For the link resolver (both phases), extending the existing spot-info render
+tests that PR #19 adds:
+
+- user URL present → button uses it, in preference to an available station
+- no user URL, station within 30 km → button uses the RWS deep link
+- neither → no button rendered at all
+- a `javascript:` user URL is neutralised by `safeHttpUrl()` before render
 
 ## Risks
 
@@ -263,8 +385,19 @@ before concluding the reminder change "didn't work".
 and distance, but a reading from a platform will still run different from the
 beach. Accepted knowingly.
 
+**Phase 2 blocks on PR #19.** The scheme-allowlist work must land before any
+user-submitted URL is rendered. Phase 1 is unaffected — its only link is a
+constant RWS URL built from a station id the app itself matched.
+
+**The RWS viewer is Dutch-only.** A link out of the app into another language,
+acceptable for the region this covers but worth revisiting if the feature ever
+extends beyond it.
+
 ## Out of scope
 
+- Validating that a submitted `live_wind_url` actually shows wind — an admin
+  eyeballs it, as with every other URL field today
+- Auto-suggesting live-wind URLs, or importing them from any third party
 - Spot cards in the list view (considered, deferred)
 - RWS forecast data (KNMI-downscaled, ~57h horizon) as an alternative to
   Open-Meteo — a separate "which forecast do I trust" design problem
