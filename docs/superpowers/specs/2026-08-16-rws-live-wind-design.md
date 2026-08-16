@@ -166,10 +166,54 @@ payload.live_html = '<tr>…measured wind block…</tr>'
 An empty string means the block vanishes with no conditional logic needed in
 Make.com.
 
-**Manual step, outside this repo:** `[[live_html]]` must be added to the
-`reminderON1.html` and `reminderOFF1.html` templates *in the Make.com scenario*
-as well as in `emails/`. The repo copies are not what Make.com renders. Until
-that is done the payload field is inert and the email is unchanged.
+#### How Make.com renders this (confirmed 2026-08-16)
+
+The scenario routes by reminder hour (`1st → 1`, `2nd → 6`, `3rd → 24`, …).
+The 1h route's module `34` fetches the template **from this repo over HTTP**,
+unauthenticated:
+
+```
+GET https://raw.githubusercontent.com/Tomguiz/kiteforecast/main/emails/reminderON1.html
+```
+
+It then runs a 24-deep nested `replace()` chain over that HTML, one call per
+placeholder.
+`[[calendar_html]]` already works exactly this way, which is why `live_html` is
+specced as a prebuilt HTML block rather than separate speed/direction/distance
+fields: no conditional logic is possible in that chain, but an empty string
+substitutes to nothing and the block simply vanishes.
+
+Adding the placeholder means wrapping one more `replace()` around the existing
+expression, making it 25 deep:
+
+```
+{{replace( <existing 24-deep expression> ; "[[live_html]]"; 1.live_html)}}
+```
+
+**This is the only manual step**, and only on the 1h route's module — the 6h
+and 24h routes are untouched. Because module `34` pulls the template from the
+repo, editing `emails/reminderON1.html` and `emails/reminderOFF1.html` is
+enough; no template copy-paste into Make.
+
+#### Deployment order (matters — getting it wrong emails users raw markup)
+
+The template is fetched from `main` at send time, so **merging is what
+activates it** — there is no separate deploy for the email. If the marker
+reaches `main` before the formula knows about it, nothing replaces
+`[[live_html]]` and users receive a literal `[[live_html]]` in their reminder.
+(`raw.githubusercontent.com` caches for a few minutes, so the change lands
+shortly after merge, not instantly.)
+
+Ship in this order, each step inert on its own:
+
+1. **Deploy `process-reminders`** — payload gains `live_html`; nothing consumes
+   it yet.
+2. **Update the Make.com formula** — the `replace()` finds no marker yet, so it
+   is a no-op.
+3. **Merge the template change to `main`** — the marker now exists and is
+   substituted correctly.
+
+Reversing steps 2 and 3 is the failure case.
 
 SMS is deliberately untouched — it is length-constrained and already carries
 the peak forecast figure.
