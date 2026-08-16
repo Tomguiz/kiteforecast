@@ -3807,8 +3807,27 @@ function spotAttributesHTML(info){
   return html+'</div>';
 }
 
+// Live-wind link precedence: a user-submitted URL wins (phase 2, not yet
+// stored), then the RWS station page, then no button at all. The RWS lookup
+// reuses the cache the panel already populated, so this costs no extra request.
+async function _liveWindHref(info,spot){
+  if(info&&info.live_wind_url) return {url:info.live_wind_url,label:'Live wind readings'};
+  // cachedLoc (what `spot` is called with here) carries .latitude/.longitude,
+  // not .lat/.lon — see renderLiveWindPanel above for the same shape.
+  if(!spot||typeof spot.latitude!=='number'||typeof spot.longitude!=='number') return null;
+  const live=await _rwsNearest(spot.latitude,spot.longitude);
+  return live?{url:live.viewerUrl,label:`Live wind — ${live.stationName}`}:null;
+}
 async function renderSpotInfoCard(spotName) {
   const el = $('spotInfoCard'); if(!el) return;
+  // Generation guard: renderSpotInfoCard is fired-and-forgotten (not awaited)
+  // by fetchForecastFromSpot, and this function now awaits two network calls
+  // (fetchSpotInfo, then _rwsNearest via _liveWindHref) before its final
+  // write. If the user navigates to another spot while either is in flight,
+  // _fetchGen has already been bumped and cachedLoc already points at the
+  // new spot — without this guard we'd paint the old spot's card using the
+  // new spot's coordinates. Re-checked after every await below.
+  const myGen=_fetchGen;
   // show collapsed header immediately while fetch is in flight
   el.innerHTML = `<div class="spot-info-card"><div class="spot-info-header" style="opacity:.5;pointer-events:none"><div style="flex:1"><div class="spot-info-title">📍 Spot info &amp; bookings</div><div class="spot-info-subtitle">Lessons · Gear rental · Contact</div></div><svg class="spot-info-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg></div></div>`;
   _spotInfoOpen = false;
@@ -3871,13 +3890,18 @@ async function renderSpotInfoCard(spotName) {
   const gearBtn = info.gear_url
     ? `<a href="${escFriendName(info.gear_url)}" target="_blank" rel="noopener" class="spot-cta-btn spot-cta-gear" onclick="trackCtaClick('${spotName}','gear')">🪁 Rent kite gear</a>`
     : '';
+  const liveWind = await _liveWindHref(info, cachedLoc);
+  if(myGen!==_fetchGen) return;      // spot changed while the RWS lookup was in flight
+  const liveWindBtn = liveWind
+    ? `<a href="${escFriendName(liveWind.url)}" target="_blank" rel="noopener" class="spot-cta-btn" onclick="trackCtaClick('${spotName}','live_wind')">🌬 ${escFriendName(liveWind.label)} ↗</a>`
+    : '';
   const websiteBtn = info.website
     ? `<a href="${escFriendName(info.website)}" target="_blank" rel="noopener" class="spot-cta-btn spot-cta-website" onclick="trackCtaClick('${spotName}','website')">🌐 Visit website</a>`
     : '';
 
   const ctaGrid = [
     webcamBtn ? `<div>${webcamBtn}</div>` : '',
-    (lessonBtn || gearBtn) ? `<div class="spot-info-ctas">${lessonBtn}${gearBtn}</div>` : '',
+    (lessonBtn || gearBtn || liveWindBtn) ? `<div class="spot-info-ctas">${lessonBtn}${gearBtn}${liveWindBtn}</div>` : '',
     websiteBtn ? `<div>${websiteBtn}</div>` : '',
   ].filter(Boolean).join('');
 
