@@ -40,7 +40,7 @@ const NOW = new Date('2026-08-16T12:34:00Z')
 const stations = () => mergeFeeds(parseFeed(speedFeed), parseFeed(dirFeed), parseFeed(gustFeed))
 
 // Brouwersdam, the spot BG2 serves
-const BROUWERSDAM = { lat: 51.7629, lon: 3.6217 }
+const BROUWERSDAM = { lat: 51.7629, lon: 3.8512 }
 // Cadzand Bad, ~1km from the CAWI mast
 const CADZAND = { lat: 51.3722, lon: 3.3706 }
 
@@ -101,7 +101,10 @@ describe('nearestStation', () => {
   it('picks the closest station', () => {
     const hit = nearestStation(stations(), BROUWERSDAM.lat, BROUWERSDAM.lon)!
     expect(hit.station.id).toBe('BG2')
-    expect(hit.distanceKm).toBeLessThan(2)
+    // The real Brouwersdam spot is ~15.8km from its mast — well inside the
+    // 30km cap, and the reason that cap exists. Most spots have no mast on top.
+    expect(hit.distanceKm).toBeGreaterThan(14)
+    expect(hit.distanceKm).toBeLessThan(17)
   })
 
   it('matches Cadzand Bad to its mast about 1km away', () => {
