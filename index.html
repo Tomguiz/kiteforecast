@@ -835,6 +835,9 @@
     .premium-badge { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:99px; background:linear-gradient(135deg,#f59e0b,#d97706); color:#000; font-size:.65rem; font-weight:800; letter-spacing:.05em; vertical-align:middle; margin-left:6px; position:relative; cursor:pointer; }
     .premium-badge::before { content:'👑'; font-size:.55rem; position:absolute; top:-7px; right:-4px; line-height:1; }
     .premium-badge.no-crown::before { display:none; }
+    /* Marks a feature that is visible but not released yet. Deliberately
+       neutral so it never reads as a premium/paid marker. */
+    .soon-badge { display:inline-flex; align-items:center; padding:2px 8px; border-radius:99px; background:rgba(148,163,184,.18); color:var(--gray); border:1px solid var(--border); font-size:.6rem; font-weight:800; letter-spacing:.06em; vertical-align:middle; margin-left:6px; }
     .premium-card { background:linear-gradient(135deg,rgba(245,158,11,.1),rgba(217,119,6,.06)); border:1px solid rgba(245,158,11,.3); border-radius:12px; padding:16px; }
     .btn-premium { display:block; width:100%; padding:13px; background:linear-gradient(135deg,#f59e0b,#d97706); color:#000; border:none; border-radius:9px; font-size:.88rem; font-weight:800; cursor:pointer; text-align:center; letter-spacing:.03em; transition:opacity .15s; margin-top:10px; }
     .btn-premium:hover { opacity:.9; }
@@ -1499,6 +1502,13 @@
         </div>
         <input type="file" id="ppAvatarInput" accept="image/*" style="display:none" onchange="uploadAvatar(this)"/>
         <p class="pp-note" style="margin-top:0;margin-bottom:6px">Unique username — visible to friends. Letters, numbers, _ . - allowed.</p>
+        <label class="pp-label" style="margin:8px 0 0 0">Home location</label>
+        <div style="display:flex;gap:6px;align-items:center;width:100%">
+          <input type="text" id="ppHomeInput" class="pp-input" placeholder="e.g. Knokke-Heist" maxlength="80" style="margin:0;flex:1 1 0;width:0;min-width:0"/>
+          <button class="btn pp-save-btn" id="ppHomeFindBtn" onclick="findHomeLocation()" style="margin:0;white-space:nowrap;flex:0 0 auto;width:auto;padding:11px 16px">📍 Find</button>
+        </div>
+        <span id="ppHomeStatus" style="font-size:.65rem;color:var(--tdim);display:block;margin-top:4px"></span>
+        <p class="pp-note" style="margin-top:4px;margin-bottom:6px">Used to find good sessions near you in the weekly digest.</p>
         <div style="border-top:1px solid var(--border);margin:4px 0 8px"></div>
 
         <!-- Share card -->
@@ -1660,6 +1670,18 @@
         </div>
         <div style="padding:0 14px 14px">
           <button class="btn pp-save-btn" id="ppDigestNowBtn" onclick="sendDigestNow()" style="width:100%">📩 Send me the next 7 days forecast</button>
+        </div>
+        <div class="notif-row" id="ppNearbyRow" style="border-top:1px solid var(--border);margin-top:10px;padding-top:12px">
+          <div class="notif-info">
+            <div class="notif-title">Also include sessions near home <span class="soon-badge" id="ppNearbySoonBadge">SOON</span></div>
+            <div class="notif-sub" id="ppNearbyHint"></div>
+            <div style="margin-top:8px;display:flex;align-items:center;gap:8px">
+              <label class="pp-label" style="margin:0">Radius</label>
+              <input type="number" id="ppNearbyKm" class="pp-input" min="25" max="200" step="5" style="margin:0;width:80px;padding:6px 8px" onchange="setDigestNearbyKm(this.value)"/>
+              <span style="font-size:.7rem;color:var(--tdim)">km</span>
+            </div>
+          </div>
+          <button class="pp-toggle" id="ppNearbyToggle" onclick="toggleDigestNearby()"><span></span></button>
         </div>
       </div>
 
@@ -3688,6 +3710,17 @@ async function renderSpotInfoCard(spotName) {
     ? `<span class="spot-info-badge unverified">⚠️ Unclaimed spot</span>`
     : '';
 
+  // Every info.* field below is public-facing (shown to every visitor of
+  // this spot, not just admins) and can originate from a business owner's
+  // own spot-claim submission — reviewed by an admin for legitimacy, but not
+  // proofread character-by-character before hitting "Verify". Escape every
+  // field for the same reason as the admin panel above: the trust boundary
+  // is "did an admin approve this business as the spot's owner", not "is
+  // every field free of markup".
+  // NOTE: href values are HTML-escaped (blocks breaking out of href="...")
+  // but a scheme like javascript: would still run once *clicked* — that is
+  // a distinct gap (URL-scheme validation, not HTML-escaping) left as-is
+  // here rather than guessed at under this pass.
   const ytId = youtubeId(info.livecam_url);
   const webcamBtn = info.livecam_url
     ? ytId
@@ -3697,16 +3730,16 @@ async function renderSpotInfoCard(spotName) {
              <iframe src="https://www.youtube.com/embed/${ytId}?autoplay=0&rel=0&modestbranding=1" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>
            </div>
          </div>`
-      : `<a href="${info.livecam_url}" target="_blank" rel="noopener" class="spot-cta-btn spot-cta-webcam" onclick="trackCtaClick('${spotName}','livecam')">🎥 Live action on the spot — webcam</a>`
+      : `<a href="${escFriendName(info.livecam_url)}" target="_blank" rel="noopener" class="spot-cta-btn spot-cta-webcam" onclick="trackCtaClick('${spotName}','livecam')">🎥 Live action on the spot — webcam</a>`
     : '';
   const lessonBtn = info.lesson_url
-    ? `<a href="${info.lesson_url}" target="_blank" rel="noopener" class="spot-cta-btn spot-cta-lesson" onclick="trackCtaClick('${spotName}','lesson')">🎓 Book a lesson</a>`
+    ? `<a href="${escFriendName(info.lesson_url)}" target="_blank" rel="noopener" class="spot-cta-btn spot-cta-lesson" onclick="trackCtaClick('${spotName}','lesson')">🎓 Book a lesson</a>`
     : '';
   const gearBtn = info.gear_url
-    ? `<a href="${info.gear_url}" target="_blank" rel="noopener" class="spot-cta-btn spot-cta-gear" onclick="trackCtaClick('${spotName}','gear')">🪁 Rent kite gear</a>`
+    ? `<a href="${escFriendName(info.gear_url)}" target="_blank" rel="noopener" class="spot-cta-btn spot-cta-gear" onclick="trackCtaClick('${spotName}','gear')">🪁 Rent kite gear</a>`
     : '';
   const websiteBtn = info.website
-    ? `<a href="${info.website}" target="_blank" rel="noopener" class="spot-cta-btn spot-cta-website" onclick="trackCtaClick('${spotName}','website')">🌐 Visit website</a>`
+    ? `<a href="${escFriendName(info.website)}" target="_blank" rel="noopener" class="spot-cta-btn spot-cta-website" onclick="trackCtaClick('${spotName}','website')">🌐 Visit website</a>`
     : '';
 
   const ctaGrid = [
@@ -3716,24 +3749,24 @@ async function renderSpotInfoCard(spotName) {
   ].filter(Boolean).join('');
 
   const metaRows = [];
-  if(info.address) metaRows.push(`<div class="spot-info-meta-row">📍 <span>${info.address}</span></div>`);
-  if(info.phone && info.phone_public) metaRows.push(`<div class="spot-info-meta-row">📞 <a href="tel:${info.phone}">${info.phone}</a></div>`);
-  if(info.email && info.email_public) metaRows.push(`<div class="spot-info-meta-row">✉️ <a href="mailto:${info.email}">${info.email}</a></div>`);
-  if(info.contact_name) metaRows.push(`<div class="spot-info-meta-row">👤 <span>${info.contact_name}</span></div>`);
+  if(info.address) metaRows.push(`<div class="spot-info-meta-row">📍 <span>${escFriendName(info.address)}</span></div>`);
+  if(info.phone && info.phone_public) metaRows.push(`<div class="spot-info-meta-row">📞 <a href="tel:${escFriendName(info.phone)}">${escFriendName(info.phone)}</a></div>`);
+  if(info.email && info.email_public) metaRows.push(`<div class="spot-info-meta-row">✉️ <a href="mailto:${escFriendName(info.email)}">${escFriendName(info.email)}</a></div>`);
+  if(info.contact_name) metaRows.push(`<div class="spot-info-meta-row">👤 <span>${escFriendName(info.contact_name)}</span></div>`);
   const metaHTML = metaRows.length ? `<div class="spot-info-meta">${metaRows.join('')}</div>` : '';
 
   const socialLinks = [];
-  if(info.instagram_url) socialLinks.push(`<a href="${info.instagram_url}" target="_blank" rel="noopener" onclick="trackCtaClick('${spotName}','instagram')">📸 Instagram</a>`);
-  if(info.facebook_url) socialLinks.push(`<a href="${info.facebook_url}" target="_blank" rel="noopener" onclick="trackCtaClick('${spotName}','facebook')">👥 Facebook</a>`);
-  if(info.livecam_url) socialLinks.push(`<a href="${info.livecam_url}" target="_blank" rel="noopener" onclick="trackCtaClick('${spotName}','livecam')">📷 Live cam</a>`);
+  if(info.instagram_url) socialLinks.push(`<a href="${escFriendName(info.instagram_url)}" target="_blank" rel="noopener" onclick="trackCtaClick('${spotName}','instagram')">📸 Instagram</a>`);
+  if(info.facebook_url) socialLinks.push(`<a href="${escFriendName(info.facebook_url)}" target="_blank" rel="noopener" onclick="trackCtaClick('${spotName}','facebook')">👥 Facebook</a>`);
+  if(info.livecam_url) socialLinks.push(`<a href="${escFriendName(info.livecam_url)}" target="_blank" rel="noopener" onclick="trackCtaClick('${spotName}','livecam')">📷 Live cam</a>`);
   const socialHTML = socialLinks.length ? `<div class="spot-info-social">${socialLinks.join('')}</div>` : '';
 
-  const descHTML = info.description ? `<p style="margin:0;font-size:.78rem;color:var(--gray);line-height:1.6;">${info.description}</p>` : '';
-  const noteHTML = info.membership_note ? `<div class="spot-info-note">ℹ️ ${info.membership_note}</div>` : '';
+  const descHTML = info.description ? `<p style="margin:0;font-size:.78rem;color:var(--gray);line-height:1.6;">${escFriendName(info.description)}</p>` : '';
+  const noteHTML = info.membership_note ? `<div class="spot-info-note">ℹ️ ${escFriendName(info.membership_note)}</div>` : '';
   const tipHTML = info.spot_tip ? `
     <div class="spot-tip-block">
       <div class="spot-tip-label">🤙 Local riders tips</div>
-      <p class="spot-tip-text">${info.spot_tip}</p>
+      <p class="spot-tip-text">${escFriendName(info.spot_tip)}</p>
     </div>` : '';
 
   el.innerHTML = `
@@ -3758,8 +3791,8 @@ async function renderSpotInfoCard(spotName) {
         ${socialHTML}
         ${!info.verified ? `<div style="font-size:.68rem;color:var(--tdim);text-align:center;margin-top:4px;">Owner of this spot? <span style="color:var(--accent);cursor:pointer;" onclick="openClaimFlow()">Claim it to manage and verify your info →</span></div>` : ''}
         ${info.added_by||info._owner_name ? `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:.68rem;color:var(--tdim);text-align:center;">
-          ${info.added_by ? `🌍 Spot added by community member <strong style="color:var(--gray)">${info.added_by}</strong>` : ''}
-          ${info._owner_name ? `${info.added_by?'<br>':''}🏴 Spot owned by <strong style="color:var(--gray)">${info._owner_name}</strong>` : ''}
+          ${info.added_by ? `🌍 Spot added by community member <strong style="color:var(--gray)">${escFriendName(info.added_by)}</strong>` : ''}
+          ${info._owner_name ? `${info.added_by?'<br>':''}🏴 Spot owned by <strong style="color:var(--gray)">${escFriendName(info._owner_name)}</strong>` : ''}
         </div>` : ''}
         <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;">
           ${(()=>{const p=loadProfile();const isOwner=p.email&&info._owner_email&&p.email===info._owner_email;const isAdmin=p.isAdmin;return isOwner?`<span style="font-size:.68rem;color:var(--accent);cursor:pointer;display:inline-flex;align-items:center;gap:4px;font-weight:600" onclick="openAdminEditFromSpot()">✏️ Edit my spot info</span>`:`<span style="font-size:.68rem;color:var(--tdim);cursor:pointer;display:inline-flex;align-items:center;gap:4px;" onclick="openSuggestUpdate()">✏️ Suggest an update</span>${isAdmin?`<span style="font-size:.68rem;color:#fb923c;cursor:pointer;display:inline-flex;align-items:center;gap:4px;font-weight:700" onclick="openAdminEditFromSpot()">⚡ Admin: Edit directly</span>`:''}`;})()}
@@ -5376,6 +5409,7 @@ function openProfilePanel(tab){
     openProfileSheet();
     const _p=loadProfile();
     const _ni=$('ppNicknameInput'); if(_ni) _ni.value=_p.nickname||'';
+    const _hi=$('ppHomeInput'); if(_hi) _hi.value=_p.homeLabel||'';
     updateNicknameReq();
     // Set save button initial state: dim if nickname already saved, default if not yet set
     (function(){ const btn=$('ppNicknameSaveBtn'); if(!btn) return;
@@ -5510,14 +5544,14 @@ function openSuggestUpdate(){
   }).join('');
 
   $('suggestUpdateContent').innerHTML=`
-    <div style="font-size:.75rem;color:var(--tdim);margin-bottom:18px;">Spot: <strong style="color:var(--text)">${cachedLoc.name}</strong> — community suggestions, reviewed by admin before going live.</div>
+    <div style="font-size:.75rem;color:var(--tdim);margin-bottom:18px;">Spot: <strong style="color:var(--text)">${escFriendName(cachedLoc.name)}</strong> — community suggestions, reviewed by admin before going live.</div>
 
     <label class="pp-label">Good wind directions <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(tap to toggle)</span></label>
     <div id="suDirBtns" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:18px">${dirBtns}</div>
 
     <label class="pp-label">Local riders tips <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">— visible to all kiters on this spot</span></label>
     ${info.spot_tip?`<div style="font-size:.68rem;color:#38bdf8;margin-bottom:6px;display:flex;align-items:center;gap:4px">✏️ Current tip shown below — edit freely and submit your update</div>`:''}
-    <textarea id="suTip" class="pp-input" rows="4" placeholder="e.g. Shallow at low tide, best at high tide. Avoid S swell. Parking on the north side." style="margin-bottom:6px;resize:vertical;min-height:88px;font-family:inherit;font-size:.85rem${info.spot_tip?';border-color:rgba(56,189,248,.4)':''}">${info.spot_tip||''}</textarea>
+    <textarea id="suTip" class="pp-input" rows="4" placeholder="e.g. Shallow at low tide, best at high tide. Avoid S swell. Parking on the north side." style="margin-bottom:6px;resize:vertical;min-height:88px;font-family:inherit;font-size:.85rem${info.spot_tip?';border-color:rgba(56,189,248,.4)':''}">${escFriendName(info.spot_tip||'')}</textarea>
     <div style="font-size:.67rem;color:var(--tdim);margin-bottom:18px;">Want to update business info, booking links or contact details? <span style="color:var(--accent);cursor:pointer" onclick="closeSuggestUpdate();openClaimFlow()">Claim this spot →</span></div>
 
     <label class="pp-label" style="margin-top:6px">🪁 Spot attributes <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">— what you can ride & what's here</span></label>
@@ -5796,7 +5830,7 @@ async function renderMySpot(){
         :c.status==='rejected'
         ?`<div style="display:flex;align-items:center;gap:8px"><span style="color:#f87171;font-size:.68rem;font-weight:700;">✕ Rejected</span><button class="claim-withdraw-btn" data-wid="${c.id}" style="background:none;border:none;color:var(--tdim);font-size:.65rem;cursor:pointer;padding:2px 4px;text-decoration:underline">Remove</button></div>`
         :`<div style="display:flex;align-items:center;gap:8px"><span style="color:#f59e0b;font-size:.68rem;font-weight:700;">⏳ Pending</span><button class="claim-withdraw-btn" data-wid="${c.id}" style="background:none;border:none;color:var(--tdim);font-size:.65rem;cursor:pointer;padding:2px 4px;text-decoration:underline">Withdraw</button></div>`;
-      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><span style="font-size:.78rem;color:var(--text)">${c.spot_name}</span>${badge}</div>`;
+      return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)"><span style="font-size:.78rem;color:var(--text)">${escFriendName(c.spot_name)}</span>${badge}</div>`;
     }).join('')}`:'';
 
   const approvedReqsHTML=(approvedReqs&&approvedReqs.length)?`
@@ -5804,7 +5838,7 @@ async function renderMySpot(){
       <div class="stats-section-title" style="margin-bottom:8px">Spots you requested</div>
       ${approvedReqs.map(r=>`
         <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:rgba(74,222,128,.06);border:1px solid rgba(74,222,128,.2);border-radius:10px;margin-bottom:8px;">
-          <span style="font-size:.82rem;font-weight:600;color:var(--text)">📍 ${r.suggested_name}</span>
+          <span style="font-size:.82rem;font-weight:600;color:var(--text)">📍 ${escFriendName(r.suggested_name)}</span>
           <span style="background:rgba(74,222,128,.15);border:1px solid rgba(74,222,128,.3);border-radius:99px;padding:2px 10px;font-size:.7rem;font-weight:700;color:#4ade80;">✓ Added</span>
         </div>`).join('')}
     </div>`:'' ;
@@ -5861,8 +5895,8 @@ async function renderMyContributions(){
       :`<span style="color:#f59e0b;font-size:.68rem;font-weight:700;white-space:nowrap;">⏳ Pending</span>`;
     return `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:10px 0;border-bottom:1px solid var(--border)">
       <div style="flex:1;min-width:0">
-        <div style="font-size:.82rem;font-weight:600;color:var(--text)">${s.spot_name}</div>
-        ${detail?`<div style="font-size:.72rem;color:var(--tdim);margin-top:2px">${detail}</div>`:''}
+        <div style="font-size:.82rem;font-weight:600;color:var(--text)">${escFriendName(s.spot_name)}</div>
+        ${detail?`<div style="font-size:.72rem;color:var(--tdim);margin-top:2px">${escFriendName(detail)}</div>`:''}
         <div style="font-size:.65rem;color:var(--tdim);margin-top:2px">${new Date(s.created_at).toLocaleDateString('en',{day:'numeric',month:'short',year:'numeric'})}</div>
       </div>
       ${badge}
@@ -5877,7 +5911,7 @@ async function renderMyContributions(){
       :`<span style="color:#f59e0b;font-size:.68rem;font-weight:700;white-space:nowrap;">⏳ Pending review</span>`;
     return `<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:10px 0;border-bottom:1px solid var(--border)">
       <div style="flex:1;min-width:0">
-        <div style="font-size:.82rem;font-weight:600;color:var(--text)">${r.suggested_name}</div>
+        <div style="font-size:.82rem;font-weight:600;color:var(--text)">${escFriendName(r.suggested_name)}</div>
         <div style="font-size:.65rem;color:var(--tdim);margin-top:2px">${new Date(r.created_at).toLocaleDateString('en',{day:'numeric',month:'short',year:'numeric'})}</div>
       </div>
       ${badge}
@@ -6306,7 +6340,7 @@ async function loadAttendances(){
       let html='';
       if(myAttend) html+=`✓ Going · ${myAttend.start_time}`;
       if(theirList.length){
-        const names=theirList.map(r=>r.nickname).join(', ');
+        const names=theirList.map(r=>escFriendName(r.nickname)).join(', ');
         html+=(html?'<br>':'')+`<span style="font-size:.58rem;color:#4ade80">👥 ${names}</span>`;
       }
       ind.innerHTML=html;
@@ -6495,12 +6529,15 @@ async function renderFriendsPanel(){
     reqSection.style.display='block';
     // Fetch nicknames for requesters
     const emails=incoming.map(r=>r.requester);
-    const{data:profiles}=await sb.from('public_profiles').select('email,nickname').in('email',emails);
+    // is_premium too: the outer premiumMap is declared further down, so
+    // referencing it here would hit the temporal dead zone.
+    const{data:profiles}=await sb.from('public_profiles').select('email,nickname,is_premium').in('email',emails);
     const nickMap=Object.fromEntries((profiles||[]).map(p=>[p.email,p.nickname||p.email]));
+    const reqPremium=Object.fromEntries((profiles||[]).map(p=>[p.email,!!p.is_premium]));
     reqList.innerHTML=incoming.map(r=>`
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.2);border-radius:10px;padding:10px 12px;">
         <div>
-          <div style="font-size:.82rem;font-weight:700;color:#fbbf24">${nickMap[r.requester]||r.requester}</div>
+          <div style="font-size:.82rem;font-weight:700;color:#fbbf24">${escFriendName(nickMap[r.requester]||r.requester)}${reqPremium[r.requester]?' <span title="Premium member" style="font-size:.8rem">👑</span>':''}</div>
           <div style="font-size:.7rem;color:var(--tdim)">wants to be your friend</div>
         </div>
         <div style="display:flex;gap:6px">
@@ -6538,7 +6575,7 @@ async function renderFriendsPanel(){
   // Outgoing pending requests (always shown if any)
   const outgoingHtml = outgoing.map(r=>`
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 0;border-bottom:1px solid var(--border);font-size:.8rem;color:var(--tdim)">
-      <span>⏳ Request sent to <strong style="color:var(--text)">${nickMap[r.recipient]||'someone'}</strong></span>
+      <span>⏳ Request sent to <strong style="color:var(--text)">${escFriendName(nickMap[r.recipient]||'someone')}</strong>${premiumMap[r.recipient]?' <span title="Premium member" style="font-size:.8rem">👑</span>':''}</span>
       <button class="btn-reset" data-frid="${r.id}" style="font-size:.7rem;color:#f87171;padding:4px 8px;border:1px solid rgba(248,113,113,.3);border-radius:6px;white-space:nowrap" onclick="cancelFriendRequest('${r.id}')">Cancel</button>
     </div>`).join('');
 
@@ -6548,9 +6585,9 @@ async function renderFriendsPanel(){
       const fe=r.requester===email?r.recipient:r.requester;
       return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 0;border-bottom:1px solid var(--border);">
         <div style="display:flex;align-items:center;gap:10px">
-          <div style="width:34px;height:34px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:800;color:#000;flex-shrink:0">${(nickMap[fe]||'?')[0].toUpperCase()}</div>
+          <div style="width:34px;height:34px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:800;color:#000;flex-shrink:0">${escFriendName((nickMap[fe]||'?')[0].toUpperCase())}</div>
           <div>
-            <div style="font-size:.82rem;font-weight:700;color:var(--text)">${nickMap[fe]||fe}${premiumMap[fe]?' <span title="Premium member" style="font-size:.8rem">👑</span>':''}</div>
+            <div style="font-size:.82rem;font-weight:700;color:var(--text)">${escFriendName(nickMap[fe]||fe)}${premiumMap[fe]?' <span title="Premium member" style="font-size:.8rem">👑</span>':''}</div>
             <div style="font-size:.7rem;color:var(--tdim)">${premiumMap[fe]?'premium friend':'friend'}${receivesMap[fe]===false?' · <span style="color:#f59e0b" title="This friend turned off &quot;Receive&quot; friend session alerts, so they will not get your session emails">🔕 alerts off</span>':''}</div>
           </div>
         </div>
@@ -6594,11 +6631,20 @@ async function doFriendSearch(query){
       ?`<span style="font-size:.72rem;color:#4ade80">✓ Friends</span>`
       :isPending
       ?`<span style="font-size:.72rem;color:var(--tdim)">⏳ Pending</span>`
-      :`<button class="btn pp-save-btn" style="font-size:.72rem;padding:5px 12px" onclick="sendFriendRequest('${u.email}','${u.nickname}')">Add friend</button>`;
+      // Untrusted values (email, nickname) must not be spliced into the JS
+      // source of an inline onclick: HTML-escaping a nickname does not stop
+      // it breaking out of the single-quoted JS string argument here, since
+      // the browser HTML-decodes the attribute BEFORE handing it to the JS
+      // parser — a nickname containing a raw or &#39;-escaped apostrophe
+      // still terminates the string either way. Route them through
+      // data-* attributes instead (properly protected by HTML-attribute
+      // escaping) and read them back via .dataset in a static onclick body
+      // that contains no interpolated attacker data at all.
+      :`<button class="btn pp-save-btn" style="font-size:.72rem;padding:5px 12px" data-email="${escFriendName(u.email)}" data-nick="${escFriendName(u.nickname||'')}" onclick="sendFriendRequest(this.dataset.email,this.dataset.nick)">Add friend</button>`;
     return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">
       <div style="display:flex;align-items:center;gap:8px">
-        <div style="width:30px;height:30px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:800;color:#000;flex-shrink:0">${(u.nickname||'?')[0].toUpperCase()}</div>
-        <span style="font-size:.82rem;font-weight:600;color:var(--text)">${u.nickname}</span>
+        <div style="width:30px;height:30px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:800;color:#000;flex-shrink:0">${escFriendName((u.nickname||'?')[0].toUpperCase())}</div>
+        <span style="font-size:.82rem;font-weight:600;color:var(--text)">${escFriendName(u.nickname)}</span>
       </div>
       ${btn}
     </div>`;
@@ -7024,14 +7070,19 @@ async function renderAdminPanel(){
   const pendingUpdates = updateSuggData||[];
   const pendingClaims = (claimData||[]).filter(c=>!c.verified);
 
+  // Everything in suggRows/rows/updateRows/claims below can originate from a
+  // public, unauthenticated submission (suggest-a-spot, claim-a-spot, or
+  // suggest-an-update) that the admin has not reviewed yet — so every string
+  // field from those rows must be escaped before landing in this admin-only
+  // innerHTML. An admin session is a much higher-value target than a friend's.
   const suggRows = pendingSuggs.map(s=>`
     <div style="background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.25);border-radius:10px;padding:12px 14px;margin-bottom:8px;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
         <div style="flex:1">
-          <div style="font-size:.82rem;font-weight:700;color:#fbbf24">${s.suggested_name}</div>
-          <div style="font-size:.72rem;color:var(--tdim);margin-top:2px">${s.location||'—'} · ${s.lat&&s.lon?`${s.lat}, ${s.lon}`:'no coords'}</div>
-          ${s.note?`<div style="font-size:.72rem;color:var(--tdim);margin-top:3px">${s.note}</div>`:''}
-          <div style="font-size:.7rem;color:var(--tdim);margin-top:3px">By: ${s.submitted_by||'anonymous'} · ${new Date(s.created_at).toLocaleDateString()}</div>
+          <div style="font-size:.82rem;font-weight:700;color:#fbbf24">${escFriendName(s.suggested_name)}</div>
+          <div style="font-size:.72rem;color:var(--tdim);margin-top:2px">${escFriendName(s.location||'—')} · ${s.lat&&s.lon?`${s.lat}, ${s.lon}`:'no coords'}</div>
+          ${s.note?`<div style="font-size:.72rem;color:var(--tdim);margin-top:3px">${escFriendName(s.note)}</div>`:''}
+          <div style="font-size:.7rem;color:var(--tdim);margin-top:3px">By: ${escFriendName(s.submitted_by||'anonymous')} · ${new Date(s.created_at).toLocaleDateString()}</div>
         </div>
         <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
           <button class="btn pp-save-btn" style="font-size:.72rem;padding:6px 12px;white-space:nowrap" onclick="adminApproveRequest('${s.id}')">Review &amp; add →</button>
@@ -7040,11 +7091,17 @@ async function renderAdminPanel(){
       </div>
     </div>`).join('');
 
+  // spot_name can trace back to an approved suggestion's suggested_name, so
+  // it is not purely admin-authored either. Route the click through a
+  // data-attribute (escaped, safe in any HTML attribute) and a wired
+  // listener instead of splicing it into an inline onclick's JS string — the
+  // previous `.replace(/'/g,...)` only defused the JS-string quote, not a
+  // raw `"` breaking out of the onclick="..." attribute itself.
   const rows=_adminSpots.map(s=>`
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="adminOpenSpot('${s.spot_name.replace(/'/g,"\\'")}')">
+    <div class="admin-spot-row" data-spot="${escFriendName(s.spot_name)}" style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);cursor:pointer">
       <div>
-        <div style="font-size:.82rem;font-weight:700;color:var(--text)">${s.display_name||s.business_name||s.spot_name}</div>
-        <div style="font-size:.7rem;color:var(--tdim)">${s.spot_name}${s.verified?' · ✓ Verified':' · ⚠️ Unverified'}</div>
+        <div style="font-size:.82rem;font-weight:700;color:var(--text)">${escFriendName(s.display_name||s.business_name||s.spot_name)}</div>
+        <div style="font-size:.7rem;color:var(--tdim)">${escFriendName(s.spot_name)}${s.verified?' · ✓ Verified':' · ⚠️ Unverified'}</div>
       </div>
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color:var(--tdim)"><polyline points="9 18 15 12 9 6"/></svg>
     </div>`).join('');
@@ -7066,9 +7123,9 @@ async function renderAdminPanel(){
     return `<div style="background:rgba(0,212,255,.06);border:1px solid rgba(0,212,255,.2);border-radius:10px;padding:12px 14px;margin-bottom:8px;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
         <div style="flex:1">
-          <div style="font-size:.82rem;font-weight:700;color:var(--accent)">${u.spot_name}</div>
-          <div style="font-size:.7rem;color:var(--tdim);margin-top:3px;line-height:1.5">${fields||'(no changes noted)'}</div>
-          <div style="font-size:.7rem;color:var(--tdim);margin-top:3px">By: ${u.email} · ${new Date(u.created_at).toLocaleDateString()}</div>
+          <div style="font-size:.82rem;font-weight:700;color:var(--accent)">${escFriendName(u.spot_name)}</div>
+          <div style="font-size:.7rem;color:var(--tdim);margin-top:3px;line-height:1.5">${escFriendName(fields)||'(no changes noted)'}</div>
+          <div style="font-size:.7rem;color:var(--tdim);margin-top:3px">By: ${escFriendName(u.email)} · ${new Date(u.created_at).toLocaleDateString()}</div>
         </div>
         <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
           <button class="btn pp-save-btn" style="font-size:.7rem;padding:5px 10px;white-space:nowrap" onclick="adminApplyUpdate(${JSON.stringify(u).replace(/"/g,'&quot;')})">Apply →</button>
@@ -7089,14 +7146,14 @@ async function renderAdminPanel(){
     <div style="background:rgba(56,189,248,.06);border:1px solid rgba(56,189,248,.2);border-radius:10px;padding:12px 14px;margin-bottom:8px;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;">
         <div style="flex:1;min-width:0">
-          <div style="font-size:.82rem;font-weight:700;color:#38bdf8">${c.spot_name}</div>
-          <div style="font-size:.72rem;color:var(--tdim);margin-top:2px">${c.business_name||'—'} · <a href="mailto:${c.email}" style="color:var(--tdim)">${c.email}</a></div>
-          ${c.website?`<div style="font-size:.7rem;color:var(--tdim);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.website}</div>`:''}
+          <div style="font-size:.82rem;font-weight:700;color:#38bdf8">${escFriendName(c.spot_name)}</div>
+          <div style="font-size:.72rem;color:var(--tdim);margin-top:2px">${escFriendName(c.business_name||'—')} · <a href="mailto:${escFriendName(c.email)}" style="color:var(--tdim)">${escFriendName(c.email)}</a></div>
+          ${c.website?`<div style="font-size:.7rem;color:var(--tdim);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escFriendName(c.website)}</div>`:''}
           <div style="font-size:.7rem;color:var(--tdim);margin-top:3px">${new Date(c.created_at).toLocaleDateString()}</div>
         </div>
         <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
-          <button class="btn pp-save-btn admin-verify-btn" data-id="${c.id}" data-spot="${c.spot_name}" data-email="${c.email}" style="font-size:.7rem;padding:5px 12px;white-space:nowrap">✓ Verify</button>
-          <button class="admin-reject-btn" data-id="${c.id}" data-spot="${c.spot_name}" data-email="${c.email}" style="font-size:.7rem;padding:5px 12px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-radius:8px;color:#f87171;cursor:pointer;white-space:nowrap">✕ Reject</button>
+          <button class="btn pp-save-btn admin-verify-btn" data-id="${c.id}" data-spot="${escFriendName(c.spot_name)}" data-email="${escFriendName(c.email)}" style="font-size:.7rem;padding:5px 12px;white-space:nowrap">✓ Verify</button>
+          <button class="admin-reject-btn" data-id="${c.id}" data-spot="${escFriendName(c.spot_name)}" data-email="${escFriendName(c.email)}" style="font-size:.7rem;padding:5px 12px;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-radius:8px;color:#f87171;cursor:pointer;white-space:nowrap">✕ Reject</button>
         </div>
       </div>
     </div>`).join('')}
@@ -7109,6 +7166,13 @@ async function renderAdminPanel(){
     <button class="btn pp-save-btn" onclick="adminOpenSpot(null)" style="margin-bottom:14px;width:100%">+ Add new spot</button>
     ${rows||'<div class="stats-empty">No spots yet.</div>'}
     <div id="adminEditForm" style="display:none;margin-top:16px"></div>`;
+
+  // Wire spot-list row clicks (data-spot is HTML-escaped above; .dataset
+  // decodes it back to the real name, so this never re-parses attacker text
+  // as an inline onclick's JS source).
+  el.querySelectorAll('.admin-spot-row').forEach(row=>{
+    row.onclick=()=>adminOpenSpot(row.dataset.spot);
+  });
 
   // Wire claim action buttons (avoids CSP issues with inline onclick)
   const verifyBtns=el.querySelectorAll('.admin-verify-btn');
@@ -7198,7 +7262,16 @@ async function adminApproveRequest(suggId, sugg){
 
 async function adminOpenSpot(spotName, prefill){
   const el=$('adminEditForm'); if(!el) return;
-  const s=prefill||(spotName?(_adminSpots||[]).find(x=>x.spot_name===spotName):null);
+  const raw=prefill||(spotName?(_adminSpots||[]).find(x=>x.spot_name===spotName):null);
+  // Every string field below lands in an HTML attribute (value="...") or a
+  // <textarea> body. `prefill` can come straight from a public "suggest a
+  // spot" submission (adminApproveRequest) — a request the admin has not yet
+  // reviewed — so escape every string field up front rather than chasing
+  // each interpolation site individually. HTML-attribute/textarea escaping
+  // round-trips correctly: the browser decodes entities back to the original
+  // characters when it populates .value, so this does not corrupt what the
+  // admin sees or ultimately saves.
+  const s=raw?Object.fromEntries(Object.entries(raw).map(([k,v])=>[k,typeof v==='string'?escFriendName(v):v])):raw;
   el.style.display='block';
   el.scrollIntoView({behavior:'smooth',block:'start'});
   el.dataset.origSpotName=spotName||'';
@@ -7208,17 +7281,17 @@ async function adminOpenSpot(spotName, prefill){
   const attrSectionHTML=`
       <div style="margin:14px 0 4px;font-size:.78rem;font-weight:700;color:var(--accent)">🪁 Spot attributes</div>
       <label class="pp-label">Disciplines</label>
-      ${attrMultiHTML('adDisciplines',SPOT_DISCIPLINES,s?.disciplines)}
+      ${attrMultiHTML('adDisciplines',SPOT_DISCIPLINES,raw?.disciplines)}
       <label class="pp-label">Facilities</label>
-      ${attrMultiHTML('adFacilities',SPOT_FACILITIES,s?.facilities)}
+      ${attrMultiHTML('adFacilities',SPOT_FACILITIES,raw?.facilities)}
       <label class="pp-label">Water type</label>
-      ${attrSingleHTML('adWaterType',SPOT_WATER_TYPES,s?.water_type)}
+      ${attrSingleHTML('adWaterType',SPOT_WATER_TYPES,raw?.water_type)}
       <label class="pp-label">Tide</label>
-      ${attrSingleHTML('adTidePref',SPOT_TIDE_PREFS,s?.tide_pref)}
+      ${attrSingleHTML('adTidePref',SPOT_TIDE_PREFS,raw?.tide_pref)}
       <label class="pp-label">Crowd</label>
-      ${attrSingleHTML('adCrowdLevel',SPOT_CROWD_LEVELS,s?.crowd_level)}
+      ${attrSingleHTML('adCrowdLevel',SPOT_CROWD_LEVELS,raw?.crowd_level)}
       <label class="pp-label">Suitable level</label>
-      ${attrSingleHTML('adSkillLevel',SPOT_SKILL_LEVELS,s?.skill_level)}`;
+      ${attrSingleHTML('adSkillLevel',SPOT_SKILL_LEVELS,raw?.skill_level)}`;
   const suggBanner=s?._suggId?`<div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:10px 14px;font-size:.78rem;color:#fbbf24;margin-bottom:14px">📥 Spot request from <strong>${s._submittedBy||'a user'}</strong> — review, adjust if needed, then save.</div>`:'';
   el.innerHTML=`
     <div style="background:rgba(0,212,255,.05);border:1px solid rgba(0,212,255,.2);border-radius:12px;padding:16px;">
@@ -7879,6 +7952,7 @@ function updatePremiumUI(){
   const notifyFriendsBadge=$('ppNotifyFriendsBadge');
   // Show who actually receives the alerts (premium-only, same as the toggle).
   renderFriendsReach();
+  renderNearbyToggle();
   if(notifyFriendsToggle){
     notifyFriendsToggle.onclick=premium?toggleNotifyFriends:()=>{ showToast('⚡ Premium only — upgrade to notify friends when you hit the water', 4000, '#f59e0b'); openProfilePanel('profile'); };
     notifyFriendsToggle.style.opacity=premium?'':'0.4';
@@ -7905,7 +7979,7 @@ function updatePremiumUI(){
 
 async function syncPremiumFromSupabase(email){
   const sb=getSb(); if(!sb||!email) return;
-  const{data,error}=await sb.from('profiles').select('is_premium,sms_enabled,phone_number,is_admin,nickname,friend_session_notifs,notify_friends_on_confirm,avatar_url,contribution_points,premium_until,notifs_enabled').eq('email',email).single();
+  const{data,error}=await sb.from('profiles').select('is_premium,sms_enabled,phone_number,is_admin,nickname,friend_session_notifs,notify_friends_on_confirm,avatar_url,contribution_points,premium_until,notifs_enabled,home_lat,home_lon,home_label,digest_nearby_enabled,digest_nearby_km').eq('email',email).single();
   console.log('[syncPremium] email=',email,'data=',data,'error=',error?.message);
   const p=loadProfile();
   if(data){
@@ -7923,6 +7997,9 @@ async function syncPremiumFromSupabase(email){
       p.notifsEnabled=data.notifs_enabled!==false;
     p.contributionPoints=data.contribution_points||0;
     p.premiumUntil=data.premium_until||null;
+    p.homeLat=data.home_lat; p.homeLon=data.home_lon; p.homeLabel=data.home_label;
+    p.digestNearbyEnabled=data.digest_nearby_enabled===true;
+    p.digestNearbyKm=data.digest_nearby_km||120;
     saveProfile(p);
     const fst=$('ppFriendSessionToggle');
     if(fst) fst.classList.toggle('on', p.friendSessionNotifs!==false);
@@ -8294,6 +8371,43 @@ async function saveNickname(fromModal){
 
   // Dismiss modal if called from it
   if(fromModal){ const m=$('nicknameModal'); if(m) m.remove(); showToast('👋 Welcome, '+val+'!'); }
+}
+// ── HOME LOCATION ──────────────────────────────────────────────────────────
+// Feeds the digest's "near you" section. Reuses the same Nominatim geocoder as
+// the spot-suggestion form; coordinates are stored, the label is for display.
+async function findHomeLocation(){
+  const q=($('ppHomeInput')?.value||'').trim();
+  const status=$('ppHomeStatus'); const btn=$('ppHomeFindBtn');
+  if(!q){ showToast('Enter a town or city first'); return; }
+  if(btn){ btn.disabled=true; btn.textContent='⏳'; }
+  if(status){ status.style.color='var(--tdim)'; status.textContent='Searching…'; }
+  try{
+    const url='https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(q);
+    const res=await fetch(url,{headers:{'Accept':'application/json'},signal:AbortSignal.timeout(10000)});
+    if(!res.ok) throw new Error('http '+res.status);
+    const arr=await res.json();
+    if(!Array.isArray(arr)||!arr.length){
+      if(status){ status.textContent='⚠️ Couldn\'t find that place — try adding the country.'; status.style.color='#f59e0b'; }
+      return;
+    }
+    const top=arr[0];
+    const lat=parseFloat(top.lat), lon=parseFloat(top.lon);
+    if(isNaN(lat)||isNaN(lon)){ if(status){ status.textContent='⚠️ No coordinates returned — try another search.'; status.style.color='#f59e0b'; } return; }
+    await saveHomeLocation(lat, lon, top.display_name||q);
+    if(status){ status.textContent='✓ '+(top.display_name||q); status.style.color='#4ade80'; }
+  }catch(e){
+    if(status){ status.textContent='⚠️ Couldn\'t reach the geocoder — try again.'; status.style.color='#f59e0b'; }
+  }finally{
+    if(btn){ btn.disabled=false; btn.textContent='📍 Find'; }
+  }
+}
+async function saveHomeLocation(lat, lon, label){
+  const p=loadProfile();
+  p.homeLat=lat; p.homeLon=lon; p.homeLabel=label;
+  saveProfile(p);
+  const sb=getSb(); if(!sb||!p.email) return;
+  await sb.from('profiles').upsert({email:p.email, home_lat:lat, home_lon:lon, home_label:label},{onConflict:'email'});
+  if(typeof renderNearbyToggle==='function') renderNearbyToggle();
 }
 // ── AUTH ──
 async function initAuth(){
@@ -8667,12 +8781,20 @@ function updateAuthUI(){
     // Profile avatar: prefer user-uploaded, fall back to OAuth provider avatar
     const avatarUrl=p.avatar_url||_authSession.user.user_metadata?.avatar_url||_authSession.user.user_metadata?.picture||'';
     const displayName=p.nickname||_authSession.user.user_metadata?.full_name||_authSession.user.user_metadata?.name||'';
+    // avatar_url is normally set by the upload flow (a data: URL) but the
+    // profile row can be PATCHed directly, so escape it the same way as any
+    // other user-controlled value landing in an HTML attribute.
     const avatarHtml=avatarUrl
-      ?`<img src="${avatarUrl}" alt="" style="width:40px;height:40px;border-radius:50%;object-fit:cover;flex-shrink:0;border:2px solid rgba(255,255,255,.15);" onerror="this.style.display='none'">`
+      ?`<img src="${escFriendName(avatarUrl)}" alt="" style="width:40px;height:40px;border-radius:50%;object-fit:cover;flex-shrink:0;border:2px solid rgba(255,255,255,.15);" onerror="this.style.display='none'">`
       :`<span style="font-size:1.3rem;line-height:1;flex-shrink:0">${isPremium()?'👑':'✅'}</span>`;
+    // displayName is the signed-in user's own nickname — only ever shown back
+    // to themselves here, so this is self-XSS at worst, not cross-user. Still
+    // escaped for defense in depth since it's the same unescaped-into-innerHTML
+    // shape as the cross-user cases above.
+    const displayNameSafe=displayName?escFriendName(displayName):'';
     if(signedInCard) signedInCard.innerHTML=isPremium()
-      ?`${avatarHtml}<div style="flex:1;min-width:0">${displayName?`<p style="margin:0 0 1px;font-size:.85rem;font-weight:700;color:#f59e0b;">${displayName} 👑</p>`:'<p style="margin:0 0 1px;font-size:.85rem;font-weight:700;color:#f59e0b;">Premium</p>'}<p id="ppLoggedEmail" style="margin:0;font-size:.78rem;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_authSession.user.email}</p></div>`
-      :`${avatarHtml}<div style="flex:1;min-width:0">${displayName?`<p style="margin:0 0 1px;font-size:.85rem;font-weight:700;color:#f1f5f9;">${displayName}</p>`:'<p style="margin:0 0 1px;font-size:.85rem;font-weight:700;color:#f1f5f9;">Signed in</p>'}<p id="ppLoggedEmail" style="margin:0;font-size:.78rem;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_authSession.user.email}</p></div>`;
+      ?`${avatarHtml}<div style="flex:1;min-width:0">${displayNameSafe?`<p style="margin:0 0 1px;font-size:.85rem;font-weight:700;color:#f59e0b;">${displayNameSafe} 👑</p>`:'<p style="margin:0 0 1px;font-size:.85rem;font-weight:700;color:#f59e0b;">Premium</p>'}<p id="ppLoggedEmail" style="margin:0;font-size:.78rem;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_authSession.user.email}</p></div>`
+      :`${avatarHtml}<div style="flex:1;min-width:0">${displayNameSafe?`<p style="margin:0 0 1px;font-size:.85rem;font-weight:700;color:#f1f5f9;">${displayNameSafe}</p>`:'<p style="margin:0 0 1px;font-size:.85rem;font-weight:700;color:#f1f5f9;">Signed in</p>'}<p id="ppLoggedEmail" style="margin:0;font-size:.78rem;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_authSession.user.email}</p></div>`;
     // Populate avatar upload preview widget
     _setAvatarPreview(avatarUrl);
     const initEl=$('ppAvatarInitials'); if(initEl&&!avatarUrl) initEl.textContent=getInitials(_authSession.user.email);
@@ -8685,7 +8807,7 @@ function updateAuthUI(){
     btn.classList.add('logged-in');
     const crownBadge=isPremium()?`<span style="position:absolute;top:-8px;left:-8px;font-size:20px;line-height:1;filter:drop-shadow(0 1px 3px rgba(0,0,0,.6));">👑</span>`:'';
     if(avatarUrl){
-      btn.innerHTML=`<img src="${avatarUrl}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'profile-btn-initials',textContent:'${initials}'}))"/>${crownBadge}<span class="profile-btn-dot" id="profileDot"></span>`;
+      btn.innerHTML=`<img src="${escFriendName(avatarUrl)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;" onerror="this.replaceWith(Object.assign(document.createElement('span'),{className:'profile-btn-initials',textContent:'${initials}'}))"/>${crownBadge}<span class="profile-btn-dot" id="profileDot"></span>`;
     } else {
       btn.innerHTML=`<span class="profile-btn-initials">${initials}</span>${crownBadge}<span class="profile-btn-dot" id="profileDot"></span>`;
     }
@@ -8746,6 +8868,61 @@ async function toggleNotifyFriends(){
   showToast(p.notifyFriendsOnConfirm===false ? 'Friends send alerts: off' : 'Friends send alerts: on');
   renderFriendsReach();
 }
+// ── DIGEST: SESSIONS NEAR HOME ─────────────────────────────────────────────
+// Opt-in: it changes what the weekly email contains, so it never turns itself
+// on. Gated on a home location — without coordinates there is nothing to
+// search around.
+//
+// NOT RELEASED YET. The row is visible so users know it is coming, but the
+// toggle is inert and writes nothing. Flip this one constant to release.
+// `let`, not `const`: releasing is still a one-line change, but tests can flip
+// it to prove the released path actually renders as released.
+let NEARBY_RELEASED = false;
+function hasHomeLocation(){
+  const p=loadProfile();
+  return typeof p.homeLat==='number' && typeof p.homeLon==='number';
+}
+function renderNearbyToggle(){
+  const row=$('ppNearbyRow'); if(!row) return;
+  const p=loadProfile();
+  const hint=$('ppNearbyHint'), toggle=$('ppNearbyToggle'), km=$('ppNearbyKm');
+  const soon=$('ppNearbySoonBadge');
+  if(soon) soon.style.display = NEARBY_RELEASED ? 'none' : 'inline-flex';
+  if(km) km.value=String(p.digestNearbyKm||120);
+  if(!NEARBY_RELEASED){
+    if(hint) hint.textContent='Coming soon — we are still building this';
+    if(toggle){ toggle.classList.remove('on'); toggle.style.opacity='0.4'; }
+    if(km) km.disabled=true;
+    return;
+  }
+  if(km) km.disabled=false;
+  if(hasHomeLocation()){
+    if(hint) hint.textContent='Good sessions around '+(p.homeLabel||'your home location');
+    if(toggle){ toggle.classList.toggle('on', p.digestNearbyEnabled===true); toggle.style.opacity=''; }
+  }else{
+    if(hint) hint.textContent='Set a home location in your profile to use this';
+    if(toggle){ toggle.classList.remove('on'); toggle.style.opacity='0.4'; }
+  }
+}
+async function toggleDigestNearby(){
+  if(!NEARBY_RELEASED){ showToast('🔜 Sessions near home is coming soon'); return; }
+  if(!hasHomeLocation()){ showToast('Set a home location in your profile first'); openProfilePanel('profile'); return; }
+  const p=loadProfile();
+  p.digestNearbyEnabled = p.digestNearbyEnabled===true ? false : true;
+  saveProfile(p);
+  renderNearbyToggle();
+  const sb=getSb(); if(!sb||!p.email) return;
+  await sb.from('profiles').upsert({email:p.email, digest_nearby_enabled:p.digestNearbyEnabled},{onConflict:'email'});
+  showToast(p.digestNearbyEnabled ? 'Nearby sessions: on' : 'Nearby sessions: off');
+}
+async function setDigestNearbyKm(val){
+  if(!NEARBY_RELEASED) return;
+  const km=Math.max(25, Math.min(200, parseInt(val,10)||120));
+  const p=loadProfile(); p.digestNearbyKm=km; saveProfile(p);
+  const el=$('ppNearbyKm'); if(el) el.value=String(km);
+  const sb=getSb(); if(!sb||!p.email) return;
+  await sb.from('profiles').upsert({email:p.email, digest_nearby_km:km},{onConflict:'email'});
+}
 
 // ── Who actually receives my session alerts ────────────────────────────────
 // session-attend-notify mails accepted friends whose own friend_session_notifs
@@ -8755,6 +8932,7 @@ async function toggleNotifyFriends(){
 // difference — profiles is own-row under RLS and public_profiles doesn't
 // expose the setting.
 let _friendsReachCache=null;
+let _friendsPendingCount=0;   // pending requests: listed in the panel, but not notified
 // Nicknames are user-supplied and go into innerHTML below — escape them.
 const escFriendName=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function toggleFriendsReach(){
@@ -8770,9 +8948,12 @@ function renderFriendsReachSummary(caret){
   const yes=_friendsReachCache.filter(f=>f.receives).length;
   const total=_friendsReachCache.length;
   const sendingOff=isPremium()&&loadProfile().notifyFriendsOnConfirm===false;
+  // Say "accepted friends" explicitly. Pending requests are listed in the
+  // Friends panel too, so a bare "0 of 1" next to a dozen rows reads as a bug
+  // rather than as "only one of those people has actually accepted".
   el.innerHTML = sendingOff
     ? `<span style="color:var(--gray)">Nobody — sending is off</span> ${caret}`
-    : `<strong style="color:var(--text)">${yes} of ${total}</strong> friend${total===1?'':'s'} will be notified ${caret}`;
+    : `<strong style="color:var(--text)">${yes} of ${total}</strong> accepted friend${total===1?'':'s'} will be notified ${caret}`;
 }
 async function renderFriendsReach(){
   const row=$('ppFriendsReachRow');
@@ -8784,6 +8965,16 @@ async function renderFriendsReach(){
     const{data,error}=await sb.rpc('friends_notif_status');
     if(error){ console.error('[friends-reach]',error); row.style.display='none'; return; }
     _friendsReachCache=data||[];
+    // Count pending requests separately. Read it here rather than from
+    // _friendsCache: the Notifications panel can be opened before the Friends
+    // panel has ever populated that cache.
+    // Both directions: incoming requests (someone asked to be your friend) are
+    // listed in the Friends panel just like outgoing ones, so counting only
+    // outgoing left a user with 5 incoming / 0 outgoing seeing "0 of N".
+    const{count}=await sb.from('friendships')
+      .select('id',{count:'exact',head:true})
+      .or(`requester.eq.${p.email},recipient.eq.${p.email}`).eq('status','pending');
+    _friendsPendingCount=count||0;
   }
   if(!_friendsReachCache.length){ row.style.display='none'; return; }
 
@@ -8796,7 +8987,10 @@ async function renderFriendsReach(){
   const off=_friendsReachCache.filter(f=>!f.receives);
   $('ppFriendsReachList').innerHTML =
     (on.length ?`<div class="notif-sub" style="color:#4ade80">✅ ${on.map(name).join(', ')}</div>`:'')+
-    (off.length?`<div class="notif-sub" style="color:var(--gray);margin-top:4px">⊘ ${off.map(name).join(', ')} — their “Receive” alerts are off</div>`:'');
+    (off.length?`<div class="notif-sub" style="color:var(--gray);margin-top:4px">⊘ ${off.map(name).join(', ')} — their “Receive” alerts are off</div>`:'')+
+    // Pending requests are not friends yet and receive nothing. Without this
+    // line the count looks wrong next to a panel full of pending names.
+    (_friendsPendingCount>0?`<div class="notif-sub" style="color:var(--tdim);margin-top:6px">${_friendsPendingCount} pending request${_friendsPendingCount===1?'':'s'} — they are notified once they accept.</div>`:'');
 }
 
 async function toggleMasterNotif(){
@@ -8935,8 +9129,8 @@ async function renderStats(){
       const barColor=e.isYou?'linear-gradient(90deg,#38bdf8,#0ea5e9)':'linear-gradient(90deg,#64748b,#475569)';
       return`<div class="stats-lb-row${e.isYou?' you':''}">
         <div class="stats-lb-rank${i<3?' '+rankClasses[i]:''}">${i<3?rankIcons[i]:i+1}</div>
-        <div class="stats-lb-avatar">${initials}</div>
-        <div class="stats-lb-name">${e.name}${e.isYou?'<span class="stats-lb-you-tag">you</span>':''}</div>
+        <div class="stats-lb-avatar">${escFriendName(initials)}</div>
+        <div class="stats-lb-name">${escFriendName(e.name)}${e.isYou?'<span class="stats-lb-you-tag">you</span>':''}</div>
         <div class="stats-lb-bar-wrap"><div class="stats-lb-bar-track"><div class="stats-lb-bar-fill" style="width:${pct}%;background:${barColor}"></div></div></div>
         <div class="stats-lb-count">${e.count}</div>
       </div>`;

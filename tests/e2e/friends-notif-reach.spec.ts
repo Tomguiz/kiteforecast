@@ -20,8 +20,13 @@ async function seedReach(
       p.email = p.email || 'me@example.com';
       p.notifyFriendsOnConfirm = sendingOn;
       localStorage.setItem('kf_profile', JSON.stringify(p));
-      // @ts-expect-error app global
-      window.getSb = () => ({ rpc: async () => ({ data: friends, error: null }) });
+      // @ts-expect-error app global — renderFriendsReach also counts pending
+      // requests via from('friendships').select().or().eq(), so the stub must
+      // model both calls.
+      window.getSb = () => ({
+        rpc: async () => ({ data: friends, error: null }),
+        from: () => ({ select: () => ({ or: () => ({ eq: async () => ({ count: 0, error: null }) }) }) }),
+      });
       // @ts-expect-error app global — reset the module-level cache between specs
       window._friendsReachCache = null;
     },
@@ -110,4 +115,35 @@ test('falls back to the email local-part when a friend has no nickname', async (
   await page.locator('#ppFriendsReachSummary').click();
 
   await expect(page.locator('#ppFriendsReachList')).toContainText('sofie');
+});
+
+test('explains pending requests so the count does not look wrong', async ({ gotoApp, page }) => {
+  // The Friends panel lists pending requests too, so "0 of 1" beside a dozen
+  // names reads as a bug unless the pending ones are accounted for.
+  await gotoApp('signedIn');
+  await page.evaluate(() => {
+    // @ts-expect-error app global
+    window.isPremium = () => true;
+    const p = JSON.parse(localStorage.getItem('kf_profile') || '{}');
+    p.email = 'me@example.com'; p.notifyFriendsOnConfirm = true;
+    localStorage.setItem('kf_profile', JSON.stringify(p));
+    // @ts-expect-error app global
+    window.getSb = () => ({
+      rpc: async () => ({ data: [{ email: 'r@x.com', nickname: 'Ruben', receives: false }], error: null }),
+      from: () => ({ select: () => ({ or: () => ({ eq: async () => ({ count: 11, error: null }) }) }) }),
+    });
+    // @ts-expect-error app global
+    window._friendsReachCache = null;
+    // @ts-expect-error app global
+    openProfilePanel('notifs');
+  });
+  await page.evaluate(() => {
+    // @ts-expect-error app global
+    return renderFriendsReach();
+  });
+  await page.locator('#ppFriendsReachSummary').click();
+
+  await expect(page.locator('#ppFriendsReachSummary')).toContainText('0 of 1');
+  await expect(page.locator('#ppFriendsReachSummary')).toContainText('accepted friend');
+  await expect(page.locator('#ppFriendsReachList')).toContainText('11 pending requests');
 });
