@@ -3581,7 +3581,8 @@ function setChipDayBadge(el,n,isFav=false){
   }
   $('apiErrorBanner').style.display='none';
   el.className='chip-days '+(n>=5?'cd-good':n>=1?'cd-ok':'cd-none');
-  el.textContent=n>0?`${n} good days 💨`:'no wind this week';
+  // Pluralise like the title attribute on the next line already does.
+  el.textContent=n>0?`${n} good day${n!==1?'s':''} 💨`:'no wind this week';
   el.title=`${n} day${n!==1?'s':''} with qualifying wind in the next 10`;
 }
 

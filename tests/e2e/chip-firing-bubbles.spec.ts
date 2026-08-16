@@ -92,3 +92,21 @@ test('no friend bubbles when nobody is going', async ({ gotoApp, page }) => {
 
   await expect(page.locator('.chip-friend')).toHaveCount(0);
 });
+
+test('the good-days badge pluralises', async ({ gotoApp, page }) => {
+  // Read "1 good days" for a long time; the title attribute beside it had
+  // always got this right.
+  await gotoApp('signedIn');
+  for (const [n, expected] of [[1, '1 good day 💨'], [3, '3 good days 💨']] as const) {
+    const text = await page.evaluate((n: number) => {
+      const el = document.createElement('span');
+      document.body.appendChild(el);
+      // @ts-expect-error app global
+      setChipDayBadge(el, n, true);
+      const t = el.textContent;
+      el.remove();
+      return t;
+    }, n);
+    expect(text).toBe(expected);
+  }
+});
