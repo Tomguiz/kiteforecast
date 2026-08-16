@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import {
   toKnots, isRainy, speedTier, isWindDirOK, hourQualifies, consecutiveRuns,
 } from '../_shared/rideability.ts'
+import { liveWindFor, type LiveWind } from '../_shared/rws.ts'
 
 const SUPABASE_URL            = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_KEY    = Deno.env.get('SB_SERVICE_ROLE_KEY')!
@@ -97,6 +98,26 @@ function fmtDateLabel(dateStr: string): string {
   return new Date(dateStr + 'T12:00:00').toLocaleDateString('en', {
     weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'
   })
+}
+
+const COMPASS_8 = ['N','NE','E','SE','S','SW','W','NW']
+const dirLabel = (deg: number | null) =>
+  deg === null ? '' : COMPASS_8[Math.round(((deg % 360) + 360) % 360 / 45) % 8]
+
+// Rendered server-side and injected whole, because the Make.com template is a
+// flat replace() chain with no conditional logic — an empty string here makes
+// the block vanish. See docs/superpowers/specs/2026-08-16-rws-live-wind-design.md
+function renderLiveHtml(live: LiveWind): string {
+  const gust = live.gustKn === null ? '' : ` &middot; gusts ${live.gustKn} kn`
+  const dir  = live.dirDeg === null ? '' : ` ${dirLabel(live.dirDeg)}`
+  const age  = live.ageMin <= 1 ? 'just now' : `${live.ageMin} min ago`
+  return `<tr>
+          <td style="background-color:#0f1520;border:1px solid #1e2535;border-top:none;padding:16px 32px;">
+            <p style="margin:0 0 10px 0;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#4a5568;">&#127788; Measured right now</p>
+            <p style="margin:0;font-family:'DM Sans',Arial,sans-serif;font-size:22px;font-weight:700;color:#5dd4f0;">${live.speedKn} kn${dir}${gust}</p>
+            <p style="margin:6px 0 0 0;font-size:11px;color:#4a5568;">${live.stationName} &middot; ${live.distanceKm.toFixed(1)} km away &middot; ${age}</p>
+          </td>
+        </tr>`
 }
 
 // ── MAIN HANDLER ──
@@ -258,6 +279,18 @@ Deno.serve(async () => {
           </td>
         </tr>`
 
+      // 1h reminder only — a measured reading is meaningless 24h out. Never let
+      // a slow or broken RWS response delay or drop the reminder itself.
+      let live_html = ''
+      if (rh === 1) {
+        try {
+          const live = await liveWindFor(Number(r.spot_lat), Number(r.spot_lon))
+          if (live) live_html = renderLiveHtml(live)
+        } catch (e) {
+          console.error('rws live wind failed', e)
+        }
+      }
+
       const payload = {
         notification_type:  r.notif_type,
         reminder_label:     rh === 1 ? '1 hour before' : `${rh} hours before`,
@@ -271,6 +304,7 @@ Deno.serve(async () => {
         date_label:         fmtDateLabel(r.session_date),
         app_link:           r.app_link,
         calendar_html,
+        live_html,
         session: {
           start_time:           sessionStart,
           end_time:             sessionEnd,
