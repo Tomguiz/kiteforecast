@@ -14,6 +14,9 @@ export type MockOptions = {
   adminFavourites?: Record<string, unknown[]>;
   adminReminders?: Record<string, unknown[]>;
   overrides?: unknown[];  // rows returned for spot_overrides (admin-added spots)
+  sessions?: unknown[];   // rows returned for session_attendances (stats)
+  spotInfo?: unknown;     // row returned for spot_info (.single() → one object)
+  claims?: unknown[];     // rows returned for spot_claims (My Spot panel)
 };
 
 const json = (route: Route, body: unknown, status = 200) =>
@@ -36,10 +39,13 @@ function tableResponse(table: string, opts: MockOptions): unknown {
     case 'spot_overrides':
       return opts.overrides ?? emptyArray;
     case 'spot_info':
-    case 'spot_update_suggestions':
-    case 'spot_claims':
-    case 'reminders':
+      return opts.spotInfo ? [opts.spotInfo] : emptyArray;
     case 'session_attendances':
+      return opts.sessions ?? emptyArray;
+    case 'spot_claims':
+      return opts.claims ?? emptyArray;
+    case 'spot_update_suggestions':
+    case 'reminders':
     case 'tide_cache':
     case 'spot_cta_clicks':
       return emptyArray;
