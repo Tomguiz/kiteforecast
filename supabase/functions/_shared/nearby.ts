@@ -46,3 +46,35 @@ export function selectNearbySpots(
     droppedByCap: Math.max(0, inRange.length - opts.limit),
   }
 }
+
+// A long drive has to buy its way in. Two rideable hours is a fine reason to
+// pop down the road and a poor reason to cross the country, so the minimum
+// session length scales with distance: the 2-hour session floor, plus an hour
+// for every 50km travelled.
+export const DRIVE_FLOOR_HOURS = 2
+export const KM_PER_EXTRA_HOUR = 50
+
+export function minHoursForDistance(distanceKm: number): number {
+  return DRIVE_FLOOR_HOURS + Math.floor(distanceKm / KM_PER_EXTRA_HOUR)
+}
+
+export interface RankableSpot { distanceKm: number; peakKn: number; totalHours: number }
+
+// Peak wind first (it is what makes a session memorable), then total rideable
+// hours (a spot you can ride all afternoon beats a one-hour blip), then
+// nearest. Spots that fail the worth-the-drive gate are removed before ranking,
+// so the limit never spends a slot on a trip not worth taking.
+export function rankNearbySpots<T extends RankableSpot>(
+  spots: T[], limit: number,
+): { selected: T[]; droppedAsNotWorthTheDrive: number; droppedByLimit: number } {
+  const worth = spots.filter(s => s.totalHours >= minHoursForDistance(s.distanceKm))
+  worth.sort((a, b) =>
+    (b.peakKn - a.peakKn) ||
+    (b.totalHours - a.totalHours) ||
+    (a.distanceKm - b.distanceKm))
+  return {
+    selected: worth.slice(0, limit),
+    droppedAsNotWorthTheDrive: spots.length - worth.length,
+    droppedByLimit: Math.max(0, worth.length - limit),
+  }
+}

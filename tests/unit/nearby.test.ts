@@ -112,3 +112,88 @@ describe('selectNearbySpots', () => {
     expect(selected.map(s => s.name)).toContain('Near1')
   })
 })
+
+import { minHoursForDistance, rankNearbySpots } from '../../supabase/functions/_shared/nearby.ts'
+
+const rankable = (name: string, distanceKm: number, peakKn: number, totalHours: number) =>
+  ({ name, distanceKm, peakKn, totalHours })
+
+describe('minHoursForDistance', () => {
+  it('asks only for the session floor when the spot is close', () => {
+    expect(minHoursForDistance(0)).toBe(2)
+    expect(minHoursForDistance(49)).toBe(2)
+  })
+
+  it('asks for an extra hour per 50km', () => {
+    expect(minHoursForDistance(50)).toBe(3)
+    expect(minHoursForDistance(100)).toBe(4)
+    expect(minHoursForDistance(150)).toBe(5)
+  })
+})
+
+describe('rankNearbySpots', () => {
+  it('drops a far spot that only offers a short window', () => {
+    // 2 rideable hours is worth 15km and not worth 120km.
+    const { selected, droppedAsNotWorthTheDrive } = rankNearbySpots([
+      rankable('Close', 15, 20, 2),
+      rankable('Far', 120, 30, 2),
+    ], 5)
+    expect(selected.map(s => s.name)).toEqual(['Close'])
+    expect(droppedAsNotWorthTheDrive).toBe(1)
+  })
+
+  it('keeps a far spot when the session is long enough to justify it', () => {
+    const { selected } = rankNearbySpots([rankable('Far', 120, 30, 4)], 5)
+    expect(selected.map(s => s.name)).toEqual(['Far'])
+  })
+
+  it('ranks by peak wind first', () => {
+    const { selected } = rankNearbySpots([
+      rankable('Breezy', 10, 18, 6),
+      rankable('Windy',  10, 28, 3),
+    ], 5)
+    expect(selected.map(s => s.name)).toEqual(['Windy', 'Breezy'])
+  })
+
+  it('breaks a peak-wind tie on total rideable hours', () => {
+    const { selected } = rankNearbySpots([
+      rankable('Short', 10, 25, 3),
+      rankable('Long',  10, 25, 7),
+    ], 5)
+    expect(selected.map(s => s.name)).toEqual(['Long', 'Short'])
+  })
+
+  it('breaks a full tie on distance', () => {
+    const { selected } = rankNearbySpots([
+      rankable('Further', 40, 25, 4),
+      rankable('Nearer',  12, 25, 4),
+    ], 5)
+    expect(selected.map(s => s.name)).toEqual(['Nearer', 'Further'])
+  })
+
+  it('caps at the limit and reports what it cut', () => {
+    const spots = [1,2,3,4,5,6,7].map(i => rankable(`S${i}`, 10, 30 - i, 5))
+    const { selected, droppedByLimit } = rankNearbySpots(spots, 5)
+    expect(selected).toHaveLength(5)
+    expect(droppedByLimit).toBe(2)
+    expect(selected.map(s => s.name)).toEqual(['S1','S2','S3','S4','S5'])
+  })
+
+  it('counts the drive gate before the limit, not after', () => {
+    // 6 spots, 2 unworthy -> 4 worthy, so the limit cuts nothing.
+    const { droppedAsNotWorthTheDrive, droppedByLimit } = rankNearbySpots([
+      rankable('A', 10, 25, 4), rankable('B', 10, 24, 4),
+      rankable('C', 10, 23, 4), rankable('D', 10, 22, 4),
+      rankable('E', 200, 30, 2), rankable('F', 200, 29, 2),
+    ], 5)
+    expect(droppedAsNotWorthTheDrive).toBe(2)
+    expect(droppedByLimit).toBe(0)
+  })
+
+  it('handles an empty list', () => {
+    const { selected, droppedAsNotWorthTheDrive, droppedByLimit } = rankNearbySpots([], 5)
+    expect(selected).toEqual([])
+    expect(droppedAsNotWorthTheDrive).toBe(0)
+    expect(droppedByLimit).toBe(0)
+  })
+})
