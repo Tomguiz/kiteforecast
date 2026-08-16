@@ -10,6 +10,7 @@ export type MockOptions = {
   isAdmin?: boolean;
   favourites?: unknown[];
   usersRpc?: unknown[];   // rows returned by the admin_list_users RPC
+  friendsNotifRpc?: unknown[]; // rows returned by the friends_notif_status RPC
   adminFavourites?: Record<string, unknown[]>;
   adminReminders?: Record<string, unknown[]>;
   overrides?: unknown[];  // rows returned for spot_overrides (admin-added spots)
@@ -111,9 +112,12 @@ export async function mockSupabase(page: Page, opts: MockOptions = {}) {
         body: method === 'HEAD' ? '' : body,
       });
     }
-    // RPC calls POST to /rest/v1/rpc/<fn>. Answer admin_list_users explicitly.
+    // RPC calls POST to /rest/v1/rpc/<fn>. Answer the ones the app calls explicitly.
     if (method === 'POST' && path.endsWith('/rpc/admin_list_users')) {
       return json(route, opts.usersRpc ?? []);
+    }
+    if (method === 'POST' && path.endsWith('/rpc/friends_notif_status')) {
+      return json(route, opts.friendsNotifRpc ?? []);
     }
     // INSERT/UPDATE/DELETE — return an empty 200/201
     return json(route, [], method === 'POST' ? 201 : 200);

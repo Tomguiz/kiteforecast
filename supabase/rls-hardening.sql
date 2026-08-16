@@ -332,12 +332,18 @@ DROP FUNCTION IF EXISTS _drop_all_policies(regclass);
 -- ---------------------------------------------------------------------------
 DROP FUNCTION IF EXISTS admin_list_users();
 CREATE OR REPLACE FUNCTION admin_list_users()
-RETURNS TABLE(email text, created_at timestamptz, last_seen_at timestamptz, nickname text)
+RETURNS TABLE(email text, created_at timestamptz, last_seen_at timestamptz, nickname text,
+              is_premium boolean, fav_count integer, follow_count integer)
 LANGUAGE sql
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT u.email::text, u.created_at, p.last_seen_at, p.nickname
+  SELECT u.email::text, u.created_at, p.last_seen_at, p.nickname,
+         COALESCE(p.is_premium, false) AS is_premium,
+         (SELECT count(*) FROM favourites f WHERE f.email = u.email)::int AS fav_count,
+         -- "following" is a spot subscription: distinct spots with live reminder rows.
+         (SELECT count(DISTINCT r.spot_name) FROM reminders r
+           WHERE r.email = u.email AND r.cancelled = false)::int AS follow_count
   FROM auth.users u
   LEFT JOIN profiles p ON p.email = u.email
   WHERE is_admin()
@@ -345,3 +351,42 @@ AS $$
 $$;
 REVOKE ALL ON FUNCTION admin_list_users() FROM anon, public;
 GRANT EXECUTE ON FUNCTION admin_list_users() TO authenticated;
+
+-- ---------------------------------------------------------------------------
+-- friends_notif_status() — who actually receives my session alerts.
+--
+-- session-attend-notify only emails accepted friends whose
+-- profiles.friend_session_notifs is true or NULL (NULL = default on). The app
+-- had no way to show that subtraction: profiles is own-row only under RLS, and
+-- public_profiles deliberately exposes just (email, nickname, is_premium).
+--
+-- SECURITY DEFINER so it can read friends' profiles rows, but scoped to the
+-- CALLER's accepted friendships — it can never reveal a non-friend's setting.
+-- Preferred over widening public_profiles, which is not friend-scoped and would
+-- expose every user's preference to every authenticated user.
+--
+-- DROP first: CREATE OR REPLACE cannot change an existing function's return
+-- columns (same reason as admin_list_users above).
+-- ---------------------------------------------------------------------------
+DROP FUNCTION IF EXISTS friends_notif_status();
+CREATE OR REPLACE FUNCTION friends_notif_status()
+RETURNS TABLE(email text, nickname text, receives boolean)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public
+AS $$
+  SELECT
+    p.email::text,
+    p.nickname,
+    COALESCE(p.friend_session_notifs, true) AS receives
+  FROM friendships f
+  JOIN profiles p
+    ON p.email = CASE WHEN f.requester = auth_email() THEN f.recipient ELSE f.requester END
+  WHERE f.status = 'accepted'
+    AND (f.requester = auth_email() OR f.recipient = auth_email())
+    AND auth_email() IS NOT NULL
+  ORDER BY receives DESC, lower(COALESCE(p.nickname, p.email));
+$$;
+REVOKE ALL ON FUNCTION friends_notif_status() FROM anon, public;
+GRANT EXECUTE ON FUNCTION friends_notif_status() TO authenticated;

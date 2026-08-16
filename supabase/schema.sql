@@ -478,3 +478,13 @@ DO $$ BEGIN ALTER TABLE spot_update_suggestions ADD COLUMN skill_level text;   E
 DO $$ BEGIN ALTER TABLE profiles ADD COLUMN contribution_points integer NOT NULL DEFAULT 0; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE profiles ADD COLUMN premium_until timestamptz; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE spot_claims ADD COLUMN status text NOT NULL DEFAULT 'pending'; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+
+-- Home location for the digest's "near you" section. Nullable: most users
+-- never set one, and the nearby section stays off without it.
+DO $$ BEGIN ALTER TABLE profiles ADD COLUMN home_lat double precision; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE profiles ADD COLUMN home_lon double precision; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE profiles ADD COLUMN home_label text; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+-- Defaults to false on purpose: this changes what an existing user's weekly
+-- email contains, so it is opt-in rather than a surprise.
+DO $$ BEGIN ALTER TABLE profiles ADD COLUMN digest_nearby_enabled boolean NOT NULL DEFAULT false; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE profiles ADD COLUMN digest_nearby_km integer NOT NULL DEFAULT 120; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
