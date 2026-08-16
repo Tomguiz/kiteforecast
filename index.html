@@ -1499,6 +1499,13 @@
         </div>
         <input type="file" id="ppAvatarInput" accept="image/*" style="display:none" onchange="uploadAvatar(this)"/>
         <p class="pp-note" style="margin-top:0;margin-bottom:6px">Unique username — visible to friends. Letters, numbers, _ . - allowed.</p>
+        <label class="pp-label" style="margin:8px 0 0 0">Home location</label>
+        <div style="display:flex;gap:6px;align-items:center;width:100%">
+          <input type="text" id="ppHomeInput" class="pp-input" placeholder="e.g. Knokke-Heist" maxlength="80" style="margin:0;flex:1 1 0;width:0;min-width:0"/>
+          <button class="btn pp-save-btn" id="ppHomeFindBtn" onclick="findHomeLocation()" style="margin:0;white-space:nowrap;flex:0 0 auto;width:auto;padding:11px 16px">📍 Find</button>
+        </div>
+        <span id="ppHomeStatus" style="font-size:.65rem;color:var(--tdim);display:block;margin-top:4px"></span>
+        <p class="pp-note" style="margin-top:4px;margin-bottom:6px">Used to find good sessions near you in the weekly digest.</p>
         <div style="border-top:1px solid var(--border);margin:4px 0 8px"></div>
 
         <!-- Share card -->
@@ -5376,6 +5383,7 @@ function openProfilePanel(tab){
     openProfileSheet();
     const _p=loadProfile();
     const _ni=$('ppNicknameInput'); if(_ni) _ni.value=_p.nickname||'';
+    const _hi=$('ppHomeInput'); if(_hi) _hi.value=_p.homeLabel||'';
     updateNicknameReq();
     // Set save button initial state: dim if nickname already saved, default if not yet set
     (function(){ const btn=$('ppNicknameSaveBtn'); if(!btn) return;
@@ -7908,7 +7916,7 @@ function updatePremiumUI(){
 
 async function syncPremiumFromSupabase(email){
   const sb=getSb(); if(!sb||!email) return;
-  const{data,error}=await sb.from('profiles').select('is_premium,sms_enabled,phone_number,is_admin,nickname,friend_session_notifs,notify_friends_on_confirm,avatar_url,contribution_points,premium_until,notifs_enabled').eq('email',email).single();
+  const{data,error}=await sb.from('profiles').select('is_premium,sms_enabled,phone_number,is_admin,nickname,friend_session_notifs,notify_friends_on_confirm,avatar_url,contribution_points,premium_until,notifs_enabled,home_lat,home_lon,home_label,digest_nearby_enabled,digest_nearby_km').eq('email',email).single();
   console.log('[syncPremium] email=',email,'data=',data,'error=',error?.message);
   const p=loadProfile();
   if(data){
@@ -7926,6 +7934,9 @@ async function syncPremiumFromSupabase(email){
       p.notifsEnabled=data.notifs_enabled!==false;
     p.contributionPoints=data.contribution_points||0;
     p.premiumUntil=data.premium_until||null;
+    p.homeLat=data.home_lat; p.homeLon=data.home_lon; p.homeLabel=data.home_label;
+    p.digestNearbyEnabled=data.digest_nearby_enabled===true;
+    p.digestNearbyKm=data.digest_nearby_km||120;
     saveProfile(p);
     const fst=$('ppFriendSessionToggle');
     if(fst) fst.classList.toggle('on', p.friendSessionNotifs!==false);
@@ -8297,6 +8308,43 @@ async function saveNickname(fromModal){
 
   // Dismiss modal if called from it
   if(fromModal){ const m=$('nicknameModal'); if(m) m.remove(); showToast('👋 Welcome, '+val+'!'); }
+}
+// ── HOME LOCATION ──────────────────────────────────────────────────────────
+// Feeds the digest's "near you" section. Reuses the same Nominatim geocoder as
+// the spot-suggestion form; coordinates are stored, the label is for display.
+async function findHomeLocation(){
+  const q=($('ppHomeInput')?.value||'').trim();
+  const status=$('ppHomeStatus'); const btn=$('ppHomeFindBtn');
+  if(!q){ showToast('Enter a town or city first'); return; }
+  if(btn){ btn.disabled=true; btn.textContent='⏳'; }
+  if(status){ status.style.color='var(--tdim)'; status.textContent='Searching…'; }
+  try{
+    const url='https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(q);
+    const res=await fetch(url,{headers:{'Accept':'application/json'},signal:AbortSignal.timeout(10000)});
+    if(!res.ok) throw new Error('http '+res.status);
+    const arr=await res.json();
+    if(!Array.isArray(arr)||!arr.length){
+      if(status){ status.textContent='⚠️ Couldn\'t find that place — try adding the country.'; status.style.color='#f59e0b'; }
+      return;
+    }
+    const top=arr[0];
+    const lat=parseFloat(top.lat), lon=parseFloat(top.lon);
+    if(isNaN(lat)||isNaN(lon)){ if(status){ status.textContent='⚠️ No coordinates returned — try another search.'; status.style.color='#f59e0b'; } return; }
+    await saveHomeLocation(lat, lon, top.display_name||q);
+    if(status){ status.textContent='✓ '+(top.display_name||q); status.style.color='#4ade80'; }
+  }catch(e){
+    if(status){ status.textContent='⚠️ Couldn\'t reach the geocoder — try again.'; status.style.color='#f59e0b'; }
+  }finally{
+    if(btn){ btn.disabled=false; btn.textContent='📍 Find'; }
+  }
+}
+async function saveHomeLocation(lat, lon, label){
+  const p=loadProfile();
+  p.homeLat=lat; p.homeLon=lon; p.homeLabel=label;
+  saveProfile(p);
+  const sb=getSb(); if(!sb||!p.email) return;
+  await sb.from('profiles').upsert({email:p.email, home_lat:lat, home_lon:lon, home_label:label},{onConflict:'email'});
+  if(typeof renderNearbyToggle==='function') renderNearbyToggle();
 }
 // ── AUTH ──
 async function initAuth(){
