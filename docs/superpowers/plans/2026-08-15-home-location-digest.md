@@ -17,8 +17,9 @@
 - **The rideability rule lives in exactly one place:** `supabase/functions/_shared/rideability.ts`. Never re-implement `hourQualifies` or the consecutive-hours rule. Three drifted copies caused the 2026-08-15 outages.
 - **`prepend PATH`:** run `export PATH="/opt/homebrew/bin:$PATH"` before any `supabase` or `gh` command.
 - **Opt-in default:** `digest_nearby_enabled` defaults to `false`. This changes an existing user's email content; it must never turn on by itself.
+- **UNRELEASED — ships behind a "SOON" badge.** The nearby-home digest is not released. Its UI must be visible but **inert**: the toggle carries a `SOON` badge, cannot be switched on, and the radius input is disabled. Tapping it explains that the feature is coming, and writes nothing to `profiles`. Removing the gate later must be a one-line change (`NEARBY_RELEASED = false` → `true`), not a rewrite.
 - **Radius default:** 120 km. Allowed range 25–200 km.
-- **Nearest-N cap:** 10 spots. When spots are dropped by the cap, log the dropped count — never truncate silently.
+- **Nearest-N cap:** check the **10 nearest** spots, then report only the **5 best**. "Best" = highest peak wind among that spot's sessions, tie-broken by nearest. Log both the count dropped by the 10-spot radius cap and the count dropped by the best-5 cut — never truncate silently.
 - **Unit tests:** `cd tests && npm run unit`. **E2E:** `cd tests && npx playwright test`.
 - **Deno type-check:** `deno check supabase/functions/weekly-digest/index.ts` must pass. (`check-new-sessions` has 12 pre-existing type errors — do not treat those as regressions.)
 
@@ -408,7 +409,7 @@ git commit -m "feat(digest): nearby-spot selection (haversine + radius + nearest
 
 **Interfaces:**
 - Consumes: `selectNearbySpots`, `NearbySpot` from `_shared/nearby.ts`; `fetchForecast`, `getGoodSessions` from `./session-logic.ts`.
-- Produces: `nearby_html` and `nearby_count` fields on the Make webhook payload.
+- Produces: `nearby_html` and `nearby_count` fields on the Make webhook payload. `nearbyForecasts` is ranked best-first and capped at 5 entries.
 
 - [ ] **Step 1: Add the profile fields to the profiles query**
 
@@ -494,6 +495,20 @@ Directly after the existing `const totalSessions = spotForecasts.reduce(...)` li
         }
       }
     }
+    // Rank and cut to the best 5. Checking 10 keeps the search wide, but a
+    // digest listing 10 spots is unreadable — and the point is "where should I
+    // go", not "here is everything". Best = strongest peak wind at that spot,
+    // tie-broken by nearest, so two equally windy spots put the closer first.
+    const NEARBY_REPORT_LIMIT = 5
+    const peakOf = (f: { sessions: any[] }) =>
+      f.sessions.reduce((m, sess) => Math.max(m, sess.max_gust ?? 0, sess.avg_kn ?? 0), 0)
+    nearbyForecasts.sort((a, b) => (peakOf(b) - peakOf(a)) || (a.distanceKm - b.distanceKm))
+    const droppedByReportLimit = Math.max(0, nearbyForecasts.length - NEARBY_REPORT_LIMIT)
+    if (droppedByReportLimit > 0) {
+      console.log(`[digest] ${email}: ${droppedByReportLimit} nearby spot(s) with sessions were cut by the best-${NEARBY_REPORT_LIMIT} report limit`)
+    }
+    nearbyForecasts.length = Math.min(nearbyForecasts.length, NEARBY_REPORT_LIMIT)
+
     const nearbyCount = nearbyForecasts.reduce((n, f) => n + f.sessions.length, 0)
 ```
 
@@ -867,45 +882,47 @@ async function seed(page: any, profile: Record<string, unknown>) {
   }, profile);
 }
 
-test('the nearby toggle is disabled until a home location is set', async ({ gotoApp, page }) => {
+test('the nearby row is marked SOON while the feature is unreleased', async ({ gotoApp, page }) => {
+  await gotoApp('signedIn');
+  await seed(page, { homeLat: 51.35, homeLon: 3.28, homeLabel: 'Knokke', digestNearbyEnabled: false });
+
+  await expect(page.locator('#ppNearbyRow .soon-badge')).toHaveText('SOON');
+  await expect(page.locator('#ppNearbyHint')).toContainText('Coming soon');
+});
+
+test('the toggle cannot be switched on while unreleased', async ({ gotoApp, page }) => {
+  await gotoApp('signedIn');
+  await seed(page, { homeLat: 51.35, homeLon: 3.28, homeLabel: 'Knokke', digestNearbyEnabled: false });
+
+  // Fail loudly if the gate lets a profile write through.
+  await page.evaluate(() => {
+    // @ts-expect-error app global
+    window.getSb = () => ({ from: () => ({ upsert: async () => { (window as any).__wrote = true; return { error: null }; } }) });
+  });
+  await page.locator('#ppNearbyToggle').click();
+
+  await expect(page.locator('#ppNearbyToggle')).not.toHaveClass(/on/);
+  expect(await page.evaluate(() => (window as any).__wrote === true)).toBe(false);
+  expect(await page.evaluate(() => {
+    // @ts-expect-error app global
+    return loadProfile().digestNearbyEnabled;
+  })).not.toBe(true);
+});
+
+test('the radius input is disabled while unreleased', async ({ gotoApp, page }) => {
+  await gotoApp('signedIn');
+  await seed(page, { homeLat: 51.35, homeLon: 3.28, homeLabel: 'Knokke', digestNearbyKm: 150 });
+
+  await expect(page.locator('#ppNearbyKm')).toBeDisabled();
+});
+
+test('the SOON gate takes precedence over the home-location gate', async ({ gotoApp, page }) => {
+  // Do not tell the user to go set a home location for something they cannot
+  // enable yet.
   await gotoApp('signedIn');
   await seed(page, { homeLat: null, homeLon: null, digestNearbyEnabled: false });
 
-  await expect(page.locator('#ppNearbyHint')).toContainText('home location');
-  await expect(page.locator('#ppNearbyToggle')).not.toHaveClass(/on/);
-});
-
-test('with a home location set the toggle becomes usable', async ({ gotoApp, page }) => {
-  await gotoApp('signedIn');
-  await seed(page, { homeLat: 51.35, homeLon: 3.28, homeLabel: 'Knokke-Heist', digestNearbyEnabled: true, digestNearbyKm: 120 });
-
-  await expect(page.locator('#ppNearbyToggle')).toHaveClass(/on/);
-  await expect(page.locator('#ppNearbyHint')).toContainText('Knokke-Heist');
-});
-
-test('the radius control shows the saved value', async ({ gotoApp, page }) => {
-  await gotoApp('signedIn');
-  await seed(page, { homeLat: 51.35, homeLon: 3.28, homeLabel: 'Knokke', digestNearbyEnabled: true, digestNearbyKm: 150 });
-
-  await expect(page.locator('#ppNearbyKm')).toHaveValue('150');
-});
-
-test('toggling off updates the stored profile', async ({ gotoApp, page }) => {
-  await gotoApp('signedIn');
-  await seed(page, { homeLat: 51.35, homeLon: 3.28, homeLabel: 'Knokke', digestNearbyEnabled: true, digestNearbyKm: 120 });
-
-  await page.evaluate(() => {
-    // @ts-expect-error app global
-    window.getSb = () => ({ from: () => ({ upsert: async () => ({ error: null }) }) });
-    // @ts-expect-error app global
-    return toggleDigestNearby();
-  });
-
-  const enabled = await page.evaluate(() => {
-    // @ts-expect-error app global
-    return loadProfile().digestNearbyEnabled;
-  });
-  expect(enabled).toBe(false);
+  await expect(page.locator('#ppNearbyHint')).toContainText('Coming soon');
 });
 ```
 
@@ -914,14 +931,24 @@ test('toggling off updates the stored profile', async ({ gotoApp, page }) => {
 Run: `cd tests && npx playwright test digest-nearby-toggle`
 Expected: FAIL — `renderNearbyToggle` is not defined.
 
-- [ ] **Step 3: Add the markup**
+- [ ] **Step 3: Add the SOON badge style**
+
+In `index.html`, directly after the `.premium-badge.no-crown` rule (~line 837), add:
+
+```css
+    /* Marks a feature that is visible but not released yet. Deliberately
+       neutral so it never reads as a premium/paid marker. */
+    .soon-badge { display:inline-flex; align-items:center; padding:2px 8px; border-radius:99px; background:rgba(148,163,184,.18); color:var(--gray); border:1px solid var(--border); font-size:.6rem; font-weight:800; letter-spacing:.06em; vertical-align:middle; margin-left:6px; }
+```
+
+- [ ] **Step 4: Add the markup**
 
 In `index.html`, inside the weekly-digest `notif-card`, directly after the `<button class="btn pp-save-btn" id="ppDigestNowBtn" …>` line, insert:
 
 ```html
         <div class="notif-row" id="ppNearbyRow" style="border-top:1px solid var(--border);margin-top:10px;padding-top:12px">
           <div class="notif-info">
-            <div class="notif-title">Also include sessions near home</div>
+            <div class="notif-title">Also include sessions near home <span class="soon-badge">SOON</span></div>
             <div class="notif-sub" id="ppNearbyHint"></div>
             <div style="margin-top:8px;display:flex;align-items:center;gap:8px">
               <label class="pp-label" style="margin:0">Radius</label>
@@ -933,7 +960,7 @@ In `index.html`, inside the weekly-digest `notif-card`, directly after the `<but
         </div>
 ```
 
-- [ ] **Step 4: Add the JS**
+- [ ] **Step 5: Add the JS**
 
 Insert after `toggleNotifyFriends` in `index.html`:
 
@@ -942,6 +969,10 @@ Insert after `toggleNotifyFriends` in `index.html`:
 // Opt-in: it changes what the weekly email contains, so it never turns itself
 // on. Gated on a home location — without coordinates there is nothing to
 // search around.
+//
+// NOT RELEASED YET. The row is visible so users know it is coming, but the
+// toggle is inert and writes nothing. Flip this one constant to release.
+const NEARBY_RELEASED = false;
 function hasHomeLocation(){
   const p=loadProfile();
   return typeof p.homeLat==='number' && typeof p.homeLon==='number';
@@ -951,6 +982,13 @@ function renderNearbyToggle(){
   const p=loadProfile();
   const hint=$('ppNearbyHint'), toggle=$('ppNearbyToggle'), km=$('ppNearbyKm');
   if(km) km.value=String(p.digestNearbyKm||120);
+  if(!NEARBY_RELEASED){
+    if(hint) hint.textContent='Coming soon — we are still building this';
+    if(toggle){ toggle.classList.remove('on'); toggle.style.opacity='0.4'; }
+    if(km) km.disabled=true;
+    return;
+  }
+  if(km) km.disabled=false;
   if(hasHomeLocation()){
     if(hint) hint.textContent='Good sessions around '+(p.homeLabel||'your home location');
     if(toggle){ toggle.classList.toggle('on', p.digestNearbyEnabled===true); toggle.style.opacity=''; }
@@ -960,6 +998,7 @@ function renderNearbyToggle(){
   }
 }
 async function toggleDigestNearby(){
+  if(!NEARBY_RELEASED){ showToast('🔜 Sessions near home is coming soon'); return; }
   if(!hasHomeLocation()){ showToast('Set a home location in your profile first'); openProfilePanel('profile'); return; }
   const p=loadProfile();
   p.digestNearbyEnabled = p.digestNearbyEnabled===true ? false : true;
@@ -970,6 +1009,7 @@ async function toggleDigestNearby(){
   showToast(p.digestNearbyEnabled ? 'Nearby sessions: on' : 'Nearby sessions: off');
 }
 async function setDigestNearbyKm(val){
+  if(!NEARBY_RELEASED) return;
   const km=Math.max(25, Math.min(200, parseInt(val,10)||120));
   const p=loadProfile(); p.digestNearbyKm=km; saveProfile(p);
   const el=$('ppNearbyKm'); if(el) el.value=String(km);
@@ -978,7 +1018,7 @@ async function setDigestNearbyKm(val){
 }
 ```
 
-- [ ] **Step 5: Call the renderer when the panel opens**
+- [ ] **Step 6: Call the renderer when the panel opens**
 
 Find the line `renderFriendsReach();` added in the premium-gating block and add directly after it:
 
@@ -986,12 +1026,12 @@ Find the line `renderFriendsReach();` added in the premium-gating block and add 
   renderNearbyToggle();
 ```
 
-- [ ] **Step 6: Run the spec, confirm it passes**
+- [ ] **Step 7: Run the spec, confirm it passes**
 
 Run: `cd tests && npx playwright test digest-nearby-toggle`
 Expected: 4 passed.
 
-- [ ] **Step 7: Run the whole suite**
+- [ ] **Step 8: Run the whole suite**
 
 ```bash
 cd tests && npm run unit && npx playwright test
@@ -999,7 +1039,7 @@ cd tests && npm run unit && npx playwright test
 
 Expected: all unit and E2E tests pass.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
 git add index.html tests/e2e/digest-nearby-toggle.spec.ts

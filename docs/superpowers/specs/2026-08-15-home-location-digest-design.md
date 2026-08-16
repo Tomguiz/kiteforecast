@@ -93,14 +93,19 @@ In `weekly-digest`, after building `spotForecasts` from favourites:
    count — a silent truncation reads as "there was nothing else".
 5. Run the same `getGoodSessions` from `_shared/rideability.ts`. Nearby spots
    use the same rideability rule as everything else, by construction.
-6. Render as a separate email section, "Near you", each spot labelled with its
+6. Rank the spots that produced sessions and keep only the **best 5**: highest
+   peak wind first, ties broken by nearest. Ten is the right number to *check*
+   and the wrong number to *print* — the reader wants "where should I go", not
+   an inventory. Log the count cut by this limit as well.
+7. Render as a separate email section, "Near you", each spot labelled with its
    distance. Favourites keep their existing position and styling so the
    familiar part of the email does not move.
 
 The existing `wxCache` already dedupes forecast fetches by `lat,lon` across
 users, so shared nearby spots cost one call per digest run, not one per user.
 
-**Cost ceiling:** 10 extra spots per opted-in user per week, minus cache hits.
+**Cost ceiling:** 10 extra forecast fetches per opted-in user per week, minus
+cache hits. Only the best 5 of those reach the email.
 
 ### 4. UI
 
@@ -127,9 +132,16 @@ an explanatory hint until a home location is set.
 - Merging `spots` and `spot_overrides`.
 - Nearby-spot *reminders* (this is digest-only).
 
-## Open question for review
+## Resolved: email length
 
-Nearby sessions could make the email much longer. This design gives them their
-own section after favourites, with no cap on sessions per spot beyond the
-10-spot cap. If that reads as too long in practice, the cheapest adjustment is
-to show only each nearby spot's single best day.
+Nearby sessions could have made the email much longer. Resolved 2026-08-16:
+check the 10 nearest spots, report only the best 5. If that still reads long,
+the next cheapest trim is one best day per spot rather than every session.
+
+## Release gating
+
+The feature ships **unreleased**: the notifications panel shows the row with a
+`SOON` badge, the toggle cannot be switched on, and the radius input is
+disabled. Nothing writes to `profiles` while gated. Release is a one-line
+change (`NEARBY_RELEASED = false` → `true`) so the UI can ship ahead of the
+backend without a second round of work.
