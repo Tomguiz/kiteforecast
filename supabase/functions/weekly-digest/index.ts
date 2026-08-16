@@ -8,6 +8,25 @@ const MAKE_WEBHOOK_URL     = 'https://hook.eu1.make.com/6t9fgm6btixri2wf5lnx47re
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
+// A section banner. The digest now carries two distinct lists — favourites and
+// nearby — and without headings of equal weight the second read as a footnote
+// to the first rather than as its own section.
+const sectionHeader = (icon: string, title: string, subtitle: string) => `
+      <tr>
+        <td style="background-color:#0b1119;border-left:1px solid #1e2535;border-right:1px solid #1e2535;border-top:1px solid #1e2535;padding:26px 32px 6px 32px;">
+          <p style="margin:0;font-family:'Bebas Neue',Arial,sans-serif;font-size:27px;line-height:1.1;color:#ffffff;letter-spacing:2px;">${icon}&nbsp;${title}</p>
+          <div style="height:3px;width:44px;background-color:#5dd4f0;font-size:0;line-height:0;margin:8px 0 0 0;">&nbsp;</div>
+          <p style="margin:10px 0 0 0;font-size:13px;line-height:1.5;color:#8296ad;">${subtitle}</p>
+        </td>
+      </tr>`
+
+// Nominatim returns the full display name ("Waterloo, Nivelles, Brabant wallon,
+// Wallonie, 1410, Belgique"), which swamps the header. Keep the place itself.
+const shortPlace = (label: string) => {
+  const first = String(label || '').split(',')[0].trim()
+  return first.length ? first : 'home'
+}
+
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
@@ -218,7 +237,11 @@ Deno.serve(async (req) => {
     // Magic link for the main CTA (app home)
     const homeLink = await magicLink(APP_BASE)
 
-    const spotsHtml = spotForecasts.slice(0, 10).map(sf => {
+    const favHeader = spotForecasts.length ? sectionHeader(
+      '&#11088;', 'YOUR FAVOURITE SPOTS',
+      `Here's what's looking good across your favourite spots for the week of ${weekStart}.`) : ''
+
+    const spotsHtml = favHeader + spotForecasts.slice(0, 10).map(sf => {
       const sessionRows = sf.sessions.map((sess: any) => `
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:10px;background-color:#1a2235;border:1px solid #242d42;border-radius:10px;">
           <tr>
@@ -314,12 +337,8 @@ Deno.serve(async (req) => {
 
     // Rendered after favourites so the familiar part of the email never moves.
     const nearbyHtml = nearbyForecasts.length ? `
-      <tr>
-        <td style="background-color:#0f1520;border-left:1px solid #1e2535;border-right:1px solid #1e2535;border-top:1px solid #1e2535;padding:22px 32px 4px 32px;">
-          <p style="margin:0 0 2px 0;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#4a5568;">Near you</p>
-          <p style="margin:0;font-size:12px;color:#4a5568;">Not in your favourites &mdash; within ${nearbyKm}&nbsp;km of ${escapeHtml(prof.home_label || 'home')}</p>
-        </td>
-      </tr>
+      ${sectionHeader('&#128205;', 'GOOD SESSIONS NEAR YOU',
+        `Spots you have not favourited, within ${nearbyKm}&nbsp;km of ${escapeHtml(shortPlace(prof.home_label))}.`)}
       ${nearbyForecasts.map(nf => `
       <tr>
         <td style="background-color:#0f1520;border-left:1px solid #1e2535;border-right:1px solid #1e2535;padding:14px 32px 0 32px;">
