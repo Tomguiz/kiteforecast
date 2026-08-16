@@ -16,63 +16,79 @@ async function seed(page: any, profile: Record<string, unknown>) {
   }, profile);
 }
 
-test('the SOON badge disappears when the feature is released', async ({ gotoApp, page }) => {
-  // Guards the one-line release: flipping NEARBY_RELEASED must be enough to
-  // ship, with no leftover "SOON" label on a live feature.
+test('the toggle works now that the feature is released', async ({ gotoApp, page }) => {
   await gotoApp('signedIn');
   await seed(page, { homeLat: 51.35, homeLon: 3.28, homeLabel: 'Knokke', digestNearbyEnabled: false });
-
-  await expect(page.locator('#ppNearbySoonBadge')).toBeVisible();
-
-  await page.evaluate(() => {
-    // @ts-expect-error app global
-    NEARBY_RELEASED = true;
-    // @ts-expect-error app global
-    renderNearbyToggle();
-  });
 
   await expect(page.locator('#ppNearbySoonBadge')).toBeHidden();
-  await expect(page.locator('#ppNearbyHint')).not.toContainText('Coming soon');
   await expect(page.locator('#ppNearbyKm')).toBeEnabled();
+  await expect(page.locator('#ppNearbyHint')).not.toContainText('Coming soon');
+  await expect(page.locator('#ppNearbyHint')).toContainText('Knokke');
 });
 
-test('the toggle cannot be switched on while unreleased', async ({ gotoApp, page }) => {
+test('turning it on saves the preference', async ({ gotoApp, page }) => {
   await gotoApp('signedIn');
   await seed(page, { homeLat: 51.35, homeLon: 3.28, homeLabel: 'Knokke', digestNearbyEnabled: false });
 
-  // Fail loudly if the gate lets a digest_nearby_* write through. Scoped to
-  // that payload (rather than any upsert) because a real click also fires
-  // the app's unrelated last-seen-tracking upsert (profiles.last_seen_at) —
-  // that one must NOT trip this assertion.
   await page.evaluate(() => {
-    // @ts-expect-error app global
+    // @ts-expect-error app global — capture what reaches profiles
     window.getSb = () => ({ from: () => ({ upsert: async (obj: any) => {
-      if (obj && (('digest_nearby_enabled' in obj) || ('digest_nearby_km' in obj))) (window as any).__wrote = true;
-      return { error: null };
+      (window as any).__saved = { ...((window as any).__saved || {}), ...obj }; return { error: null };
     } }) });
   });
   await page.locator('#ppNearbyToggle').click();
 
-  await expect(page.locator('#ppNearbyToggle')).not.toHaveClass(/on/);
-  expect(await page.evaluate(() => (window as any).__wrote === true)).toBe(false);
-  expect(await page.evaluate(() => {
-    // @ts-expect-error app global
-    return loadProfile().digestNearbyEnabled;
-  })).not.toBe(true);
+  await expect(page.locator('#ppNearbyToggle')).toHaveClass(/on/);
+  expect(await page.evaluate(() => (window as any).__saved?.digest_nearby_enabled)).toBe(true);
 });
 
-test('the radius input is disabled while unreleased', async ({ gotoApp, page }) => {
-  await gotoApp('signedIn');
-  await seed(page, { homeLat: 51.35, homeLon: 3.28, homeLabel: 'Knokke', digestNearbyKm: 150 });
-
-  await expect(page.locator('#ppNearbyKm')).toBeDisabled();
-});
-
-test('the SOON gate takes precedence over the home-location gate', async ({ gotoApp, page }) => {
-  // Do not tell the user to go set a home location for something they cannot
-  // enable yet.
+test('still requires a home location before it can be switched on', async ({ gotoApp, page }) => {
   await gotoApp('signedIn');
   await seed(page, { homeLat: null, homeLon: null, digestNearbyEnabled: false });
 
+  await expect(page.locator('#ppNearbyHint')).toContainText('home location');
+  await page.locator('#ppNearbyToggle').click();
+  await expect(page.locator('#ppNearbyToggle')).not.toHaveClass(/on/);
+});
+
+test('the gate still holds if the flag is ever turned back off', async ({ gotoApp, page }) => {
+  // Guards the kill switch: flipping NEARBY_RELEASED back to false must fully
+  // re-gate the row, not leave a half-live control behind.
+  await gotoApp('signedIn');
+  await seed(page, { homeLat: 51.35, homeLon: 3.28, homeLabel: 'Knokke', digestNearbyEnabled: false });
+
+  await page.evaluate(() => {
+    // @ts-expect-error app global
+    NEARBY_RELEASED = false;
+    // @ts-expect-error app global
+    renderNearbyToggle();
+  });
+
+  await expect(page.locator('#ppNearbySoonBadge')).toBeVisible();
+  await expect(page.locator('#ppNearbyKm')).toBeDisabled();
   await expect(page.locator('#ppNearbyHint')).toContainText('Coming soon');
+});
+
+test('SMS alerts are marked SOON and cannot be switched on', async ({ gotoApp, page }) => {
+  // Production has no TWILIO_* secrets, so process-reminders skips the send.
+  // The toggle used to save a preference that could never produce a text.
+  await gotoApp('premium');
+  await page.evaluate(() => {
+    // @ts-expect-error app global
+    openProfilePanel('notifs');
+    // @ts-expect-error app global
+    // Scope the spy: a document click also fires an unrelated touchLastSeen
+    // upsert of last_seen_at, which would make a blanket spy always true.
+    window.getSb = () => ({ from: () => ({ upsert: async (obj: any) => {
+      if (obj && 'sms_enabled' in obj) (window as any).__smsWrote = true;
+      return { error: null };
+    } }) });
+    // @ts-expect-error app global
+    renderSmsGate();
+  });
+
+  await expect(page.locator('#ppSmsSoonBadge')).toBeVisible();
+  await page.locator('#ppSmsToggle').click();
+  await expect(page.locator('#ppSmsToggle')).not.toHaveClass(/on/);
+  expect(await page.evaluate(() => (window as any).__smsWrote === true)).toBe(false);
 });

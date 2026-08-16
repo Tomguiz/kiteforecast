@@ -1646,7 +1646,7 @@
       <div class="notif-card">
         <div class="notif-row">
           <div class="notif-info">
-            <div class="notif-title">📱 SMS alerts <span class="premium-badge">PREMIUM</span></div>
+            <div class="notif-title">📱 SMS alerts <span class="premium-badge">PREMIUM</span> <span class="soon-badge" id="ppSmsSoonBadge">SOON</span></div>
             <div class="notif-sub">Text message 1h before your session</div>
           </div>
           <button class="pp-toggle" id="ppSmsToggle" onclick="toggleSms()"><span></span></button>
@@ -5798,6 +5798,7 @@ async function renderMySpot(){
         ?`<span style="background:rgba(74,222,128,.15);border:1px solid rgba(74,222,128,.3);border-radius:99px;padding:2px 10px;font-size:.7rem;font-weight:700;color:#4ade80;">✓ Verified</span>`
         :`<span style="background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);border-radius:99px;padding:2px 10px;font-size:.7rem;font-weight:700;color:#f59e0b;">⏳ Pending verification</span>`;
       claimFormHTML=`
+        <div class="stats-section-title" style="margin-bottom:8px">Your claim on the spot you're viewing</div>
         <div style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
             <div style="font-weight:700;color:var(--text);font-size:.85rem;">📍 ${escFriendName(existing.spot_name)}</div>
@@ -5814,9 +5815,10 @@ async function renderMySpot(){
         </div>`;
     } else {
       claimFormHTML=`
+        <div class="stats-section-title" style="margin-bottom:8px">Own or manage a spot?</div>
         <div style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">
           <div style="font-size:.82rem;font-weight:700;color:var(--text);margin-bottom:4px;">🏴 Claim <span style="color:var(--accent)">${escFriendName(spotName)}</span></div>
-          <div style="font-size:.72rem;color:var(--tdim);margin-bottom:14px;">Are you the owner or manager of this spot? Claim it to add your business info.</div>
+          <div style="font-size:.72rem;color:var(--tdim);margin-bottom:14px;">This is the spot you have open right now — open a different spot to claim that one instead. Claim it to add your business info.</div>
 
           <label class="pp-label">Spot display name <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(optional — rename how this spot appears)</span></label>
           <input type="text" id="claimDisplayName" class="pp-input" placeholder="e.g. RBSC Duinbergen" style="margin-bottom:12px"/>
@@ -5877,7 +5879,9 @@ async function renderMySpot(){
         </div>`;
     }
   } else {
-    claimFormHTML=`<div style="font-size:.78rem;color:var(--tdim);margin-bottom:16px;">Open a spot forecast page first, claim that spot. If accepted, you'll be able to manage it here.</div>`;
+    claimFormHTML=`
+      <div class="stats-section-title" style="margin-bottom:8px">Own or manage a spot?</div>
+      <div style="font-size:.78rem;color:var(--tdim);margin-bottom:16px;">Open that spot's forecast page first, then come back here to claim it. Once accepted you can manage it from this panel.</div>`;
   }
 
   // All user's claims
@@ -8023,6 +8027,7 @@ function updatePremiumUI(){
   const notifyFriendsBadge=$('ppNotifyFriendsBadge');
   // Show who actually receives the alerts (premium-only, same as the toggle).
   renderFriendsReach();
+  renderSmsGate();
   renderNearbyToggle();
   if(notifyFriendsToggle){
     notifyFriendsToggle.onclick=premium?toggleNotifyFriends:()=>{ showToast('⚡ Premium only — upgrade to notify friends when you hit the water', 4000, '#f59e0b'); openProfilePanel('profile'); };
@@ -8137,7 +8142,12 @@ async function manageSubscription(){
   }
 }
 
+// SMS is NOT live: production has no TWILIO_* secrets, so process-reminders
+// skips the send. Letting the toggle save a preference would promise a text
+// that never arrives. Flip this one constant once Twilio is configured.
+let SMS_RELEASED = false;
 async function toggleSms(){
+  if(!SMS_RELEASED){ showToast('🔜 SMS alerts are coming soon'); return; }
   if(!isPremium()){ showToast('⚡ Premium only — upgrade to unlock SMS alerts', 4000, '#f59e0b'); return; }
   const p=loadProfile(); p.smsEnabled=!p.smsEnabled; saveProfile(p);
   const sb=getSb();
@@ -8464,8 +8474,14 @@ async function findHomeLocation(){
     const top=arr[0];
     const lat=parseFloat(top.lat), lon=parseFloat(top.lon);
     if(isNaN(lat)||isNaN(lon)){ if(status){ status.textContent='⚠️ No coordinates returned — try another search.'; status.style.color='#f59e0b'; } return; }
-    await saveHomeLocation(lat, lon, top.display_name||q);
-    if(status){ status.textContent='✓ '+(top.display_name||q); status.style.color='#4ade80'; }
+    // Nominatim's display_name is the full postal string. Store the place and
+    // the country, which is what a header needs; show the full match in the
+    // status line so the user can still tell whether it found the right place.
+    const full=top.display_name||q;
+    const parts=full.split(',').map(x=>x.trim()).filter(Boolean);
+    const shortLabel=parts.length>1 ? `${parts[0]}, ${parts[parts.length-1].split('/')[0].trim()}` : (parts[0]||q);
+    await saveHomeLocation(lat, lon, shortLabel);
+    if(status){ status.textContent='✓ '+full; status.style.color='#4ade80'; }
   }catch(e){
     if(status){ status.textContent='⚠️ Couldn\'t reach the geocoder — try again.'; status.style.color='#f59e0b'; }
   }finally{
@@ -8948,10 +8964,18 @@ async function toggleNotifyFriends(){
 // toggle is inert and writes nothing. Flip this one constant to release.
 // `let`, not `const`: releasing is still a one-line change, but tests can flip
 // it to prove the released path actually renders as released.
-let NEARBY_RELEASED = false;
+let NEARBY_RELEASED = true;
 function hasHomeLocation(){
   const p=loadProfile();
   return typeof p.homeLat==='number' && typeof p.homeLon==='number';
+}
+function renderSmsGate(){
+  const badge=$('ppSmsSoonBadge'); const toggle=$('ppSmsToggle');
+  if(badge) badge.style.display = SMS_RELEASED ? 'none' : 'inline-flex';
+  if(!SMS_RELEASED){
+    if(toggle){ toggle.classList.remove('on'); toggle.style.opacity='0.4'; }
+    const phoneSection=$('ppPhoneSection'); if(phoneSection) phoneSection.style.display='none';
+  }else if(toggle){ toggle.style.opacity=''; }
 }
 function renderNearbyToggle(){
   const row=$('ppNearbyRow'); if(!row) return;
