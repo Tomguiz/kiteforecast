@@ -3870,11 +3870,21 @@ function spotAttributesHTML(info){
   return html+'</div>';
 }
 
-// Live-wind link precedence: a user-submitted URL wins (phase 2, not yet
-// stored), then the RWS station page, then no button at all. The RWS lookup
+// Live-wind link: the RWS station page, or no button at all. The RWS lookup
 // reuses the cache the panel already populated, so this costs no extra request.
+//
+// PHASE 1 ONLY — the `info.live_wind_url` branch (a user-submitted URL, which
+// takes precedence over the station link) is deliberately NOT here. Rendering
+// it needs safeHttpUrl(), which does not exist in this file yet: PR #19 has not
+// landed. escFriendName escapes quotes and angle brackets and does nothing to
+// the URL scheme, so a `javascript:` URL would still execute on click. See the
+// spec's "Phase 2 — Security" section: "phase 2 must not merge before PR #19"
+// and "The new button must call safeHttpUrl(), not escFriendName() alone".
+// Reintroduce the branch together with safeHttpUrl, not before:
+//   if(info&&info.live_wind_url){ const u=safeHttpUrl(info.live_wind_url);
+//     if(u) return {url:u,label:'Live wind readings'} }
+// docs/superpowers/specs/2026-08-16-rws-live-wind-design.md
 async function _liveWindHref(info,spot){
-  if(info&&info.live_wind_url) return {url:info.live_wind_url,label:'Live wind readings'};
   // cachedLoc (what `spot` is called with here) carries .latitude/.longitude,
   // not .lat/.lon — see renderLiveWindPanel above for the same shape.
   if(!spot||typeof spot.latitude!=='number'||typeof spot.longitude!=='number') return null;
