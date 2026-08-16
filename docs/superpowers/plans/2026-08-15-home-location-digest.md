@@ -19,7 +19,10 @@
 - **Opt-in default:** `digest_nearby_enabled` defaults to `false`. This changes an existing user's email content; it must never turn on by itself.
 - **UNRELEASED — ships behind a "SOON" badge.** The nearby-home digest is not released. Its UI must be visible but **inert**: the toggle carries a `SOON` badge, cannot be switched on, and the radius input is disabled. Tapping it explains that the feature is coming, and writes nothing to `profiles`. Removing the gate later must be a one-line change (`NEARBY_RELEASED = false` → `true`), not a rewrite.
 - **Radius default:** 120 km. Allowed range 25–200 km.
-- **Nearest-N cap:** check the **10 nearest** spots, then report only the **5 best**. "Best" = highest peak wind among that spot's sessions, tie-broken by nearest. Log both the count dropped by the 10-spot radius cap and the count dropped by the best-5 cut — never truncate silently.
+- **Nearest-N cap:** check the **10 nearest** spots, then report only the **5 best**.
+- **Ranking:** peak wind first, then total rideable hours, then nearest.
+- **Worth-the-drive gate:** a spot is dropped entirely when its total rideable hours are too few to justify the distance — `minHours = 2 + floor(distanceKm / 50)`. A 2-hour window 15 km away is worth it; the same 2 hours 120 km away is not.
+- Log every drop count separately (radius cap, worth-the-drive gate, best-5 cut) — never truncate silently.
 - **Unit tests:** `cd tests && npm run unit`. **E2E:** `cd tests && npx playwright test`.
 - **Deno type-check:** `deno check supabase/functions/weekly-digest/index.ts` must pass. (`check-new-sessions` has 12 pre-existing type errors — do not treat those as regressions.)
 
@@ -495,19 +498,23 @@ Directly after the existing `const totalSessions = spotForecasts.reduce(...)` li
         }
       }
     }
-    // Rank and cut to the best 5. Checking 10 keeps the search wide, but a
-    // digest listing 10 spots is unreadable — and the point is "where should I
-    // go", not "here is everything". Best = strongest peak wind at that spot,
-    // tie-broken by nearest, so two equally windy spots put the closer first.
-    const NEARBY_REPORT_LIMIT = 5
-    const peakOf = (f: { sessions: any[] }) =>
-      f.sessions.reduce((m, sess) => Math.max(m, sess.max_gust ?? 0, sess.avg_kn ?? 0), 0)
-    nearbyForecasts.sort((a, b) => (peakOf(b) - peakOf(a)) || (a.distanceKm - b.distanceKm))
-    const droppedByReportLimit = Math.max(0, nearbyForecasts.length - NEARBY_REPORT_LIMIT)
-    if (droppedByReportLimit > 0) {
-      console.log(`[digest] ${email}: ${droppedByReportLimit} nearby spot(s) with sessions were cut by the best-${NEARBY_REPORT_LIMIT} report limit`)
+    // Rank and cut to the best 5 (see Task 4b for rankNearbySpots).
+    const ranked = rankNearbySpots(
+      nearbyForecasts.map(f => ({
+        ...f,
+        peakKn:     f.sessions.reduce((m, x) => Math.max(m, x.max_gust ?? 0, x.avg_kn ?? 0), 0),
+        totalHours: f.sessions.reduce((n, x) => n + (x.duration_hours ?? 0), 0),
+      })),
+      5,
+    )
+    if (ranked.droppedAsNotWorthTheDrive > 0) {
+      console.log(`[digest] ${email}: ${ranked.droppedAsNotWorthTheDrive} nearby spot(s) dropped — too few rideable hours for the distance`)
     }
-    nearbyForecasts.length = Math.min(nearbyForecasts.length, NEARBY_REPORT_LIMIT)
+    if (ranked.droppedByLimit > 0) {
+      console.log(`[digest] ${email}: ${ranked.droppedByLimit} nearby spot(s) cut by the best-5 report limit`)
+    }
+    nearbyForecasts.length = 0
+    nearbyForecasts.push(...ranked.selected)
 
     const nearbyCount = nearbyForecasts.reduce((n, f) => n + f.sessions.length, 0)
 ```
@@ -517,7 +524,7 @@ Directly after the existing `const totalSessions = spotForecasts.reduce(...)` li
 At the top of the file, alongside the existing `session-logic` import:
 
 ```ts
-import { selectNearbySpots } from '../_shared/nearby.ts'
+import { selectNearbySpots, rankNearbySpots } from '../_shared/nearby.ts'
 ```
 
 - [ ] **Step 5: Type-check**
@@ -530,6 +537,170 @@ Expected: `Check ...` with no errors.
 ```bash
 git add supabase/functions/weekly-digest/index.ts
 git commit -m "feat(digest): compute good sessions at spots near the user's home"
+```
+
+---
+
+### Task 4b: `rankNearbySpots` — worth-the-drive gate and best-5 ranking
+
+Pure, unit-tested. Keeps the "is this trip worth it" judgement out of the digest's
+main loop and under test.
+
+**Files:**
+- Modify: `supabase/functions/_shared/nearby.ts`
+- Modify: `tests/unit/nearby.test.ts`
+
+**Interfaces:**
+- Consumes: nothing.
+- Produces:
+  - `minHoursForDistance(distanceKm: number): number`
+  - `interface RankableSpot { distanceKm: number; peakKn: number; totalHours: number }`
+  - `rankNearbySpots<T extends RankableSpot>(spots: T[], limit: number): { selected: T[]; droppedAsNotWorthTheDrive: number; droppedByLimit: number }`
+
+- [ ] **Step 1: Write the failing tests**
+
+Append to `tests/unit/nearby.test.ts`:
+
+```ts
+import { minHoursForDistance, rankNearbySpots } from '../../supabase/functions/_shared/nearby.ts'
+
+const rankable = (name: string, distanceKm: number, peakKn: number, totalHours: number) =>
+  ({ name, distanceKm, peakKn, totalHours })
+
+describe('minHoursForDistance', () => {
+  it('asks only for the session floor when the spot is close', () => {
+    expect(minHoursForDistance(0)).toBe(2)
+    expect(minHoursForDistance(49)).toBe(2)
+  })
+
+  it('asks for an extra hour per 50km', () => {
+    expect(minHoursForDistance(50)).toBe(3)
+    expect(minHoursForDistance(100)).toBe(4)
+    expect(minHoursForDistance(150)).toBe(5)
+  })
+})
+
+describe('rankNearbySpots', () => {
+  it('drops a far spot that only offers a short window', () => {
+    // 2 rideable hours is worth 15km and not worth 120km.
+    const { selected, droppedAsNotWorthTheDrive } = rankNearbySpots([
+      rankable('Close', 15, 20, 2),
+      rankable('Far', 120, 30, 2),
+    ], 5)
+    expect(selected.map(s => s.name)).toEqual(['Close'])
+    expect(droppedAsNotWorthTheDrive).toBe(1)
+  })
+
+  it('keeps a far spot when the session is long enough to justify it', () => {
+    const { selected } = rankNearbySpots([rankable('Far', 120, 30, 4)], 5)
+    expect(selected.map(s => s.name)).toEqual(['Far'])
+  })
+
+  it('ranks by peak wind first', () => {
+    const { selected } = rankNearbySpots([
+      rankable('Breezy', 10, 18, 6),
+      rankable('Windy',  10, 28, 3),
+    ], 5)
+    expect(selected.map(s => s.name)).toEqual(['Windy', 'Breezy'])
+  })
+
+  it('breaks a peak-wind tie on total rideable hours', () => {
+    const { selected } = rankNearbySpots([
+      rankable('Short', 10, 25, 3),
+      rankable('Long',  10, 25, 7),
+    ], 5)
+    expect(selected.map(s => s.name)).toEqual(['Long', 'Short'])
+  })
+
+  it('breaks a full tie on distance', () => {
+    const { selected } = rankNearbySpots([
+      rankable('Further', 40, 25, 4),
+      rankable('Nearer',  12, 25, 4),
+    ], 5)
+    expect(selected.map(s => s.name)).toEqual(['Nearer', 'Further'])
+  })
+
+  it('caps at the limit and reports what it cut', () => {
+    const spots = [1,2,3,4,5,6,7].map(i => rankable(`S${i}`, 10, 30 - i, 5))
+    const { selected, droppedByLimit } = rankNearbySpots(spots, 5)
+    expect(selected).toHaveLength(5)
+    expect(droppedByLimit).toBe(2)
+    expect(selected.map(s => s.name)).toEqual(['S1','S2','S3','S4','S5'])
+  })
+
+  it('counts the drive gate before the limit, not after', () => {
+    // 6 spots, 2 unworthy -> 4 worthy, so the limit cuts nothing.
+    const { droppedAsNotWorthTheDrive, droppedByLimit } = rankNearbySpots([
+      rankable('A', 10, 25, 4), rankable('B', 10, 24, 4),
+      rankable('C', 10, 23, 4), rankable('D', 10, 22, 4),
+      rankable('E', 200, 30, 2), rankable('F', 200, 29, 2),
+    ], 5)
+    expect(droppedAsNotWorthTheDrive).toBe(2)
+    expect(droppedByLimit).toBe(0)
+  })
+
+  it('handles an empty list', () => {
+    const { selected, droppedAsNotWorthTheDrive, droppedByLimit } = rankNearbySpots([], 5)
+    expect(selected).toEqual([])
+    expect(droppedAsNotWorthTheDrive).toBe(0)
+    expect(droppedByLimit).toBe(0)
+  })
+})
+```
+
+- [ ] **Step 2: Run them, confirm they fail**
+
+Run: `cd tests && npm run unit -- nearby`
+Expected: FAIL — `minHoursForDistance` / `rankNearbySpots` are not exported.
+
+- [ ] **Step 3: Implement**
+
+Append to `supabase/functions/_shared/nearby.ts`:
+
+```ts
+// A long drive has to buy its way in. Two rideable hours is a fine reason to
+// pop down the road and a poor reason to cross the country, so the minimum
+// session length scales with distance: the 2-hour session floor, plus an hour
+// for every 50km travelled.
+export const DRIVE_FLOOR_HOURS = 2
+export const KM_PER_EXTRA_HOUR = 50
+
+export function minHoursForDistance(distanceKm: number): number {
+  return DRIVE_FLOOR_HOURS + Math.floor(distanceKm / KM_PER_EXTRA_HOUR)
+}
+
+export interface RankableSpot { distanceKm: number; peakKn: number; totalHours: number }
+
+// Peak wind first (it is what makes a session memorable), then total rideable
+// hours (a spot you can ride all afternoon beats a one-hour blip), then
+// nearest. Spots that fail the worth-the-drive gate are removed before ranking,
+// so the limit never spends a slot on a trip not worth taking.
+export function rankNearbySpots<T extends RankableSpot>(
+  spots: T[], limit: number,
+): { selected: T[]; droppedAsNotWorthTheDrive: number; droppedByLimit: number } {
+  const worth = spots.filter(s => s.totalHours >= minHoursForDistance(s.distanceKm))
+  worth.sort((a, b) =>
+    (b.peakKn - a.peakKn) ||
+    (b.totalHours - a.totalHours) ||
+    (a.distanceKm - b.distanceKm))
+  return {
+    selected: worth.slice(0, limit),
+    droppedAsNotWorthTheDrive: spots.length - worth.length,
+    droppedByLimit: Math.max(0, worth.length - limit),
+  }
+}
+```
+
+- [ ] **Step 4: Run the tests, confirm they pass**
+
+Run: `cd tests && npm run unit`
+Expected: the whole unit suite green.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add supabase/functions/_shared/nearby.ts tests/unit/nearby.test.ts
+git commit -m "feat(digest): worth-the-drive gate and best-5 ranking for nearby spots"
 ```
 
 ---
