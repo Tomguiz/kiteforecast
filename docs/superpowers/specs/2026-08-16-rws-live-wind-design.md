@@ -216,8 +216,10 @@ and `reminderOFF1.html` carry different placeholder sets — `OFF1` has no
 `[[calendar_html]]`, no `[[session.start_time_formatted]]`, no
 `[[session.end_time_formatted]]` and no `[[session.duration_hours]]` — so they
 are rendered by **separate** modules with separate, differently-sized `replace()`
-expressions. Module `34` is the ON chain (24 deep, becoming 25); the OFF chain
-is its own module.
+expressions. Confirmed against the live scenario on 2026-08-16: module `34` is
+the ON chain (24 deep, becoming 25) and module `46` is the OFF chain (23 deep,
+becoming 24). The OFF chain has no `[[calendar_html]]` replace, which is what
+makes the two expressions different lengths.
 
 `process-reminders` has **no ON/OFF branch**: it emits `live_html` on every 1h
 reminder and the template is chosen downstream by the session rating. So the
@@ -246,7 +248,7 @@ Ship in this order, each step inert on its own:
 1. **Deploy `process-reminders`** — payload gains `live_html`; nothing consumes
    it yet.
 2. **Update the Make.com formula on BOTH 1h modules — the ON chain (module
-   `34`) and the OFF chain.** The `replace()` finds no marker yet in either, so
+   `34`) and the OFF chain (module `46`).** The `replace()` finds no marker yet in either, so
    both edits are no-ops at this point.
 3. **Merge the template change to `main`** — the marker now exists in both
    `reminderON1.html` and `reminderOFF1.html`, and is substituted correctly.
