@@ -26,7 +26,7 @@
 //      and the email. Kept as-is so each surface stays self-consistent.
 
 import { haversineKm } from './nearby.ts'
-import { toKnots } from './rideability.ts'
+import { toKnots, speedTier, isWindDirOK } from './rideability.ts'
 
 export const RWS_BASE = 'https://rwsos.rws.nl/wb-api'
 export const RWS_VIEWER = 'https://rwsos.rws.nl/viewer/map/noordzee/meteo/location'
@@ -211,4 +211,23 @@ export async function liveWindFor(
   const hit = nearestStation(stations, lat, lon, opts.maxKm ?? RWS_MAX_KM)
   if (!hit) return null
   return toLiveWind(hit.station, hit.distanceKm, opts.now ?? new Date())
+}
+
+// Is this spot firing RIGHT NOW, by the app's own rideability rule?
+//
+// Deliberately reuses speedTier and isWindDirOK rather than inventing a
+// threshold: speedTier(kn) > 0 IS 15 knots, and it is already what the
+// "good days" badge counts. A fresh `kn >= 15` here would be a second
+// definition of rideable, free to drift from the first.
+//
+// Direction is part of the rule because a spot blowing 25 kn from the wrong
+// quarter is not firing, and a false "firing" badge is the one that costs
+// someone a drive to the beach. `dirDeg` is nullable (the direction feed
+// covers a different station set than speed), and an unknown direction
+// cannot be confirmed as onshore — so it reads as not firing.
+export function isFiringNow(
+  speedKn: number, dirDeg: number | null, spotDirs: number[],
+): boolean {
+  if (dirDeg === null) return false
+  return speedTier(speedKn) > 0 && isWindDirOK(dirDeg, spotDirs)
 }
