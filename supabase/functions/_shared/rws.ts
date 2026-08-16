@@ -144,9 +144,9 @@ export type FetchLike = (url: string) => Promise<{ ok: boolean; json: () => Prom
 // Each locations/geojson call returns EVERY station with its latest value
 // inline, so three requests cover all spots — not three per spot.
 const FEEDS = [
-  { key: 'speed', path: '/sp/dd/2.0/locations/geojson', src: 'datapush-1min',  obs: 'WS1' },
-  { key: 'dir',   path: '/sp/dd/2.0/locations/geojson', src: 'datapush-1min',  obs: 'WR1' },
-  { key: 'gust',  path: '/sp/dd/2.0/locations/geojson', src: 'datapush-10min', obs: 'WS10MXS3' },
+  { path: '/sp/dd/2.0/locations/geojson', src: 'datapush-1min',  obs: 'WS1' },
+  { path: '/sp/dd/2.0/locations/geojson', src: 'datapush-1min',  obs: 'WR1' },
+  { path: '/sp/dd/2.0/locations/geojson', src: 'datapush-10min', obs: 'WS10MXS3' },
 ] as const
 
 function feedUrl(f: typeof FEEDS[number]): string {

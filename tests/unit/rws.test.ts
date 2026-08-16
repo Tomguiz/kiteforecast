@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   parseFeed, mergeFeeds, nearestStation, toLiveWind, viewerUrl,
   RWS_MAX_KM, RWS_MAX_AGE_MIN, type RwsStation,
+  fetchStations, liveWindFor, type FetchLike,
 } from '../../supabase/functions/_shared/rws.ts'
 
 // Captured from the live API on 2026-08-16. locationName carries the raw
@@ -221,8 +222,6 @@ describe('constants', () => {
   })
 })
 
-import { fetchStations, liveWindFor, type FetchLike } from '../../supabase/functions/_shared/rws.ts'
-
 const feedFor = (url: string) =>
   url.includes('WS10MXS3') ? gustFeed : url.includes('WR1') ? dirFeed : speedFeed
 
@@ -234,7 +233,7 @@ describe('fetchStations', () => {
     const spy: FetchLike = async (url) => { seen.push(url); return { ok: true, json: async () => feedFor(url) } }
     const sts = await fetchStations(spy)
     expect(seen.length).toBe(3)
-    expect(seen.some(u => u.includes('observationTypeId=WS1'))).toBe(true)
+    expect(seen.some(u => u.includes('observationTypeId=WS1&'))).toBe(true)
     expect(seen.some(u => u.includes('observationTypeId=WR1'))).toBe(true)
     expect(seen.some(u => u.includes('observationTypeId=WS10MXS3'))).toBe(true)
     expect(sts.map(s => s.id).sort()).toEqual(['BG2', 'CAWI', 'KATS'])
@@ -250,7 +249,7 @@ describe('fetchStations', () => {
     // 'observationTypeId=WS1&' matches WS1 only — WS10MXS3 has no '&' there.
     const failing: FetchLike = async (url) =>
       url.includes('observationTypeId=WS1&')
-        ? { ok: false, json: async () => ({}) }
+        ? { ok: false, json: async () => feedFor(url) }
         : { ok: true, json: async () => feedFor(url) }
     expect(await fetchStations(failing)).toEqual([])
   })
@@ -258,7 +257,7 @@ describe('fetchStations', () => {
   it('still returns stations when only the optional gust feed fails', async () => {
     const partial: FetchLike = async (url) =>
       url.includes('WS10MXS3')
-        ? { ok: false, json: async () => ({}) }
+        ? { ok: false, json: async () => feedFor(url) }
         : { ok: true, json: async () => feedFor(url) }
     const sts = await fetchStations(partial)
     expect(sts.length).toBe(3)
