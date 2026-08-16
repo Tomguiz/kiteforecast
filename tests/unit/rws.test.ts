@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  FIRING_MIN_KN,
   parseFeed, mergeFeeds, nearestStation, toLiveWind, viewerUrl,
   RWS_MAX_KM, RWS_MAX_AGE_MIN, RWS_MAX_FUTURE_MIN, type RwsStation,
   fetchStations, liveWindFor, type FetchLike, isFiringNow,
@@ -318,11 +319,14 @@ describe('isFiringNow', () => {
   // Cadzand Bad / Knokke: good on W and NW
   const DIRS = [270, 315]
 
-  it('fires at 15 kn from a good direction', () => {
-    expect(isFiringNow(15, 270, DIRS)).toBe(true)
+  it('fires at 18 kn from a good direction', () => {
+    expect(isFiringNow(18, 270, DIRS)).toBe(true)
   })
 
-  it('does not fire at 14 kn, however good the direction', () => {
+  it('does not fire at 17 kn, however good the direction', () => {
+    // 15-17kn is rideable and the good-days badge counts it, but the firing
+    // bubble is a stronger claim and deliberately stays quiet here.
+    expect(isFiringNow(17, 270, DIRS)).toBe(false)
     expect(isFiringNow(14, 270, DIRS)).toBe(false)
   })
 
@@ -354,5 +358,38 @@ describe('isFiringNow', () => {
 
   it('returns false when the spot works in any direction but the wind is weak', () => {
     expect(isFiringNow(10, 270, [])).toBe(false)
+  })
+})
+
+describe('isFiringNow — the 18kn bar', () => {
+  // "Firing" is a higher bar than "rideable" on purpose: the good-days badge
+  // counts from 15kn, this bubble says drop everything and drive.
+  const DIRS = [0, 45, 225, 270, 315]
+
+  it('does not fire at the rideable threshold', () => {
+    expect(isFiringNow(15, 270, DIRS)).toBe(false)
+    expect(isFiringNow(17, 270, DIRS)).toBe(false)
+  })
+
+  it('fires from 18kn', () => {
+    expect(isFiringNow(18, 270, DIRS)).toBe(true)
+    expect(isFiringNow(25, 270, DIRS)).toBe(true)
+  })
+
+  it('does not fire on the wrong direction however strong', () => {
+    expect(isFiringNow(35, 135, DIRS)).toBe(false)
+  })
+
+  it('treats an unknown direction as not firing', () => {
+    // A false "firing" bubble is the one that costs someone a drive.
+    expect(isFiringNow(30, null, DIRS)).toBe(false)
+  })
+
+  it('fires in any direction for a spot with no listed dirs', () => {
+    expect(isFiringNow(20, 135, [])).toBe(true)
+  })
+
+  it('exports the threshold rather than hiding a magic number', () => {
+    expect(FIRING_MIN_KN).toBe(18)
   })
 })

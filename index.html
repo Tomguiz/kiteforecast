@@ -383,6 +383,10 @@
     .chip-days { font-size:.65rem; font-weight:700; padding:1px 5px; border-radius:99px; margin-left:2px; line-height:1.5; }
     /* "Firing now" — measured wind, not forecast. Warm against the green
        forecast badge so the two never read as the same kind of claim. */
+    /* One bubble per friend confirmed for today - initial only. Separate from
+       the firing bubble on purpose: a friend going is worth surfacing whatever
+       the wind is doing, and the wind is worth surfacing with nobody going. */
+    .chip-friend { display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border-radius:50%; margin-left:3px; font-size:.58rem; font-weight:800; line-height:1; background:rgba(56,189,248,.22); color:#7dd3fc; border:1px solid rgba(56,189,248,.45); flex-shrink:0; }
     .chip-firing { font-size:.65rem; font-weight:700; padding:1px 5px; border-radius:99px; margin-left:3px; line-height:1.5; background:rgba(249,115,22,.18); color:#fb923c; white-space:nowrap; }
     .chip-days.cd-good    { background:rgba(34,197,94,.15);  color:#4ade80; }
     .chip-days.cd-ok      { background:rgba(34,197,94,.15);  color:#4ade80; }
@@ -1926,14 +1930,15 @@ async function _rwsFetchStations(){
   return out;
 }
 // Mirrors isFiringNow in _shared/rws.ts. Reuses the app's own rideability rule
-// rather than a fresh 15: speedTier(kn)>0 IS 15 knots, and it is already what
+// rather than a fresh 15: the badge counts from 15 kn, and it is already what
 // the "good days" badge counts, so the bubble and the badge cannot drift apart.
 // Direction is part of the rule — 25 kn from the wrong quarter is not firing,
 // and a false "firing" bubble is the one that costs someone a drive. A null
 // direction cannot be confirmed as onshore, so it reads as not firing.
+const FIRING_MIN_KN=18;
 function _rwsIsFiringNow(speedKn,dirDeg,spotDirs){
   if(dirDeg===null||dirDeg===undefined) return false;
-  if(speedTier(speedKn)<=0) return false;
+  if(speedKn<FIRING_MIN_KN) return false;
   if(!spotDirs||!spotDirs.length) return true;   // spot works in any direction
   return spotDirs.some(sd=>angleDiff(dirDeg,sd)<=22.5);
 }
@@ -3583,6 +3588,29 @@ function setChipDayBadge(el,n,isFav=false){
 const FREE_FAV_LIMIT = 1;
 const _chipQueue={running:0,max:1,queue:[]};
 
+// Who else is going today, per spot. ONE query for every favourite, not one per
+// chip. RLS on session_attendances restricts reads to your own rows and your
+// friends', so this is inherently "friends" without picking a policy here. Own
+// rows are dropped: the bubble answers "who else is going", not "am I going".
+let _todayAttendCache=null, _todayAttendTs=0;
+async function _friendsGoingToday(){
+  if(_todayAttendCache&&Date.now()-_todayAttendTs<60000) return _todayAttendCache;
+  const sb=getSb(); const me=loadProfile().email;
+  const out={};
+  if(sb&&me){
+    const today=new Date().toISOString().slice(0,10);
+    const{data,error}=await sb.from('session_attendances')
+      .select('email,nickname,spot_name')
+      .eq('session_date',today).eq('cancelled',false);
+    if(error) console.error('[chips] attendance lookup failed:',error);
+    for(const r of data||[]){
+      if(r.email===me) continue;
+      (out[r.spot_name]=out[r.spot_name]||[]).push(r.nickname||r.email.split('@')[0]);
+    }
+  }
+  _todayAttendCache=out; _todayAttendTs=Date.now();
+  return out;
+}
 function renderHintChips(){
   // Always clear search bar when rendering home screen chips
   const _si=$('searchInput'); if(_si&&!cachedLoc) _si.value='';
@@ -3636,6 +3664,17 @@ function renderHintChips(){
         fire.className='chip-firing';
         fire.textContent=`🔥 ${live.speedKn} kn`;
         fire.title=`Measured now at ${live.stationName} · ${live.distanceKm.toFixed(1)} km away`;
+      }).catch(()=>{});
+      // Friend bubbles are independent of wind: a mate going is worth knowing
+      // even on a light day, so this is NOT gated on the firing check above.
+      _friendsGoingToday().then(map=>{
+        for(const nick of (map[f.name]||[])){
+          const b=document.createElement('span');
+          b.className='chip-friend';
+          b.textContent=(String(nick).trim()[0]||'?').toUpperCase();
+          b.title=nick+' is going today';
+          label.appendChild(b);
+        }
       }).catch(()=>{});
       const rm=document.createElement('span');
       rm.className='fav-chip-remove'; rm.textContent='✕'; rm.title='Remove from your spots';

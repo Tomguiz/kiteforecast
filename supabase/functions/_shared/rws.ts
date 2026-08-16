@@ -225,9 +225,15 @@ export async function liveWindFor(
 // someone a drive to the beach. `dirDeg` is nullable (the direction feed
 // covers a different station set than speed), and an unknown direction
 // cannot be confirmed as onshore — so it reads as not firing.
+// "Firing" is deliberately a HIGHER bar than "rideable". The good-days badge
+// counts anything from 15 kn; this bubble is a nudge to drop what you are doing
+// and drive, so it only fires at 18+. Keeping them different is the point —
+// a bubble that lit up as often as the badge would say nothing extra.
+export const FIRING_MIN_KN = 18
+
 export function isFiringNow(
   speedKn: number, dirDeg: number | null, spotDirs: number[],
 ): boolean {
   if (dirDeg === null) return false
-  return speedTier(speedKn) > 0 && isWindDirOK(dirDeg, spotDirs)
+  return speedKn >= FIRING_MIN_KN && isWindDirOK(dirDeg, spotDirs)
 }
