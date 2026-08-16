@@ -5735,6 +5735,7 @@ async function renderMySpot(){
         ?`<span style="background:rgba(74,222,128,.15);border:1px solid rgba(74,222,128,.3);border-radius:99px;padding:2px 10px;font-size:.7rem;font-weight:700;color:#4ade80;">✓ Verified</span>`
         :`<span style="background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.3);border-radius:99px;padding:2px 10px;font-size:.7rem;font-weight:700;color:#f59e0b;">⏳ Pending verification</span>`;
       claimFormHTML=`
+        <div class="stats-section-title" style="margin-bottom:8px">Your claim on the spot you're viewing</div>
         <div style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
             <div style="font-weight:700;color:var(--text);font-size:.85rem;">📍 ${existing.spot_name}</div>
@@ -5751,9 +5752,10 @@ async function renderMySpot(){
         </div>`;
     } else {
       claimFormHTML=`
+        <div class="stats-section-title" style="margin-bottom:8px">Own or manage a spot?</div>
         <div style="background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px;">
-          <div style="font-size:.82rem;font-weight:700;color:var(--text);margin-bottom:4px;">🏴 Claim <span style="color:var(--accent)">${spotName}</span></div>
-          <div style="font-size:.72rem;color:var(--tdim);margin-bottom:14px;">Are you the owner or manager of this spot? Claim it to add your business info.</div>
+          <div style="font-size:.82rem;font-weight:700;color:var(--text);margin-bottom:4px;">🏴 Claim <span style="color:var(--accent)">${escFriendName(spotName)}</span></div>
+          <div style="font-size:.72rem;color:var(--tdim);margin-bottom:14px;">This is the spot you have open right now — open a different spot to claim that one instead. Claim it to add your business info.</div>
 
           <label class="pp-label">Spot display name <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(optional — rename how this spot appears)</span></label>
           <input type="text" id="claimDisplayName" class="pp-input" placeholder="e.g. RBSC Duinbergen" style="margin-bottom:12px"/>
@@ -5814,7 +5816,9 @@ async function renderMySpot(){
         </div>`;
     }
   } else {
-    claimFormHTML=`<div style="font-size:.78rem;color:var(--tdim);margin-bottom:16px;">Open a spot forecast page first, claim that spot. If accepted, you'll be able to manage it here.</div>`;
+    claimFormHTML=`
+      <div class="stats-section-title" style="margin-bottom:8px">Own or manage a spot?</div>
+      <div style="font-size:.78rem;color:var(--tdim);margin-bottom:16px;">Open that spot's forecast page first, then come back here to claim it. Once accepted you can manage it from this panel.</div>`;
   }
 
   // All user's claims
