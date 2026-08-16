@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { fetchForecast, getGoodSessions } from './session-logic.ts'
+import { selectNearbySpots, rankNearbySpots } from '../_shared/nearby.ts'
 
 const SUPABASE_URL         = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_KEY = Deno.env.get('SB_SERVICE_ROLE_KEY')!
@@ -19,7 +20,8 @@ Deno.serve(async (req) => {
   let emailFilter: string | null = null
   try { const body = await req.json(); emailFilter = body?.email_filter ?? null } catch { /* no body */ }
 
-  let query = supabase.from('profiles').select('email')
+  let query = supabase.from('profiles')
+    .select('email,home_lat,home_lon,home_label,digest_nearby_enabled,digest_nearby_km')
   if (emailFilter) {
     query = query.eq('email', emailFilter)
   } else {
@@ -30,6 +32,8 @@ Deno.serve(async (req) => {
   if (profErr) return new Response(JSON.stringify({ error: profErr.message }), { status: 500 })
 
   const emails = (profiles ?? []).map((p: any) => p.email)
+  const profileByEmail = new Map<string, any>()
+  for (const p of profiles ?? []) profileByEmail.set(p.email, p)
   if (!emails.length) return new Response(JSON.stringify({ sent: 0 }), { status: 200 })
 
   const { data: favs } = await supabase
@@ -56,6 +60,17 @@ Deno.serve(async (req) => {
   const overrideDirs = new Map<string, number[]>()
   for (const o of overrides ?? []) {
     if (o.dirs?.length) overrideDirs.set(o.name, o.dirs)
+  }
+
+  // Catalogue for the "near you" section. Loaded once per run, not per user.
+  // Only fetched when at least one user in this batch has the section on.
+  const anyNearby = (profiles ?? []).some((p: any) =>
+    p.digest_nearby_enabled && p.home_lat != null && p.home_lon != null)
+  let catalogue: any[] = []
+  if (anyNearby) {
+    const { data: spotRows } = await supabase
+      .from('spots').select('name,loc,lat,lon,dirs').eq('active', true)
+    catalogue = spotRows ?? []
   }
 
   const wxCache = new Map<string, any>()
@@ -102,6 +117,60 @@ Deno.serve(async (req) => {
     }
 
     const totalSessions = spotForecasts.reduce((s, sf) => s + sf.sessions.length, 0)
+
+    // ── "Near you": good sessions at catalogue spots around the user's home ──
+    // Uses the same getGoodSessions as favourites, so a day can never count as
+    // rideable in one section and not the other.
+    const prof = profileByEmail.get(email) ?? {}
+    const nearbyForecasts: Array<{ spot: string; distanceKm: number; sessions: any[] }> = []
+    if (prof.digest_nearby_enabled && prof.home_lat != null && prof.home_lon != null && catalogue.length) {
+      const { selected, droppedByCap } = selectNearbySpots(
+        catalogue,
+        { lat: prof.home_lat, lon: prof.home_lon },
+        {
+          radiusKm: prof.digest_nearby_km ?? 120,
+          exclude: userFavs.map((f: any) => ({ name: f.spot_name, lat: f.spot_lat, lon: f.spot_lon })),
+          limit: 10,
+        },
+      )
+      if (droppedByCap > 0) {
+        console.log(`[digest] ${email}: ${droppedByCap} nearby spot(s) beyond the 10-spot cap were not checked`)
+      }
+      for (const s of selected) {
+        const key = `${s.lat},${s.lon}`
+        if (!wxCache.has(key)) {
+          try { wxCache.set(key, await fetchForecast(s.lat, s.lon)) }
+          catch { wxCache.set(key, null) }
+        }
+        const wx = wxCache.get(key)
+        if (!wx) continue
+        const dirs = overrideDirs.get(s.name) ?? s.dirs ?? []
+        const sessions = getGoodSessions(wx, dirs, null)
+        if (sessions.length) {
+          nearbyForecasts.push({ spot: s.name, distanceKm: Math.round(s.distanceKm), sessions })
+        }
+      }
+    }
+    // Rank and cut to the best 5 (see Task 4b for rankNearbySpots).
+    const ranked = rankNearbySpots(
+      nearbyForecasts.map(f => ({
+        ...f,
+        peakKn:     f.sessions.reduce((m, x) => Math.max(m, x.max_gust ?? 0, x.avg_kn ?? 0), 0),
+        totalHours: f.sessions.reduce((n, x) => n + (x.duration_hours ?? 0), 0),
+      })),
+      5,
+    )
+    if (ranked.droppedAsNotWorthTheDrive > 0) {
+      console.log(`[digest] ${email}: ${ranked.droppedAsNotWorthTheDrive} nearby spot(s) dropped — too few rideable hours for the distance`)
+    }
+    if (ranked.droppedByLimit > 0) {
+      console.log(`[digest] ${email}: ${ranked.droppedByLimit} nearby spot(s) cut by the best-5 report limit`)
+    }
+    nearbyForecasts.length = 0
+    nearbyForecasts.push(...ranked.selected)
+
+    const nearbyCount = nearbyForecasts.reduce((n, f) => n + f.sessions.length, 0)
+
     const weekStart = new Date().toLocaleDateString('en', { day: 'numeric', month: 'long', year: 'numeric' })
 
     // Magic link for the main CTA (app home)
