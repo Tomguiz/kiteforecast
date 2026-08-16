@@ -199,7 +199,14 @@ Deno.serve(async (req) => {
         const dirs = overrideDirs.get(s.name) ?? s.dirs ?? []
         const sessions = getGoodSessions(wx, dirs, null)
         if (sessions.length) {
-          nearbyForecasts.push({ spot: s.name, distanceKm: Math.round(s.distanceKm), sessions })
+          const sessionsWithLinks = sessions.map(sess => ({
+            ...sess,
+            forecast_link: `${APP_BASE}?spot=${encodeURIComponent(s.name)}&date=${sess.date}`,
+            join_link: `${APP_BASE}?join=${btoa(JSON.stringify({
+              spot: s.name, date: sess.date, start_time: sess.win_start.replace('h00', ':00'),
+            }))}`,
+          }))
+          nearbyForecasts.push({ spot: s.name, distanceKm: Math.round(s.distanceKm), sessions: sessionsWithLinks })
         }
       }
     }
@@ -366,6 +373,20 @@ Deno.serve(async (req) => {
                       <td style="vertical-align:middle;text-align:center;width:24%;">
                         <p style="margin:0;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4a5568;">Dir</p>
                         <p style="margin:3px 0 0 0;font-family:'Bebas Neue',Arial,sans-serif;font-size:20px;color:#4ade80;line-height:1;">${sess.dom_dir} ${sess.dir_arrow}</p>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:0 16px 12px 16px;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                      <td style="width:50%;padding-right:5px;">
+                        <a href="${sess.forecast_link}" style="display:block;text-align:center;background:rgba(93,212,240,.12);border:1px solid rgba(93,212,240,.3);border-radius:8px;padding:9px 12px;font-family:'DM Sans',Arial,sans-serif;font-size:12px;font-weight:700;color:#5dd4f0;text-decoration:none;">&#128202; View forecast</a>
+                      </td>
+                      <td style="width:50%;padding-left:5px;">
+                        <a href="${sess.join_link}" style="display:block;text-align:center;background:rgba(74,222,128,.12);border:1px solid rgba(74,222,128,.3);border-radius:8px;padding:9px 12px;font-family:'DM Sans',Arial,sans-serif;font-size:12px;font-weight:700;color:#4ade80;text-decoration:none;">&#127689; I&rsquo;m going!</a>
                       </td>
                     </tr>
                   </table>
