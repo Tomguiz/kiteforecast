@@ -4,6 +4,19 @@ on:
     branches: [main]
   pull_request:
 jobs:
+  unit:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm install
+      - run: npm run unit
+
   e2e:
     runs-on: ubuntu-latest
     defaults:
