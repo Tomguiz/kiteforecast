@@ -6526,7 +6526,7 @@ async function renderFriendsPanel(){
     reqList.innerHTML=incoming.map(r=>`
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.2);border-radius:10px;padding:10px 12px;">
         <div>
-          <div style="font-size:.82rem;font-weight:700;color:#fbbf24">${nickMap[r.requester]||r.requester}${reqPremium[r.requester]?' <span title="Premium member" style="font-size:.8rem">👑</span>':''}</div>
+          <div style="font-size:.82rem;font-weight:700;color:#fbbf24">${escFriendName(nickMap[r.requester]||r.requester)}${reqPremium[r.requester]?' <span title="Premium member" style="font-size:.8rem">👑</span>':''}</div>
           <div style="font-size:.7rem;color:var(--tdim)">wants to be your friend</div>
         </div>
         <div style="display:flex;gap:6px">
@@ -6564,7 +6564,7 @@ async function renderFriendsPanel(){
   // Outgoing pending requests (always shown if any)
   const outgoingHtml = outgoing.map(r=>`
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 0;border-bottom:1px solid var(--border);font-size:.8rem;color:var(--tdim)">
-      <span>⏳ Request sent to <strong style="color:var(--text)">${nickMap[r.recipient]||'someone'}</strong>${premiumMap[r.recipient]?' <span title="Premium member" style="font-size:.8rem">👑</span>':''}</span>
+      <span>⏳ Request sent to <strong style="color:var(--text)">${escFriendName(nickMap[r.recipient]||'someone')}</strong>${premiumMap[r.recipient]?' <span title="Premium member" style="font-size:.8rem">👑</span>':''}</span>
       <button class="btn-reset" data-frid="${r.id}" style="font-size:.7rem;color:#f87171;padding:4px 8px;border:1px solid rgba(248,113,113,.3);border-radius:6px;white-space:nowrap" onclick="cancelFriendRequest('${r.id}')">Cancel</button>
     </div>`).join('');
 
@@ -6574,9 +6574,9 @@ async function renderFriendsPanel(){
       const fe=r.requester===email?r.recipient:r.requester;
       return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 0;border-bottom:1px solid var(--border);">
         <div style="display:flex;align-items:center;gap:10px">
-          <div style="width:34px;height:34px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:800;color:#000;flex-shrink:0">${(nickMap[fe]||'?')[0].toUpperCase()}</div>
+          <div style="width:34px;height:34px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:800;color:#000;flex-shrink:0">${escFriendName((nickMap[fe]||'?')[0].toUpperCase())}</div>
           <div>
-            <div style="font-size:.82rem;font-weight:700;color:var(--text)">${nickMap[fe]||fe}${premiumMap[fe]?' <span title="Premium member" style="font-size:.8rem">👑</span>':''}</div>
+            <div style="font-size:.82rem;font-weight:700;color:var(--text)">${escFriendName(nickMap[fe]||fe)}${premiumMap[fe]?' <span title="Premium member" style="font-size:.8rem">👑</span>':''}</div>
             <div style="font-size:.7rem;color:var(--tdim)">${premiumMap[fe]?'premium friend':'friend'}${receivesMap[fe]===false?' · <span style="color:#f59e0b" title="This friend turned off &quot;Receive&quot; friend session alerts, so they will not get your session emails">🔕 alerts off</span>':''}</div>
           </div>
         </div>
@@ -8913,9 +8913,12 @@ async function renderFriendsReach(){
     // Count pending requests separately. Read it here rather than from
     // _friendsCache: the Notifications panel can be opened before the Friends
     // panel has ever populated that cache.
+    // Both directions: incoming requests (someone asked to be your friend) are
+    // listed in the Friends panel just like outgoing ones, so counting only
+    // outgoing left a user with 5 incoming / 0 outgoing seeing "0 of N".
     const{count}=await sb.from('friendships')
       .select('id',{count:'exact',head:true})
-      .eq('requester',p.email).eq('status','pending');
+      .or(`requester.eq.${p.email},recipient.eq.${p.email}`).eq('status','pending');
     _friendsPendingCount=count||0;
   }
   if(!_friendsReachCache.length){ row.style.display='none'; return; }

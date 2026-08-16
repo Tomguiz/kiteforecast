@@ -115,8 +115,11 @@ describe('selectNearbySpots', () => {
 
 import { minHoursForDistance, rankNearbySpots } from '../../supabase/functions/_shared/nearby.ts'
 
-const rankable = (name: string, distanceKm: number, peakKn: number, totalHours: number) =>
-  ({ name, distanceKm, peakKn, totalHours })
+// bestSessionHours defaults to totalHours so existing single-session-style
+// callers below are unaffected; pass it explicitly to model a spot whose week
+// total is padded out by several short, separate sessions.
+const rankable = (name: string, distanceKm: number, peakKn: number, totalHours: number, bestSessionHours: number = totalHours) =>
+  ({ name, distanceKm, peakKn, totalHours, bestSessionHours })
 
 describe('minHoursForDistance', () => {
   it('asks only for the session floor when the spot is close', () => {
@@ -145,6 +148,28 @@ describe('rankNearbySpots', () => {
   it('keeps a far spot when the session is long enough to justify it', () => {
     const { selected } = rankNearbySpots([rankable('Far', 120, 30, 4)], 5)
     expect(selected.map(s => s.name)).toEqual(['Far'])
+  })
+
+  it('drops a far spot whose week total clears the gate only by summing several short sessions', () => {
+    // 130km needs 4h (the gate). Three separate 2h sessions sum to a 6h week
+    // total, which would wrongly clear the gate — but each one alone is still
+    // just a 2h session at the end of a 260km round trip, exactly the case
+    // the gate exists to prevent. The gate must look at the best SINGLE
+    // session (2h), not the week total (6h).
+    const { selected, droppedAsNotWorthTheDrive } = rankNearbySpots([
+      rankable('FarSplit', 130, 25, 6, 2),
+    ], 5)
+    expect(selected).toEqual([])
+    expect(droppedAsNotWorthTheDrive).toBe(1)
+  })
+
+  it('keeps a far spot whose single best session (not the week total) clears the gate', () => {
+    // 130km needs 4h. A single 5h session clears the gate even though other
+    // shorter sessions elsewhere in the week would not have on their own.
+    const { selected } = rankNearbySpots([
+      rankable('FarLong', 130, 25, 5, 5),
+    ], 5)
+    expect(selected.map(s => s.name)).toEqual(['FarLong'])
   })
 
   it('ranks by peak wind first', () => {

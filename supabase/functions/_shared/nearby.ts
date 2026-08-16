@@ -74,16 +74,25 @@ export function minHoursForDistance(distanceKm: number): number {
   return DRIVE_FLOOR_HOURS + Math.floor(distanceKm / KM_PER_EXTRA_HOUR)
 }
 
-export interface RankableSpot { distanceKm: number; peakKn: number; totalHours: number }
+export interface RankableSpot { distanceKm: number; peakKn: number; bestSessionHours: number; totalHours: number }
 
 // Peak wind first (it is what makes a session memorable), then total rideable
 // hours (a spot you can ride all afternoon beats a one-hour blip), then
 // nearest. Spots that fail the worth-the-drive gate are removed before ranking,
 // so the limit never spends a slot on a trip not worth taking.
+//
+// The gate itself must look at the best SINGLE session, not the week's total.
+// totalHours sums every good day in the 7-day window, so a spot 130km away
+// with three separate 2-hour sessions sums to 6h and would clear a 4h gate —
+// even though it means three 260km round trips for two hours of riding each.
+// bestSessionHours (the longest contiguous window at that spot) is what
+// actually answers "is this one trip worth the drive". totalHours remains a
+// ranking tiebreak afterwards: among spots that already cleared the gate, one
+// you can ride all week still beats a one-off.
 export function rankNearbySpots<T extends RankableSpot>(
   spots: T[], limit: number,
 ): { selected: T[]; droppedAsNotWorthTheDrive: number; droppedByLimit: number } {
-  const worth = spots.filter(s => s.totalHours >= minHoursForDistance(s.distanceKm))
+  const worth = spots.filter(s => s.bestSessionHours >= minHoursForDistance(s.distanceKm))
   worth.sort((a, b) =>
     (b.peakKn - a.peakKn) ||
     (b.totalHours - a.totalHours) ||

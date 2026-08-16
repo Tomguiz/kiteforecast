@@ -21,10 +21,11 @@ async function seedReach(
       p.notifyFriendsOnConfirm = sendingOn;
       localStorage.setItem('kf_profile', JSON.stringify(p));
       // @ts-expect-error app global — renderFriendsReach also counts pending
-      // requests via from('friendships'), so the stub must model both calls.
+      // requests via from('friendships').select().or().eq(), so the stub must
+      // model both calls.
       window.getSb = () => ({
         rpc: async () => ({ data: friends, error: null }),
-        from: () => ({ select: () => ({ eq: () => ({ eq: async () => ({ count: 0, error: null }) }) }) }),
+        from: () => ({ select: () => ({ or: () => ({ eq: async () => ({ count: 0, error: null }) }) }) }),
       });
       // @ts-expect-error app global — reset the module-level cache between specs
       window._friendsReachCache = null;
@@ -129,7 +130,7 @@ test('explains pending requests so the count does not look wrong', async ({ goto
     // @ts-expect-error app global
     window.getSb = () => ({
       rpc: async () => ({ data: [{ email: 'r@x.com', nickname: 'Ruben', receives: false }], error: null }),
-      from: () => ({ select: () => ({ eq: () => ({ eq: async () => ({ count: 11, error: null }) }) }) }),
+      from: () => ({ select: () => ({ or: () => ({ eq: async () => ({ count: 11, error: null }) }) }) }),
     });
     // @ts-expect-error app global
     window._friendsReachCache = null;

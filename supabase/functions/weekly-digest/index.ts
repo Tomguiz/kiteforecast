@@ -73,9 +73,14 @@ Deno.serve(async (req) => {
     p.digest_nearby_enabled && p.home_lat != null && p.home_lon != null)
   let catalogue: any[] = []
   if (anyNearby) {
-    const { data: spotRows } = await supabase
+    const { data: spotRows, error: spotsErr } = await supabase
       .from('spots').select('name,loc,lat,lon,dirs').eq('active', true)
+    if (spotsErr) console.error('[digest] spots catalogue query failed:', spotsErr.message)
     catalogue = spotRows ?? []
+    // Without this, a failed (or merely empty) catalogue query silently
+    // disables "near you" for every opted-in user this run: catalogue.length
+    // gates the whole block below, and nothing else would ever say why.
+    if (!catalogue.length) console.error('[digest] anyNearby is true but the spots catalogue came back empty — "near you" will be skipped for all opted-in users this run')
   }
 
   const wxCache = new Map<string, any>()
@@ -91,6 +96,13 @@ Deno.serve(async (req) => {
       && prof.home_lat != null && prof.home_lon != null
     if (!userFavs.length && !nearbyOn) continue
 
+    // The client clamps this to 25–200, but that is a UI constraint only — a
+    // user can PATCH any integer onto their own profile row via the REST API.
+    // Clamp again here so an out-of-range value can't blow up the radius (or
+    // the forecast fetch volume) server-side, and reuse this single clamped
+    // value everywhere digest_nearby_km is read below, including the email copy.
+    const nearbyKm = Math.min(200, Math.max(25, prof.digest_nearby_km ?? 120))
+
     const APP_BASE = 'https://tomguiz.github.io/kiteforecast/'
 
     // Email CTAs use plain app URLs (not single-use magic links): magic links get
@@ -104,8 +116,13 @@ Deno.serve(async (req) => {
     for (const fav of userFavs) {
       const key = `${fav.spot_lat},${fav.spot_lon}`
       if (!wxCache.has(key)) {
+        // wxCache is shared across every user in this run, so a swallowed
+        // failure here silently drops this spot from EVERY remaining user's
+        // digest, not just this one. Cache the null as before (retrying per
+        // user could stampede a failing API) but log it so the failure is
+        // visible instead of just looking like "no sessions this week".
         try { wxCache.set(key, await fetchForecast(fav.spot_lat, fav.spot_lon)) }
-        catch { wxCache.set(key, null) }
+        catch (e) { console.error(`[digest] forecast fetch failed for ${fav.spot_name} (${key}):`, e); wxCache.set(key, null) }
       }
       const wx = wxCache.get(key)
       if (!wx) continue
@@ -138,7 +155,7 @@ Deno.serve(async (req) => {
         catalogue,
         { lat: prof.home_lat, lon: prof.home_lon },
         {
-          radiusKm: prof.digest_nearby_km ?? 120,
+          radiusKm: nearbyKm,
           exclude: userFavs.map((f: any) => ({ name: f.spot_name, lat: f.spot_lat, lon: f.spot_lon })),
           limit: 10,
         },
@@ -152,8 +169,11 @@ Deno.serve(async (req) => {
       for (const s of selected) {
         const key = `${s.lat},${s.lon}`
         if (!wxCache.has(key)) {
+          // Same shared-cache reasoning as the favourites loop above: a
+          // silent failure here removes this spot from every remaining
+          // user's "near you" section for the rest of the run.
           try { wxCache.set(key, await fetchForecast(s.lat, s.lon)) }
-          catch { wxCache.set(key, null) }
+          catch (e) { console.error(`[digest] forecast fetch failed for ${s.name} (${key}):`, e); wxCache.set(key, null) }
         }
         const wx = wxCache.get(key)
         if (!wx) continue
@@ -169,6 +189,15 @@ Deno.serve(async (req) => {
       nearbyForecasts.map(f => ({
         ...f,
         peakKn:     f.sessions.reduce((m, x) => Math.max(m, x.max_gust ?? 0, x.avg_kn ?? 0), 0),
+        // The worth-the-drive gate cares about a single session, so it needs
+        // the longest CONTIGUOUS window (win_hours) at this spot, not
+        // duration_hours (which sums all good hours in a day — a split
+        // 10:00-12:00 + 16:00-18:00 day would otherwise wrongly count as 4
+        // hours toward a threshold meant to describe one session).
+        bestSessionHours: f.sessions.reduce((m, x) => Math.max(m, x.win_hours ?? 0), 0),
+        // totalHours stays a ranking tiebreak only (see rankNearbySpots): a
+        // spot you can ride all week still beats a one-off, once both have
+        // already cleared the per-session gate above.
         totalHours: f.sessions.reduce((n, x) => n + (x.duration_hours ?? 0), 0),
       })),
       5,
@@ -288,7 +317,7 @@ Deno.serve(async (req) => {
       <tr>
         <td style="background-color:#0f1520;border-left:1px solid #1e2535;border-right:1px solid #1e2535;border-top:1px solid #1e2535;padding:22px 32px 4px 32px;">
           <p style="margin:0 0 2px 0;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#4a5568;">Near you</p>
-          <p style="margin:0;font-size:12px;color:#4a5568;">Not in your favourites &mdash; within ${prof.digest_nearby_km ?? 120}&nbsp;km of ${escapeHtml(prof.home_label || 'home')}</p>
+          <p style="margin:0;font-size:12px;color:#4a5568;">Not in your favourites &mdash; within ${nearbyKm}&nbsp;km of ${escapeHtml(prof.home_label || 'home')}</p>
         </td>
       </tr>
       ${nearbyForecasts.map(nf => `
