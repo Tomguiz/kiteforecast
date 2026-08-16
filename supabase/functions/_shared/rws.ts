@@ -138,3 +138,48 @@ export function toLiveWind(station: RwsStation, distanceKm: number, now: Date): 
     viewerUrl:   viewerUrl(station.id),
   }
 }
+
+export type FetchLike = (url: string) => Promise<{ ok: boolean; json: () => Promise<unknown> }>
+
+// Each locations/geojson call returns EVERY station with its latest value
+// inline, so three requests cover all spots — not three per spot.
+const FEEDS = [
+  { key: 'speed', path: '/sp/dd/2.0/locations/geojson', src: 'datapush-1min',  obs: 'WS1' },
+  { key: 'dir',   path: '/sp/dd/2.0/locations/geojson', src: 'datapush-1min',  obs: 'WR1' },
+  { key: 'gust',  path: '/sp/dd/2.0/locations/geojson', src: 'datapush-10min', obs: 'WS10MXS3' },
+] as const
+
+function feedUrl(f: typeof FEEDS[number]): string {
+  const q = new URLSearchParams({
+    sourceName: f.src, observationTypeId: f.obs, boundingBox: RWS_BBOX,
+  })
+  return `${RWS_BASE}${f.path}?${q}`
+}
+
+async function getFeed(f: typeof FEEDS[number], fetchFn: FetchLike): Promise<Map<string, FeedEntry>> {
+  try {
+    const res = await fetchFn(feedUrl(f))
+    if (!res.ok) return new Map()
+    return parseFeed(await res.json())
+  } catch {
+    return new Map()
+  }
+}
+
+// Direction and gust are best-effort: a station with speed but no gust is still
+// worth showing. Losing speed means there is nothing to show at all.
+export async function fetchStations(f: FetchLike = fetch as unknown as FetchLike): Promise<RwsStation[]> {
+  const [speed, dir, gust] = await Promise.all(FEEDS.map(feed => getFeed(feed, f)))
+  if (!speed.size) return []
+  return mergeFeeds(speed, dir, gust)
+}
+
+export async function liveWindFor(
+  lat: number, lon: number,
+  opts: { fetchFn?: FetchLike; now?: Date; maxKm?: number } = {},
+): Promise<LiveWind | null> {
+  const stations = await fetchStations(opts.fetchFn ?? (fetch as unknown as FetchLike))
+  const hit = nearestStation(stations, lat, lon, opts.maxKm ?? RWS_MAX_KM)
+  if (!hit) return null
+  return toLiveWind(hit.station, hit.distanceKm, opts.now ?? new Date())
+}

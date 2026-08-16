@@ -220,3 +220,69 @@ describe('constants', () => {
     expect(RWS_MAX_AGE_MIN).toBe(30)
   })
 })
+
+import { fetchStations, liveWindFor, type FetchLike } from '../../supabase/functions/_shared/rws.ts'
+
+const feedFor = (url: string) =>
+  url.includes('WS10MXS3') ? gustFeed : url.includes('WR1') ? dirFeed : speedFeed
+
+const okFetch: FetchLike = async (url) => ({ ok: true, json: async () => feedFor(url) })
+
+describe('fetchStations', () => {
+  it('requests all three feeds and merges them', async () => {
+    const seen: string[] = []
+    const spy: FetchLike = async (url) => { seen.push(url); return { ok: true, json: async () => feedFor(url) } }
+    const sts = await fetchStations(spy)
+    expect(seen.length).toBe(3)
+    expect(seen.some(u => u.includes('observationTypeId=WS1'))).toBe(true)
+    expect(seen.some(u => u.includes('observationTypeId=WR1'))).toBe(true)
+    expect(seen.some(u => u.includes('observationTypeId=WS10MXS3'))).toBe(true)
+    expect(sts.map(s => s.id).sort()).toEqual(['BG2', 'CAWI', 'KATS'])
+  })
+
+  it('sends the bounding box on every request', async () => {
+    const seen: string[] = []
+    await fetchStations(async (url) => { seen.push(url); return { ok: true, json: async () => feedFor(url) } })
+    expect(seen.every(u => u.includes('boundingBox='))).toBe(true)
+  })
+
+  it('returns an empty list when the speed feed fails', async () => {
+    // 'observationTypeId=WS1&' matches WS1 only — WS10MXS3 has no '&' there.
+    const failing: FetchLike = async (url) =>
+      url.includes('observationTypeId=WS1&')
+        ? { ok: false, json: async () => ({}) }
+        : { ok: true, json: async () => feedFor(url) }
+    expect(await fetchStations(failing)).toEqual([])
+  })
+
+  it('still returns stations when only the optional gust feed fails', async () => {
+    const partial: FetchLike = async (url) =>
+      url.includes('WS10MXS3')
+        ? { ok: false, json: async () => ({}) }
+        : { ok: true, json: async () => feedFor(url) }
+    const sts = await fetchStations(partial)
+    expect(sts.length).toBe(3)
+    expect(sts.find(s => s.id === 'BG2')!.gustMs).toBeNull()
+  })
+
+  it('returns an empty list rather than throwing when fetch rejects', async () => {
+    expect(await fetchStations(async () => { throw new Error('network down') })).toEqual([])
+  })
+})
+
+describe('liveWindFor', () => {
+  it('returns the reading for a covered spot', async () => {
+    const lw = await liveWindFor(BROUWERSDAM.lat, BROUWERSDAM.lon, { fetchFn: okFetch, now: NOW })
+    expect(lw!.stationId).toBe('BG2')
+    expect(lw!.speedKn).toBe(9)   // 4.78 * 1.94384 = 9.29 -> 9
+  })
+
+  it('returns null for a spot with no station in range', async () => {
+    expect(await liveWindFor(20.9, -156.4, { fetchFn: okFetch, now: NOW })).toBeNull()
+  })
+
+  it('returns null rather than throwing when the network fails', async () => {
+    const boom: FetchLike = async () => { throw new Error('down') }
+    expect(await liveWindFor(BROUWERSDAM.lat, BROUWERSDAM.lon, { fetchFn: boom, now: NOW })).toBeNull()
+  })
+})
