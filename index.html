@@ -860,6 +860,12 @@
     .share-btn:hover { border-color:rgba(0,212,255,.6); color:var(--accent); background:rgba(0,212,255,.08); transform:scale(1.08); }
     .share-btn:focus { outline:none; }
     /* ── Spot Info card ── */
+    /* Inside the spot-info card the card is already the disclosure, so the
+       block's own mobile toggle row and outer chrome are redundant. */
+    .lwd-in-card { margin:0 0 10px 0 !important; border:none !important; background:none !important; padding:0 !important; }
+    .lwd-in-card .lwd-toggle { display:none !important; }
+    .lwd-in-card .lwd-panel { display:flex !important; flex-wrap:wrap; align-items:center; gap:8px; }
+    .lwd-in-card .lwd-desktop-label { display:inline !important; }
     .spot-info-card { margin:16px 0; border-radius:14px; border:1px solid var(--border); background:rgba(255,255,255,.03); overflow:hidden; }
     .spot-info-header { display:flex; align-items:center; gap:10px; padding:14px 18px; border-bottom:1px solid var(--border); cursor:pointer; }
     .spot-info-header:hover { background:rgba(255,255,255,.04); }
@@ -1859,6 +1865,7 @@ function renderWindDirChips(){
   if(box){
     const degs=[...windDirs].sort((a,b)=>a-b);
     box.innerHTML=degs.map(d=>`<span class="s-btn s-btn-static active" data-deg="${d}">${compass(d)}</span>`).join('');
+  mountWindDirs();
   }
   // Collapsed-panel (mobile) peek label still summarises the selected dirs.
   const lbl=$('lwdToggleDirs');
@@ -1866,6 +1873,35 @@ function renderWindDirChips(){
 }
 // Back-compat alias — older call sites still invoke updateShoreHint().
 function updateShoreHint(){ renderWindDirChips(); }
+// The good-wind-dirs block used to sit in its own full-width band under the
+// spot-info card, costing a whole row of vertical space on mobile to show five
+// short chips. It now lives INSIDE the card body, with a summary in the card's
+// collapsed subtitle so the directions are still glanceable without expanding.
+//
+// The element is MOVED, never re-created: index.html keeps #locWindDirs outside
+// #spotInfoCard's async innerHTML so its chips survive re-renders, and
+// appendChild relocates the same node with its wiring intact. If the card has
+// not rendered a mount yet (empty/unclaimed state), it stays where it was.
+// Park the wind-dirs block back outside #spotInfoCard before the card rewrites
+// its innerHTML. Without this, moving the block inside the card means the next
+// re-render destroys it — the exact hazard the original standalone placement
+// was there to avoid.
+function unmountWindDirs(){
+  const dirs=$('locWindDirs'); const card=$('spotInfoCard');
+  if(!dirs||!card||!card.contains(dirs)) return;
+  card.parentElement.insertBefore(dirs, card.nextSibling);
+  dirs.classList.remove('lwd-in-card');
+}
+function mountWindDirs(){
+  const dirs=$('locWindDirs'); if(!dirs) return;
+  const mount=$('windDirsMount');
+  if(mount){
+    if(dirs.parentElement!==mount) mount.appendChild(dirs);
+    dirs.classList.add('lwd-in-card');
+  }else{
+    dirs.classList.remove('lwd-in-card');
+  }
+}
 function toggleWindDirsPanel(){
   const tog=$('lwdToggle'), panel=$('lwdPanel');
   if(!tog||!panel) return;
@@ -3701,6 +3737,7 @@ function spotAttributesHTML(info){
 
 async function renderSpotInfoCard(spotName) {
   const el = $('spotInfoCard'); if(!el) return;
+  unmountWindDirs();
   // show collapsed header immediately while fetch is in flight
   el.innerHTML = `<div class="spot-info-card"><div class="spot-info-header" style="opacity:.5;pointer-events:none"><div style="flex:1"><div class="spot-info-title">📍 Spot info &amp; bookings</div><div class="spot-info-subtitle">Lessons · Gear rental · Contact</div></div><svg class="spot-info-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg></div></div>`;
   _spotInfoOpen = false;
@@ -3713,11 +3750,12 @@ async function renderSpotInfoCard(spotName) {
         <div class="spot-info-header" onclick="_spotInfoOpen=!_spotInfoOpen;this.nextElementSibling.style.display=_spotInfoOpen?'flex':'none';this.querySelector('.sic-claim-btn').style.display=_spotInfoOpen?'none':'inline-flex'">
           <div style="flex:1">
             <div class="spot-info-title">📍 Spot info &amp; bookings</div>
-            <div class="spot-info-subtitle">Lessons · Gear rental · Contact</div>
+            <div class="spot-info-subtitle">Lessons · Gear rental · Contact${windDirs.size ? ` · <span style="color:var(--accent);font-weight:700">&#129517; ${[...windDirs].sort((a,b)=>a-b).map(compass).join('/')}</span>` : ''}</div>
           </div>
           <button class="sic-claim-btn spot-info-open-btn" onclick="event.stopPropagation();_spotInfoOpen=true;this.closest('.spot-info-card').querySelector('.spot-info-unclaimed').style.display='flex';this.style.display='none'">🏴 Claim this spot</button>
         </div>
         <div class="spot-info-unclaimed" style="display:none">
+          <div id="windDirsMount" style="width:100%"></div>
           <div class="spot-info-unclaimed-icon">🏴</div>
           <div class="spot-info-unclaimed-title">No info yet for this spot</div>
           <div class="spot-info-unclaimed-sub">Are you the owner or manager here? Claim this spot to add lesson bookings, gear rental, and contact details.</div>
@@ -3728,6 +3766,9 @@ async function renderSpotInfoCard(spotName) {
           </div>
         </div>
       </div>`;
+    // Unclaimed spots take this early return, so mount here too — otherwise
+    // the majority of spots keep the old full-width band.
+    mountWindDirs();
     return;
   }
 
@@ -3808,7 +3849,7 @@ async function renderSpotInfoCard(spotName) {
       <div class="spot-info-header" onclick="_spotInfoOpen=!_spotInfoOpen;this.nextElementSibling.style.display=_spotInfoOpen?'flex':'none';this.querySelector('.spot-info-open-btn').textContent=_spotInfoOpen?'▲ Less':'More details ↓'">
         <div style="flex:1">
           <div class="spot-info-title">📍 Spot info &amp; bookings</div>
-          <div class="spot-info-subtitle">Lessons · Gear rental · Contact${livecamUrl ? ' · <span style="display:inline-flex;align-items:center;gap:4px;color:#f87171;font-weight:700"><span class="webcam-dot" style="width:5px;height:5px"></span>Live cam</span>' : ''}</div>
+          <div class="spot-info-subtitle">Lessons · Gear rental · Contact${livecamUrl ? ' · <span style="display:inline-flex;align-items:center;gap:4px;color:#f87171;font-weight:700"><span class="webcam-dot" style="width:5px;height:5px"></span>Live cam</span>' : ''}${windDirs.size ? ` · <span style="color:var(--accent);font-weight:700">&#129517; ${[...windDirs].sort((a,b)=>a-b).map(compass).join('/')}</span>` : ''}</div>
         </div>
         <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
           ${unclaimedBadge}
@@ -3816,6 +3857,7 @@ async function renderSpotInfoCard(spotName) {
         </div>
       </div>
       <div class="spot-info-body" style="display:none">
+        <div id="windDirsMount"></div>
         ${spotAttributesHTML(info)}
         ${ctaGrid}
         ${metaHTML}
@@ -3838,6 +3880,10 @@ async function renderSpotInfoCard(spotName) {
   // spliced into an inline onclick.
   el.querySelectorAll('[data-cta]').forEach(node =>
     node.addEventListener('click', () => trackCtaClick(spotName, node.dataset.cta)));
+
+  // The card is async: mount (or re-mount) the wind-dirs block once its
+  // container exists, whichever of the two rendered first.
+  mountWindDirs();
 }
 
 async function trackCtaClick(spotName, ctaType) {
