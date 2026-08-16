@@ -78,7 +78,13 @@ Deno.serve(async (req) => {
 
   for (const email of emails) {
     const userFavs = favsByEmail.get(email) ?? []
-    if (!userFavs.length) continue
+    // A user with no favourites can still want the digest: the "near you"
+    // section stands on its own. Skip only when there is nothing to report
+    // from either source.
+    const prof = profileByEmail.get(email) ?? {}
+    const nearbyOn = prof.digest_nearby_enabled === true
+      && prof.home_lat != null && prof.home_lon != null
+    if (!userFavs.length && !nearbyOn) continue
 
     const APP_BASE = 'https://tomguiz.github.io/kiteforecast/'
 
@@ -121,7 +127,6 @@ Deno.serve(async (req) => {
     // ── "Near you": good sessions at catalogue spots around the user's home ──
     // Uses the same getGoodSessions as favourites, so a day can never count as
     // rideable in one section and not the other.
-    const prof = profileByEmail.get(email) ?? {}
     const nearbyForecasts: Array<{ spot: string; distanceKm: number; sessions: any[] }> = []
     if (prof.digest_nearby_enabled && prof.home_lat != null && prof.home_lon != null && catalogue.length) {
       const { selected, droppedByCap } = selectNearbySpots(
