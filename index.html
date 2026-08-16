@@ -835,6 +835,9 @@
     .premium-badge { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:99px; background:linear-gradient(135deg,#f59e0b,#d97706); color:#000; font-size:.65rem; font-weight:800; letter-spacing:.05em; vertical-align:middle; margin-left:6px; position:relative; cursor:pointer; }
     .premium-badge::before { content:'👑'; font-size:.55rem; position:absolute; top:-7px; right:-4px; line-height:1; }
     .premium-badge.no-crown::before { display:none; }
+    /* Marks a feature that is visible but not released yet. Deliberately
+       neutral so it never reads as a premium/paid marker. */
+    .soon-badge { display:inline-flex; align-items:center; padding:2px 8px; border-radius:99px; background:rgba(148,163,184,.18); color:var(--gray); border:1px solid var(--border); font-size:.6rem; font-weight:800; letter-spacing:.06em; vertical-align:middle; margin-left:6px; }
     .premium-card { background:linear-gradient(135deg,rgba(245,158,11,.1),rgba(217,119,6,.06)); border:1px solid rgba(245,158,11,.3); border-radius:12px; padding:16px; }
     .btn-premium { display:block; width:100%; padding:13px; background:linear-gradient(135deg,#f59e0b,#d97706); color:#000; border:none; border-radius:9px; font-size:.88rem; font-weight:800; cursor:pointer; text-align:center; letter-spacing:.03em; transition:opacity .15s; margin-top:10px; }
     .btn-premium:hover { opacity:.9; }
@@ -1667,6 +1670,18 @@
         </div>
         <div style="padding:0 14px 14px">
           <button class="btn pp-save-btn" id="ppDigestNowBtn" onclick="sendDigestNow()" style="width:100%">📩 Send me the next 7 days forecast</button>
+        </div>
+        <div class="notif-row" id="ppNearbyRow" style="border-top:1px solid var(--border);margin-top:10px;padding-top:12px">
+          <div class="notif-info">
+            <div class="notif-title">Also include sessions near home <span class="soon-badge">SOON</span></div>
+            <div class="notif-sub" id="ppNearbyHint"></div>
+            <div style="margin-top:8px;display:flex;align-items:center;gap:8px">
+              <label class="pp-label" style="margin:0">Radius</label>
+              <input type="number" id="ppNearbyKm" class="pp-input" min="25" max="200" step="5" style="margin:0;width:80px;padding:6px 8px" onchange="setDigestNearbyKm(this.value)"/>
+              <span style="font-size:.7rem;color:var(--tdim)">km</span>
+            </div>
+          </div>
+          <button class="pp-toggle" id="ppNearbyToggle" onclick="toggleDigestNearby()"><span></span></button>
         </div>
       </div>
 
@@ -7890,6 +7905,7 @@ function updatePremiumUI(){
   const notifyFriendsBadge=$('ppNotifyFriendsBadge');
   // Show who actually receives the alerts (premium-only, same as the toggle).
   renderFriendsReach();
+  renderNearbyToggle();
   if(notifyFriendsToggle){
     notifyFriendsToggle.onclick=premium?toggleNotifyFriends:()=>{ showToast('⚡ Premium only — upgrade to notify friends when you hit the water', 4000, '#f59e0b'); openProfilePanel('profile'); };
     notifyFriendsToggle.style.opacity=premium?'':'0.4';
@@ -8796,6 +8812,57 @@ async function toggleNotifyFriends(){
   await sb.from('profiles').upsert({email:p.email, notify_friends_on_confirm:p.notifyFriendsOnConfirm!==false},{onConflict:'email'});
   showToast(p.notifyFriendsOnConfirm===false ? 'Friends send alerts: off' : 'Friends send alerts: on');
   renderFriendsReach();
+}
+// ── DIGEST: SESSIONS NEAR HOME ─────────────────────────────────────────────
+// Opt-in: it changes what the weekly email contains, so it never turns itself
+// on. Gated on a home location — without coordinates there is nothing to
+// search around.
+//
+// NOT RELEASED YET. The row is visible so users know it is coming, but the
+// toggle is inert and writes nothing. Flip this one constant to release.
+const NEARBY_RELEASED = false;
+function hasHomeLocation(){
+  const p=loadProfile();
+  return typeof p.homeLat==='number' && typeof p.homeLon==='number';
+}
+function renderNearbyToggle(){
+  const row=$('ppNearbyRow'); if(!row) return;
+  const p=loadProfile();
+  const hint=$('ppNearbyHint'), toggle=$('ppNearbyToggle'), km=$('ppNearbyKm');
+  if(km) km.value=String(p.digestNearbyKm||120);
+  if(!NEARBY_RELEASED){
+    if(hint) hint.textContent='Coming soon — we are still building this';
+    if(toggle){ toggle.classList.remove('on'); toggle.style.opacity='0.4'; }
+    if(km) km.disabled=true;
+    return;
+  }
+  if(km) km.disabled=false;
+  if(hasHomeLocation()){
+    if(hint) hint.textContent='Good sessions around '+(p.homeLabel||'your home location');
+    if(toggle){ toggle.classList.toggle('on', p.digestNearbyEnabled===true); toggle.style.opacity=''; }
+  }else{
+    if(hint) hint.textContent='Set a home location in your profile to use this';
+    if(toggle){ toggle.classList.remove('on'); toggle.style.opacity='0.4'; }
+  }
+}
+async function toggleDigestNearby(){
+  if(!NEARBY_RELEASED){ showToast('🔜 Sessions near home is coming soon'); return; }
+  if(!hasHomeLocation()){ showToast('Set a home location in your profile first'); openProfilePanel('profile'); return; }
+  const p=loadProfile();
+  p.digestNearbyEnabled = p.digestNearbyEnabled===true ? false : true;
+  saveProfile(p);
+  renderNearbyToggle();
+  const sb=getSb(); if(!sb||!p.email) return;
+  await sb.from('profiles').upsert({email:p.email, digest_nearby_enabled:p.digestNearbyEnabled},{onConflict:'email'});
+  showToast(p.digestNearbyEnabled ? 'Nearby sessions: on' : 'Nearby sessions: off');
+}
+async function setDigestNearbyKm(val){
+  if(!NEARBY_RELEASED) return;
+  const km=Math.max(25, Math.min(200, parseInt(val,10)||120));
+  const p=loadProfile(); p.digestNearbyKm=km; saveProfile(p);
+  const el=$('ppNearbyKm'); if(el) el.value=String(km);
+  const sb=getSb(); if(!sb||!p.email) return;
+  await sb.from('profiles').upsert({email:p.email, digest_nearby_km:km},{onConflict:'email'});
 }
 
 // ── Who actually receives my session alerts ────────────────────────────────
