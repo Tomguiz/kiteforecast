@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   parseFeed, mergeFeeds, nearestStation, toLiveWind, viewerUrl,
-  RWS_MAX_KM, RWS_MAX_AGE_MIN, type RwsStation,
+  RWS_MAX_KM, RWS_MAX_AGE_MIN, RWS_MAX_FUTURE_MIN, type RwsStation,
   fetchStations, liveWindFor, type FetchLike,
 } from '../../supabase/functions/_shared/rws.ts'
 
@@ -179,6 +179,27 @@ describe('toLiveWind', () => {
     expect(toLiveWind(withTs('2026-08-16T11:00:00Z'), 1.2, NOW)).toBeNull()
   })
 
+  // The age gate is two-sided. With an upper bound only, a future timestamp
+  // sails through and then hits `ageMin <= 1 -> 'just now'` in both renderers,
+  // so the most broken reading displays as the freshest one. The realistic
+  // trigger is a timeStamp missing its timezone designator: the browser parses
+  // the bare ISO form as LOCAL time, so a Dutch user in CEST sees every reading
+  // 2h in the future, permanently "just now", permanently wrong.
+  it('rejects a reading timestamped hours in the future', () => {
+    // NOW is 12:34Z; a CEST-misparsed 12:30 reading lands at 14:30 -> -116 min.
+    expect(toLiveWind(withTs('2026-08-16T14:30:00Z'), 1.2, NOW)).toBeNull()
+  })
+
+  it('accepts small negative skew inside the future tolerance', () => {
+    // 2 minutes ahead: ageMin === -2, the boundary, still accepted.
+    expect(toLiveWind(withTs('2026-08-16T12:36:00Z'), 1.2, NOW)!.ageMin).toBe(-2)
+  })
+
+  it('rejects a reading just past the future tolerance', () => {
+    // 3 minutes ahead: ageMin === -3, one minute beyond the boundary.
+    expect(toLiveWind(withTs('2026-08-16T12:37:00Z'), 1.2, NOW)).toBeNull()
+  })
+
   it('rejects a station with no speed reading', () => {
     expect(toLiveWind(withTs('2026-08-16T12:30:00Z', null), 1.2, NOW)).toBeNull()
   })
@@ -219,6 +240,7 @@ describe('constants', () => {
   it('matches the spec thresholds', () => {
     expect(RWS_MAX_KM).toBe(30)
     expect(RWS_MAX_AGE_MIN).toBe(30)
+    expect(RWS_MAX_FUTURE_MIN).toBe(2)
   })
 })
 

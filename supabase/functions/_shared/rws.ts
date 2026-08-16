@@ -3,7 +3,27 @@
 // injected — so everything here is unit-testable without deploying.
 //
 // index.html carries a hand-mirrored copy of nearestStation/toLiveWind, the
-// same way it mirrors rideability. Change both together.
+// same way it mirrors rideability (see `_rwsFetchStations` / `_rwsNearest`).
+//
+// MIRROR PARITY — a whole-branch review found three divergences that a
+// per-task review had already looked for and missed, so the list is explicit.
+// Change both copies together, and check each of these when you do:
+//
+//   1. Per-feed failure isolation. Each of the three feeds is wrapped in its
+//      OWN try/catch (getFeed below) and degrades to an empty Map. A failing
+//      gust feed must never cost speed + direction — the spec's failure table
+//      requires "Reading shown, gust omitted".
+//   2. BOTH bounds of the age gate. `ageMin < -2 || ageMin > RWS_MAX_AGE_MIN`.
+//      The lower bound is not decorative: if the feed ever emits a timeStamp
+//      with no timezone designator, the browser parses it as local time and a
+//      CEST user sees every reading 2h in the future — which, with an upper
+//      bound only, renders as the freshest reading possible ("just now").
+//   3. The station-name fallback: last comma-separated field of locationName,
+//      falling back to the station id.
+//   4. The knots constant is a DELIBERATE exception. This module uses
+//      `toKnots` (1.94384); index.html uses its pre-existing `toKnotsR`
+//      (1.944). Readings on a .5 boundary can differ by 1 kn between the app
+//      and the email. Kept as-is so each surface stays self-consistent.
 
 import { haversineKm } from './nearby.ts'
 import { toKnots } from './rideability.ts'
@@ -18,6 +38,10 @@ export const RWS_MAX_KM = 30
 // The 1-minute feed updates every 1-2 min; anything this old means the station
 // or the feed has stopped, and a stale number is worse than none.
 export const RWS_MAX_AGE_MIN = 30
+// Clock skew tolerance. A reading timestamped further ahead than this is not a
+// fresh reading, it is a broken one — most likely a timeStamp that lost its
+// timezone designator and got parsed as local time.
+export const RWS_MAX_FUTURE_MIN = 2
 
 export interface RwsStation {
   id: string
@@ -126,7 +150,12 @@ export function toLiveWind(station: RwsStation, distanceKm: number, now: Date): 
   const t = Date.parse(station.ts)
   if (Number.isNaN(t)) return null
   const ageMin = Math.round((now.getTime() - t) / 60000)
-  if (ageMin > RWS_MAX_AGE_MIN) return null
+  // Two-sided. A future timestamp is as broken as a stale one — and with an
+  // upper bound only it would sail through and render as "just now", the
+  // freshest possible reading. RWS_MAX_FUTURE_MIN of slack absorbs ordinary
+  // clock skew between the mast and this host; anything beyond is a parse or
+  // a feed fault, and a wrong number is worse than none.
+  if (ageMin < -RWS_MAX_FUTURE_MIN || ageMin > RWS_MAX_AGE_MIN) return null
   return {
     stationId:   station.id,
     stationName: station.name,
