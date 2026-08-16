@@ -1673,7 +1673,7 @@
         </div>
         <div class="notif-row" id="ppNearbyRow" style="border-top:1px solid var(--border);margin-top:10px;padding-top:12px">
           <div class="notif-info">
-            <div class="notif-title">Also include sessions near home <span class="soon-badge">SOON</span></div>
+            <div class="notif-title">Also include sessions near home <span class="soon-badge" id="ppNearbySoonBadge">SOON</span></div>
             <div class="notif-sub" id="ppNearbyHint"></div>
             <div style="margin-top:8px;display:flex;align-items:center;gap:8px">
               <label class="pp-label" style="margin:0">Radius</label>
@@ -8820,7 +8820,9 @@ async function toggleNotifyFriends(){
 //
 // NOT RELEASED YET. The row is visible so users know it is coming, but the
 // toggle is inert and writes nothing. Flip this one constant to release.
-const NEARBY_RELEASED = false;
+// `let`, not `const`: releasing is still a one-line change, but tests can flip
+// it to prove the released path actually renders as released.
+let NEARBY_RELEASED = false;
 function hasHomeLocation(){
   const p=loadProfile();
   return typeof p.homeLat==='number' && typeof p.homeLon==='number';
@@ -8829,6 +8831,8 @@ function renderNearbyToggle(){
   const row=$('ppNearbyRow'); if(!row) return;
   const p=loadProfile();
   const hint=$('ppNearbyHint'), toggle=$('ppNearbyToggle'), km=$('ppNearbyKm');
+  const soon=$('ppNearbySoonBadge');
+  if(soon) soon.style.display = NEARBY_RELEASED ? 'none' : 'inline-flex';
   if(km) km.value=String(p.digestNearbyKm||120);
   if(!NEARBY_RELEASED){
     if(hint) hint.textContent='Coming soon — we are still building this';

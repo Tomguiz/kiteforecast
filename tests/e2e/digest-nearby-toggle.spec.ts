@@ -16,12 +16,24 @@ async function seed(page: any, profile: Record<string, unknown>) {
   }, profile);
 }
 
-test('the nearby row is marked SOON while the feature is unreleased', async ({ gotoApp, page }) => {
+test('the SOON badge disappears when the feature is released', async ({ gotoApp, page }) => {
+  // Guards the one-line release: flipping NEARBY_RELEASED must be enough to
+  // ship, with no leftover "SOON" label on a live feature.
   await gotoApp('signedIn');
   await seed(page, { homeLat: 51.35, homeLon: 3.28, homeLabel: 'Knokke', digestNearbyEnabled: false });
 
-  await expect(page.locator('#ppNearbyRow .soon-badge')).toHaveText('SOON');
-  await expect(page.locator('#ppNearbyHint')).toContainText('Coming soon');
+  await expect(page.locator('#ppNearbySoonBadge')).toBeVisible();
+
+  await page.evaluate(() => {
+    // @ts-expect-error app global
+    NEARBY_RELEASED = true;
+    // @ts-expect-error app global
+    renderNearbyToggle();
+  });
+
+  await expect(page.locator('#ppNearbySoonBadge')).toBeHidden();
+  await expect(page.locator('#ppNearbyHint')).not.toContainText('Coming soon');
+  await expect(page.locator('#ppNearbyKm')).toBeEnabled();
 });
 
 test('the toggle cannot be switched on while unreleased', async ({ gotoApp, page }) => {
