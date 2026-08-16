@@ -381,6 +381,9 @@
     .chip:hover { border-color:var(--accent); color:var(--accent); }
     .chip-dirs { font-size:.65rem; color:var(--tdim); font-weight:600; }
     .chip-days { font-size:.65rem; font-weight:700; padding:1px 5px; border-radius:99px; margin-left:2px; line-height:1.5; }
+    /* "Firing now" — measured wind, not forecast. Warm against the green
+       forecast badge so the two never read as the same kind of claim. */
+    .chip-firing { font-size:.65rem; font-weight:700; padding:1px 5px; border-radius:99px; margin-left:3px; line-height:1.5; background:rgba(249,115,22,.18); color:#fb923c; white-space:nowrap; }
     .chip-days.cd-good    { background:rgba(34,197,94,.15);  color:#4ade80; }
     .chip-days.cd-ok      { background:rgba(34,197,94,.15);  color:#4ade80; }
     .chip-days.cd-none    { background:rgba(148,163,184,.1); color:var(--tdim); }
@@ -1921,6 +1924,18 @@ async function _rwsFetchStations(){
   // interactions — forever, for every user.
   _rwsStations=out; _rwsStationsTs=Date.now();
   return out;
+}
+// Mirrors isFiringNow in _shared/rws.ts. Reuses the app's own rideability rule
+// rather than a fresh 15: speedTier(kn)>0 IS 15 knots, and it is already what
+// the "good days" badge counts, so the bubble and the badge cannot drift apart.
+// Direction is part of the rule — 25 kn from the wrong quarter is not firing,
+// and a false "firing" bubble is the one that costs someone a drive. A null
+// direction cannot be confirmed as onshore, so it reads as not firing.
+function _rwsIsFiringNow(speedKn,dirDeg,spotDirs){
+  if(dirDeg===null||dirDeg===undefined) return false;
+  if(speedTier(speedKn)<=0) return false;
+  if(!spotDirs||!spotDirs.length) return true;   // spot works in any direction
+  return spotDirs.some(sd=>angleDiff(dirDeg,sd)<=22.5);
 }
 async function _rwsNearest(lat,lon){
   const sts=await _rwsFetchStations();
@@ -3609,6 +3624,19 @@ function renderHintChips(){
       if(_spotsIsReady){
         fetchChipQualDays({name:f.name,loc:f.label||'',lat:f.lat,lon:f.lon,dirs:_liveDirs}).then(n=>{setChipDayBadge(fbadge,n,true);updateBestWindowBar();});
       }
+      // "Firing now" bubble, from the nearest RWS mast. Favourites carry
+      // .lat/.lon (NOT .latitude/.longitude like cachedLoc — see
+      // renderLiveWindPanel). Costs no extra request: _rwsNearest reads the
+      // 60s station cache, so every favourite is a pure comparison after the
+      // first one. Absent unless the spot is genuinely firing.
+      const fire=document.createElement('span');
+      label.appendChild(fire);
+      _rwsNearest(f.lat,f.lon).then(live=>{
+        if(!live||!_rwsIsFiringNow(live.speedKn,live.dirDeg,_liveDirs)) return;
+        fire.className='chip-firing';
+        fire.textContent=`🔥 ${live.speedKn} kn`;
+        fire.title=`Measured now at ${live.stationName} · ${live.distanceKm.toFixed(1)} km away`;
+      }).catch(()=>{});
       const rm=document.createElement('span');
       rm.className='fav-chip-remove'; rm.textContent='✕'; rm.title='Remove from your spots';
       rm.addEventListener('click',e=>{e.stopPropagation();removeFav(f);});
