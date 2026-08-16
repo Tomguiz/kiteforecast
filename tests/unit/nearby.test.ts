@@ -197,3 +197,79 @@ describe('rankNearbySpots', () => {
     expect(droppedByLimit).toBe(0)
   })
 })
+
+describe('selectNearbySpots — geographic spread', () => {
+  // Spots a few km apart share an Open-Meteo grid cell, so they share a
+  // forecast. Suggesting several of them is padding, not choice.
+  const HOME2 = { lat: 50.7175, lon: 4.3978 }  // Waterloo, inland
+  const coast = (name: string, lat: number, lon: number) =>
+    ({ name, loc: 'coast', lat, lon, dirs: [270] })
+
+  it('keeps only one spot from a tight cluster', () => {
+    // Heist / Zeebrugge / Duinbergen sit within ~8km of each other.
+    const spots = [
+      coast('Heist',      51.3400, 3.2400),
+      coast('Duinbergen', 51.3468, 3.2660),
+      coast('Zeebrugge',  51.3300, 3.2000),
+    ]
+    const { selected, droppedAsTooClose } = selectNearbySpots(spots, HOME2,
+      { radiusKm: 200, exclude: [], limit: 10 })
+    expect(selected).toHaveLength(1)
+    expect(droppedAsTooClose).toBe(2)
+  })
+
+  it('keeps the nearest member of each cluster', () => {
+    // Verified against haversineKm from Waterloo: 104.9km vs 106.5km. The
+    // greedy walk is nearest-first, so the closer one represents the cluster.
+    const spots = [
+      coast('Further', 51.3400, 3.2400),  // 106.5km
+      coast('Nearer',  51.3600, 3.3000),  // 104.9km
+    ]
+    const { selected } = selectNearbySpots(spots, HOME2,
+      { radiusKm: 200, exclude: [], limit: 10 })
+    expect(selected.map(s => s.name)).toEqual(['Nearer'])
+  })
+
+  it('keeps spots that are genuinely far apart', () => {
+    // De Panne and Knokke are opposite ends of the Belgian coast (~60km).
+    const spots = [
+      coast('Knokke',  51.3500, 3.2900),
+      coast('DePanne', 51.0980, 2.5900),
+    ]
+    const { selected, droppedAsTooClose } = selectNearbySpots(spots, HOME2,
+      { radiusKm: 200, exclude: [], limit: 10 })
+    expect(selected).toHaveLength(2)
+    expect(droppedAsTooClose).toBe(0)
+  })
+
+  it('honours an explicit minSeparationKm', () => {
+    const spots = [
+      coast('A', 51.3400, 3.2400),
+      coast('B', 51.3468, 3.2660),
+    ]
+    const tight = selectNearbySpots(spots, HOME2,
+      { radiusKm: 200, exclude: [], limit: 10, minSeparationKm: 1 })
+    expect(tight.selected).toHaveLength(2)
+    const wide = selectNearbySpots(spots, HOME2,
+      { radiusKm: 200, exclude: [], limit: 10, minSeparationKm: 50 })
+    expect(wide.selected).toHaveLength(1)
+  })
+
+  it('counts the cap over spread spots, not raw in-range ones', () => {
+    // 3 clustered + 2 distant, limit 2 -> spread yields 3, cap drops 1.
+    const spots = [
+      coast('C1', 51.3400, 3.2400),
+      coast('C2', 51.3468, 3.2660),
+      coast('C3', 51.3300, 3.2000),
+      // Verified with haversineKm: D1<->D2 30.1km, D2<->nearest cluster 31.5km,
+      // so all three survive the spread and only the limit cuts one.
+      coast('D1', 51.0500, 2.4500),
+      coast('D2', 51.1500, 2.8500)
+    ]
+    const { selected, droppedAsTooClose, droppedByCap } = selectNearbySpots(spots, HOME2,
+      { radiusKm: 200, exclude: [], limit: 2 })
+    expect(droppedAsTooClose).toBe(2)
+    expect(selected).toHaveLength(2)
+    expect(droppedByCap).toBe(1)
+  })
+})

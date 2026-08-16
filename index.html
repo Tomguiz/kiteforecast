@@ -6495,12 +6495,15 @@ async function renderFriendsPanel(){
     reqSection.style.display='block';
     // Fetch nicknames for requesters
     const emails=incoming.map(r=>r.requester);
-    const{data:profiles}=await sb.from('public_profiles').select('email,nickname').in('email',emails);
+    // is_premium too: the outer premiumMap is declared further down, so
+    // referencing it here would hit the temporal dead zone.
+    const{data:profiles}=await sb.from('public_profiles').select('email,nickname,is_premium').in('email',emails);
     const nickMap=Object.fromEntries((profiles||[]).map(p=>[p.email,p.nickname||p.email]));
+    const reqPremium=Object.fromEntries((profiles||[]).map(p=>[p.email,!!p.is_premium]));
     reqList.innerHTML=incoming.map(r=>`
       <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:rgba(245,158,11,.07);border:1px solid rgba(245,158,11,.2);border-radius:10px;padding:10px 12px;">
         <div>
-          <div style="font-size:.82rem;font-weight:700;color:#fbbf24">${nickMap[r.requester]||r.requester}</div>
+          <div style="font-size:.82rem;font-weight:700;color:#fbbf24">${nickMap[r.requester]||r.requester}${reqPremium[r.requester]?' <span title="Premium member" style="font-size:.8rem">👑</span>':''}</div>
           <div style="font-size:.7rem;color:var(--tdim)">wants to be your friend</div>
         </div>
         <div style="display:flex;gap:6px">
@@ -6538,7 +6541,7 @@ async function renderFriendsPanel(){
   // Outgoing pending requests (always shown if any)
   const outgoingHtml = outgoing.map(r=>`
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 0;border-bottom:1px solid var(--border);font-size:.8rem;color:var(--tdim)">
-      <span>⏳ Request sent to <strong style="color:var(--text)">${nickMap[r.recipient]||'someone'}</strong></span>
+      <span>⏳ Request sent to <strong style="color:var(--text)">${nickMap[r.recipient]||'someone'}</strong>${premiumMap[r.recipient]?' <span title="Premium member" style="font-size:.8rem">👑</span>':''}</span>
       <button class="btn-reset" data-frid="${r.id}" style="font-size:.7rem;color:#f87171;padding:4px 8px;border:1px solid rgba(248,113,113,.3);border-radius:6px;white-space:nowrap" onclick="cancelFriendRequest('${r.id}')">Cancel</button>
     </div>`).join('');
 
@@ -8755,6 +8758,7 @@ async function toggleNotifyFriends(){
 // difference — profiles is own-row under RLS and public_profiles doesn't
 // expose the setting.
 let _friendsReachCache=null;
+let _friendsPendingCount=0;   // pending requests: listed in the panel, but not notified
 // Nicknames are user-supplied and go into innerHTML below — escape them.
 const escFriendName=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 function toggleFriendsReach(){
@@ -8770,9 +8774,12 @@ function renderFriendsReachSummary(caret){
   const yes=_friendsReachCache.filter(f=>f.receives).length;
   const total=_friendsReachCache.length;
   const sendingOff=isPremium()&&loadProfile().notifyFriendsOnConfirm===false;
+  // Say "accepted friends" explicitly. Pending requests are listed in the
+  // Friends panel too, so a bare "0 of 1" next to a dozen rows reads as a bug
+  // rather than as "only one of those people has actually accepted".
   el.innerHTML = sendingOff
     ? `<span style="color:var(--gray)">Nobody — sending is off</span> ${caret}`
-    : `<strong style="color:var(--text)">${yes} of ${total}</strong> friend${total===1?'':'s'} will be notified ${caret}`;
+    : `<strong style="color:var(--text)">${yes} of ${total}</strong> accepted friend${total===1?'':'s'} will be notified ${caret}`;
 }
 async function renderFriendsReach(){
   const row=$('ppFriendsReachRow');
@@ -8784,6 +8791,13 @@ async function renderFriendsReach(){
     const{data,error}=await sb.rpc('friends_notif_status');
     if(error){ console.error('[friends-reach]',error); row.style.display='none'; return; }
     _friendsReachCache=data||[];
+    // Count pending requests separately. Read it here rather than from
+    // _friendsCache: the Notifications panel can be opened before the Friends
+    // panel has ever populated that cache.
+    const{count}=await sb.from('friendships')
+      .select('id',{count:'exact',head:true})
+      .eq('requester',p.email).eq('status','pending');
+    _friendsPendingCount=count||0;
   }
   if(!_friendsReachCache.length){ row.style.display='none'; return; }
 
@@ -8796,7 +8810,10 @@ async function renderFriendsReach(){
   const off=_friendsReachCache.filter(f=>!f.receives);
   $('ppFriendsReachList').innerHTML =
     (on.length ?`<div class="notif-sub" style="color:#4ade80">✅ ${on.map(name).join(', ')}</div>`:'')+
-    (off.length?`<div class="notif-sub" style="color:var(--gray);margin-top:4px">⊘ ${off.map(name).join(', ')} — their “Receive” alerts are off</div>`:'');
+    (off.length?`<div class="notif-sub" style="color:var(--gray);margin-top:4px">⊘ ${off.map(name).join(', ')} — their “Receive” alerts are off</div>`:'')+
+    // Pending requests are not friends yet and receive nothing. Without this
+    // line the count looks wrong next to a panel full of pending names.
+    (_friendsPendingCount>0?`<div class="notif-sub" style="color:var(--tdim);margin-top:6px">${_friendsPendingCount} pending request${_friendsPendingCount===1?'':'s'} — they are notified once they accept.</div>`:'');
 }
 
 async function toggleMasterNotif(){

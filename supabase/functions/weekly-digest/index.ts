@@ -134,7 +134,7 @@ Deno.serve(async (req) => {
     // rideable in one section and not the other.
     const nearbyForecasts: Array<{ spot: string; distanceKm: number; sessions: any[] }> = []
     if (prof.digest_nearby_enabled && prof.home_lat != null && prof.home_lon != null && catalogue.length) {
-      const { selected, droppedByCap } = selectNearbySpots(
+      const { selected, droppedByCap, droppedAsTooClose } = selectNearbySpots(
         catalogue,
         { lat: prof.home_lat, lon: prof.home_lon },
         {
@@ -143,6 +143,9 @@ Deno.serve(async (req) => {
           limit: 10,
         },
       )
+      if (droppedAsTooClose > 0) {
+        console.log(`[digest] ${email}: ${droppedAsTooClose} nearby spot(s) skipped as too close to a spot already suggested`)
+      }
       if (droppedByCap > 0) {
         console.log(`[digest] ${email}: ${droppedByCap} nearby spot(s) beyond the 10-spot cap were not checked`)
       }

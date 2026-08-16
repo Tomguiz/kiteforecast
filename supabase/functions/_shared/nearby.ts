@@ -27,11 +27,17 @@ export function haversineKm(aLat: number, aLon: number, bLat: number, bLon: numb
   return 2 * R_EARTH_KM * Math.asin(Math.min(1, Math.sqrt(h)))
 }
 
+// Two spots a few km apart share an Open-Meteo grid cell (~11km) and therefore
+// share a forecast — listing both is padding, not choice. Keep suggestions far
+// enough apart that the conditions can genuinely differ. 25km is roughly the
+// scale at which coastal wind starts to diverge along a shoreline.
+export const MIN_SPOT_SEPARATION_KM = 25
+
 export function selectNearbySpots(
   spots: CatalogueSpot[],
   home: { lat: number; lon: number },
-  opts: { radiusKm: number; exclude: ExcludedSpot[]; limit: number },
-): { selected: NearbySpot[]; droppedByCap: number } {
+  opts: { radiusKm: number; exclude: ExcludedSpot[]; limit: number; minSeparationKm?: number },
+): { selected: NearbySpot[]; droppedByCap: number; droppedAsTooClose: number } {
   const isExcluded = (s: CatalogueSpot) =>
     opts.exclude.some(e => e.name === s.name && haversineKm(e.lat, e.lon, s.lat, s.lon) <= SAME_SPOT_KM)
 
@@ -41,9 +47,19 @@ export function selectNearbySpots(
     .filter(s => s.distanceKm <= opts.radiusKm)
     .sort((a, b) => a.distanceKm - b.distanceKm)
 
+  // Greedy spread: walk nearest-first and keep a spot only when it is far
+  // enough from everything already kept. Nearest-first means the closest
+  // representative of each area wins, so spreading never costs extra travel.
+  const sep = opts.minSeparationKm ?? MIN_SPOT_SEPARATION_KM
+  const spread: NearbySpot[] = []
+  for (const s of inRange) {
+    if (spread.every(k => haversineKm(k.lat, k.lon, s.lat, s.lon) >= sep)) spread.push(s)
+  }
+
   return {
-    selected: inRange.slice(0, opts.limit),
-    droppedByCap: Math.max(0, inRange.length - opts.limit),
+    selected: spread.slice(0, opts.limit),
+    droppedAsTooClose: inRange.length - spread.length,
+    droppedByCap: Math.max(0, spread.length - opts.limit),
   }
 }
 
