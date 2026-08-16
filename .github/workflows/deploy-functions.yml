@@ -22,7 +22,12 @@ jobs:
 
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          # Pinned, not `latest`. With `latest` the action resolves the release
+          # through an unauthenticated GitHub API call on every run, and that
+          # call is rate-limited — on 2026-08-16 it failed in 6 seconds and the
+          # PR #29 merge never deployed. The failure is silent unless someone
+          # reads the notification email. Bump this deliberately.
+          version: 2.114.0
 
       - name: Verify credentials are configured
         run: |
