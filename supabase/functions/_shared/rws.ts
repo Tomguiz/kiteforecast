@@ -62,13 +62,19 @@ export function parseFeed(json: unknown): Map<string, FeedEntry> {
     const p = ft?.properties
     const c = ft?.geometry?.coordinates
     if (!p || typeof p.id !== 'string' || !Array.isArray(c) || c.length < 2) continue
+    // Validate coordinates are actually numbers, then check they are finite.
+    // Rejects null (Number(null)=0 is wrong), non-numeric strings, objects, etc.
+    if (typeof c[0] !== 'number' || typeof c[1] !== 'number') continue
+    const lon = Number(c[0])
+    const lat = Number(c[1])
+    if (!Number.isFinite(lon) || !Number.isFinite(lat)) continue
     const events = Array.isArray(p.events) ? p.events as { timeStamp?: string; value?: number }[] : []
     const last = events.length ? events[events.length - 1] : null
     out.set(p.id, {
       id:   p.id,
       name: cleanName(typeof p.locationName === 'string' ? p.locationName : p.id),
-      lon:  Number(c[0]),
-      lat:  Number(c[1]),
+      lon,
+      lat,
       value: last && typeof last.value === 'number' ? last.value : null,
       ts:    last && typeof last.timeStamp === 'string' ? last.timeStamp : null,
     })
@@ -102,6 +108,8 @@ export function nearestStation(
 ): { station: RwsStation; distanceKm: number } | null {
   let best: { station: RwsStation; distanceKm: number } | null = null
   for (const st of stations) {
+    // Skip malformed stations with NaN coordinates to avoid poison-pill scenario.
+    if (!Number.isFinite(st.lat) || !Number.isFinite(st.lon)) continue
     const d = haversineKm(lat, lon, st.lat, st.lon)
     if (d > maxKm) continue
     if (!best || d < best.distanceKm) best = { station: st, distanceKm: d }

@@ -72,6 +72,18 @@ describe('parseFeed', () => {
       properties: { id: 'X', locationName: 'X', events: [] } }] }
     expect(parseFeed(f).get('X')!.value).toBeNull()
   })
+
+  it('skips a feature with non-numeric string coordinates', () => {
+    const f = { features: [{ geometry: { coordinates: ['not', 'numbers'] },
+      properties: { id: 'BAD', locationName: 'Bad', events: [{ timeStamp: '2026-08-16T12:30:00Z', value: 5.0 }] } }] }
+    expect(parseFeed(f).size).toBe(0)
+  })
+
+  it('skips a feature with null or NaN coordinate elements', () => {
+    const f = { features: [{ geometry: { coordinates: [null, 51] },
+      properties: { id: 'BAD', locationName: 'Bad', events: [{ timeStamp: '2026-08-16T12:30:00Z', value: 5.0 }] } }] }
+    expect(parseFeed(f).size).toBe(0)
+  })
 })
 
 describe('mergeFeeds', () => {
@@ -124,6 +136,22 @@ describe('nearestStation', () => {
 
   it('returns null for an empty station list', () => {
     expect(nearestStation([], BROUWERSDAM.lat, BROUWERSDAM.lon)).toBeNull()
+  })
+
+  it('ignores malformed stations with NaN coordinates', () => {
+    // A malformed station occurring first would become best if not filtered out.
+    // This test proves parseFeed catches the malformation, but also tests
+    // the layer here: ensure a valid station is selected even if a malformed
+    // entry somehow made it through.
+    const malformed: RwsStation = {
+      id: 'BROKEN', name: 'Broken', lat: NaN, lon: NaN,
+      speedMs: 5.0, dirDeg: 350, gustMs: 5.0, ts: '2026-08-16T12:30:00Z',
+    }
+    const valid: RwsStation = stations().find(s => s.id === 'CAWI')!
+    const mixedList = [malformed, valid]
+    const hit = nearestStation(mixedList, CADZAND.lat, CADZAND.lon)!
+    expect(hit.station.id).toBe('CAWI')
+    expect(hit.distanceKm).toBeLessThan(2)
   })
 })
 
