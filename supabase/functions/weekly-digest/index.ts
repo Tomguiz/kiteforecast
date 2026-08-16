@@ -14,6 +14,11 @@ const CORS = {
   'Access-Control-Allow-Headers': 'Content-Type, Authorization',
 }
 
+// Spot names come from the catalogue and home_label is user-supplied; both are
+// interpolated into email HTML, so escape them.
+const escapeHtml = (s: string) => String(s).replace(/[&<>"']/g, c =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string))
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS })
 
@@ -256,7 +261,7 @@ Deno.serve(async (req) => {
         <tr>
           <td style="background-color:#0f1520;border-left:1px solid #1e2535;border-right:1px solid #1e2535;border-top:1px solid #1e2535;padding:20px 32px 4px 32px;">
             <p style="margin:0 0 2px 0;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#4a5568;">Spot</p>
-            <p style="margin:0;font-family:'Bebas Neue',Arial,sans-serif;font-size:26px;color:#5dd4f0;letter-spacing:1px;">&#128205; ${sf.spot}</p>
+            <p style="margin:0;font-family:'Bebas Neue',Arial,sans-serif;font-size:26px;color:#5dd4f0;letter-spacing:1px;">&#128205; ${escapeHtml(sf.spot)}</p>
           </td>
         </tr>
         <tr>
@@ -266,7 +271,7 @@ Deno.serve(async (req) => {
         </tr>`
     }).join('')
 
-    const noSessionsHtml = totalSessions === 0 ? `
+    const noSessionsHtml = (totalSessions + nearbyCount) === 0 ? `
       <tr>
         <td style="background-color:#141b27;border:1px solid #1e2535;border-top:none;padding:40px 32px;text-align:center;">
           <p style="margin:0 0 8px 0;font-size:32px;">&#128168;</p>
@@ -274,6 +279,50 @@ Deno.serve(async (req) => {
           <p style="margin:0;font-size:13px;color:#4a5568;line-height:1.5;">We're keeping an eye on your spots.<br/>You'll hear from us when the wind picks up.</p>
         </td>
       </tr>` : ''
+
+    // Rendered after favourites so the familiar part of the email never moves.
+    const nearbyHtml = nearbyForecasts.length ? `
+      <tr>
+        <td style="background-color:#0f1520;border-left:1px solid #1e2535;border-right:1px solid #1e2535;border-top:1px solid #1e2535;padding:22px 32px 4px 32px;">
+          <p style="margin:0 0 2px 0;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#4a5568;">Near you</p>
+          <p style="margin:0;font-size:12px;color:#4a5568;">Not in your favourites &mdash; within ${prof.digest_nearby_km ?? 120}&nbsp;km of ${escapeHtml(prof.home_label || 'home')}</p>
+        </td>
+      </tr>
+      ${nearbyForecasts.map(nf => `
+      <tr>
+        <td style="background-color:#0f1520;border-left:1px solid #1e2535;border-right:1px solid #1e2535;padding:14px 32px 0 32px;">
+          <p style="margin:0;font-family:'Bebas Neue',Arial,sans-serif;font-size:22px;color:#5dd4f0;letter-spacing:1px;">&#128205; ${escapeHtml(nf.spot)}
+            <span style="font-family:'DM Sans',Arial,sans-serif;font-size:11px;color:#4a5568;letter-spacing:0;">&nbsp;&middot;&nbsp;${nf.distanceKm} km away</span>
+          </p>
+        </td>
+      </tr>
+      <tr>
+        <td style="background-color:#141b27;border-left:1px solid #1e2535;border-right:1px solid #1e2535;padding:0 32px 16px 32px;">
+          ${nf.sessions.map((sess: any) => `
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:10px;background-color:#1a2235;border:1px solid #242d42;border-radius:10px;">
+              <tr>
+                <td style="padding:12px 16px;">
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                    <tr>
+                      <td style="vertical-align:middle;width:52%;">
+                        <p style="margin:0;font-family:'Bebas Neue',Arial,sans-serif;font-size:18px;color:#ffffff;letter-spacing:1px;">${sess.day_of_week}</p>
+                        <p style="margin:2px 0 0 0;font-size:11px;color:#4a5568;">${sess.win_start} &ndash; ${sess.win_end} &middot; ${sess.win_hours}h</p>
+                      </td>
+                      <td style="vertical-align:middle;text-align:center;width:24%;">
+                        <p style="margin:0;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4a5568;">Avg</p>
+                        <p style="margin:3px 0 0 0;font-family:'Bebas Neue',Arial,sans-serif;font-size:20px;color:#5dd4f0;line-height:1;">${sess.avg_kn}<span style="font-size:11px;color:#4a5568;"> kn</span></p>
+                      </td>
+                      <td style="vertical-align:middle;text-align:center;width:24%;">
+                        <p style="margin:0;font-size:9px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4a5568;">Dir</p>
+                        <p style="margin:3px 0 0 0;font-family:'Bebas Neue',Arial,sans-serif;font-size:20px;color:#4ade80;line-height:1;">${sess.dom_dir} ${sess.dir_arrow}</p>
+                      </td>
+                    </tr>
+                  </table>
+                </td>
+              </tr>
+            </table>`).join('')}
+        </td>
+      </tr>`).join('')}` : ''
 
     // Footer CTA rendered here (not mapped in Make) so the button always has a
     // valid href — a previously empty Make field left the button dead.
@@ -285,9 +334,12 @@ Deno.serve(async (req) => {
       email,
       week_start: weekStart,
       total_good_sessions: totalSessions,
-      has_sessions: totalSessions > 0,
+      has_sessions: (totalSessions + nearbyCount) > 0,
       spots_html: spotsHtml,
       no_sessions_html: noSessionsHtml,
+      nearby_html:  nearbyHtml,
+      nearby_count: nearbyCount,
+      has_nearby:   nearbyCount > 0,
       home_link: homeLink,
       cta_html: ctaHtml,
     }
