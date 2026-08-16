@@ -221,11 +221,11 @@ DO $$ BEGIN
   CREATE POLICY "all_delete_suggestions" ON spot_suggestions FOR DELETE TO authenticated USING (true);
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
--- CTA click tracking (lesson, gear, website, instagram, facebook, livecam)
+-- CTA click tracking (lesson, gear, website, instagram, facebook, livecam, live_wind)
 CREATE TABLE IF NOT EXISTS spot_cta_clicks (
   id          uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
   spot_name   text        NOT NULL,
-  cta_type    text        NOT NULL,  -- 'lesson' | 'gear' | 'website' | 'instagram' | 'facebook' | 'livecam'
+  cta_type    text        NOT NULL,  -- 'lesson' | 'gear' | 'website' | 'instagram' | 'facebook' | 'livecam' | 'live_wind'
   user_email  text,                  -- null for anonymous users
   clicked_at  timestamptz NOT NULL DEFAULT now()
 );

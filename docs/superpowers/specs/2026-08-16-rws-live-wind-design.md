@@ -187,14 +187,15 @@ Make.com.
 #### How Make.com renders this (confirmed 2026-08-16)
 
 The scenario routes by reminder hour (`1st → 1`, `2nd → 6`, `3rd → 24`, …).
-The 1h route's module `34` fetches the template **from this repo over HTTP**,
+The 1h route's modules fetch the template **from this repo over HTTP**,
 unauthenticated:
 
 ```
 GET https://raw.githubusercontent.com/Tomguiz/kiteforecast/main/emails/reminderON1.html
+GET https://raw.githubusercontent.com/Tomguiz/kiteforecast/main/emails/reminderOFF1.html
 ```
 
-It then runs a 24-deep nested `replace()` chain over that HTML, one call per
+Each then runs a nested `replace()` chain over that HTML, one call per
 placeholder.
 `[[calendar_html]]` already works exactly this way, which is why `live_html` is
 specced as a prebuilt HTML block rather than separate speed/direction/distance
@@ -202,16 +203,36 @@ fields: no conditional logic is possible in that chain, but an empty string
 substitutes to nothing and the block simply vanishes.
 
 Adding the placeholder means wrapping one more `replace()` around the existing
-expression, making it 25 deep:
+expression:
 
 ```
-{{replace( <existing 24-deep expression> ; "[[live_html]]"; 1.live_html)}}
+{{replace( <existing expression> ; "[[live_html]]"; 1.live_html)}}
 ```
 
-**This is the only manual step**, and only on the 1h route's module — the 6h
-and 24h routes are untouched. Because module `34` pulls the template from the
-repo, editing `emails/reminderON1.html` and `emails/reminderOFF1.html` is
-enough; no template copy-paste into Make.
+#### ⚠️ Both 1h modules must be updated — ON *and* OFF
+
+**There are two replace chains on the 1h route, not one.** `reminderON1.html`
+and `reminderOFF1.html` carry different placeholder sets — `OFF1` has no
+`[[calendar_html]]`, no `[[session.start_time_formatted]]`, no
+`[[session.end_time_formatted]]` and no `[[session.duration_hours]]` — so they
+are rendered by **separate** modules with separate, differently-sized `replace()`
+expressions. Confirmed against the live scenario on 2026-08-16: module `34` is
+the ON chain (24 deep, becoming 25) and module `46` is the OFF chain (23 deep,
+becoming 24). The OFF chain has no `[[calendar_html]]` replace, which is what
+makes the two expressions different lengths.
+
+`process-reminders` has **no ON/OFF branch**: it emits `live_html` on every 1h
+reminder and the template is chosen downstream by the session rating. So the
+placeholder reaches both templates, and:
+
+> If only the ON module is updated, **every SESSION OFF 1h email ships a
+> literal `[[live_html]]` string in its body.**
+
+The manual work is therefore: **wrap the extra `replace()` around the existing
+expression on BOTH the ON and the OFF 1h modules.** The 6h and 24h routes are
+untouched. Because both modules pull their template from the repo, editing
+`emails/reminderON1.html` and `emails/reminderOFF1.html` is enough; no template
+copy-paste into Make.
 
 #### Deployment order (matters — getting it wrong emails users raw markup)
 
@@ -226,12 +247,22 @@ Ship in this order, each step inert on its own:
 
 1. **Deploy `process-reminders`** — payload gains `live_html`; nothing consumes
    it yet.
-2. **Update the Make.com formula** — the `replace()` finds no marker yet, so it
-   is a no-op.
-3. **Merge the template change to `main`** — the marker now exists and is
-   substituted correctly.
+2. **Update the Make.com formula on BOTH 1h modules — the ON chain (module
+   `34`) and the OFF chain (module `46`).** The `replace()` finds no marker yet in either, so
+   both edits are no-ops at this point.
+3. **Merge the template change to `main`** — the marker now exists in both
+   `reminderON1.html` and `reminderOFF1.html`, and is substituted correctly.
 
-Reversing steps 2 and 3 is the failure case.
+Two ways to get this wrong, both of which email users raw markup:
+
+- **Reversing steps 2 and 3** — the marker reaches `main` before either formula
+  knows about it.
+- **Updating only the ON module in step 2** — every SESSION OFF 1h email then
+  ships a literal `[[live_html]]`. This is the easy mistake, because the ON
+  template is the one you are looking at while making the change.
+
+Verify by triggering one reminder of each kind, or by searching a sent OFF
+email for `[[live_html]]` before considering the rollout complete.
 
 SMS is deliberately untouched — it is length-constrained and already carries
 the peak forecast figure.

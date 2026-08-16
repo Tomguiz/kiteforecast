@@ -1321,6 +1321,11 @@
 
     <div id="spotInfoCard"></div>
 
+    <!-- Live measured wind from the nearest RWS mast. Stable standalone element
+         (NOT inside spotInfoCard's async innerHTML) for the same reason as
+         locWindDirs below: it must survive every spot-info re-render. -->
+    <div id="liveWindPanel"></div>
+
     <!-- Good wind dirs — interactive selector, grouped with the spot-info card.
          Kept as a stable standalone element (NOT inside spotInfoCard's async
          innerHTML) so the buttons + wiring survive every spot-info re-render. -->
@@ -1834,6 +1839,197 @@ function daylightWeatherCode(dayHours,fallbackCode){
 //  HELPERS
 // ══════════════════════════════════
 const toKnotsR = ms => Math.round(ms * 1.944);
+
+// ── RWS live wind ──────────────────────────────────────────────────────────
+// Hand-mirrored from supabase/functions/_shared/rws.ts, the same way the
+// rideability rule is mirrored. Change both together — that file's header
+// carries the explicit parity checklist (per-feed failure isolation, both
+// bounds of the age gate, the station-name fallback, the knots constant).
+//
+// Knots constant: this mirror uses the app's existing toKnotsR (1.944) while
+// the module uses toKnots (1.94384). That divergence is DELIBERATE — each
+// surface stays self-consistent with its own conventions — but it means a
+// reading straddling a .5 boundary can render 1 kn apart between the app and
+// the reminder email. Do not "fix" one side in isolation.
+const RWS_BASE='https://rwsos.rws.nl/wb-api';
+const RWS_BBOX='[2,48.56,7.5,57]';
+const RWS_MAX_KM=30, RWS_MAX_AGE_MIN=30;
+// Clock skew tolerance for the lower bound of the age gate. See rws.ts.
+const RWS_MAX_FUTURE_MIN=2;
+const RWS_FEEDS=[
+  {path:'/sp/dd/2.0/locations/geojson',src:'datapush-1min', obs:'WS1'},
+  {path:'/sp/dd/2.0/locations/geojson',src:'datapush-1min', obs:'WR1'},
+  {path:'/sp/dd/2.0/locations/geojson',src:'datapush-10min',obs:'WS10MXS3'},
+];
+function _rwsHaversineKm(aLat,aLon,bLat,bLon){
+  const R=6371,rad=d=>d*Math.PI/180;
+  const dLat=rad(bLat-aLat),dLon=rad(bLon-aLon);
+  const h=Math.sin(dLat/2)**2+Math.cos(rad(aLat))*Math.cos(rad(bLat))*Math.sin(dLon/2)**2;
+  return 2*R*Math.asin(Math.min(1,Math.sqrt(h)));
+}
+function _rwsParseFeed(json){
+  const out=new Map();
+  const feats=json&&json.features;
+  if(!Array.isArray(feats)) return out;
+  for(const f of feats){
+    const p=f&&f.properties, c=f&&f.geometry&&f.geometry.coordinates;
+    if(!p||typeof p.id!=='string'||!Array.isArray(c)||c.length<2) continue;
+    // Validate coordinates are actually numbers, then check they are finite.
+    // Rejects null (Number(null)=0 is wrong), non-numeric strings, objects, etc.
+    if(typeof c[0]!=='number'||typeof c[1]!=='number') continue;
+    const lon=Number(c[0]), lat=Number(c[1]);
+    if(!Number.isFinite(lon)||!Number.isFinite(lat)) continue;
+    const ev=Array.isArray(p.events)?p.events:[];
+    const last=ev.length?ev[ev.length-1]:null;
+    out.set(p.id,{
+      id:p.id,
+      name:String(p.locationName||p.id).split(',').pop().trim(),
+      lon, lat,
+      value:last&&typeof last.value==='number'?last.value:null,
+      ts:last&&typeof last.timeStamp==='string'?last.timeStamp:null,
+    });
+  }
+  return out;
+}
+const RWS_TTL_MS=60000;        // the feed only updates every 1-2 minutes
+const RWS_TTL_FAIL_MS=30000;   // shorter, so an outage recovers quickly
+let _rwsStations=null, _rwsStationsTs=0;
+async function _rwsFetchStations(){
+  if(_rwsStations&&Date.now()-_rwsStationsTs<(_rwsStations.length?RWS_TTL_MS:RWS_TTL_FAIL_MS))
+    return _rwsStations;
+  // Per-feed isolation, matching getFeed() in _shared/rws.ts: each feed
+  // degrades to an empty Map on its own. safeFetch throws on any non-ok
+  // response, so a bare Promise.all would let one failing feed take down all
+  // three — a gust-feed outage would hide the whole panel, when the spec
+  // requires "Reading shown, gust omitted".
+  const maps=await Promise.all(RWS_FEEDS.map(async f=>{
+    try{
+      const q=new URLSearchParams({sourceName:f.src,observationTypeId:f.obs,boundingBox:RWS_BBOX});
+      return _rwsParseFeed(await safeFetch(`${RWS_BASE}${f.path}?${q}`,8000));
+    }catch{ return new Map(); }
+  }));
+  const [speed,dir,gust]=maps;
+  const out=[];
+  // The speed feed defines the station set: no speed, nothing worth showing.
+  for(const [id,s] of speed) out.push({
+    id,name:s.name,lat:s.lat,lon:s.lon,speedMs:s.value,ts:s.ts,
+    dirDeg:(dir.get(id)||{}).value??null, gustMs:(gust.get(id)||{}).value??null,
+  });
+  // Cache the empty result too, under the shorter TTL. Without this a
+  // persistent upstream failure meant 3 feed requests (6 with safeFetch's
+  // retry) on EVERY renderGrid — and renderGrid fires from ~10 unrelated
+  // interactions — forever, for every user.
+  _rwsStations=out; _rwsStationsTs=Date.now();
+  return out;
+}
+async function _rwsNearest(lat,lon){
+  const sts=await _rwsFetchStations();
+  let best=null;
+  for(const st of sts){
+    // Skip malformed stations with NaN coordinates to avoid poison-pill scenario.
+    if(!Number.isFinite(st.lat)||!Number.isFinite(st.lon)) continue;
+    const d=_rwsHaversineKm(lat,lon,st.lat,st.lon);
+    if(d>RWS_MAX_KM) continue;
+    if(!best||d<best.distanceKm) best={station:st,distanceKm:d};
+  }
+  if(!best) return null;
+  const st=best.station;
+  if(st.speedMs===null||!st.ts) return null;
+  const t=Date.parse(st.ts);
+  if(isNaN(t)) return null;
+  const ageMin=Math.round((Date.now()-t)/60000);
+  // Two-sided, mirroring toLiveWind in _shared/rws.ts. A future timestamp is
+  // not fresh, it is broken — and it would otherwise hit `ageMin<=1` below and
+  // render as "just now". Concretely: if the feed's timeStamp ever loses its
+  // timezone designator, Date.parse treats the bare ISO form as LOCAL, so a
+  // Dutch user in CEST sees every reading 2h ahead — permanently "just now",
+  // permanently wrong, and never rejected by an upper bound alone.
+  if(ageMin<-RWS_MAX_FUTURE_MIN||ageMin>RWS_MAX_AGE_MIN) return null;
+  return {
+    stationId:st.id, stationName:st.name, distanceKm:best.distanceKm,
+    speedKn:toKnotsR(st.speedMs), dirDeg:st.dirDeg,
+    gustKn:st.gustMs===null?null:toKnotsR(st.gustMs), ageMin,
+    viewerUrl:`https://rwsos.rws.nl/viewer/map/noordzee/meteo/location/${encodeURIComponent(st.id)}`,
+  };
+}
+// tdsSparkSVG is built for ~24 hourly points in a 58x26px box. The 1-minute
+// feed yields ~180 points over 3h — 0.3px apart, an unreadable hairline.
+// Downsample to evenly spaced samples so the sparkline reads as a trend. The
+// first and last points are always kept, so the line still ends on the most
+// recent reading.
+const RWS_SPARK_POINTS=36;
+function _rwsDownsample(arr,target=RWS_SPARK_POINTS){
+  if(!Array.isArray(arr)||arr.length<=target) return arr||[];
+  const step=(arr.length-1)/(target-1), out=[];
+  for(let i=0;i<target;i++) out.push(arr[Math.round(i*step)]);
+  return out;
+}
+// 3h trend for the matched station, for the sparkline. Failure yields [].
+// Cached per station under the same 60s scheme as the station feed, INCLUDING
+// the empty result (shorter TTL): renderGrid fires from ~10 unrelated
+// interactions and each one used to issue a fresh uncached request.
+let _rwsTrendCache=new Map();
+async function _rwsTrend(stationId){
+  const hit=_rwsTrendCache.get(stationId);
+  if(hit&&Date.now()-hit.ts<(hit.data.length?RWS_TTL_MS:RWS_TTL_FAIL_MS)) return hit.data;
+  let data=[];
+  try{
+    const end=new Date(), start=new Date(Date.now()-3*3600*1000);
+    const q=new URLSearchParams({
+      observationTypeId:'WS1', sourceName:'datapush-1min', locationCode:stationId,
+      startTime:start.toISOString().slice(0,19)+'Z', endTime:end.toISOString().slice(0,19)+'Z',
+    });
+    const j=await safeFetch(`${RWS_BASE}/sp/dd/2.0/timeseries?${q}`,8000);
+    const ev=j&&j.results&&j.results[0]&&j.results[0].events;
+    if(Array.isArray(ev)) data=_rwsDownsample(ev.filter(e=>e&&typeof e.value==='number').map(e=>toKnotsR(e.value)));
+  }catch{ data=[]; }
+  _rwsTrendCache.set(stationId,{data,ts:Date.now()});
+  return data;
+}
+// Which spot the panel currently shows, and the exact markup it shows. Both
+// are needed because renderGrid() — which calls this — fires from ~10 unrelated
+// interactions (bell toggles, attendance confirm/cancel, notification changes,
+// wind-dir set, auth callbacks). Blanking up front made every one of those
+// flash the panel empty for two awaits; comparing the resolved markup instead
+// means an unchanged panel is never touched at all.
+let _liveWindKey=null, _liveWindHtml='';
+function _liveWindSpotKey(spot){
+  return spot?`${spot.name||''}|${spot.latitude},${spot.longitude}`:null;
+}
+async function renderLiveWindPanel(spot){
+  const el=$('liveWindPanel'); if(!el) return;
+  const key=_liveWindSpotKey(spot);
+  // Only blank when the spot actually changed — otherwise the old spot's
+  // reading would linger while the new one's lookup is in flight.
+  if(key!==_liveWindKey){ el.innerHTML=''; _liveWindKey=key; _liveWindHtml=''; }
+  const paint=html=>{ if(html!==_liveWindHtml){ el.innerHTML=html; _liveWindHtml=html; } };
+  if(!spot||typeof spot.latitude!=='number'||typeof spot.longitude!=='number'){ paint(''); return; }
+  // Guard against a slow response landing after the user moved to another spot.
+  // Same generation counter fetchForecastFromSpot uses to cancel its own
+  // in-flight requests — bumped on every new spot fetch and on resetSearch.
+  // Re-checked after EVERY await below, so a response delayed past either
+  // network call is discarded rather than painting into the wrong spot's view.
+  const myGen=_fetchGen;
+  const live=await _rwsNearest(spot.latitude,spot.longitude);
+  if(myGen!==_fetchGen) return;           // spot changed while this request was in flight
+  if(!live){ paint(''); return; }         // no station, stale, or fetch failed
+  const trend=await _rwsTrend(live.stationId);
+  if(myGen!==_fetchGen) return;           // spot changed while the trend request was in flight
+  const spark=trend.length>1?tdsSparkSVG(trend,'#5dd4f0',null):'';
+  const dir=live.dirDeg===null?'':` ${['N','NE','E','SE','S','SW','W','NW'][Math.round(((live.dirDeg%360)+360)%360/45)%8]}`;
+  const gust=live.gustKn===null?'':` · gusts ${live.gustKn} kn`;
+  const age=live.ageMin<=1?'just now':`${live.ageMin} min ago`;
+  // stationName is the ONLY untrusted value here — it comes from a third-party
+  // feed. dir, gust and age are generated numerals and literals from this
+  // function; escaping them too would only hide where the real boundary is.
+  paint(`<div class="spot-info-card" style="padding:14px 16px">
+    <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#4a5568;margin-bottom:6px">🌬 Measured right now</div>
+    <div style="font-size:22px;font-weight:700;color:#5dd4f0">${live.speedKn} kn${dir}${gust}</div>
+    ${spark?`<div style="margin:8px 0">${spark}</div>`:''}
+    <div style="font-size:11px;color:#4a5568">${escFriendName(live.stationName)} · ${live.distanceKm.toFixed(1)} km away · ${age}</div>
+  </div>`);
+}
+
 const DIRS8 = ['N','NE','E','SE','S','SW','W','NW'];
 const compass = deg => DIRS8[Math.round(((deg%360)+360)%360/45)%8];
 const ARROWS8 = ['↓','↙','←','↖','↑','↗','→','↘'];
@@ -3735,9 +3931,40 @@ function spotAttributesHTML(info){
   return html+'</div>';
 }
 
+// Live-wind link: the RWS station page, or no button at all. The RWS lookup
+// reuses the cache the panel already populated, so this costs no extra request.
+//
+// PHASE 1 ONLY — the `info.live_wind_url` branch (a user-submitted URL, which
+// takes precedence over the station link) is deliberately NOT here. Rendering
+// it needs safeHttpUrl(), which does not exist in this file yet: PR #19 has not
+// landed. escFriendName escapes quotes and angle brackets and does nothing to
+// the URL scheme, so a `javascript:` URL would still execute on click. See the
+// spec's "Phase 2 — Security" section: "phase 2 must not merge before PR #19"
+// and "The new button must call safeHttpUrl(), not escFriendName() alone".
+// Reintroduce the branch together with safeHttpUrl, not before:
+//   if(info&&info.live_wind_url){ const u=safeHttpUrl(info.live_wind_url);
+//     if(u) return {url:u,label:'Live wind readings'} }
+// docs/superpowers/specs/2026-08-16-rws-live-wind-design.md
+async function _liveWindHref(info,spot){
+  // cachedLoc (what `spot` is called with here) carries .latitude/.longitude,
+  // not .lat/.lon — see renderLiveWindPanel above for the same shape.
+  if(!spot||typeof spot.latitude!=='number'||typeof spot.longitude!=='number') return null;
+  const live=await _rwsNearest(spot.latitude,spot.longitude);
+  return live?{url:live.viewerUrl,label:`Live wind — ${live.stationName}`}:null;
+}
 async function renderSpotInfoCard(spotName) {
   const el = $('spotInfoCard'); if(!el) return;
+  // Park the wind-dirs block outside the card before its innerHTML is
+  // rewritten below — it now lives INSIDE the card and would be destroyed.
   unmountWindDirs();
+  // Generation guard: renderSpotInfoCard is fired-and-forgotten (not awaited)
+  // by fetchForecastFromSpot, and this function now awaits two network calls
+  // (fetchSpotInfo, then _rwsNearest via _liveWindHref) before its final
+  // write. If the user navigates to another spot while either is in flight,
+  // _fetchGen has already been bumped and cachedLoc already points at the
+  // new spot — without this guard we'd paint the old spot's card using the
+  // new spot's coordinates. Re-checked after every await below.
+  const myGen=_fetchGen;
   // show collapsed header immediately while fetch is in flight
   el.innerHTML = `<div class="spot-info-card"><div class="spot-info-header" style="opacity:.5;pointer-events:none"><div style="flex:1"><div class="spot-info-title">📍 Spot info &amp; bookings</div><div class="spot-info-subtitle">Lessons · Gear rental · Contact</div></div><svg class="spot-info-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg></div></div>`;
   _spotInfoOpen = false;
@@ -3811,13 +4038,21 @@ async function renderSpotInfoCard(spotName) {
   const gearBtn = gearUrl
     ? `<a href="${escFriendName(gearUrl)}" target="_blank" rel="noopener" class="spot-cta-btn spot-cta-gear" data-cta="gear">🪁 Rent kite gear</a>`
     : '';
+  const liveWind = await _liveWindHref(info, cachedLoc);
+  if(myGen!==_fetchGen) return;      // spot changed while the RWS lookup was in flight
+  // Same treatment as every other CTA on main: scheme-allowlisted href and a
+  // data-cta hook, so spotName is never spliced into an inline handler.
+  const liveWindUrl = liveWind ? safeHttpUrl(liveWind.url) : '';
+  const liveWindBtn = liveWindUrl
+    ? `<a href="${escFriendName(liveWindUrl)}" target="_blank" rel="noopener" class="spot-cta-btn" data-cta="live_wind">🌬 ${escFriendName(liveWind.label)} ↗</a>`
+    : '';
   const websiteBtn = websiteUrl
     ? `<a href="${escFriendName(websiteUrl)}" target="_blank" rel="noopener" class="spot-cta-btn spot-cta-website" data-cta="website">🌐 Visit website</a>`
     : '';
 
   const ctaGrid = [
     webcamBtn ? `<div>${webcamBtn}</div>` : '',
-    (lessonBtn || gearBtn) ? `<div class="spot-info-ctas">${lessonBtn}${gearBtn}</div>` : '',
+    (lessonBtn || gearBtn || liveWindBtn) ? `<div class="spot-info-ctas">${lessonBtn}${gearBtn}${liveWindBtn}</div>` : '',
     websiteBtn ? `<div>${websiteBtn}</div>` : '',
   ].filter(Boolean).join('');
 
@@ -4439,6 +4674,7 @@ function renderGrid(){
 
   showOnly('results');
   renderSpotInfoCard(loc.name);
+  renderLiveWindPanel(loc);
   if(_authSession?.user) loadAttendances();
 
   // ── deep-link: open the modal for the target date directly ──
