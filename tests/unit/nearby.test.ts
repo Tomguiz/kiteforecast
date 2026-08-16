@@ -298,3 +298,41 @@ describe('selectNearbySpots — geographic spread', () => {
     expect(droppedByCap).toBe(1)
   })
 })
+
+describe('nearby sessions carry the same CTAs as favourites', () => {
+  // A nearby spot is a SUGGESTION — the one thing the section exists for is
+  // acting on it. Favourite sessions have had "View forecast" / "I'm going!"
+  // from the start; nearby ones shipped without any link at all.
+  const APP_BASE = 'https://tomguiz.github.io/kiteforecast/'
+  const buildLinks = (spot: string, sess: { date: string; win_start: string }) => ({
+    forecast_link: `${APP_BASE}?spot=${encodeURIComponent(spot)}&date=${sess.date}`,
+    join_link: `${APP_BASE}?join=${btoa(JSON.stringify({
+      spot, date: sess.date, start_time: sess.win_start.replace('h00', ':00'),
+    }))}`,
+  })
+
+  it('builds a forecast deep link naming the spot and date', () => {
+    const { forecast_link } = buildLinks('Vlissingen', { date: '2026-08-18', win_start: '11h00' })
+    expect(forecast_link).toBe(`${APP_BASE}?spot=Vlissingen&date=2026-08-18`)
+  })
+
+  it('encodes spot names containing spaces', () => {
+    // encodeURIComponent leaves apostrophes alone (they are legal in a query
+    // value); what matters is that no raw space survives to break the URL.
+    const { forecast_link } = buildLinks("L'Almanarre Sud", { date: '2026-08-18', win_start: '11h00' })
+    expect(forecast_link).toContain("L'Almanarre%20Sud")
+    expect(forecast_link).not.toContain(' ')
+  })
+
+  it('builds a join payload the app can decode back', () => {
+    const { join_link } = buildLinks('Vlissingen', { date: '2026-08-18', win_start: '11h00' })
+    const payload = JSON.parse(atob(join_link.split('?join=')[1]))
+    expect(payload).toEqual({ spot: 'Vlissingen', date: '2026-08-18', start_time: '11:00' })
+  })
+
+  it('converts the window start into the clock format the join flow expects', () => {
+    const { join_link } = buildLinks('Oostende', { date: '2026-08-18', win_start: '09h00' })
+    const payload = JSON.parse(atob(join_link.split('?join=')[1]))
+    expect(payload.start_time).toBe('09:00')
+  })
+})
