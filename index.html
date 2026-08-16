@@ -1646,7 +1646,7 @@
       <div class="notif-card">
         <div class="notif-row">
           <div class="notif-info">
-            <div class="notif-title">📱 SMS alerts <span class="premium-badge">PREMIUM</span></div>
+            <div class="notif-title">📱 SMS alerts <span class="premium-badge">PREMIUM</span> <span class="soon-badge" id="ppSmsSoonBadge">SOON</span></div>
             <div class="notif-sub">Text message 1h before your session</div>
           </div>
           <button class="pp-toggle" id="ppSmsToggle" onclick="toggleSms()"><span></span></button>
@@ -7956,6 +7956,7 @@ function updatePremiumUI(){
   const notifyFriendsBadge=$('ppNotifyFriendsBadge');
   // Show who actually receives the alerts (premium-only, same as the toggle).
   renderFriendsReach();
+  renderSmsGate();
   renderNearbyToggle();
   if(notifyFriendsToggle){
     notifyFriendsToggle.onclick=premium?toggleNotifyFriends:()=>{ showToast('⚡ Premium only — upgrade to notify friends when you hit the water', 4000, '#f59e0b'); openProfilePanel('profile'); };
@@ -8070,7 +8071,12 @@ async function manageSubscription(){
   }
 }
 
+// SMS is NOT live: production has no TWILIO_* secrets, so process-reminders
+// skips the send. Letting the toggle save a preference would promise a text
+// that never arrives. Flip this one constant once Twilio is configured.
+let SMS_RELEASED = false;
 async function toggleSms(){
+  if(!SMS_RELEASED){ showToast('🔜 SMS alerts are coming soon'); return; }
   if(!isPremium()){ showToast('⚡ Premium only — upgrade to unlock SMS alerts', 4000, '#f59e0b'); return; }
   const p=loadProfile(); p.smsEnabled=!p.smsEnabled; saveProfile(p);
   const sb=getSb();
@@ -8887,10 +8893,18 @@ async function toggleNotifyFriends(){
 // toggle is inert and writes nothing. Flip this one constant to release.
 // `let`, not `const`: releasing is still a one-line change, but tests can flip
 // it to prove the released path actually renders as released.
-let NEARBY_RELEASED = false;
+let NEARBY_RELEASED = true;
 function hasHomeLocation(){
   const p=loadProfile();
   return typeof p.homeLat==='number' && typeof p.homeLon==='number';
+}
+function renderSmsGate(){
+  const badge=$('ppSmsSoonBadge'); const toggle=$('ppSmsToggle');
+  if(badge) badge.style.display = SMS_RELEASED ? 'none' : 'inline-flex';
+  if(!SMS_RELEASED){
+    if(toggle){ toggle.classList.remove('on'); toggle.style.opacity='0.4'; }
+    const phoneSection=$('ppPhoneSection'); if(phoneSection) phoneSection.style.display='none';
+  }else if(toggle){ toggle.style.opacity=''; }
 }
 function renderNearbyToggle(){
   const row=$('ppNearbyRow'); if(!row) return;
