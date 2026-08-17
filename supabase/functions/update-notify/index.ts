@@ -13,7 +13,7 @@ const DIR_LABELS: Record<number, string> = {0:'N',45:'NE',90:'E',135:'SE',180:'S
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS })
 
-  const { email, spot_name, website, livecam_url, lesson_url, gear_url,
+  const { email, spot_name, website, livecam_url, live_wind_url, lesson_url, gear_url,
           instagram_url, facebook_url, address, suggested_dirs, tip } = await req.json()
 
   const dirsLabel = suggested_dirs?.length
@@ -29,6 +29,7 @@ Deno.serve(async (req) => {
     spot_name,
     website:        website        || '—',
     livecam_url:    livecam_url    || '—',
+    live_wind_url:  live_wind_url  || '—',
     lesson_url:     lesson_url     || '—',
     gear_url:       gear_url       || '—',
     instagram_url:  instagram_url  || '—',

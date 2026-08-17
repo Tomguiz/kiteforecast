@@ -4062,21 +4062,22 @@ function spotAttributesHTML(info){
   return html+'</div>';
 }
 
-// Live-wind link: the RWS station page, or no button at all. The RWS lookup
-// reuses the cache the panel already populated, so this costs no extra request.
+// Live-wind link: a rider-submitted page if there is one, else the nearest RWS
+// station page, else no button at all. The RWS lookup reuses the cache the
+// panel already populated, so this costs no extra request.
 //
-// PHASE 1 ONLY — the `info.live_wind_url` branch (a user-submitted URL, which
-// takes precedence over the station link) is deliberately NOT here. Rendering
-// it needs safeHttpUrl(), which does not exist in this file yet: PR #19 has not
-// landed. escFriendName escapes quotes and angle brackets and does nothing to
-// the URL scheme, so a `javascript:` URL would still execute on click. See the
-// spec's "Phase 2 — Security" section: "phase 2 must not merge before PR #19"
-// and "The new button must call safeHttpUrl(), not escFriendName() alone".
-// Reintroduce the branch together with safeHttpUrl, not before:
-//   if(info&&info.live_wind_url){ const u=safeHttpUrl(info.live_wind_url);
-//     if(u) return {url:u,label:'Live wind readings'} }
+// live_wind_url is the app's first *rider*-submitted URL — every other link
+// here traces back to an admin, or to a business owner whose claim an admin
+// verified. It therefore goes through safeHttpUrl(), never escFriendName()
+// alone: escaping stops an href breaking out of its attribute, it does nothing
+// about a `javascript:` URL firing on click. A URL that fails the scheme check
+// falls through to the station link instead of rendering a dead button.
 // docs/superpowers/specs/2026-08-16-rws-live-wind-design.md
 async function _liveWindHref(info,spot){
+  if(info&&info.live_wind_url){
+    const u=safeHttpUrl(info.live_wind_url);
+    if(u) return {url:u,label:'Live wind readings'};
+  }
   // cachedLoc (what `spot` is called with here) carries .latitude/.longitude,
   // not .lat/.lon — see renderLiveWindPanel above for the same shape.
   if(!spot||typeof spot.latitude!=='number'||typeof spot.longitude!=='number') return null;
@@ -6036,6 +6037,12 @@ function openSuggestUpdate(){
     <textarea id="suTip" class="pp-input" rows="4" placeholder="e.g. Shallow at low tide, best at high tide. Avoid S swell. Parking on the north side." style="margin-bottom:6px;resize:vertical;min-height:88px;font-family:inherit;font-size:.85rem${info.spot_tip?';border-color:rgba(56,189,248,.4)':''}">${escFriendName(info.spot_tip||'')}</textarea>
     <div style="font-size:.67rem;color:var(--tdim);margin-bottom:18px;">Want to update business info, booking links or contact details? <span style="color:var(--accent);cursor:pointer" onclick="closeSuggestUpdate();openClaimFlow()">Claim this spot →</span></div>
 
+    <label class="pp-label" style="margin-top:6px">🔗 Spot links <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">— local knowledge, not business info</span></label>
+    <label class="pp-label">🌬 Live wind readings</label>
+    <input type="url" id="suLiveWind" class="pp-input" value="${escFriendName(info.live_wind_url||'')}" placeholder="https://… a live wind page for this spot" style="margin-bottom:10px"/>
+    <label class="pp-label">🎥 Webcam</label>
+    <input type="url" id="suLivecam" class="pp-input" value="${escFriendName(info.livecam_url||'')}" placeholder="https://… a webcam pointed at the spot" style="margin-bottom:18px"/>
+
     <label class="pp-label" style="margin-top:6px">🪁 Spot attributes <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">— what you can ride & what's here</span></label>
     <label class="pp-label">Disciplines</label>
     ${attrMultiHTML('suDisciplines',SPOT_DISCIPLINES,info.disciplines)}
@@ -6075,13 +6082,28 @@ async function submitSuggestUpdate(){
   const _water=readSingleAttr('suWaterType'), _tide=readSingleAttr('suTidePref');
   const _crowd=readSingleAttr('suCrowdLevel'), _skill=readSingleAttr('suSkillLevel');
   const _hasAttr=!!(_disc||_fac||_water||_tide||_crowd||_skill);
-  if(!selDirs.length&&!tip&&!_hasAttr){ showToast('Add a wind direction, a tip, or a spot attribute before sending.'); return; }
+
+  // The two link fields are the only place in the app where an ordinary rider
+  // proposes a URL. safeHttpUrl() on render is the real boundary (see
+  // _liveWindHref), but rejecting here too means the submitter finds out
+  // immediately instead of an admin silently dropping the row later. A blank
+  // field is not an error — it just carries nothing.
+  const _rawLiveWind=($('suLiveWind')?.value||'').trim();
+  const _rawLivecam =($('suLivecam') ?.value||'').trim();
+  const _liveWind=_rawLiveWind?safeHttpUrl(_rawLiveWind):'';
+  const _livecam =_rawLivecam ?safeHttpUrl(_rawLivecam) :'';
+  if(_rawLiveWind&&!_liveWind){ showToast('That live wind link is not a valid http(s) address.'); return; }
+  if(_rawLivecam &&!_livecam ){ showToast('That webcam link is not a valid http(s) address.'); return; }
+  if(_liveWind.length>500||_livecam.length>500){ showToast('That link is too long — use a direct page URL.'); return; }
+
+  if(!selDirs.length&&!tip&&!_hasAttr&&!_liveWind&&!_livecam){ showToast('Add a wind direction, a tip, a link, or a spot attribute before sending.'); return; }
 
   btn.disabled=true; btn.textContent='Sending…';
   const sb=getSb(); if(!sb){ btn.disabled=false; btn.textContent='Send suggestion →'; return; }
   const{error}=await sb.from('spot_update_suggestions').insert({
     email, spot_name:spotName,
     suggested_dirs:selDirs.length?selDirs:null, tip:tip||null,
+    live_wind_url:_liveWind||null, livecam_url:_livecam||null,
     disciplines:_disc, facilities:_fac, water_type:_water,
     tide_pref:_tide, crowd_level:_crowd, skill_level:_skill,
   });
@@ -6091,7 +6113,7 @@ async function submitSuggestUpdate(){
   await fetch('https://kpwmajtxmcfpakvonimf.supabase.co/functions/v1/update-notify',{
     method:'POST',
     headers:{'Content-Type':'application/json','Authorization':'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwd21hanR4bWNmcGFrdm9uaW1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTcyMjYsImV4cCI6MjA5MDczMzIyNn0.QfQuIQbnfVUOApPbOdvCRbNsVdb0SBAwMX-hvioGJmg'},
-    body:JSON.stringify({email,spot_name:spotName,suggested_dirs:selDirs,tip}),
+    body:JSON.stringify({email,spot_name:spotName,suggested_dirs:selDirs,tip,live_wind_url:_liveWind,livecam_url:_livecam}),
   }).catch(()=>{});
 
   showToast('✓ Suggestion sent! We\'ll review it shortly.');
@@ -7605,6 +7627,7 @@ async function renderAdminPanel(){
     const fields=[
       u.website&&`Website: ${u.website}`,
       u.livecam_url&&`Live cam: ${u.livecam_url}`,
+      u.live_wind_url&&`Live wind: ${u.live_wind_url}`,
       u.lesson_url&&`Lessons: ${u.lesson_url}`,
       u.gear_url&&`Gear: ${u.gear_url}`,
       u.instagram_url&&`Instagram: ${u.instagram_url}`,
@@ -7850,6 +7873,9 @@ async function adminOpenSpot(spotName, prefill){
       <label class="pp-label">Live cam URL</label>
       <input type="url" id="adLivecam" class="pp-input" value="${s?.livecam_url||''}" placeholder="https://…" style="margin-bottom:10px"/>
 
+      <label class="pp-label">Live wind URL <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(overrides the automatic RWS station link)</span></label>
+      <input type="url" id="adLiveWind" class="pp-input" value="${s?.live_wind_url||''}" placeholder="https://…" style="margin-bottom:10px"/>
+
       <label class="pp-label">Instagram URL</label>
       <input type="url" id="adInstagram" class="pp-input" value="${s?.instagram_url||''}" placeholder="https://instagram.com/…" style="margin-bottom:10px"/>
 
@@ -7918,6 +7944,7 @@ async function adminApplyUpdate(u){
   const updates={};
   if(u.website)       updates.website=u.website;
   if(u.livecam_url)   updates.livecam_url=u.livecam_url;
+  if(u.live_wind_url) updates.live_wind_url=u.live_wind_url;
   if(u.lesson_url)    updates.lesson_url=u.lesson_url;
   if(u.gear_url)      updates.gear_url=u.gear_url;
   if(u.instagram_url) updates.instagram_url=u.instagram_url;
@@ -8158,6 +8185,7 @@ async function adminSaveSpotInfo(){
     lesson_url:      ($('adLessonUrl')?.value||'').trim()||null,
     gear_url:        ($('adGearUrl')?.value||'').trim()||null,
     livecam_url:     ($('adLivecam')?.value||'').trim()||null,
+    live_wind_url:   ($('adLiveWind')?.value||'').trim()||null,
     instagram_url:   ($('adInstagram')?.value||'').trim()||null,
     facebook_url:    ($('adFacebook')?.value||'').trim()||null,
     description:     ($('adDesc')?.value||'').trim()||null,
