@@ -240,6 +240,7 @@
     .tds-dc-gust { color:var(--tdim); font-weight:600; font-size:.57rem; }
     .tds-dc-spark { margin-top:auto; line-height:0; }
     .tds-spark { display:block; width:100%; height:24px; }
+    .rws-trend { display:block; width:100%; height:44px; }
 
     .forecast-grid {
       display: grid;
@@ -2022,6 +2023,44 @@ async function _rwsTrend(stationId){
   _rwsTrendCache.set(stationId,{data,ts:Date.now()});
   return data;
 }
+// The 3h trend line is NOT the day-card sparkline. tdsSparkSVG normalises
+// against a fixed 0-45 kn axis — right for comparing whole days, useless here:
+// three hours of 6-8 kn wind came out as ~1.3px of movement in a 24px box, a
+// flat hairline with nothing on screen saying what it covered. This scales to
+// the window's own readings instead. The minimum span stops the opposite
+// failure: a dead-steady three hours would otherwise be stretched until sensor
+// jitter looked like a building breeze.
+const RWS_TREND_MIN_SPAN_KN=5;
+function rwsTrendRange(knArr){
+  const pts=(knArr||[]).filter(v=>v!=null&&!isNaN(v));
+  if(!pts.length) return {lo:0,hi:RWS_TREND_MIN_SPAN_KN};
+  let lo=Math.min(...pts), hi=Math.max(...pts);
+  if(hi-lo<RWS_TREND_MIN_SPAN_KN){
+    const mid=(lo+hi)/2;
+    lo=mid-RWS_TREND_MIN_SPAN_KN/2; hi=mid+RWS_TREND_MIN_SPAN_KN/2;
+    if(lo<0){ hi-=lo; lo=0; }   // shift the band up rather than plotting below 0 kn
+  }
+  return {lo,hi};
+}
+// Oldest reading left, newest right, with a dot on the newest so "now" is
+// findable. Empty for a single point: one reading is not a trend, and a flat
+// line spanning the card would imply three hours of data we do not have.
+const RWS_TREND_W=280, RWS_TREND_H=44, RWS_TREND_PAD=5;
+function rwsTrendSVG(knArr){
+  const pts=(knArr||[]).filter(v=>v!=null&&!isNaN(v));
+  if(pts.length<2) return '';
+  const W=RWS_TREND_W, H=RWS_TREND_H, PAD=RWS_TREND_PAD, C='#5dd4f0';
+  const {lo,hi}=rwsTrendRange(pts);
+  const n=pts.length;
+  const px=i=>i*(W/(n-1));
+  const py=kn=>H-PAD-((kn-lo)/(hi-lo))*(H-2*PAD);
+  const line=pts.map((kn,i)=>`${px(i).toFixed(1)},${py(kn).toFixed(1)}`).join(' ');
+  return `<svg class="rws-trend" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">`
+    +`<polygon points="0,${H} ${line} ${W},${H}" fill="${C}" fill-opacity="0.16"/>`
+    +`<polyline points="${line}" fill="none" stroke="${C}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`
+    +`<circle cx="${px(n-1).toFixed(1)}" cy="${py(pts[n-1]).toFixed(1)}" r="2.5" fill="${C}" vector-effect="non-scaling-stroke"/>`
+    +`</svg>`;
+}
 // Which spot the panel currently shows, and the exact markup it shows. Both
 // are needed because renderGrid() — which calls this — fires from ~10 unrelated
 // interactions (bell toggles, attendance confirm/cancel, notification changes,
@@ -2051,7 +2090,15 @@ async function renderLiveWindPanel(spot){
   if(!live){ paint(''); return; }         // no station, stale, or fetch failed
   const trend=await _rwsTrend(live.stationId);
   if(myGen!==_fetchGen) return;           // spot changed while the trend request was in flight
-  const spark=trend.length>1?tdsSparkSVG(trend,'#5dd4f0',null):'';
+  const spark=rwsTrendSVG(trend);
+  // A line with no axis is decoration. These two labels are what make it
+  // readable: what span it covers, and how high and low the wind ran in it.
+  const trendLabels=spark
+    ?`<div style="display:flex;justify-content:space-between;font-size:10px;color:#4a5568;margin-bottom:2px">`
+      +`<span>last 3h</span>`
+      +`<span>${Math.round(Math.min(...trend))}–${Math.round(Math.max(...trend))} kn</span>`
+     +`</div>`
+    :'';
   const dir=live.dirDeg===null?'':` ${['N','NE','E','SE','S','SW','W','NW'][Math.round(((live.dirDeg%360)+360)%360/45)%8]}`;
   const gust=live.gustKn===null?'':` · gusts ${live.gustKn} kn`;
   const age=live.ageMin<=1?'just now':`${live.ageMin} min ago`;
@@ -2061,7 +2108,7 @@ async function renderLiveWindPanel(spot){
   paint(`<div class="spot-info-card" style="padding:14px 16px">
     <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#4a5568;margin-bottom:6px">🌬 Measured right now</div>
     <div style="font-size:22px;font-weight:700;color:#5dd4f0">${live.speedKn} kn${dir}${gust}</div>
-    ${spark?`<div style="margin:8px 0">${spark}</div>`:''}
+    ${spark?`<div style="margin:8px 0">${trendLabels}${spark}</div>`:''}
     <div style="font-size:11px;color:#4a5568">${escFriendName(live.stationName)} · ${live.distanceKm.toFixed(1)} km away · ${age}</div>
   </div>`);
 }
