@@ -1,0 +1,167 @@
+import { describe, it, expect } from 'vitest'
+import { providerFromUrl } from '../../supabase/functions/_shared/providers.ts'
+
+describe('providerFromUrl', () => {
+  it('reads a weatherlink embeddable-page uuid', () => {
+    expect(providerFromUrl('https://www.weatherlink.com/embeddablePage/show/87ca27e8616443678fffe486311370ee/signature'))
+      .toEqual({ provider: 'weatherlink', stationId: '87ca27e8616443678fffe486311370ee' })
+  })
+
+  it('reads a holfuy station id from either URL shape', () => {
+    expect(providerFromUrl('https://api.holfuy.com/live/?s=101&m=JSON'))
+      .toEqual({ provider: 'holfuy', stationId: '101' })
+    expect(providerFromUrl('https://holfuy.com/en/weather/101'))
+      .toEqual({ provider: 'holfuy', stationId: '101' })
+  })
+
+  it('reads a pioupiou id from the api and openwindmap shapes', () => {
+    expect(providerFromUrl('https://api.pioupiou.fr/v1/live/1234'))
+      .toEqual({ provider: 'pioupiou', stationId: '1234' })
+    expect(providerFromUrl('https://www.openwindmap.org/PP-1234'))
+      .toEqual({ provider: 'pioupiou', stationId: '1234' })
+  })
+
+  it('refuses lookalike hosts and non-provider URLs', () => {
+    expect(providerFromUrl('https://weatherlink.com.attacker.example/embeddablePage/show/abc/signature')).toBeNull()
+    expect(providerFromUrl('https://notholfuy.com/en/weather/101')).toBeNull()
+    expect(providerFromUrl('https://www.sycod.be/nl/meteo')).toBeNull()
+    expect(providerFromUrl('javascript:alert(1)')).toBeNull()
+    expect(providerFromUrl('')).toBeNull()
+  })
+})
+
+import { toLiveWindFrom } from '../../supabase/functions/_shared/providers.ts'
+
+const NOW = new Date('2026-08-18T08:40:00Z')
+
+// Captured: weatherlink.com/embeddablePage/summaryData/87ca27e8... (Sycod)
+const weatherlink = {
+  ownerName: 'Sycod',
+  lastReceived: Date.parse('2026-08-18T08:38:48Z'),
+  currConditionValues: [
+    { displayName: 'Wind Speed',             value: 25,  convertedValue: 22, unitLabel: 'knots' },
+    { displayName: 'Wind Direction',         value: 251, convertedValue: 5648, unitLabel: '' },
+    { displayName: '10 Min High Wind Speed', value: 28,  convertedValue: 24, unitLabel: 'knots' },
+  ],
+}
+
+// Captured: api.holfuy.com/live/?s=101&m=JSON — speed/gust in km/h
+const holfuy = {
+  stationId: 101, stationName: 'TestStation', dateTime: '2026-08-18 08:38:00',
+  wind: { speed: 40.7, gust: 51.9, min: 20, unit: 'km/h', direction: 268 },
+}
+
+describe('toLiveWindFrom', () => {
+  it('takes weatherlink speed from convertedValue and direction from value', () => {
+    const lw = toLiveWindFrom('weatherlink', '87ca27e8', weatherlink, NOW)!
+    expect(lw.speedKn).toBe(22)      // NOT 25 — value is mph, convertedValue is knots
+    expect(lw.dirDeg).toBe(251)      // NOT 5648 — convertedValue is meaningless here
+    expect(lw.gustKn).toBe(24)
+    expect(lw.stationName).toBe('Sycod')
+    expect(lw.ageMin).toBe(1)
+  })
+
+  it('converts holfuy km/h to knots', () => {
+    const lw = toLiveWindFrom('holfuy', '101', holfuy, NOW)!
+    expect(lw.speedKn).toBe(22)      // 40.7 km/h
+    expect(lw.gustKn).toBe(28)       // 51.9 km/h
+    expect(lw.dirDeg).toBe(268)
+  })
+
+  it('converts pioupiou m/s to knots and reads its nested shape', () => {
+    const pioupiou = { data: { id: 1234, meta: { name: 'Zeebrugge' },
+      measurements: { date: '2026-08-18T08:38:00Z', wind_speed_avg: 11.3, wind_speed_max: 14.4, wind_heading: 251 } } }
+    const lw = toLiveWindFrom('pioupiou', '1234', pioupiou, NOW)!
+    expect(lw.speedKn).toBe(22)      // 11.3 m/s
+    expect(lw.gustKn).toBe(28)       // 14.4 m/s
+    expect(lw.stationName).toBe('Zeebrugge')
+  })
+
+  it('rejects a stale reading and a future one', () => {
+    const stale = { ...weatherlink, lastReceived: Date.parse('2026-08-18T08:00:00Z') } // 40 min
+    expect(toLiveWindFrom('weatherlink', 'x', stale, NOW)).toBeNull()
+    const future = { ...weatherlink, lastReceived: Date.parse('2026-08-18T08:50:00Z') } // +10 min
+    expect(toLiveWindFrom('weatherlink', 'x', future, NOW)).toBeNull()
+  })
+
+  it('returns null rather than throwing on junk', () => {
+    expect(toLiveWindFrom('holfuy', '1', null, NOW)).toBeNull()
+    expect(toLiveWindFrom('holfuy', '1', {}, NOW)).toBeNull()
+    expect(toLiveWindFrom('weatherlink', '1', { currConditionValues: [] }, NOW)).toBeNull()
+  })
+
+  it('drops a non-numeric weatherlink gust rather than surfacing NaN', () => {
+    const badGust = {
+      ...weatherlink,
+      currConditionValues: [
+        weatherlink.currConditionValues[0],
+        weatherlink.currConditionValues[1],
+        { displayName: '10 Min High Wind Speed', value: 'n/a', convertedValue: 'n/a', unitLabel: 'knots' },
+      ],
+    }
+    const lw = toLiveWindFrom('weatherlink', '87ca27e8', badGust, NOW)!
+    expect(lw.gustKn).toBeNull()
+    expect(lw.speedKn).toBe(22)
+  })
+})
+
+import { discoverInHtml, isBlockedHost } from '../../supabase/functions/_shared/providers.ts'
+
+describe('discoverInHtml', () => {
+  it('finds the weatherlink widget a club page embeds', () => {
+    // The shape sycod.be/nl/meteo actually serves.
+    const html = `<iframe frameborder='0' height='200'
+      src='https://www.weatherlink.com/embeddablePage/show/87ca27e8616443678fffe486311370ee/signature'
+      style="border: 0px none;"></iframe>`
+    expect(discoverInHtml(html))
+      .toEqual({ provider: 'weatherlink', stationId: '87ca27e8616443678fffe486311370ee' })
+  })
+
+  it('finds holfuy and pioupiou embeds', () => {
+    expect(discoverInHtml(`<iframe src="https://api.holfuy.com/live/?s=101&m=JSON"></iframe>`))
+      .toEqual({ provider: 'holfuy', stationId: '101' })
+    expect(discoverInHtml(`<a href="https://www.openwindmap.org/PP-1234">wind</a>`))
+      .toEqual({ provider: 'pioupiou', stationId: '1234' })
+  })
+
+  it('finds nothing in a page with no provider', () => {
+    expect(discoverInHtml('<html><body><p>no wind here</p></body></html>')).toBeNull()
+    expect(discoverInHtml('')).toBeNull()
+  })
+})
+
+describe('isBlockedHost', () => {
+  it('blocks loopback, private ranges, link-local and cloud metadata', () => {
+    for (const h of ['127.0.0.1', 'localhost', '10.0.0.5', '172.16.0.1', '192.168.1.1',
+                     '169.254.169.254', '[::1]', '::1', 'fd00::1', '0.0.0.0',
+                     '64:ff9b::7f00:1',   // NAT64 well-known prefix embedding 127.0.0.1
+                     '2002:7f00:1::'])    // 6to4 prefix embedding 127.0.0.1
+      expect(isBlockedHost(h), h).toBe(true)
+  })
+
+  it('allows ordinary public hosts', () => {
+    for (const h of ['www.sycod.be', 'weatherlink.com', '8.8.8.8',
+                     'xn--80aswg.xn--p1ai'])  // IDN club page (метео.рф), punycoded by new URL().hostname
+      expect(isBlockedHost(h), h).toBe(false)
+  })
+
+  // Fix round 1: a block-list version of isBlockedHost passed both tests above
+  // while still letting an attacker reach loopback/metadata through an encoding
+  // the block-list never anticipated. These assert the specific bypasses a
+  // review found, so a future regression to block-list semantics fails loudly.
+  it('blocks SSRF bypass encodings (IPv4-mapped/compatible IPv6, inet_aton legacy forms, trailing-dot localhost, CGNAT)', () => {
+    for (const h of [
+      '[::ffff:127.0.0.1]',   // IPv4-mapped IPv6, dotted-quad form, loopback
+      '::ffff:169.254.169.254', // IPv4-mapped IPv6, dotted-quad form, cloud metadata
+      '0:0:0:0:0:0:0:1',      // loopback, fully expanded (not the compressed '::1')
+      '127.1',                // inet_aton 2-part shorthand for 127.0.0.1
+      '0177.0.0.1',           // octal-leading-zero first octet for 127.0.0.1
+      '2130706433',           // 127.0.0.1 as a single decimal integer
+      '0x7f.1',                // hex + shorthand mix for 127.0.0.1
+      '0251.0376.0251.0376',  // octal octets for 169.254.169.254
+      'localhost.',           // trailing root dot bypassing a plain '===' / endsWith check
+      '100.64.1.1',           // carrier-grade NAT, reachable infra on some hosts
+    ])
+      expect(isBlockedHost(h), h).toBe(true)
+  })
+})
