@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import {
+  FIRING_MIN_KN,
   parseFeed, mergeFeeds, nearestStation, toLiveWind, viewerUrl,
   RWS_MAX_KM, RWS_MAX_AGE_MIN, RWS_MAX_FUTURE_MIN, type RwsStation,
-  fetchStations, liveWindFor, type FetchLike,
+  fetchStations, liveWindFor, type FetchLike, isFiringNow,
 } from '../../supabase/functions/_shared/rws.ts'
 
 // Captured from the live API on 2026-08-16. locationName carries the raw
@@ -305,5 +306,90 @@ describe('liveWindFor', () => {
   it('returns null rather than throwing when the network fails', async () => {
     const boom: FetchLike = async () => { throw new Error('down') }
     expect(await liveWindFor(BROUWERSDAM.lat, BROUWERSDAM.lon, { fetchFn: boom, now: NOW })).toBeNull()
+  })
+})
+
+// The "firing now" bubble on the favourites list. Deliberately reuses the
+// app's own rideability rule rather than a fresh threshold: speedTier(kn) > 0
+// IS 15 knots, and it is what the "good days" badge already means. A spot
+// blowing 25 kn from the wrong quarter is not firing, so direction is part of
+// the rule — a false "firing" badge is the one that gets someone in the car
+// for nothing.
+describe('isFiringNow', () => {
+  // Cadzand Bad / Knokke: good on W and NW
+  const DIRS = [270, 315]
+
+  it('fires at 18 kn from a good direction', () => {
+    expect(isFiringNow(18, 270, DIRS)).toBe(true)
+  })
+
+  it('does not fire at 17 kn, however good the direction', () => {
+    // 15-17kn is rideable and the good-days badge counts it, but the firing
+    // bubble is a stronger claim and deliberately stays quiet here.
+    expect(isFiringNow(17, 270, DIRS)).toBe(false)
+    expect(isFiringNow(14, 270, DIRS)).toBe(false)
+  })
+
+  it('does not fire at 25 kn from the wrong direction', () => {
+    expect(isFiringNow(25, 90, DIRS)).toBe(false)
+  })
+
+  // Tolerance is +/-22.5 deg per good dir. Tested against a SINGLE-dir spot on
+  // purpose: with [270,315] the two tolerance bands touch (247.5 -> 337.5 is
+  // continuous), so no direction between them can ever be excluded and the
+  // boundary would be untestable.
+  it('accepts a direction within 22.5 degrees of a good dir', () => {
+    expect(isFiringNow(20, 292, [270])).toBe(true)   // 22 deg off
+    expect(isFiringNow(20, 293, [270])).toBe(false)  // 23 deg off
+  })
+
+  it('has continuous cover between two good dirs 45 deg apart', () => {
+    // The real reason the boundary test above needs a single-dir spot.
+    expect(isFiringNow(20, 293, DIRS)).toBe(true)
+  })
+
+  it('treats an empty dirs list as "works in any direction"', () => {
+    expect(isFiringNow(18, 90, [])).toBe(true)
+  })
+
+  it('returns false for a null direction rather than guessing', () => {
+    expect(isFiringNow(25, null, DIRS)).toBe(false)
+  })
+
+  it('returns false when the spot works in any direction but the wind is weak', () => {
+    expect(isFiringNow(10, 270, [])).toBe(false)
+  })
+})
+
+describe('isFiringNow — the 18kn bar', () => {
+  // "Firing" is a higher bar than "rideable" on purpose: the good-days badge
+  // counts from 15kn, this bubble says drop everything and drive.
+  const DIRS = [0, 45, 225, 270, 315]
+
+  it('does not fire at the rideable threshold', () => {
+    expect(isFiringNow(15, 270, DIRS)).toBe(false)
+    expect(isFiringNow(17, 270, DIRS)).toBe(false)
+  })
+
+  it('fires from 18kn', () => {
+    expect(isFiringNow(18, 270, DIRS)).toBe(true)
+    expect(isFiringNow(25, 270, DIRS)).toBe(true)
+  })
+
+  it('does not fire on the wrong direction however strong', () => {
+    expect(isFiringNow(35, 135, DIRS)).toBe(false)
+  })
+
+  it('treats an unknown direction as not firing', () => {
+    // A false "firing" bubble is the one that costs someone a drive.
+    expect(isFiringNow(30, null, DIRS)).toBe(false)
+  })
+
+  it('fires in any direction for a spot with no listed dirs', () => {
+    expect(isFiringNow(20, 135, [])).toBe(true)
+  })
+
+  it('exports the threshold rather than hiding a magic number', () => {
+    expect(FIRING_MIN_KN).toBe(18)
   })
 })

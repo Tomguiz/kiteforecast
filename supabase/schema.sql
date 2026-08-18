@@ -488,3 +488,10 @@ DO $$ BEGIN ALTER TABLE profiles ADD COLUMN home_label text; EXCEPTION WHEN dupl
 -- email contains, so it is opt-in rather than a surprise.
 DO $$ BEGIN ALTER TABLE profiles ADD COLUMN digest_nearby_enabled boolean NOT NULL DEFAULT false; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE profiles ADD COLUMN digest_nearby_km integer NOT NULL DEFAULT 120; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+
+-- RWS live wind, phase 2: a rider-submitted live-wind page per spot. Takes
+-- precedence over the automatic nearest-station link, which only covers the
+-- Dutch/Belgian coast. Suggestions land in spot_update_suggestions and reach
+-- spot_info only when an admin applies them.
+DO $$ BEGIN ALTER TABLE spot_info ADD COLUMN live_wind_url text; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE spot_update_suggestions ADD COLUMN live_wind_url text; EXCEPTION WHEN duplicate_column THEN NULL; END $$;

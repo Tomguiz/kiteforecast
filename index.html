@@ -240,6 +240,7 @@
     .tds-dc-gust { color:var(--tdim); font-weight:600; font-size:.57rem; }
     .tds-dc-spark { margin-top:auto; line-height:0; }
     .tds-spark { display:block; width:100%; height:24px; }
+    .rws-trend { display:block; width:100%; height:44px; }
 
     .forecast-grid {
       display: grid;
@@ -381,6 +382,13 @@
     .chip:hover { border-color:var(--accent); color:var(--accent); }
     .chip-dirs { font-size:.65rem; color:var(--tdim); font-weight:600; }
     .chip-days { font-size:.65rem; font-weight:700; padding:1px 5px; border-radius:99px; margin-left:2px; line-height:1.5; }
+    /* "Firing now" — measured wind, not forecast. Warm against the green
+       forecast badge so the two never read as the same kind of claim. */
+    /* One bubble per friend confirmed for today - initial only. Separate from
+       the firing bubble on purpose: a friend going is worth surfacing whatever
+       the wind is doing, and the wind is worth surfacing with nobody going. */
+    .chip-friend { display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border-radius:50%; margin-left:3px; font-size:.58rem; font-weight:800; line-height:1; background:rgba(56,189,248,.22); color:#7dd3fc; border:1px solid rgba(56,189,248,.45); flex-shrink:0; }
+    .chip-firing { font-size:.65rem; font-weight:700; padding:1px 5px; border-radius:99px; margin-left:3px; line-height:1.5; background:rgba(249,115,22,.18); color:#fb923c; white-space:nowrap; }
     .chip-days.cd-good    { background:rgba(34,197,94,.15);  color:#4ade80; }
     .chip-days.cd-ok      { background:rgba(34,197,94,.15);  color:#4ade80; }
     .chip-days.cd-none    { background:rgba(148,163,184,.1); color:var(--tdim); }
@@ -889,6 +897,12 @@
     .spot-cta-lesson { background:linear-gradient(135deg,#0ea5e9,#0284c7); color:#fff; }
     .spot-cta-gear   { background:linear-gradient(135deg,#10b981,#059669); color:#fff; }
     .spot-cta-website{ background:rgba(255,255,255,.08); color:var(--text); border:1px solid var(--border); }
+    /* Without this the live-wind CTA inherited only .spot-cta-btn — layout, no
+       paint — so it read as bare text next to the filled lesson/gear buttons. */
+    .spot-cta-livewind{ background:linear-gradient(135deg,#5dd4f0,#0e9bb8); color:#04212b; }
+    /* A spot with no lesson or gear booking leaves a single CTA in this
+       two-column grid, which would sit in one cell as a stray half-button. */
+    .spot-info-ctas > :only-child { grid-column:1 / -1; }
     .spot-info-meta { display:flex; flex-direction:column; gap:6px; font-size:.75rem; color:var(--gray); }
     .spot-info-meta-row { display:flex; align-items:baseline; gap:6px; }
     .spot-info-meta a { color:var(--accent); text-decoration:none; }
@@ -1922,6 +1936,35 @@ async function _rwsFetchStations(){
   _rwsStations=out; _rwsStationsTs=Date.now();
   return out;
 }
+// Mirrors isFiringNow in _shared/rws.ts. Reuses the app's own rideability rule
+// rather than a fresh 15: the badge counts from 15 kn, and it is already what
+// the "good days" badge counts, so the bubble and the badge cannot drift apart.
+// Direction is part of the rule — 25 kn from the wrong quarter is not firing,
+// and a false "firing" bubble is the one that costs someone a drive. A null
+// direction cannot be confirmed as onshore, so it reads as not firing.
+// ── RELEASE FLAGS ───────────────────────────────────────────────────────────
+// Declared HERE, near the top, and not beside the functions that use them.
+// initAuth() is called at top level, and reaches renderSmsGate() and
+// renderNearbyToggle() via updateAuthUI -> updatePremiumUI while the script is
+// still evaluating. A `let` declared further down the file is in its temporal
+// dead zone at that moment, so reading it throws ReferenceError — which killed
+// updateAuthUI before it repainted the profile button, leaving a signed-in user
+// looking signed out on every refresh (2026-08-16).
+//
+// SMS is NOT live: production has no TWILIO_* secrets, so process-reminders
+// skips the send. Letting the toggle save a preference would promise a text
+// that never arrives. Flip this once Twilio is configured.
+let SMS_RELEASED = false;
+// Sessions-near-home IS live.
+let NEARBY_RELEASED = true;
+
+const FIRING_MIN_KN=18;
+function _rwsIsFiringNow(speedKn,dirDeg,spotDirs){
+  if(dirDeg===null||dirDeg===undefined) return false;
+  if(speedKn<FIRING_MIN_KN) return false;
+  if(!spotDirs||!spotDirs.length) return true;   // spot works in any direction
+  return spotDirs.some(sd=>angleDiff(dirDeg,sd)<=22.5);
+}
 async function _rwsNearest(lat,lon){
   const sts=await _rwsFetchStations();
   let best=null;
@@ -1986,6 +2029,44 @@ async function _rwsTrend(stationId){
   _rwsTrendCache.set(stationId,{data,ts:Date.now()});
   return data;
 }
+// The 3h trend line is NOT the day-card sparkline. tdsSparkSVG normalises
+// against a fixed 0-45 kn axis — right for comparing whole days, useless here:
+// three hours of 6-8 kn wind came out as ~1.3px of movement in a 24px box, a
+// flat hairline with nothing on screen saying what it covered. This scales to
+// the window's own readings instead. The minimum span stops the opposite
+// failure: a dead-steady three hours would otherwise be stretched until sensor
+// jitter looked like a building breeze.
+const RWS_TREND_MIN_SPAN_KN=5;
+function rwsTrendRange(knArr){
+  const pts=(knArr||[]).filter(v=>v!=null&&!isNaN(v));
+  if(!pts.length) return {lo:0,hi:RWS_TREND_MIN_SPAN_KN};
+  let lo=Math.min(...pts), hi=Math.max(...pts);
+  if(hi-lo<RWS_TREND_MIN_SPAN_KN){
+    const mid=(lo+hi)/2;
+    lo=mid-RWS_TREND_MIN_SPAN_KN/2; hi=mid+RWS_TREND_MIN_SPAN_KN/2;
+    if(lo<0){ hi-=lo; lo=0; }   // shift the band up rather than plotting below 0 kn
+  }
+  return {lo,hi};
+}
+// Oldest reading left, newest right, with a dot on the newest so "now" is
+// findable. Empty for a single point: one reading is not a trend, and a flat
+// line spanning the card would imply three hours of data we do not have.
+const RWS_TREND_W=280, RWS_TREND_H=44, RWS_TREND_PAD=5;
+function rwsTrendSVG(knArr){
+  const pts=(knArr||[]).filter(v=>v!=null&&!isNaN(v));
+  if(pts.length<2) return '';
+  const W=RWS_TREND_W, H=RWS_TREND_H, PAD=RWS_TREND_PAD, C='#5dd4f0';
+  const {lo,hi}=rwsTrendRange(pts);
+  const n=pts.length;
+  const px=i=>i*(W/(n-1));
+  const py=kn=>H-PAD-((kn-lo)/(hi-lo))*(H-2*PAD);
+  const line=pts.map((kn,i)=>`${px(i).toFixed(1)},${py(kn).toFixed(1)}`).join(' ');
+  return `<svg class="rws-trend" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">`
+    +`<polygon points="0,${H} ${line} ${W},${H}" fill="${C}" fill-opacity="0.16"/>`
+    +`<polyline points="${line}" fill="none" stroke="${C}" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>`
+    +`<circle cx="${px(n-1).toFixed(1)}" cy="${py(pts[n-1]).toFixed(1)}" r="2.5" fill="${C}" vector-effect="non-scaling-stroke"/>`
+    +`</svg>`;
+}
 // Which spot the panel currently shows, and the exact markup it shows. Both
 // are needed because renderGrid() — which calls this — fires from ~10 unrelated
 // interactions (bell toggles, attendance confirm/cancel, notification changes,
@@ -2015,7 +2096,15 @@ async function renderLiveWindPanel(spot){
   if(!live){ paint(''); return; }         // no station, stale, or fetch failed
   const trend=await _rwsTrend(live.stationId);
   if(myGen!==_fetchGen) return;           // spot changed while the trend request was in flight
-  const spark=trend.length>1?tdsSparkSVG(trend,'#5dd4f0',null):'';
+  const spark=rwsTrendSVG(trend);
+  // A line with no axis is decoration. These two labels are what make it
+  // readable: what span it covers, and how high and low the wind ran in it.
+  const trendLabels=spark
+    ?`<div style="display:flex;justify-content:space-between;font-size:10px;color:#4a5568;margin-bottom:2px">`
+      +`<span>last 3h</span>`
+      +`<span>${Math.round(Math.min(...trend))}–${Math.round(Math.max(...trend))} kn</span>`
+     +`</div>`
+    :'';
   const dir=live.dirDeg===null?'':` ${['N','NE','E','SE','S','SW','W','NW'][Math.round(((live.dirDeg%360)+360)%360/45)%8]}`;
   const gust=live.gustKn===null?'':` · gusts ${live.gustKn} kn`;
   const age=live.ageMin<=1?'just now':`${live.ageMin} min ago`;
@@ -2025,7 +2114,7 @@ async function renderLiveWindPanel(spot){
   paint(`<div class="spot-info-card" style="padding:14px 16px">
     <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#4a5568;margin-bottom:6px">🌬 Measured right now</div>
     <div style="font-size:22px;font-weight:700;color:#5dd4f0">${live.speedKn} kn${dir}${gust}</div>
-    ${spark?`<div style="margin:8px 0">${spark}</div>`:''}
+    ${spark?`<div style="margin:8px 0">${trendLabels}${spark}</div>`:''}
     <div style="font-size:11px;color:#4a5568">${escFriendName(live.stationName)} · ${live.distanceKm.toFixed(1)} km away · ${age}</div>
   </div>`);
 }
@@ -3561,13 +3650,37 @@ function setChipDayBadge(el,n,isFav=false){
   }
   $('apiErrorBanner').style.display='none';
   el.className='chip-days '+(n>=5?'cd-good':n>=1?'cd-ok':'cd-none');
-  el.textContent=n>0?`${n} good days 💨`:'no wind this week';
+  // Pluralise like the title attribute on the next line already does.
+  el.textContent=n>0?`${n} good day${n!==1?'s':''} 💨`:'no wind this week';
   el.title=`${n} day${n!==1?'s':''} with qualifying wind in the next 10`;
 }
 
 const FREE_FAV_LIMIT = 1;
 const _chipQueue={running:0,max:1,queue:[]};
 
+// Who else is going today, per spot. ONE query for every favourite, not one per
+// chip. RLS on session_attendances restricts reads to your own rows and your
+// friends', so this is inherently "friends" without picking a policy here. Own
+// rows are dropped: the bubble answers "who else is going", not "am I going".
+let _todayAttendCache=null, _todayAttendTs=0;
+async function _friendsGoingToday(){
+  if(_todayAttendCache&&Date.now()-_todayAttendTs<60000) return _todayAttendCache;
+  const sb=getSb(); const me=loadProfile().email;
+  const out={};
+  if(sb&&me){
+    const today=new Date().toISOString().slice(0,10);
+    const{data,error}=await sb.from('session_attendances')
+      .select('email,nickname,spot_name')
+      .eq('session_date',today).eq('cancelled',false);
+    if(error) console.error('[chips] attendance lookup failed:',error);
+    for(const r of data||[]){
+      if(r.email===me) continue;
+      (out[r.spot_name]=out[r.spot_name]||[]).push(r.nickname||r.email.split('@')[0]);
+    }
+  }
+  _todayAttendCache=out; _todayAttendTs=Date.now();
+  return out;
+}
 function renderHintChips(){
   // Always clear search bar when rendering home screen chips
   const _si=$('searchInput'); if(_si&&!cachedLoc) _si.value='';
@@ -3609,6 +3722,30 @@ function renderHintChips(){
       if(_spotsIsReady){
         fetchChipQualDays({name:f.name,loc:f.label||'',lat:f.lat,lon:f.lon,dirs:_liveDirs}).then(n=>{setChipDayBadge(fbadge,n,true);updateBestWindowBar();});
       }
+      // "Firing now" bubble, from the nearest RWS mast. Favourites carry
+      // .lat/.lon (NOT .latitude/.longitude like cachedLoc — see
+      // renderLiveWindPanel). Costs no extra request: _rwsNearest reads the
+      // 60s station cache, so every favourite is a pure comparison after the
+      // first one. Absent unless the spot is genuinely firing.
+      const fire=document.createElement('span');
+      label.appendChild(fire);
+      _rwsNearest(f.lat,f.lon).then(live=>{
+        if(!live||!_rwsIsFiringNow(live.speedKn,live.dirDeg,_liveDirs)) return;
+        fire.className='chip-firing';
+        fire.textContent=`🔥 ${live.speedKn} kn`;
+        fire.title=`Measured now at ${live.stationName} · ${live.distanceKm.toFixed(1)} km away`;
+      }).catch(()=>{});
+      // Friend bubbles are independent of wind: a mate going is worth knowing
+      // even on a light day, so this is NOT gated on the firing check above.
+      _friendsGoingToday().then(map=>{
+        for(const nick of (map[f.name]||[])){
+          const b=document.createElement('span');
+          b.className='chip-friend';
+          b.textContent=(String(nick).trim()[0]||'?').toUpperCase();
+          b.title=nick+' is going today';
+          label.appendChild(b);
+        }
+      }).catch(()=>{});
       const rm=document.createElement('span');
       rm.className='fav-chip-remove'; rm.textContent='✕'; rm.title='Remove from your spots';
       rm.addEventListener('click',e=>{e.stopPropagation();removeFav(f);});
@@ -3858,6 +3995,33 @@ function youtubeId(url) {
   return m ? m[1] : null;
 }
 
+// Which webcam URLs may be rendered INSIDE an iframe, as opposed to linked to.
+// livecam_url is community-suggestable: once an admin approves a suggestion it
+// is shown to every visitor of the spot, so this is a host allowlist rather
+// than a "does it look like a player" guess. Framing an arbitrary URL would let
+// one approved suggestion put a whole third-party page — its scripts, its
+// cookies, its own frames — inside the spot card. Anything not on the list
+// keeps the plain link button it has today.
+//
+// The host is taken from a parsed URL, never matched against the raw string:
+// youtubeId's regex happily matches `youtube.com.attacker.example/watch?v=…`,
+// which is a page on the attacker's domain. Subdomains match only with a dot
+// separator, so `notipcamlive.com` is not a subdomain of `ipcamlive.com`.
+const CAM_EMBED_HOSTS=['ipcamlive.com'];
+function camEmbedSrc(url){
+  const safe=safeHttpUrl(url); if(!safe) return null;
+  let u; try{ u=new URL(safe); }catch(e){ return null; }
+  const host=u.hostname.toLowerCase();
+  const isHost=h=>host===h||host.endsWith('.'+h);
+  if(isHost('youtube.com')||isHost('youtu.be')){
+    const id=youtubeId(safe);
+    return id?`https://www.youtube.com/embed/${id}?autoplay=0&rel=0&modestbranding=1`:null;
+  }
+  // /player/ only: the same host also serves account and dashboard pages.
+  if(CAM_EMBED_HOSTS.some(isHost)&&u.pathname.startsWith('/player/')) return u.href;
+  return null;
+}
+
 // Spot-info links (website, booking, gear, socials, webcam) are typed by a
 // business owner in their claim. An admin approves the *claim*, not the URL
 // scheme — HTML-escaping an href stops it breaking out of the attribute but a
@@ -3931,21 +4095,22 @@ function spotAttributesHTML(info){
   return html+'</div>';
 }
 
-// Live-wind link: the RWS station page, or no button at all. The RWS lookup
-// reuses the cache the panel already populated, so this costs no extra request.
+// Live-wind link: a rider-submitted page if there is one, else the nearest RWS
+// station page, else no button at all. The RWS lookup reuses the cache the
+// panel already populated, so this costs no extra request.
 //
-// PHASE 1 ONLY — the `info.live_wind_url` branch (a user-submitted URL, which
-// takes precedence over the station link) is deliberately NOT here. Rendering
-// it needs safeHttpUrl(), which does not exist in this file yet: PR #19 has not
-// landed. escFriendName escapes quotes and angle brackets and does nothing to
-// the URL scheme, so a `javascript:` URL would still execute on click. See the
-// spec's "Phase 2 — Security" section: "phase 2 must not merge before PR #19"
-// and "The new button must call safeHttpUrl(), not escFriendName() alone".
-// Reintroduce the branch together with safeHttpUrl, not before:
-//   if(info&&info.live_wind_url){ const u=safeHttpUrl(info.live_wind_url);
-//     if(u) return {url:u,label:'Live wind readings'} }
+// live_wind_url is the app's first *rider*-submitted URL — every other link
+// here traces back to an admin, or to a business owner whose claim an admin
+// verified. It therefore goes through safeHttpUrl(), never escFriendName()
+// alone: escaping stops an href breaking out of its attribute, it does nothing
+// about a `javascript:` URL firing on click. A URL that fails the scheme check
+// falls through to the station link instead of rendering a dead button.
 // docs/superpowers/specs/2026-08-16-rws-live-wind-design.md
 async function _liveWindHref(info,spot){
+  if(info&&info.live_wind_url){
+    const u=safeHttpUrl(info.live_wind_url);
+    if(u) return {url:u,label:'Live wind readings'};
+  }
   // cachedLoc (what `spot` is called with here) carries .latitude/.longitude,
   // not .lat/.lon — see renderLiveWindPanel above for the same shape.
   if(!spot||typeof spot.latitude!=='number'||typeof spot.longitude!=='number') return null;
@@ -4021,13 +4186,13 @@ async function renderSpotInfoCard(spotName) {
   const lessonUrl  = safeHttpUrl(info.lesson_url);
   const gearUrl    = safeHttpUrl(info.gear_url);
   const websiteUrl = safeHttpUrl(info.website);
-  const ytId = youtubeId(livecamUrl);
+  const camEmbed = camEmbedSrc(livecamUrl);
   const webcamBtn = livecamUrl
-    ? ytId
+    ? camEmbed
       ? `<div>
            <div class="webcam-embed-label"><span class="webcam-dot"></span> Live action on the spot — webcam</div>
            <div class="webcam-embed" data-cta="livecam">
-             <iframe src="https://www.youtube.com/embed/${ytId}?autoplay=0&rel=0&modestbranding=1" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>
+             <iframe src="${escFriendName(camEmbed)}" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>
            </div>
          </div>`
       : `<a href="${escFriendName(livecamUrl)}" target="_blank" rel="noopener" class="spot-cta-btn spot-cta-webcam" data-cta="livecam">🎥 Live action on the spot — webcam</a>`
@@ -4044,7 +4209,7 @@ async function renderSpotInfoCard(spotName) {
   // data-cta hook, so spotName is never spliced into an inline handler.
   const liveWindUrl = liveWind ? safeHttpUrl(liveWind.url) : '';
   const liveWindBtn = liveWindUrl
-    ? `<a href="${escFriendName(liveWindUrl)}" target="_blank" rel="noopener" class="spot-cta-btn" data-cta="live_wind">🌬 ${escFriendName(liveWind.label)} ↗</a>`
+    ? `<a href="${escFriendName(liveWindUrl)}" target="_blank" rel="noopener" class="spot-cta-btn spot-cta-livewind" data-cta="live_wind">🌬 ${escFriendName(liveWind.label)}</a>`
     : '';
   const websiteBtn = websiteUrl
     ? `<a href="${escFriendName(websiteUrl)}" target="_blank" rel="noopener" class="spot-cta-btn spot-cta-website" data-cta="website">🌐 Visit website</a>`
@@ -5911,6 +6076,12 @@ function openSuggestUpdate(){
     <textarea id="suTip" class="pp-input" rows="4" placeholder="e.g. Shallow at low tide, best at high tide. Avoid S swell. Parking on the north side." style="margin-bottom:6px;resize:vertical;min-height:88px;font-family:inherit;font-size:.85rem${info.spot_tip?';border-color:rgba(56,189,248,.4)':''}">${escFriendName(info.spot_tip||'')}</textarea>
     <div style="font-size:.67rem;color:var(--tdim);margin-bottom:18px;">Want to update business info, booking links or contact details? <span style="color:var(--accent);cursor:pointer" onclick="closeSuggestUpdate();openClaimFlow()">Claim this spot →</span></div>
 
+    <label class="pp-label" style="margin-top:6px">🔗 Spot links <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">— local knowledge, not business info</span></label>
+    <label class="pp-label">🌬 Live wind readings</label>
+    <input type="url" id="suLiveWind" class="pp-input" value="${escFriendName(info.live_wind_url||'')}" placeholder="https://… a live wind page for this spot" style="margin-bottom:10px"/>
+    <label class="pp-label">🎥 Webcam</label>
+    <input type="url" id="suLivecam" class="pp-input" value="${escFriendName(info.livecam_url||'')}" placeholder="https://… a webcam pointed at the spot" style="margin-bottom:18px"/>
+
     <label class="pp-label" style="margin-top:6px">🪁 Spot attributes <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">— what you can ride & what's here</span></label>
     <label class="pp-label">Disciplines</label>
     ${attrMultiHTML('suDisciplines',SPOT_DISCIPLINES,info.disciplines)}
@@ -5950,13 +6121,28 @@ async function submitSuggestUpdate(){
   const _water=readSingleAttr('suWaterType'), _tide=readSingleAttr('suTidePref');
   const _crowd=readSingleAttr('suCrowdLevel'), _skill=readSingleAttr('suSkillLevel');
   const _hasAttr=!!(_disc||_fac||_water||_tide||_crowd||_skill);
-  if(!selDirs.length&&!tip&&!_hasAttr){ showToast('Add a wind direction, a tip, or a spot attribute before sending.'); return; }
+
+  // The two link fields are the only place in the app where an ordinary rider
+  // proposes a URL. safeHttpUrl() on render is the real boundary (see
+  // _liveWindHref), but rejecting here too means the submitter finds out
+  // immediately instead of an admin silently dropping the row later. A blank
+  // field is not an error — it just carries nothing.
+  const _rawLiveWind=($('suLiveWind')?.value||'').trim();
+  const _rawLivecam =($('suLivecam') ?.value||'').trim();
+  const _liveWind=_rawLiveWind?safeHttpUrl(_rawLiveWind):'';
+  const _livecam =_rawLivecam ?safeHttpUrl(_rawLivecam) :'';
+  if(_rawLiveWind&&!_liveWind){ showToast('That live wind link is not a valid http(s) address.'); return; }
+  if(_rawLivecam &&!_livecam ){ showToast('That webcam link is not a valid http(s) address.'); return; }
+  if(_liveWind.length>500||_livecam.length>500){ showToast('That link is too long — use a direct page URL.'); return; }
+
+  if(!selDirs.length&&!tip&&!_hasAttr&&!_liveWind&&!_livecam){ showToast('Add a wind direction, a tip, a link, or a spot attribute before sending.'); return; }
 
   btn.disabled=true; btn.textContent='Sending…';
   const sb=getSb(); if(!sb){ btn.disabled=false; btn.textContent='Send suggestion →'; return; }
   const{error}=await sb.from('spot_update_suggestions').insert({
     email, spot_name:spotName,
     suggested_dirs:selDirs.length?selDirs:null, tip:tip||null,
+    live_wind_url:_liveWind||null, livecam_url:_livecam||null,
     disciplines:_disc, facilities:_fac, water_type:_water,
     tide_pref:_tide, crowd_level:_crowd, skill_level:_skill,
   });
@@ -5966,7 +6152,7 @@ async function submitSuggestUpdate(){
   await fetch('https://kpwmajtxmcfpakvonimf.supabase.co/functions/v1/update-notify',{
     method:'POST',
     headers:{'Content-Type':'application/json','Authorization':'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwd21hanR4bWNmcGFrdm9uaW1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTcyMjYsImV4cCI6MjA5MDczMzIyNn0.QfQuIQbnfVUOApPbOdvCRbNsVdb0SBAwMX-hvioGJmg'},
-    body:JSON.stringify({email,spot_name:spotName,suggested_dirs:selDirs,tip}),
+    body:JSON.stringify({email,spot_name:spotName,suggested_dirs:selDirs,tip,live_wind_url:_liveWind,livecam_url:_livecam}),
   }).catch(()=>{});
 
   showToast('✓ Suggestion sent! We\'ll review it shortly.');
@@ -7480,6 +7666,7 @@ async function renderAdminPanel(){
     const fields=[
       u.website&&`Website: ${u.website}`,
       u.livecam_url&&`Live cam: ${u.livecam_url}`,
+      u.live_wind_url&&`Live wind: ${u.live_wind_url}`,
       u.lesson_url&&`Lessons: ${u.lesson_url}`,
       u.gear_url&&`Gear: ${u.gear_url}`,
       u.instagram_url&&`Instagram: ${u.instagram_url}`,
@@ -7725,6 +7912,9 @@ async function adminOpenSpot(spotName, prefill){
       <label class="pp-label">Live cam URL</label>
       <input type="url" id="adLivecam" class="pp-input" value="${s?.livecam_url||''}" placeholder="https://…" style="margin-bottom:10px"/>
 
+      <label class="pp-label">Live wind URL <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(overrides the automatic RWS station link)</span></label>
+      <input type="url" id="adLiveWind" class="pp-input" value="${s?.live_wind_url||''}" placeholder="https://…" style="margin-bottom:10px"/>
+
       <label class="pp-label">Instagram URL</label>
       <input type="url" id="adInstagram" class="pp-input" value="${s?.instagram_url||''}" placeholder="https://instagram.com/…" style="margin-bottom:10px"/>
 
@@ -7793,6 +7983,7 @@ async function adminApplyUpdate(u){
   const updates={};
   if(u.website)       updates.website=u.website;
   if(u.livecam_url)   updates.livecam_url=u.livecam_url;
+  if(u.live_wind_url) updates.live_wind_url=u.live_wind_url;
   if(u.lesson_url)    updates.lesson_url=u.lesson_url;
   if(u.gear_url)      updates.gear_url=u.gear_url;
   if(u.instagram_url) updates.instagram_url=u.instagram_url;
@@ -8033,6 +8224,7 @@ async function adminSaveSpotInfo(){
     lesson_url:      ($('adLessonUrl')?.value||'').trim()||null,
     gear_url:        ($('adGearUrl')?.value||'').trim()||null,
     livecam_url:     ($('adLivecam')?.value||'').trim()||null,
+    live_wind_url:   ($('adLiveWind')?.value||'').trim()||null,
     instagram_url:   ($('adInstagram')?.value||'').trim()||null,
     facebook_url:    ($('adFacebook')?.value||'').trim()||null,
     description:     ($('adDesc')?.value||'').trim()||null,
@@ -8436,10 +8628,6 @@ async function manageSubscription(){
   }
 }
 
-// SMS is NOT live: production has no TWILIO_* secrets, so process-reminders
-// skips the send. Letting the toggle save a preference would promise a text
-// that never arrives. Flip this one constant once Twilio is configured.
-let SMS_RELEASED = false;
 async function toggleSms(){
   if(!SMS_RELEASED){ showToast('🔜 SMS alerts are coming soon'); return; }
   if(!isPremium()){ showToast('⚡ Premium only — upgrade to unlock SMS alerts', 4000, '#f59e0b'); return; }
@@ -9258,7 +9446,6 @@ async function toggleNotifyFriends(){
 // toggle is inert and writes nothing. Flip this one constant to release.
 // `let`, not `const`: releasing is still a one-line change, but tests can flip
 // it to prove the released path actually renders as released.
-let NEARBY_RELEASED = true;
 function hasHomeLocation(){
   const p=loadProfile();
   return typeof p.homeLat==='number' && typeof p.homeLon==='number';
@@ -9323,7 +9510,15 @@ async function setDigestNearbyKm(val){
 let _friendsReachCache=null;
 let _friendsPendingCount=0;   // pending requests: listed in the panel, but not notified
 // Nicknames are user-supplied and go into innerHTML below — escape them.
-const escFriendName=t=>String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// A `function` declaration, deliberately, NOT `const escFriendName = t => …`.
+// It is called from 84 places, including updateAuthUI, which runs during
+// top-level evaluation via initAuth(). A const arrow is in its temporal dead
+// zone until this line executes, so the arrow form threw ReferenceError there
+// and left signed-in users looking signed out. Function declarations hoist, so
+// call order stops mattering.
+function escFriendName(t){
+  return String(t).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
 function toggleFriendsReach(){
   const list=$('ppFriendsReachList');
   if(!list) return;
