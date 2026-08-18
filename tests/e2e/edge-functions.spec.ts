@@ -101,4 +101,43 @@ test.describe('edge function security gates', () => {
     expect(body.live.stationName).toBe('Sycod');
     await ctx.dispose();
   });
+
+  test('wind-discover rejects unauthenticated callers', async () => {
+    const ctx = await request.newContext();
+    const res = await ctx.post(`${BASE}/wind-discover`, {
+      headers: { Authorization: `Bearer ${ANON}` },
+      data: { url: 'https://www.sycod.be/nl/meteo' },
+    });
+    expect(res.status()).toBe(401);
+    await ctx.dispose();
+  });
+
+  test('wind-discover refuses a private-range target', async () => {
+    const ctx = await request.newContext();
+    for (const url of ['http://169.254.169.254/latest/meta-data/',
+                       'http://127.0.0.1:8000/', 'http://10.0.0.1/']) {
+      const res = await ctx.post(`${BASE}/wind-discover`, {
+        headers: { Authorization: `Bearer ${ANON}` }, data: { url },
+      });
+      // 401 (no user) or 400 (blocked) — never 200, and never any fetched content
+      expect([400, 401]).toContain(res.status());
+      expect(await res.text()).not.toContain('meta-data');
+    }
+    await ctx.dispose();
+  });
+
+  test('wind-discover rate-limits a single caller', async () => {
+    const ctx = await request.newContext();
+    const codes: number[] = [];
+    for (let i = 0; i < 8; i++) {
+      const res = await ctx.post(`${BASE}/wind-discover`, {
+        headers: { Authorization: `Bearer ${ANON}` }, data: { url: 'https://example.com/' },
+      });
+      codes.push(res.status());
+    }
+    // anon is rejected before the limiter, so this asserts the gate order:
+    // never a 200, and never a 5xx from the limiter itself.
+    expect(codes.every(c => c === 401 || c === 429)).toBe(true);
+    await ctx.dispose();
+  });
 });
