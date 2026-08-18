@@ -900,6 +900,9 @@
     /* Without this the live-wind CTA inherited only .spot-cta-btn — layout, no
        paint — so it read as bare text next to the filled lesson/gear buttons. */
     .spot-cta-livewind{ background:linear-gradient(135deg,#5dd4f0,#0e9bb8); color:#04212b; }
+    /* A spot with no lesson or gear booking leaves a single CTA in this
+       two-column grid, which would sit in one cell as a stray half-button. */
+    .spot-info-ctas > :only-child { grid-column:1 / -1; }
     .spot-info-meta { display:flex; flex-direction:column; gap:6px; font-size:.75rem; color:var(--gray); }
     .spot-info-meta-row { display:flex; align-items:baseline; gap:6px; }
     .spot-info-meta a { color:var(--accent); text-decoration:none; }

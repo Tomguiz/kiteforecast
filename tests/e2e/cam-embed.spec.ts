@@ -82,3 +82,24 @@ test('the live-wind CTA is a filled button, not bare text', async ({ gotoApp, pa
   expect(bg).not.toBe('none');
   expect(bg).not.toBe('rgba(0, 0, 0, 0)');
 });
+
+test('a lone live-wind CTA fills the row instead of half of it', async ({ gotoApp, page }) => {
+  // A spot with no lesson or gear booking still puts its live-wind button in
+  // the two-column CTA grid, where it would otherwise occupy one cell and
+  // leave the other empty — reading as a stray half-button.
+  await gotoApp('signedOut', {
+    spotInfo: { spot_name: 'Lone CTA', verified: true,
+      live_wind_url: 'https://meteozeebrugge.example/' },
+  });
+  await page.evaluate(() => renderSpotInfoCard('Lone CTA'));
+  const { btn, row } = await page.evaluate(() => {
+    // the results view is hidden and the card body collapsed until "More
+    // details" is tapped; show both so the CTA has a real laid-out width
+    showOnly('results');
+    (document.querySelector('#spotInfoCard .spot-info-body') as HTMLElement).style.display = 'flex';
+    const b = document.querySelector('#spotInfoCard [data-cta="live_wind"]') as HTMLElement;
+    return { btn: b.getBoundingClientRect().width,
+             row: (b.parentElement as HTMLElement).getBoundingClientRect().width };
+  });
+  expect(btn).toBeGreaterThan(row * 0.9);
+});
