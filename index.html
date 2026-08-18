@@ -1958,7 +1958,7 @@ let SMS_RELEASED = false;
 // Sessions-near-home IS live.
 let NEARBY_RELEASED = true;
 
-const FIRING_MIN_KN=18;
+const FIRING_MIN_KN=15;
 function _rwsIsFiringNow(speedKn,dirDeg,spotDirs){
   if(dirDeg===null||dirDeg===undefined) return false;
   if(speedKn<FIRING_MIN_KN) return false;
