@@ -133,12 +133,15 @@ describe('discoverInHtml', () => {
 describe('isBlockedHost', () => {
   it('blocks loopback, private ranges, link-local and cloud metadata', () => {
     for (const h of ['127.0.0.1', 'localhost', '10.0.0.5', '172.16.0.1', '192.168.1.1',
-                     '169.254.169.254', '[::1]', '::1', 'fd00::1', '0.0.0.0'])
+                     '169.254.169.254', '[::1]', '::1', 'fd00::1', '0.0.0.0',
+                     '64:ff9b::7f00:1',   // NAT64 well-known prefix embedding 127.0.0.1
+                     '2002:7f00:1::'])    // 6to4 prefix embedding 127.0.0.1
       expect(isBlockedHost(h), h).toBe(true)
   })
 
   it('allows ordinary public hosts', () => {
-    for (const h of ['www.sycod.be', 'weatherlink.com', '8.8.8.8'])
+    for (const h of ['www.sycod.be', 'weatherlink.com', '8.8.8.8',
+                     'xn--80aswg.xn--p1ai'])  // IDN club page (метео.рф), punycoded by new URL().hostname
       expect(isBlockedHost(h), h).toBe(false)
   })
 

@@ -104,6 +104,12 @@ export function isBlockedHost(hostname: string): boolean {
     // IPv4-mapped (::ffff:a:b) / IPv4-compatible (::a:b) written as pure hex,
     // not a dotted quad — same address space as the dot-embedded form above.
     if (g[0] === 0 && g[1] === 0 && g[2] === 0 && g[3] === 0 && g[4] === 0 && (g[5] === 0xffff || g[5] === 0)) return true
+    // NAT64 (64:ff9b::/96) and 6to4 (2002::/16) also carry an embedded IPv4 in
+    // their low bits — same reachable-private-space problem as the mapped/
+    // compatible forms above, just via a different transition mechanism. No
+    // club's weather page has any reason to be addressed through either.
+    if (g[0] === 0x64 && g[1] === 0xff9b && g[2] === 0 && g[3] === 0 && g[4] === 0 && g[5] === 0) return true
+    if (g[0] === 0x2002) return true
     if ((g[0] & 0xff00) === 0xfc00 || (g[0] & 0xff00) === 0xfd00) return true  // unique-local fc00::/7
     if (g[0] >= 0xfe80 && g[0] <= 0xfebf) return true                          // link-local fe80::/10
     return false
@@ -128,11 +134,14 @@ export function isBlockedHost(hostname: string): boolean {
   }
 
   // Otherwise allow only a genuine DNS hostname — dot-separated labels of
-  // letters/digits/hyphens, ending in an alphabetic TLD. A name that later
-  // RESOLVES to a private address is out of scope here; the caller re-checks
-  // post-resolution. This is the fallback that keeps bare integers, hex/octal
-  // octets, and other numeric disguises from being treated as safe.
-  return !/^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,}$/.test(h)
+  // letters/digits/hyphens, ending in an alphabetic TLD or a punycode `xn--`
+  // TLD (new URL().hostname punycodes IDN hosts automatically, so a rider
+  // pasting e.g. метео.рф must not be refused just because its TLD encodes
+  // as `xn--p1ai`). A name that later RESOLVES to a private address is out of
+  // scope here; the caller re-checks post-resolution. This is the fallback
+  // that keeps bare integers, hex/octal octets, and other numeric disguises
+  // from being treated as safe.
+  return !/^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?\.)+(?:[a-z]{2,}|xn--[a-z0-9-]{2,})$/.test(h)
 }
 
 import { RWS_MAX_AGE_MIN, RWS_MAX_FUTURE_MIN, type LiveWind } from './rws.ts'
