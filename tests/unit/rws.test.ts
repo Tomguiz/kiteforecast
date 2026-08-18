@@ -319,14 +319,11 @@ describe('isFiringNow', () => {
   // Cadzand Bad / Knokke: good on W and NW
   const DIRS = [270, 315]
 
-  it('fires at 18 kn from a good direction', () => {
-    expect(isFiringNow(18, 270, DIRS)).toBe(true)
+  it('fires at 15 kn from a good direction', () => {
+    expect(isFiringNow(15, 270, DIRS)).toBe(true)
   })
 
-  it('does not fire at 17 kn, however good the direction', () => {
-    // 15-17kn is rideable and the good-days badge counts it, but the firing
-    // bubble is a stronger claim and deliberately stays quiet here.
-    expect(isFiringNow(17, 270, DIRS)).toBe(false)
+  it('does not fire at 14 kn, however good the direction', () => {
     expect(isFiringNow(14, 270, DIRS)).toBe(false)
   })
 
@@ -361,18 +358,18 @@ describe('isFiringNow', () => {
   })
 })
 
-describe('isFiringNow — the 18kn bar', () => {
-  // "Firing" is a higher bar than "rideable" on purpose: the good-days badge
-  // counts from 15kn, this bubble says drop everything and drive.
+describe('isFiringNow — the 15kn bar', () => {
+  // Same bar as the rest of the app: speedTier(kn)>0 is 15, which is what the
+  // good-days badge counts, so bubble and badge cannot disagree.
   const DIRS = [0, 45, 225, 270, 315]
 
-  it('does not fire at the rideable threshold', () => {
-    expect(isFiringNow(15, 270, DIRS)).toBe(false)
-    expect(isFiringNow(17, 270, DIRS)).toBe(false)
+  it('does not fire below the rideable threshold', () => {
+    expect(isFiringNow(14, 270, DIRS)).toBe(false)
+    expect(isFiringNow(9, 270, DIRS)).toBe(false)
   })
 
-  it('fires from 18kn', () => {
-    expect(isFiringNow(18, 270, DIRS)).toBe(true)
+  it('fires from 15kn', () => {
+    expect(isFiringNow(15, 270, DIRS)).toBe(true)
     expect(isFiringNow(25, 270, DIRS)).toBe(true)
   })
 
@@ -390,6 +387,6 @@ describe('isFiringNow — the 18kn bar', () => {
   })
 
   it('exports the threshold rather than hiding a magic number', () => {
-    expect(FIRING_MIN_KN).toBe(18)
+    expect(FIRING_MIN_KN).toBe(15)
   })
 })

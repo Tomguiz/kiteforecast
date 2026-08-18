@@ -1,7 +1,7 @@
 import { test, expect } from '../fixtures/auth';
 
 // Favourite chips carry two independent signals:
-//   🔥 21 kn  — measured wind at a station within 30km, at or above 18kn
+//   🔥 21 kn  — measured wind at a station within 30km, at or above 15kn
 //   (J)(M)    — one bubble per friend confirmed for today, initial only
 // They are deliberately independent: a mate going matters on a light day, and
 // wind matters with nobody going.
@@ -29,16 +29,16 @@ async function seedChip(page: any, opts: {
   await page.waitForTimeout(250);
 }
 
-test('shows the firing bubble at 18kn from a good direction', async ({ gotoApp, page }) => {
+test('shows the firing bubble at 15kn from a good direction', async ({ gotoApp, page }) => {
   await gotoApp('signedIn');
   await seedChip(page, { live: { speedKn: 21, dirDeg: 270 } });
 
   await expect(page.locator('.chip-firing')).toHaveText('🔥 21 kn');
 });
 
-test('stays quiet at 17kn — rideable, but not firing', async ({ gotoApp, page }) => {
+test('stays quiet below 15kn', async ({ gotoApp, page }) => {
   await gotoApp('signedIn');
-  await seedChip(page, { live: { speedKn: 17, dirDeg: 270 } });
+  await seedChip(page, { live: { speedKn: 14, dirDeg: 270 } });
 
   await expect(page.locator('.chip-firing')).toHaveCount(0);
 });
