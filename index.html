@@ -4518,24 +4518,30 @@ async function safeFetch(url,timeoutMs=10000,retries=1){
   }
 }
 
-// Throttled fetch queue — max N concurrent chip fetches to avoid rate limits
+// Throttled fetch queue — max N concurrent chip fetches to avoid rate limits.
+// Every start goes through _chipQueueDrain, which claims the slot and dequeues
+// in the SAME tick. Checking queue.length now and shifting 400ms later let two
+// settling fetches both arm a drain: the first took the entry, the second
+// shifted `undefined` and threw "shift(...) is not a function". It also let a
+// caller arriving inside that 400ms gap see running===0 and start alongside the
+// pending drain, pushing `running` past `max` and losing the 429 protection.
 function queuedFetch(fn){
   return new Promise((resolve,reject)=>{
-    const run=()=>{
-      _chipQueue.running++;
-      fn().then(resolve,reject).finally(()=>{
-        _chipQueue.running--;
-        // Take the job NOW, run it later. Checking length here and shifting
-        // 400ms later is a race: another completion can drain the queue in
-        // between, leaving shift() undefined and calling undefined().
-        if(_chipQueue.queue.length){
-          const next=_chipQueue.queue.shift();
-          setTimeout(()=>{ if(next) next(); },400);
-        }
-      });
-    };
-    if(_chipQueue.running<_chipQueue.max) run(); else _chipQueue.queue.push(run);
+    // Promise.resolve().then(fn) so a synchronous throw in fn rejects instead of
+    // escaping the drain — that would skip the .finally and leak the slot forever.
+    _chipQueue.queue.push(()=>Promise.resolve().then(fn).then(resolve,reject));
+    _chipQueueDrain(0);
   });
+}
+
+// Start the next queued fetch if a slot is free, `delayMs` after now. The 400ms
+// spacing between successive fetches is what keeps Open-Meteo from rate-limiting.
+function _chipQueueDrain(delayMs){
+  if(_chipQueue.running>=_chipQueue.max||!_chipQueue.queue.length) return;
+  const task=_chipQueue.queue.shift();
+  _chipQueue.running++; // claim the slot now so nothing starts ahead of the timer
+  const start=()=>{ task().finally(()=>{ _chipQueue.running--; _chipQueueDrain(400); }); };
+  if(delayMs) setTimeout(start,delayMs); else start();
 }
 
 async function fetchForecast(query){
