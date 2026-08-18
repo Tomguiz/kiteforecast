@@ -897,6 +897,12 @@
     .spot-cta-lesson { background:linear-gradient(135deg,#0ea5e9,#0284c7); color:#fff; }
     .spot-cta-gear   { background:linear-gradient(135deg,#10b981,#059669); color:#fff; }
     .spot-cta-website{ background:rgba(255,255,255,.08); color:var(--text); border:1px solid var(--border); }
+    /* Without this the live-wind CTA inherited only .spot-cta-btn — layout, no
+       paint — so it read as bare text next to the filled lesson/gear buttons. */
+    .spot-cta-livewind{ background:linear-gradient(135deg,#5dd4f0,#0e9bb8); color:#04212b; }
+    /* A spot with no lesson or gear booking leaves a single CTA in this
+       two-column grid, which would sit in one cell as a stray half-button. */
+    .spot-info-ctas > :only-child { grid-column:1 / -1; }
     .spot-info-meta { display:flex; flex-direction:column; gap:6px; font-size:.75rem; color:var(--gray); }
     .spot-info-meta-row { display:flex; align-items:baseline; gap:6px; }
     .spot-info-meta a { color:var(--accent); text-decoration:none; }
@@ -3989,6 +3995,33 @@ function youtubeId(url) {
   return m ? m[1] : null;
 }
 
+// Which webcam URLs may be rendered INSIDE an iframe, as opposed to linked to.
+// livecam_url is community-suggestable: once an admin approves a suggestion it
+// is shown to every visitor of the spot, so this is a host allowlist rather
+// than a "does it look like a player" guess. Framing an arbitrary URL would let
+// one approved suggestion put a whole third-party page — its scripts, its
+// cookies, its own frames — inside the spot card. Anything not on the list
+// keeps the plain link button it has today.
+//
+// The host is taken from a parsed URL, never matched against the raw string:
+// youtubeId's regex happily matches `youtube.com.attacker.example/watch?v=…`,
+// which is a page on the attacker's domain. Subdomains match only with a dot
+// separator, so `notipcamlive.com` is not a subdomain of `ipcamlive.com`.
+const CAM_EMBED_HOSTS=['ipcamlive.com'];
+function camEmbedSrc(url){
+  const safe=safeHttpUrl(url); if(!safe) return null;
+  let u; try{ u=new URL(safe); }catch(e){ return null; }
+  const host=u.hostname.toLowerCase();
+  const isHost=h=>host===h||host.endsWith('.'+h);
+  if(isHost('youtube.com')||isHost('youtu.be')){
+    const id=youtubeId(safe);
+    return id?`https://www.youtube.com/embed/${id}?autoplay=0&rel=0&modestbranding=1`:null;
+  }
+  // /player/ only: the same host also serves account and dashboard pages.
+  if(CAM_EMBED_HOSTS.some(isHost)&&u.pathname.startsWith('/player/')) return u.href;
+  return null;
+}
+
 // Spot-info links (website, booking, gear, socials, webcam) are typed by a
 // business owner in their claim. An admin approves the *claim*, not the URL
 // scheme — HTML-escaping an href stops it breaking out of the attribute but a
@@ -4153,13 +4186,13 @@ async function renderSpotInfoCard(spotName) {
   const lessonUrl  = safeHttpUrl(info.lesson_url);
   const gearUrl    = safeHttpUrl(info.gear_url);
   const websiteUrl = safeHttpUrl(info.website);
-  const ytId = youtubeId(livecamUrl);
+  const camEmbed = camEmbedSrc(livecamUrl);
   const webcamBtn = livecamUrl
-    ? ytId
+    ? camEmbed
       ? `<div>
            <div class="webcam-embed-label"><span class="webcam-dot"></span> Live action on the spot — webcam</div>
            <div class="webcam-embed" data-cta="livecam">
-             <iframe src="https://www.youtube.com/embed/${ytId}?autoplay=0&rel=0&modestbranding=1" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>
+             <iframe src="${escFriendName(camEmbed)}" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"></iframe>
            </div>
          </div>`
       : `<a href="${escFriendName(livecamUrl)}" target="_blank" rel="noopener" class="spot-cta-btn spot-cta-webcam" data-cta="livecam">🎥 Live action on the spot — webcam</a>`
@@ -4176,7 +4209,7 @@ async function renderSpotInfoCard(spotName) {
   // data-cta hook, so spotName is never spliced into an inline handler.
   const liveWindUrl = liveWind ? safeHttpUrl(liveWind.url) : '';
   const liveWindBtn = liveWindUrl
-    ? `<a href="${escFriendName(liveWindUrl)}" target="_blank" rel="noopener" class="spot-cta-btn" data-cta="live_wind">🌬 ${escFriendName(liveWind.label)} ↗</a>`
+    ? `<a href="${escFriendName(liveWindUrl)}" target="_blank" rel="noopener" class="spot-cta-btn spot-cta-livewind" data-cta="live_wind">🌬 ${escFriendName(liveWind.label)}</a>`
     : '';
   const websiteBtn = websiteUrl
     ? `<a href="${escFriendName(websiteUrl)}" target="_blank" rel="noopener" class="spot-cta-btn spot-cta-website" data-cta="website">🌐 Visit website</a>`
