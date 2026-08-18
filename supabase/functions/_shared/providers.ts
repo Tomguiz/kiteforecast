@@ -39,6 +39,43 @@ export function providerFromUrl(url: string): ProviderRef | null {
   return null
 }
 
+// Pull every absolute http(s) URL out of the markup and keep the first that
+// resolves to a provider. Deliberately NOT an HTML parse: we are looking for an
+// identifier, not reading content, so a regex over hrefs and srcs is enough and
+// cannot be confused by malformed markup.
+export function discoverInHtml(html: string): ProviderRef | null {
+  const text = String(html || '')
+  const urls = text.match(/https?:\/\/[^\s"'<>\\]+/g) || []
+  for (const raw of urls) {
+    const ref = providerFromUrl(raw.replace(/&amp;/g, '&'))
+    if (ref) return ref
+  }
+  return null
+}
+
+// Anything that could reach infrastructure rather than the public internet. The
+// caller must re-run this after EVERY redirect, not just on the submitted URL.
+export function isBlockedHost(hostname: string): boolean {
+  const h = String(hostname || '').toLowerCase().replace(/^\[|\]$/g, '')
+  if (!h || h === 'localhost' || h.endsWith('.localhost') || h.endsWith('.internal')) return true
+  // IPv6
+  if (h.includes(':')) {
+    if (h === '::1' || h === '::') return true
+    if (/^f[cd][0-9a-f]{2}:/.test(h)) return true   // unique-local fc00::/7
+    if (/^fe[89ab][0-9a-f]:/.test(h)) return true   // link-local fe80::/10
+    return false
+  }
+  const m = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/)
+  if (!m) return false                              // a name; DNS is checked by the caller
+  const [a, b] = [Number(m[1]), Number(m[2])]
+  if (a === 0 || a === 127 || a === 10) return true
+  if (a === 172 && b >= 16 && b <= 31) return true
+  if (a === 192 && b === 168) return true
+  if (a === 169 && b === 254) return true           // link-local + cloud metadata
+  if (a >= 224) return true                         // multicast / reserved
+  return false
+}
+
 import { RWS_MAX_AGE_MIN, RWS_MAX_FUTURE_MIN, type LiveWind } from './rws.ts'
 
 const KN_PER_MS   = 1.943844

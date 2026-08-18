@@ -104,3 +104,41 @@ describe('toLiveWindFrom', () => {
     expect(lw.speedKn).toBe(22)
   })
 })
+
+import { discoverInHtml, isBlockedHost } from '../../supabase/functions/_shared/providers.ts'
+
+describe('discoverInHtml', () => {
+  it('finds the weatherlink widget a club page embeds', () => {
+    // The shape sycod.be/nl/meteo actually serves.
+    const html = `<iframe frameborder='0' height='200'
+      src='https://www.weatherlink.com/embeddablePage/show/87ca27e8616443678fffe486311370ee/signature'
+      style="border: 0px none;"></iframe>`
+    expect(discoverInHtml(html))
+      .toEqual({ provider: 'weatherlink', stationId: '87ca27e8616443678fffe486311370ee' })
+  })
+
+  it('finds holfuy and pioupiou embeds', () => {
+    expect(discoverInHtml(`<iframe src="https://api.holfuy.com/live/?s=101&m=JSON"></iframe>`))
+      .toEqual({ provider: 'holfuy', stationId: '101' })
+    expect(discoverInHtml(`<a href="https://www.openwindmap.org/PP-1234">wind</a>`))
+      .toEqual({ provider: 'pioupiou', stationId: '1234' })
+  })
+
+  it('finds nothing in a page with no provider', () => {
+    expect(discoverInHtml('<html><body><p>no wind here</p></body></html>')).toBeNull()
+    expect(discoverInHtml('')).toBeNull()
+  })
+})
+
+describe('isBlockedHost', () => {
+  it('blocks loopback, private ranges, link-local and cloud metadata', () => {
+    for (const h of ['127.0.0.1', 'localhost', '10.0.0.5', '172.16.0.1', '192.168.1.1',
+                     '169.254.169.254', '[::1]', '::1', 'fd00::1', '0.0.0.0'])
+      expect(isBlockedHost(h), h).toBe(true)
+  })
+
+  it('allows ordinary public hosts', () => {
+    for (const h of ['www.sycod.be', 'weatherlink.com', '8.8.8.8'])
+      expect(isBlockedHost(h), h).toBe(false)
+  })
+})
