@@ -55,7 +55,7 @@ each independently sufficient:
 
 | Provider | API | Key | CORS | Route |
 |---|---|---|---|---|
-| Pioupiou / OpenWindMap | `api.pioupiou.fr/v1/live/<id>` | none | `*` | direct from the browser |
+| Pioupiou / OpenWindMap | `api.pioupiou.fr/v1/live/<id>` | none | `*` | via `wind-proxy` (see below) |
 | Holfuy | `api.holfuy.com/live/?s=<id>&m=JSON&su=km/h` | none | absent | via `wind-proxy` |
 | WeatherLink (Davis) | `weatherlink.com/embeddablePage/summaryData/<uuid>` | none | absent | via `wind-proxy` |
 | RWS (existing) | `rwsos.rws.nl/wb-api` | none | `*` | direct, unchanged |
@@ -200,19 +200,31 @@ difference between a reading and a lie:
 - **Every failure degrades to hidden.** No error state reaches the panel; a
   provider that is down looks exactly like a spot with no provider.
 
-## Where the code lives
+## Where the code lives — every provider goes through the proxy
 
-The app has no build step — `index.html` is served raw by Pages — so code
-cannot be shared between the Deno edge functions and the browser. The RWS
-logic is already duplicated between `_shared/rws.ts` and `index.html` for
-exactly this reason.
+The app has no build step (`index.html` is served raw by Pages), so browser
+code and Deno edge-function code cannot share a module. That is why the RWS
+logic exists twice today, in `_shared/rws.ts` and again in `index.html`.
 
-This spec does not fix that, and does not pretend the duplication is free:
+Rather than repeat that mistake three more times, **every provider is fetched
+through `wind-proxy`, including Pioupiou, which the browser could call
+directly.** The adapters then live exactly once, in
+`supabase/functions/_shared/providers.ts`, and the client holds no
+provider-specific code at all — it asks for a spot's reading and gets the
+`LiveWind` shape back.
 
-- Phase 1 adds the adapters to `index.html` only.
-- Phase 2 mirrors them into `_shared/` for `process-reminders`.
-- Adapters stay small and pure, and **both copies are tested against the same
-  captured fixtures**, so a divergence fails a test rather than shipping.
+What this buys:
+
+- **One copy to test**, with vitest, next to `rws.test.ts` — no fixture
+  mirroring, no drift, no second implementation to keep honest.
+- **Phase 2 is nearly free**: `process-reminders` imports the same module.
+- **The 60s cache is shared across users** rather than per-browser, so fifty
+  riders opening the same spot is one upstream call, not fifty.
+
+The cost, stated plainly: one extra hop for Pioupiou, and live readings now
+depend on our edge function being up. The app already takes that dependency
+for tides, and every failure degrades to hidden, so a proxy outage looks like
+a spot with no provider rather than a broken page.
 
 ## `wind-proxy`
 
@@ -276,8 +288,10 @@ and nothing revisits it. A station that goes permanently offline degrades to
 the RWS fallback and then to a link, silently. Detecting dead stations is out
 of scope; the panel simply shows nothing.
 
-**Adapter drift between the two copies.** Named above; shared fixtures are the
-control. It is a real cost of having no build step, not a solved problem.
+**A new single point of failure.** Routing every provider through `wind-proxy`
+removes the duplication risk but concentrates availability in one function. It
+is the same bet the app already makes on `tide-proxy`, and the failure mode is
+the mildest one available: no reading, no error state, the link still works.
 
 **Coverage is still partial.** Two providers do not cover every spot, and
 riders will keep submitting URLs that stay links. That is the honest outcome —
