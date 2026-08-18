@@ -27,6 +27,11 @@ Stated so they are easy to overturn:
    Everything else keeps the link button it has today.
 3. **A URL that matches no provider is not an error.** It stays a link. No
    degraded mode, no "we tried and failed" state in the UI.
+4. **The app tries the URL for you.** A rider pastes what they know — usually
+   their club's page, not a widget URL — so the app fetches that page once,
+   server-side, and looks for a provider widget inside it. Requested
+   explicitly, and Sycod proves it works: `sycod.be/nl/meteo` embeds a
+   WeatherLink widget whose id is right there in the markup.
 
 ## Why not scraping
 
@@ -123,6 +128,48 @@ the render path stays a column read rather than a string parse.
 Schema is applied by hand in this project — these run via
 `supabase db query --linked` and are verified against
 `information_schema`, not assumed from this file.
+
+## Discovery: turning a pasted page into a provider
+
+A rider pastes `sycod.be/nl/meteo`. Nobody should expect them to know that the
+values behind it come from a WeatherLink widget with id `87ca27e8…`. So the app
+resolves it for them:
+
+```
+submitted URL
+  → is it already a provider URL?          → done, no fetch
+  → else fetch it ONCE, server-side, and scan for a provider signature
+      weatherlink.com/embeddablePage/show/<uuid>   → weatherlink, <uuid>
+      api.holfuy.com/live/?s=<id> | holfuy.com/…/<id> → holfuy, <id>
+      pioupiou/openwindmap PP-<id>                → pioupiou, <id>
+  → nothing found                          → null, the URL stays a link
+```
+
+**This runs once, when the suggestion is submitted and again when an admin
+applies it — never on render.** The distinction from scraping is not
+cosmetic: discovery extracts an *identifier* and then talks to a documented
+JSON API, so what riders see always comes from a provider feed, never from
+parsed page text. A club redesigning its site cannot change the numbers shown;
+at worst discovery has to run again.
+
+### This fetches a user-supplied URL, so it is the one real attack surface here
+
+Every control below is required, not advisory:
+
+- **http(s) only**, via the existing `safeHttpUrl()`.
+- **Resolve the host first and reject private space** — loopback, link-local,
+  RFC1918, IPv6 unique-local, and the cloud metadata address. Re-check after
+  every redirect, not only on the first URL, and cap redirects at 3.
+- **5s timeout, 512 KB cap**, no cookies or auth headers forwarded.
+- **The page body never reaches the client.** The endpoint returns
+  `{provider, station_id}` or `null` — nothing else. A caller cannot use it to
+  read a page.
+- **Signed-in callers only, rate-limited per user.** Discovery is a
+  once-per-suggestion action, not something a page calls in a loop.
+
+Without these it is an SSRF endpoint that any signed-in user can point at
+internal addresses. With them it fetches a public page, keeps an id, and
+forgets the rest.
 
 ## The adapter shape
 
@@ -242,9 +289,9 @@ the alternative is guessing at numbers.
 - Providers requiring per-user API keys (WeatherLink API v2, Ecowitt,
   Weathercloud). Note the WeatherLink *embeddable page* endpoint used here is
   the public widget feed, not the keyed v2 API.
-- Resolving a provider from a club's own page (e.g. `sycod.be/nl/meteo`)
-  automatically. An admin pastes the widget URL the page embeds; teaching the
-  app to discover it would be scraping by another name.
+- Continuously scraping a page for values (see "Why not scraping"). One-time
+  provider *discovery* is in scope — see below — reading values from arbitrary
+  HTML on every render is not.
 - Windguru station pages
 - Riders submitting a provider id directly rather than a URL
 - Any change to the reminder path in phase 1
