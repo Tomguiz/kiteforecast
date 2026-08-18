@@ -141,4 +141,24 @@ describe('isBlockedHost', () => {
     for (const h of ['www.sycod.be', 'weatherlink.com', '8.8.8.8'])
       expect(isBlockedHost(h), h).toBe(false)
   })
+
+  // Fix round 1: a block-list version of isBlockedHost passed both tests above
+  // while still letting an attacker reach loopback/metadata through an encoding
+  // the block-list never anticipated. These assert the specific bypasses a
+  // review found, so a future regression to block-list semantics fails loudly.
+  it('blocks SSRF bypass encodings (IPv4-mapped/compatible IPv6, inet_aton legacy forms, trailing-dot localhost, CGNAT)', () => {
+    for (const h of [
+      '[::ffff:127.0.0.1]',   // IPv4-mapped IPv6, dotted-quad form, loopback
+      '::ffff:169.254.169.254', // IPv4-mapped IPv6, dotted-quad form, cloud metadata
+      '0:0:0:0:0:0:0:1',      // loopback, fully expanded (not the compressed '::1')
+      '127.1',                // inet_aton 2-part shorthand for 127.0.0.1
+      '0177.0.0.1',           // octal-leading-zero first octet for 127.0.0.1
+      '2130706433',           // 127.0.0.1 as a single decimal integer
+      '0x7f.1',                // hex + shorthand mix for 127.0.0.1
+      '0251.0376.0251.0376',  // octal octets for 169.254.169.254
+      'localhost.',           // trailing root dot bypassing a plain '===' / endsWith check
+      '100.64.1.1',           // carrier-grade NAT, reachable infra on some hosts
+    ])
+      expect(isBlockedHost(h), h).toBe(true)
+  })
 })
