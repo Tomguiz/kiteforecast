@@ -117,7 +117,14 @@ test('Users list sorts by last seen (default) then by created, and flips directi
   await page.locator('#burgerList').getByText('Users').click();
   const content = page.locator('#ppAdminUsersContent');
 
-  const order = async () => (await content.innerText());
+  // The roster only renders once admin_list_users resolves — snapshotting the
+  // text before that reads "Loading…", so every indexOf below comes back -1.
+  // Wait for the cards themselves (count is order-agnostic, so this gates on
+  // the render without weakening what the ordering assertions check).
+  const order = async () => {
+    await expect(content.locator('[data-email]')).toHaveCount(adminUserRows.length);
+    return content.innerText();
+  };
   // Default: last seen desc → admin (Jun 24) before alice (Jun 23); newbie (null) last.
   let t = await order();
   expect(t.indexOf('admin@test.dev')).toBeLessThan(t.indexOf('alice@example.com'));
