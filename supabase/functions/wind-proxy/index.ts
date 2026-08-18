@@ -11,14 +11,22 @@ const json = (body: unknown, status = 200) =>
 // The endpoint takes a provider slug and a station id — never a URL. The upstream
 // address is built here from a fixed template, so there is no input that makes
 // this fetch an arbitrary host.
-const ENDPOINT: Record<ProviderId, (id: string) => string> = {
-  pioupiou:    id => `https://api.pioupiou.fr/v1/live/${encodeURIComponent(id)}`,
-  holfuy:      id => `https://api.holfuy.com/live/?s=${encodeURIComponent(id)}&m=JSON&su=km/h`,
-  weatherlink: id => `https://www.weatherlink.com/embeddablePage/summaryData/${encodeURIComponent(id)}`,
-}
-const ID_OK: Record<ProviderId, RegExp> = {
+//
+// Object.create(null): a plain `{}` literal inherits from Object.prototype, so a
+// caller-supplied provider of "constructor", "toString", "__proto__", etc. would
+// look up a real (non-function/non-RegExp) value via the prototype chain instead
+// of coming back undefined. `ID_OK[provider]?.test(...)` would then throw outside
+// the try/catch below and the handler would 500 — an error surfaced to the
+// caller, which the spec forbids. A null-prototype object has no chain to fall
+// through, so those keys resolve to undefined exactly like any other unknown slug.
+const ENDPOINT: Record<ProviderId, (id: string) => string> = Object.assign(Object.create(null), {
+  pioupiou:    (id: string) => `https://api.pioupiou.fr/v1/live/${encodeURIComponent(id)}`,
+  holfuy:      (id: string) => `https://api.holfuy.com/live/?s=${encodeURIComponent(id)}&m=JSON&su=km/h`,
+  weatherlink: (id: string) => `https://www.weatherlink.com/embeddablePage/summaryData/${encodeURIComponent(id)}`,
+})
+const ID_OK: Record<ProviderId, RegExp> = Object.assign(Object.create(null), {
   pioupiou: /^\d{1,10}$/, holfuy: /^\d{1,10}$/, weatherlink: /^[0-9a-f]{16,64}$/i,
-}
+})
 
 const TTL_MS = 60_000
 const cache = new Map<string, { at: number; body: unknown }>()
