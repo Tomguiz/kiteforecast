@@ -80,7 +80,7 @@ export function toLiveWindFrom(
       if (ageMin === null || !Number.isFinite(speedKn)) return null
       return {
         stationId, stationName: String(p.ownerName || 'Station'), distanceKm: 0,
-        speedKn, gustKn: gust ? round(Number(gust.convertedValue)) : null,
+        speedKn, gustKn: gust && Number.isFinite(Number(gust.convertedValue)) ? round(Number(gust.convertedValue)) : null,
         dirDeg: dir && Number.isFinite(Number(dir.value)) ? Number(dir.value) : null,
         ageMin, viewerUrl: `https://www.weatherlink.com/embeddablePage/show/${stationId}/signature`,
       }

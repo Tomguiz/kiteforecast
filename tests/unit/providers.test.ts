@@ -89,4 +89,18 @@ describe('toLiveWindFrom', () => {
     expect(toLiveWindFrom('holfuy', '1', {}, NOW)).toBeNull()
     expect(toLiveWindFrom('weatherlink', '1', { currConditionValues: [] }, NOW)).toBeNull()
   })
+
+  it('drops a non-numeric weatherlink gust rather than surfacing NaN', () => {
+    const badGust = {
+      ...weatherlink,
+      currConditionValues: [
+        weatherlink.currConditionValues[0],
+        weatherlink.currConditionValues[1],
+        { displayName: '10 Min High Wind Speed', value: 'n/a', convertedValue: 'n/a', unitLabel: 'knots' },
+      ],
+    }
+    const lw = toLiveWindFrom('weatherlink', '87ca27e8', badGust, NOW)!
+    expect(lw.gustKn).toBeNull()
+    expect(lw.speedKn).toBe(22)
+  })
 })
