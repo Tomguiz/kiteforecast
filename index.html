@@ -8687,7 +8687,10 @@ async function savePhone(){
 ;(function(){
   const params=new URLSearchParams(location.search);
   const tab=params.get('tab');
-  if(tab==='friends'||tab==='notifs'||tab==='myspot'||tab==='contrib'){
+  // 'profile' opens the panel at its root, which is where the home-location
+  // field lives — the what's-new email links straight to it. Without it in this
+  // allowlist the param was silently dropped and the link just opened the app.
+  if(tab==='friends'||tab==='notifs'||tab==='myspot'||tab==='contrib'||tab==='profile'){
     history.replaceState({},'',location.pathname);
     window._pendingTab=tab;
   }
