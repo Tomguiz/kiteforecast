@@ -45,4 +45,24 @@ test.describe('edge function security gates', () => {
     expect(res.status()).toBe(401);
     await ctx.dispose();
   });
+
+  test('wind-proxy refuses an unknown provider', async () => {
+    const ctx = await request.newContext();
+    const res = await ctx.get(`${BASE}/wind-proxy?provider=evil&station_id=1`, {
+      headers: { Authorization: `Bearer ${ANON}` },
+    });
+    expect(res.status()).toBe(400);
+    await ctx.dispose();
+  });
+
+  test('wind-proxy takes no URL parameter — it cannot be aimed at a host', async () => {
+    const ctx = await request.newContext();
+    const res = await ctx.get(
+      `${BASE}/wind-proxy?provider=holfuy&station_id=1&url=http://169.254.169.254/`,
+      { headers: { Authorization: `Bearer ${ANON}` } });
+    // The url param is ignored entirely; the response is a normal provider result.
+    expect(res.status()).toBe(200);
+    expect(await res.text()).not.toContain('169.254');
+    await ctx.dispose();
+  });
 });
