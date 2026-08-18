@@ -57,12 +57,18 @@ test.describe('edge function security gates', () => {
 
   test('wind-proxy takes no URL parameter — it cannot be aimed at a host', async () => {
     const ctx = await request.newContext();
+    // Not the metadata address (169.254.169.254): Cloudflare's WAF rejects that
+    // literal at the edge on *.supabase.co, so a test using it would pass or fail
+    // for reasons entirely outside this codebase. `example.invalid` is a reserved
+    // TLD that can never resolve — if the url param were ever honoured, the fetch
+    // would fail loudly (network error) rather than silently succeeding, so a 200
+    // with no trace of it in the body proves the function built its upstream URL
+    // from its own fixed template and never touched caller input.
     const res = await ctx.get(
-      `${BASE}/wind-proxy?provider=holfuy&station_id=1&url=http://169.254.169.254/`,
+      `${BASE}/wind-proxy?provider=holfuy&station_id=1&url=http://example.invalid/`,
       { headers: { Authorization: `Bearer ${ANON}` } });
-    // The url param is ignored entirely; the response is a normal provider result.
     expect(res.status()).toBe(200);
-    expect(await res.text()).not.toContain('169.254');
+    expect(await res.text()).not.toContain('example.invalid');
     await ctx.dispose();
   });
 });
