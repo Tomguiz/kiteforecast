@@ -7,6 +7,7 @@ import {
   type RwsStation, type FetchLike,
 } from '../_shared/rws.ts'
 import { renderLiveHtml } from '../_shared/live-html.ts'
+import { buildManageLink } from '../_shared/manage-link.ts'
 
 const SUPABASE_URL            = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_KEY    = Deno.env.get('SB_SERVICE_ROLE_KEY')!
@@ -305,6 +306,7 @@ Deno.serve(async () => {
         day_of_week:        new Date(r.session_date + 'T12:00:00').toLocaleDateString('en', { weekday: 'long' }),
         date_label:         fmtDateLabel(r.session_date),
         app_link:           r.app_link,
+        manage_link:        buildManageLink(r.app_link, r.spot_name, r.session_date),
         calendar_html,
         live_html,
         session: {
