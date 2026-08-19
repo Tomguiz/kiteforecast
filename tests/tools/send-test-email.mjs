@@ -38,8 +38,14 @@ const dateStr = date.toISOString().slice(0, 10)
 const base = 'https://tomguiz.github.io/kiteforecast/'
 const spot = 'TEST — ignore this email'
 
+// ON vs OFF is NOT a payload field — notif_type only ever carries 'spot' or
+// 'day'. The Make.com scenario picks reminderON<h> vs reminderOFF<h> from the
+// session figures, so --template OFF<h> sends a payload describing a session
+// that never materialised and lets the scenario reach its own conclusion.
+const dead = onOff === 'OFF'
+
 const payload = {
-  notification_type: onOff === 'ON' ? 'spot' : 'session_off',
+  notification_type: 'spot',
   reminder_label: rh === 1 ? '1 hour before' : `${rh} hours before`,
   email,
   spot,
@@ -53,7 +59,13 @@ const payload = {
   manage_link: `${base}?tab=notifs&spot=${encodeURIComponent(spot)}&date=${dateStr}`,
   calendar_html: '',
   live_html: '',
-  session: {
+  session: dead ? {
+    start_time: `${dateStr}T11:00`, end_time: '',
+    start_time_formatted: '11:00', end_time_formatted: '',
+    duration_hours: 0, wind_speed_peak_kn: 9, wind_speed_min_kn: 4,
+    wind_gusts_kn: 12, wind_direction: 'SE', wind_consistency_pct: 18,
+    rating: 'Too light',
+  } : {
     start_time: `${dateStr}T11:00`, end_time: `${dateStr}T16:00`,
     start_time_formatted: '11:00', end_time_formatted: '16:00',
     duration_hours: 5, wind_speed_peak_kn: 24, wind_speed_min_kn: 17,
@@ -67,7 +79,7 @@ const payload = {
   user_good_wind_dirs: ['SW', 'W', 'NW'],
 }
 
-console.log(`template : reminder${tpl}`)
+console.log(`template : reminder${tpl} (the scenario picks ON/OFF from the session figures)`)
 console.log(`recipient: ${email}   (1 recipient)`)
 console.log(`webhook  : ${WEBHOOK}`)
 
