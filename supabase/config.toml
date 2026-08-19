@@ -1,0 +1,11 @@
+# Minimal config: this project deploys functions from CI and manages everything
+# else from the dashboard, so only the per-function overrides live here.
+project_id = "kpwmajtxmcfpakvonimf"
+
+# The unsubscribe link is clicked from an email client, which sends no
+# Authorization header. Every other function in this project answers 401 without
+# one, so this exemption is what makes the opt-out reachable at all. It is safe
+# because the only credential the function accepts is the unguessable per-profile
+# unsubscribe_token, and a GET has no side effects.
+[functions.unsubscribe]
+verify_jwt = false

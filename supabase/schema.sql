@@ -495,3 +495,41 @@ DO $$ BEGIN ALTER TABLE profiles ADD COLUMN digest_nearby_km integer NOT NULL DE
 -- spot_info only when an admin applies them.
 DO $$ BEGIN ALTER TABLE spot_info ADD COLUMN live_wind_url text; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE spot_update_suggestions ADD COLUMN live_wind_url text; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+
+-- ---------------------------------------------------------------------------
+-- Profile columns that existed only in the live database
+-- ---------------------------------------------------------------------------
+-- These were applied by hand and never made it back into this file, so a
+-- rebuild from schema.sql produced a profiles table the app could not read.
+-- Verified against information_schema on 2026-08-19; defaults match live.
+DO $$ BEGIN ALTER TABLE profiles ADD COLUMN nickname text; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE profiles ADD COLUMN avatar_url text; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE profiles ADD COLUMN friend_session_notifs boolean NOT NULL DEFAULT true; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE profiles ADD COLUMN notify_friends_on_confirm boolean DEFAULT true; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+
+-- ---------------------------------------------------------------------------
+-- One-click unsubscribe for broadcast email
+-- ---------------------------------------------------------------------------
+-- Announcement email goes to every profile, including people who have paused
+-- reminders, so it needs an opt-out that works without signing in. The token is
+-- the only credential the unsubscribe endpoint accepts.
+DO $$ BEGIN ALTER TABLE profiles ADD COLUMN unsubscribe_token uuid NOT NULL DEFAULT gen_random_uuid(); EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+-- gen_random_uuid() is VOLATILE, so ADD COLUMN rewrites the table and gives each
+-- existing row its own token rather than reusing one evaluated default. The
+-- unique index is what actually guarantees that; it fails loudly if it ever
+-- stops holding, which beats silently shipping one token to everybody.
+CREATE UNIQUE INDEX IF NOT EXISTS profiles_unsubscribe_token_idx ON profiles (unsubscribe_token);
+
+-- A broadcast is re-runnable by hand, and the failure mode of a half-finished
+-- run is mailing the first N people twice. One row per (campaign, recipient),
+-- written after the webhook accepts, makes a re-run resume instead of repeat.
+CREATE TABLE IF NOT EXISTS broadcast_sends (
+  campaign  text        NOT NULL,
+  email     text        NOT NULL,
+  sent_at   timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (campaign, email)
+);
+
+ALTER TABLE broadcast_sends ENABLE ROW LEVEL SECURITY;
+-- No policies: only the service role writes here, and the service role bypasses
+-- RLS. Enabling it with zero policies denies anon/authenticated outright.
