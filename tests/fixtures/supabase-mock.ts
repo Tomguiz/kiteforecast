@@ -15,6 +15,7 @@ export type MockOptions = {
   adminReminders?: Record<string, unknown[]>;
   overrides?: unknown[];  // rows returned for spot_overrides (admin-added spots)
   sessions?: unknown[];   // rows returned for session_attendances (stats)
+  reminders?: unknown[];  // rows returned for reminders (Notifications schedule)
   spotInfo?: unknown;     // row returned for spot_info (.single() → one object)
   claims?: unknown[];     // rows returned for spot_claims (My Spot panel)
 };
@@ -44,8 +45,9 @@ function tableResponse(table: string, opts: MockOptions): unknown {
       return opts.sessions ?? emptyArray;
     case 'spot_claims':
       return opts.claims ?? emptyArray;
-    case 'spot_update_suggestions':
     case 'reminders':
+      return opts.reminders ?? emptyArray;
+    case 'spot_update_suggestions':
     case 'tide_cache':
     case 'spot_cta_clicks':
       return emptyArray;

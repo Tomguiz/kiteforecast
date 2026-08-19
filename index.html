@@ -839,6 +839,13 @@
     .pp-notif-session-date { font-weight:600; color:var(--text); }
     .pp-notif-pill { display:inline-block; padding:1px 6px; border-radius:4px; font-size:.65rem; font-weight:700; background:rgba(56,189,248,.12); color:#38bdf8; border:1px solid rgba(56,189,248,.2); }
     .pp-notif-pill.sent { background:rgba(100,116,139,.1); color:var(--tdim); border-color:rgba(100,116,139,.2); text-decoration:line-through; }
+    /* Per-day opt-out, reached from the "Manage this alert" button in reminder
+       emails. Two-step confirm like .pp-notif-del, since it silently cancels
+       every pending reminder for that day. */
+    .pp-notif-day-cancel { margin-left:auto; padding:1px 6px; border-radius:4px; font-size:.62rem; font-weight:700; line-height:1.5; background:transparent; border:1px solid var(--border); color:var(--tdim); cursor:pointer; flex-shrink:0; transition:all .15s; }
+    .pp-notif-day-cancel:hover { border-color:rgba(239,68,68,.5); color:#f87171; background:rgba(239,68,68,.08); }
+    .pp-notif-day-cancel.confirming { border-color:#ef4444; color:#f87171; background:rgba(239,68,68,.12); }
+    .pp-notif-day-focus { background:rgba(56,189,248,.09); border-radius:6px; margin:0 -6px; padding:3px 6px; box-shadow:inset 2px 0 0 var(--accent); }
     /* ── Premium ── */
     .premium-badge { display:inline-flex; align-items:center; gap:4px; padding:2px 8px; border-radius:99px; background:linear-gradient(135deg,#f59e0b,#d97706); color:#000; font-size:.65rem; font-weight:800; letter-spacing:.05em; vertical-align:middle; margin-left:6px; position:relative; cursor:pointer; }
     .premium-badge::before { content:'👑'; font-size:.55rem; position:absolute; top:-7px; right:-4px; line-height:1; }
@@ -5972,6 +5979,9 @@ function openProfilePanel(tab){
   }
 }
 function closeProfilePanel(){
+  // Drop an unapplied email deep link — if the spot was already unfollowed the
+  // flag would otherwise sit there and hijack a later render.
+  window._pendingNotifFocus=null;
   $('profileOverlay').style.display='none';
   document.body.style.overflow='';
 }
@@ -8697,6 +8707,14 @@ async function savePhone(){
   // field lives — the what's-new email links straight to it. Without it in this
   // allowlist the param was silently dropped and the link just opened the app.
   if(tab==='friends'||tab==='notifs'||tab==='myspot'||tab==='contrib'||tab==='profile'){
+    // Capture spot+date BEFORE replaceState strips the query. The ?spot= deep
+    // link handler lower down reads location.search too but runs after this
+    // IIFE, so without this a ?tab=notifs&spot=…&date=… link from a reminder
+    // email loses both params and lands on an unfocused list.
+    if(tab==='notifs'){
+      const fSpot=params.get('spot'), fDate=params.get('date');
+      if(fSpot&&fDate) window._pendingNotifFocus={spot:fSpot,date:fDate};
+    }
     history.replaceState({},'',location.pathname);
     window._pendingTab=tab;
   }
@@ -9909,7 +9927,7 @@ async function renderNotifList(){
           const t=_sd?_sd.toLocaleDateString([],{weekday:'short'})+' '+_sd.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'';
           return `<span class="pp-notif-pill${r.sent?' sent':''}" title="Sends at ${t}">${r.reminder_hours}h${t?` <span style="font-weight:400;opacity:.7">${t}</span>`:''}${r.sent?' ✓':''}</span>`;
         }).join('');
-        scheduleHTML+=`<div class="pp-notif-session"><span class="pp-notif-session-date">${dayLabel}${startT}</span>${pills}</div>`;
+        scheduleHTML+=`<div class="pp-notif-session" data-spot="${escFriendName(n.spotName)}" data-date="${d}"><span class="pp-notif-session-date">${dayLabel}${startT}</span>${pills}<button class="pp-notif-day-cancel" data-spot="${escFriendName(n.spotName)}" data-date="${d}" title="Stop all alerts for this day">&#10005;</button></div>`;
       }
     }
     const confirmedSet=new Set(confirmedDates);
@@ -9925,7 +9943,7 @@ async function renderNotifList(){
           const t=_sd?_sd.toLocaleDateString([],{weekday:'short'})+' '+_sd.toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}):'';
           return `<span class="pp-notif-pill" style="opacity:.5">${r.reminder_hours}h${t?` <span style="font-weight:400">${t}</span>`:''}</span>`;
         }).join('');
-        scheduleHTML+=`<div class="pp-notif-session" style="padding-left:10px;"><span class="pp-notif-session-date" style="color:var(--tdim)">${dayLabel}${startT}</span>${pills}</div>`;
+        scheduleHTML+=`<div class="pp-notif-session" style="padding-left:10px;" data-spot="${escFriendName(n.spotName)}" data-date="${d}"><span class="pp-notif-session-date" style="color:var(--tdim)">${dayLabel}${startT}</span>${pills}<button class="pp-notif-day-cancel" data-spot="${escFriendName(n.spotName)}" data-date="${d}" title="Stop all alerts for this day">&#10005;</button></div>`;
       }
     }
     if(!confirmedDates.length&&!monitoringDates.length){
@@ -9957,7 +9975,7 @@ async function renderNotifList(){
       : 'No sessions forecast yet';
 
     const uid='notif-'+n.id.replace(/[^a-z0-9]/gi,'');
-    return `<div class="pp-notif-item" style="flex-direction:column;align-items:stretch;padding:0;overflow:hidden;">
+    return `<div class="pp-notif-item" data-spot="${escFriendName(n.spotName)}" style="flex-direction:column;align-items:stretch;padding:0;overflow:hidden;">
       <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;cursor:pointer;" onclick="(function(el){var b=el.closest('.pp-notif-item').querySelector('.pp-notif-body');var open=b.style.display==='none'||!b.style.display;b.style.display=open?'block':'none';el.querySelector('.pp-notif-chevron').style.transform=open?'rotate(180deg)':'rotate(0deg)';})(this)">
         <div class="pp-notif-info" style="flex:1;min-width:0;">
           <div class="pp-notif-spot">🔔 ${escFriendName(n.spotName)}</div>
@@ -9974,6 +9992,63 @@ async function renderNotifList(){
   }).join('');
   list.querySelectorAll('.pp-day-chip').forEach(chip=>
     chip.addEventListener('click',()=>toggleSpotDay(chip.dataset.spot,+chip.dataset.day)));
+  // Same reason as .pp-day-chip above: the spot name travels as a data
+  // attribute, never inside an inline handler's JS string.
+  list.querySelectorAll('.pp-notif-day-cancel').forEach(btn=>
+    btn.addEventListener('click',e=>{ e.stopPropagation(); confirmCancelDay(btn); }));
+  _applyPendingNotifFocus(list);
+}
+
+// Deep link from a reminder email's "Manage this alert" button. Opens the card
+// for the spot the mail was about and marks the day it was about, so the user
+// lands on the row they came to switch off rather than on a collapsed list.
+function _applyPendingNotifFocus(list){
+  const focus=window._pendingNotifFocus;
+  if(!focus) return;
+  const cards=[...list.querySelectorAll('.pp-notif-item')];
+  const card=cards.find(el=>el.dataset.spot===focus.spot);
+  if(!card) return;              // unfollowed since the mail went out, or not synced yet
+  const body=card.querySelector('.pp-notif-body');
+  if(body) body.style.display='block';
+  const chev=card.querySelector('.pp-notif-chevron');
+  if(chev) chev.style.transform='rotate(180deg)';
+  const row=[...card.querySelectorAll('.pp-notif-session[data-date]')]
+    .find(el=>el.dataset.date===focus.date);
+  if(row) row.classList.add('pp-notif-day-focus');
+  // Deliberately NOT one-shot. renderNotifList runs several times on load —
+  // session restore, openSection, then syncNotifsFromSupabase resolving — and
+  // each pass rebuilds innerHTML, so a single apply got wiped by the next
+  // render and the card collapsed again. The flag is cleared by
+  // closeProfilePanel instead. Scrolling IS one-shot: re-running it on every
+  // render would yank the view back while the user is reading.
+  if(!focus.scrolled){
+    focus.scrolled=true;
+    (row||card).scrollIntoView({behavior:'smooth',block:'center'});
+  }
+}
+
+// Two-step, like confirmDeleteNotif — one click cancels every pending reminder
+// for that spot+day, which is not something to do on a stray tap.
+function confirmCancelDay(btn){
+  const spot=btn.dataset.spot, date=btn.dataset.date;
+  if(btn.dataset.confirming){
+    removeDayNotif(spot,date).then(()=>{
+      showToast('Alerts off for that day');
+      updateTabBadges();
+      renderNotifList();
+    });
+    return;
+  }
+  btn.dataset.confirming='1';
+  btn.textContent='Turn off this day?';
+  btn.classList.add('confirming');
+  setTimeout(()=>{
+    if(btn.dataset.confirming){
+      delete btn.dataset.confirming;
+      btn.innerHTML='&#10005;';
+      btn.classList.remove('confirming');
+    }
+  },3000);
 }
 function confirmDeleteNotif(btn,id){
   if(btn.dataset.confirming){
