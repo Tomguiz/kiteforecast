@@ -1,5 +1,7 @@
 // Notifies a user when their spot request has been approved and added to KiteForecast
 
+import { recordEmail } from '../_shared/email-log-client.ts'
+
 const MAKE_WEBHOOK_URL = 'https://hook.eu1.make.com/6t9fgm6btixri2wf5lnx47requf416vs'
 
 const CORS = {
@@ -29,6 +31,10 @@ Deno.serve(async (req) => {
     headers: { 'Content-Type': 'application/json' },
     body:    JSON.stringify(payload),
   })
+
+  // Logged after the webhook accepts, so a row means "handed to Make". Never
+  // throws, so a logging failure cannot stop the notification.
+  await recordEmail({ email, kind: 'spot_request_approved', meta: { spot_name } })
 
   return new Response(JSON.stringify({ ok: true }), { headers: { 'Content-Type': 'application/json', ...CORS } })
 })

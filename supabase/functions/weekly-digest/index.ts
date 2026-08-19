@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { fetchForecast, getGoodSessions } from './session-logic.ts'
 import { selectNearbySpots, rankNearbySpots } from '../_shared/nearby.ts'
+import { recordEmail } from '../_shared/email-log-client.ts'
 
 const SUPABASE_URL         = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_KEY = Deno.env.get('SB_SERVICE_ROLE_KEY')!
@@ -420,6 +421,11 @@ Deno.serve(async (req) => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
+    })
+    // Never throws, so a logging failure cannot cost a rider their digest.
+    await recordEmail({
+      email, kind: 'digest',
+      meta: { week_start: weekStart, total_good_sessions: totalSessions, nearby_count: nearbyCount },
     })
     sent++
   }

@@ -8,6 +8,7 @@ import {
 } from '../_shared/rws.ts'
 import { renderLiveHtml } from '../_shared/live-html.ts'
 import { buildManageLink } from '../_shared/manage-link.ts'
+import { recordEmail } from '../_shared/email-log-client.ts'
 
 const SUPABASE_URL            = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_KEY    = Deno.env.get('SB_SERVICE_ROLE_KEY')!
@@ -337,6 +338,12 @@ Deno.serve(async () => {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
         body:    JSON.stringify(payload),
+      })
+
+      // Never throws, so a logging failure cannot cost a rider their reminder.
+      await recordEmail({
+        email: r.email, kind: r.notif_type,
+        meta: { spot_name: r.spot_name, hours_before: rh },
       })
 
       // SMS via Twilio — premium users only, 1h reminder only
