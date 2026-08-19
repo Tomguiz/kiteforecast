@@ -18,6 +18,7 @@ import {
   resolveTier, buildPersonalHtml, buildYourSpotsHtml,
   type ProfileLike, type Tier,
 } from './content.ts'
+import { isServiceRoleCaller } from '../_shared/service-role-auth.ts'
 
 const SUPABASE_URL         = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_KEY = Deno.env.get('SB_SERVICE_ROLE_KEY')!
@@ -53,6 +54,14 @@ const json = (body: unknown, status = 200) =>
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS })
+
+  // verify_jwt is not a gate here: the anon key is public and satisfies it, so
+  // without this check anyone could mail all 25 riders — and pass a fresh
+  // `campaign` each time to slip past the broadcast_sends de-duplication.
+  // This function is operator-triggered, so it requires the service-role key.
+  if (!isServiceRoleCaller(req.headers, SUPABASE_SERVICE_KEY)) {
+    return json({ error: 'Service-role key required' }, 401)
+  }
 
   let emailFilter: string | null = null
   let campaign = DEFAULT_CAMPAIGN
