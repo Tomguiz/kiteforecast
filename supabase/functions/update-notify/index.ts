@@ -1,4 +1,6 @@
 // Sends an admin email when a user submits a spot update suggestion
+import { recordEmail } from '../_shared/email-log-client.ts'
+
 const MAKE_WEBHOOK_URL = 'https://hook.eu1.make.com/6t9fgm6btixri2wf5lnx47requf416vs'
 const ADMIN_EMAIL      = Deno.env.get('ADMIN_EMAIL') ?? 'tom.guisgand@gmail.com'
 
@@ -46,6 +48,10 @@ Deno.serve(async (req) => {
     headers: { 'Content-Type': 'application/json' },
     body:    JSON.stringify(payload),
   })
+
+  // Goes to the admin, not the rider, so that is the address recorded; the
+  // rider who triggered it is kept in meta. Never throws.
+  await recordEmail({ email: ADMIN_EMAIL, kind: 'spot_update', meta: { spot_name, submitter_email: email } })
 
   return new Response(JSON.stringify({ ok: true }), { headers: { 'Content-Type': 'application/json', ...CORS } })
 })

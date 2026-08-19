@@ -7,6 +7,7 @@
 // keeps the notification and the row on a single, reliable path.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { recordEmail } from '../_shared/email-log-client.ts'
 
 const MAKE_WEBHOOK_URL  = 'https://hook.eu1.make.com/6t9fgm6btixri2wf5lnx47requf416vs'
 const ADMIN_EMAIL       = Deno.env.get('ADMIN_EMAIL')        ?? 'tom.guisgand@gmail.com'
@@ -91,6 +92,12 @@ Deno.serve(async (req) => {
   } catch (e) {
     notified = false
     console.error('Make webhook failed:', (e as Error).message)
+  }
+
+  // Only logged when the webhook actually accepted — this one already tracks
+  // that in `notified`, so respect it rather than recording a send that failed.
+  if (notified) {
+    await recordEmail({ email: ADMIN_EMAIL, kind: 'spot_suggestion', meta: { spot_name: name } })
   }
 
   return new Response(JSON.stringify({ ok: true, saved: !insertErr, notified }), {

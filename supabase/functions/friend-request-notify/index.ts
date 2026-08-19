@@ -1,5 +1,6 @@
 // Notifies a user by email when someone sends them a friend request
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { recordEmail } from '../_shared/email-log-client.ts'
 
 const MAKE_WEBHOOK_URL = 'https://hook.eu1.make.com/6t9fgm6btixri2wf5lnx47requf416vs'
 const SUPABASE_URL     = Deno.env.get('SUPABASE_URL')     ?? 'https://kpwmajtxmcfpakvonimf.supabase.co'
@@ -48,6 +49,12 @@ Deno.serve(async (req) => {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
     body:    JSON.stringify(payload),
+  })
+
+  // Logged after the webhook accepts. Never throws, so it cannot break the notify.
+  await recordEmail({
+    email: recipient_email, kind: 'friend_request',
+    meta: { requester_email },
   })
 
   return new Response(JSON.stringify({ ok: true }), {

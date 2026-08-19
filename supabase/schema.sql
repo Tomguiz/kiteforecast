@@ -533,3 +533,37 @@ CREATE TABLE IF NOT EXISTS broadcast_sends (
 ALTER TABLE broadcast_sends ENABLE ROW LEVEL SECURITY;
 -- No policies: only the service role writes here, and the service role bypasses
 -- RLS. Enabling it with zero policies denies anon/authenticated outright.
+
+-- ---------------------------------------------------------------------------
+-- Outgoing email log
+-- ---------------------------------------------------------------------------
+-- Every email this project sends goes out through the Make.com webhook, and
+-- until now nothing recorded that it happened: reminders, digests and notifies
+-- were fire-and-forget. That made "what have we sent this rider?" unanswerable,
+-- and left onboarding-style emails with no way to know they had already gone.
+--
+-- One row per recipient per send. Written by the edge functions with the service
+-- role; never written from the browser.
+CREATE TABLE IF NOT EXISTS email_log (
+  id        uuid        PRIMARY KEY DEFAULT gen_random_uuid(),
+  email     text        NOT NULL,
+  kind      text        NOT NULL,   -- mirrors the payload's notification_type
+  campaign  text,                   -- set for one-off blasts, null for the rest
+  meta      jsonb,                  -- spot name, session date, … for context
+  sent_at   timestamptz NOT NULL DEFAULT now()
+);
+
+-- The Users panel reads "everything sent to this rider, newest first".
+CREATE INDEX IF NOT EXISTS email_log_email_sent_idx ON email_log (email, sent_at DESC);
+-- "Has this rider had the onboarding email?" — the dedupe check.
+CREATE INDEX IF NOT EXISTS email_log_kind_email_idx ON email_log (kind, email);
+
+ALTER TABLE email_log ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  -- Same shape as profiles/reminders/favourites: your own row, or any row if
+  -- admin. No insert/update/delete policies at all — only the service role
+  -- writes here, and it bypasses RLS.
+  CREATE POLICY "email_log_select_own" ON email_log FOR SELECT TO authenticated
+    USING (email = auth_email() OR is_admin());
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;

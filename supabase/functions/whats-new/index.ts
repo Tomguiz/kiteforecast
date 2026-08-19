@@ -18,6 +18,7 @@ import {
   resolveTier, buildPersonalHtml, buildYourSpotsHtml,
   type ProfileLike, type Tier,
 } from './content.ts'
+import { recordEmail } from '../_shared/email-log-client.ts'
 import { isServiceRoleCaller } from '../_shared/service-role-auth.ts'
 
 const SUPABASE_URL         = Deno.env.get('SUPABASE_URL')!
@@ -154,6 +155,11 @@ Deno.serve(async (req) => {
       failures.push({ email, reason: String(e) })
       continue
     }
+
+    // broadcast_sends is the dedupe ledger for *this* campaign; email_log is the
+    // rider-facing history the admin panel reads. Both, deliberately: the first
+    // must stay a tight (campaign, email) key, the second spans every email type.
+    await recordEmail({ email, kind: 'whats_new', campaign, meta: { tier } })
 
     const { error: recErr } = await supabase
       .from('broadcast_sends').insert({ campaign, email })

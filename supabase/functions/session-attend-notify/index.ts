@@ -1,5 +1,6 @@
 // Notifies friends when a user confirms they're going kiting
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { recordEmails } from '../_shared/email-log-client.ts'
 
 const MAKE_WEBHOOK_URL = 'https://hook.eu1.make.com/6t9fgm6btixri2wf5lnx47requf416vs'
 const SUPABASE_URL     = Deno.env.get('SUPABASE_URL')     ?? 'https://kpwmajtxmcfpakvonimf.supabase.co'
@@ -83,6 +84,13 @@ Deno.serve(async (req) => {
   })
 
   await Promise.all(sends)
+
+  // One row per friend notified, in a single insert. Never throws.
+  await recordEmails((friends || []).map((friend: any) => ({
+    email: friend.email,
+    kind:  'session_attendance',
+    meta:  { spot_name, session_date: dateLabel, attendee_nickname: nickname },
+  })))
 
   return new Response(JSON.stringify({ ok: true, notified: sends.length }), {
     headers: { 'Content-Type': 'application/json', ...CORS },
