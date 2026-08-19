@@ -128,6 +128,9 @@ test('saving the admin form sends the attribute fields to spot_info', async ({ g
     // also select a facility + crowd so the payload has both array + scalar
     (document.querySelector('#adFacilities .s-btn[data-val="Kiteshop"]') as HTMLButtonElement).click();
     (document.querySelector('#adCrowdLevel .s-btn[data-val="Crowded"]') as HTMLButtonElement).click();
+    // A spot needs at least one good wind direction to be saveable
+    // (see wind-dirs-required.spec.ts); this test is about the other fields.
+    (document.querySelector('#adDirBtns .s-btn') as HTMLElement).classList.add('active');
   });
   const req = page.waitForRequest(r =>
     r.url().includes('/rest/v1/spot_info') && (r.method() === 'POST' || r.method() === 'PATCH'));
