@@ -4233,7 +4233,6 @@ async function renderSpotInfoCard(spotName) {
   const facebookUrl  = safeHttpUrl(info.facebook_url);
   if(instagramUrl) socialLinks.push(`<a href="${escFriendName(instagramUrl)}" target="_blank" rel="noopener" data-cta="instagram">📸 Instagram</a>`);
   if(facebookUrl) socialLinks.push(`<a href="${escFriendName(facebookUrl)}" target="_blank" rel="noopener" data-cta="facebook">👥 Facebook</a>`);
-  if(livecamUrl) socialLinks.push(`<a href="${escFriendName(livecamUrl)}" target="_blank" rel="noopener" data-cta="livecam">📷 Live cam</a>`);
   const socialHTML = socialLinks.length ? `<div class="spot-info-social">${socialLinks.join('')}</div>` : '';
 
   const descHTML = info.description ? `<p style="margin:0;font-size:.78rem;color:var(--gray);line-height:1.6;">${escFriendName(info.description)}</p>` : '';

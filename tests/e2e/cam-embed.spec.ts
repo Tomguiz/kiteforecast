@@ -103,3 +103,31 @@ test('a lone live-wind CTA fills the row instead of half of it', async ({ gotoAp
   });
   expect(btn).toBeGreaterThan(row * 0.9);
 });
+
+// A spot with a webcam used to render TWO links to the identical URL: the
+// prominent "Live action on the spot — webcam" CTA, and a second "📷 Live cam"
+// chip tucked in among the Instagram/Facebook social links. Same href, two
+// buttons, no way to tell them apart.
+test('a webcam URL yields exactly one clickable link, not two', async ({ gotoApp, page }) => {
+  await gotoApp('signedOut');
+  await page.evaluate(() => {
+    (window as any).fetchSpotInfo = async () => ({
+      spot_name: 'Cam Spot', verified: true,
+      // a non-embeddable page, so the CTA stays a link rather than an iframe
+      livecam_url: 'https://www.clubnorthzeebrugge.be/meteo-webcam',
+      instagram_url: 'https://instagram.com/example',
+    });
+  });
+  await page.evaluate(async () => {
+    await renderSpotInfoCard('Cam Spot');
+    document.getElementById('results')!.style.display = 'block';
+  });
+  await page.locator('.spot-info-header').click();
+
+  expect(await page.locator('a[data-cta="livecam"]').count()).toBe(1);
+  // the surviving one is the descriptive CTA, not the social-row chip
+  await expect(page.locator('a[data-cta="livecam"]')).toContainText('Live action on the spot');
+  // the social row still carries the links that genuinely belong to it
+  await expect(page.locator('.spot-info-social')).toContainText('Instagram');
+  expect(await page.locator('.spot-info-social a[data-cta="livecam"]').count()).toBe(0);
+});
