@@ -130,7 +130,9 @@ Deno.serve(async (req) => {
       home_setup_link:  PROFILE_URL,
       personal_html:    buildPersonalHtml(prof, { replyTo: REPLY_TO, upgradeUrl: PROFILE_URL, now }),
       your_spots_html:  buildYourSpotsHtml(favsByEmail.get(email) ?? [], APP_BASE),
-      unsubscribe_link: `${SUPABASE_URL}/functions/v1/unsubscribe?t=${prof.unsubscribe_token}`,
+      // Points at the static page, not the function: Supabase Edge Functions
+      // rewrite text/html to text/plain, so the function can only serve JSON.
+      unsubscribe_link: `${APP_BASE}unsubscribe.html?t=${prof.unsubscribe_token}`,
     }
 
     if (dryRun) { sent++; continue }
