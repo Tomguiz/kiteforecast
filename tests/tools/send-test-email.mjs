@@ -36,7 +36,14 @@ const rh = Number(hours)
 const date = new Date(Date.now() + rh * 3600 * 1000)
 const dateStr = date.toISOString().slice(0, 10)
 const base = 'https://tomguiz.github.io/kiteforecast/'
-const spot = 'TEST — ignore this email'
+
+// The Make.com scenario de-duplicates against a Google Sheet, matching on
+// email + spot + date_label + reminder_label all at once. reminder_label only
+// encodes the hour, so two runs at the same --template — even ON then OFF —
+// collide on all four and the second is silently suppressed as a duplicate.
+// A per-run token in the spot name keeps every send distinct.
+const token = Math.random().toString(36).slice(2, 6).toUpperCase()
+const spot = `TEST ${tpl} ${token} — ignore this email`
 
 // ON vs OFF is NOT a payload field — notif_type only ever carries 'spot' or
 // 'day'. The Make.com scenario picks reminderON<h> vs reminderOFF<h> from the
@@ -80,6 +87,7 @@ const payload = {
 }
 
 console.log(`template : reminder${tpl} (the scenario picks ON/OFF from the session figures)`)
+console.log(`spot     : ${spot}`)
 console.log(`recipient: ${email}   (1 recipient)`)
 console.log(`webhook  : ${WEBHOOK}`)
 
