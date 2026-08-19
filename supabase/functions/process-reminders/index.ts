@@ -6,6 +6,7 @@ import {
   fetchStations, nearestStation, toLiveWind,
   type LiveWind, type RwsStation, type FetchLike,
 } from '../_shared/rws.ts'
+import { renderLiveHtml } from '../_shared/live-html.ts'
 
 const SUPABASE_URL            = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_KEY    = Deno.env.get('SB_SERVICE_ROLE_KEY')!
@@ -101,39 +102,6 @@ function fmtDateLabel(dateStr: string): string {
   return new Date(dateStr + 'T12:00:00').toLocaleDateString('en', {
     weekday: 'long', month: 'long', day: 'numeric', year: 'numeric'
   })
-}
-
-const COMPASS_8 = ['N','NE','E','SE','S','SW','W','NW']
-const dirLabel = (deg: number | null) =>
-  deg === null ? '' : COMPASS_8[Math.round(((deg % 360) + 360) % 360 / 45) % 8]
-
-// stationName is the one genuinely untrusted value in this payload: it comes
-// from a third-party feed via cleanName(), which does no sanitisation. Every
-// other interpolation below is a generated numeral or a literal from this file.
-function escHtml(s: string): string {
-  return String(s)
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;').replace(/'/g, '&#39;')
-}
-
-// Rendered server-side and injected whole, because the Make.com template is a
-// flat replace() chain with no conditional logic — an empty string here makes
-// the block vanish. See docs/superpowers/specs/2026-08-16-rws-live-wind-design.md
-//
-// The label is deliberately neutral: this same block renders inside the SESSION
-// OFF 1h email too ("the wind never showed"), where "Measured right now — 22 kn"
-// would read as a self-contradiction. One label serves both, no ON/OFF branch.
-function renderLiveHtml(live: LiveWind): string {
-  const gust = live.gustKn === null ? '' : ` &middot; gusts ${live.gustKn} kn`
-  const dir  = live.dirDeg === null ? '' : ` ${dirLabel(live.dirDeg)}`
-  const age  = live.ageMin <= 1 ? 'just now' : `${live.ageMin} min ago`
-  return `<tr>
-          <td style="background-color:#0f1520;border:1px solid #1e2535;border-top:none;padding:16px 32px;">
-            <p style="margin:0 0 10px 0;font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#4a5568;">&#127788; Current reading at the nearest mast</p>
-            <p style="margin:0;font-family:'DM Sans',Arial,sans-serif;font-size:22px;font-weight:700;color:#5dd4f0;">${live.speedKn} kn${dir}${gust}</p>
-            <p style="margin:6px 0 0 0;font-size:11px;color:#4a5568;">${escHtml(live.stationName)} &middot; ${live.distanceKm.toFixed(1)} km away &middot; ${age}</p>
-          </td>
-        </tr>`
 }
 
 // ── MAIN HANDLER ──
