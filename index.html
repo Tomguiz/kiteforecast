@@ -1301,7 +1301,7 @@
         <a href="https://maps.google.com" target="_blank" rel="noopener" id="suggestMapsLink" onclick="this.href=spotMapsSearchUrl()" style="display:inline-flex;align-items:center;gap:5px;margin-top:-4px;padding:6px 12px;background:rgba(0,212,255,.1);border:1px solid rgba(0,212,255,.25);border-radius:8px;font-size:.72rem;font-weight:700;color:var(--accent);text-decoration:none">🗺️ Or check the location on Google Maps</a>
 
         <div>
-          <label class="pp-label">Good wind directions <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(optional — tap to toggle)</span></label>
+          <label class="pp-label">Good wind directions <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(required — tap to toggle, pick at least one)</span></label>
           <div id="suggestDirBtns" style="display:flex;flex-wrap:wrap;gap:6px"></div>
         </div>
 
@@ -6685,12 +6685,15 @@ async function submitSpotSuggestion(){
   if(!country)                       missing.push(['suggestCountry',   'Country is required']);
   if(!lat||isNaN(parseFloat(lat)))   missing.push(['suggestLat',       'Latitude is required']);
   if(!lon||isNaN(parseFloat(lon)))   missing.push(['suggestLon',       'Longitude is required']);
+  // A spot with no good wind directions can never qualify a session, so it would
+  // be invisible everywhere it matters — chips, reminders, digest. Require one.
+  if(!dirs)                          missing.push(['suggestDirBtns',   'Pick at least one good wind direction']);
   if(missing.length){
     missing.forEach(([id])=>{ const el=$(id); if(el){ el.style.border='1.5px solid #f87171'; el.scrollIntoView({behavior:'smooth',block:'center'}); } });
     showToast('⚠️ '+missing[0][1]);
     return;
   }
-  ['suggestName','suggestLocation','suggestCountry','suggestLat','suggestLon'].forEach(id=>{ const el=$(id); if(el) el.style.border=''; });
+  ['suggestName','suggestLocation','suggestCountry','suggestLat','suggestLon','suggestDirBtns'].forEach(id=>{ const el=$(id); if(el) el.style.border=''; });
 
   // Persist + notify in one call. The DB insert happens server-side inside the
   // edge function (service role) — the client no longer inserts directly,
@@ -7934,7 +7937,7 @@ async function adminOpenSpot(spotName, prefill){
       <label class="pp-label">Description</label>
       <textarea id="adDesc" class="pp-input" rows="3" placeholder="Describe the spot…" style="margin-bottom:10px;resize:vertical;min-height:72px;font-family:inherit;font-size:.85rem">${s?.description||''}</textarea>
 
-      <label class="pp-label">Wind directions</label>
+      <label class="pp-label">Wind directions <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--tdim)">(at least one required)</span></label>
       <div id="adDirBtns" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px;">
         ${DIR_LABELS.map((lbl,i)=>{
           const activeDirs=s?.dirs?.length?s.dirs:(s?._dirs||'').split(',').map(x=>{ const m=DIR_LABELS.indexOf(x.trim()); return m>=0?DIR_DEGS[m]:null; }).filter(x=>x!==null);
@@ -8206,6 +8209,15 @@ async function adminSaveSpotInfo(){
 
   if(isNew&&(!lat||!lon)){ showToast('Latitude and longitude are required for new spots'); if(btn){btn.disabled=false;btn.textContent='Add spot';} return; }
 
+  // Every spot needs at least one good wind direction: hourQualifies() gates on
+  // isWindDirOK(), so a spot with dirs=[] never produces a rideable hour and is
+  // silently absent from chips, reminders and the digest. Read the toggles here
+  // rather than at the write below so we can refuse before any row is touched —
+  // that also stops an edit from wiping the dirs of an existing spot, since the
+  // spot_overrides upsert further down writes dirsArr unconditionally.
+  const dirsArr=[...$('adDirBtns')?.querySelectorAll('.s-btn.active')||[]].map(b=>parseInt(b.dataset.deg));
+  if(!dirsArr.length){ showToast('Pick at least one good wind direction'); $('adDirBtns')?.scrollIntoView({behavior:'smooth',block:'center'}); if(btn){btn.disabled=false;btn.textContent=isNew?'Add spot':'Save changes';} return; }
+
   // For a rename: get coords from existing spot_overrides row
   let renameLat=lat, renameLon=lon, renameLoc=loc;
   if(isRename){
@@ -8269,7 +8281,7 @@ async function adminSaveSpotInfo(){
     if(oe){ showToast('spot_info saved but spot_overrides failed: '+oe.message); }
     const si=SPOTS.findIndex(x=>x.name===spotName);
     if(si>=0){SPOTS[si].loc=finalLoc;}
-    else{SPOTS.push({name:spotName,loc:finalLoc,lat:finalLat,lon:finalLon,dirs:[]});}
+    else{SPOTS.push({name:spotName,loc:finalLoc,lat:finalLat,lon:finalLon,dirs:dirsArr});}
   }
 
   // Mark suggestion as approved, award 5 contribution points, and notify the requester
@@ -8310,8 +8322,7 @@ async function adminSaveSpotInfo(){
       }).catch(()=>{});
   }
 
-  // Save wind dirs to spot_overrides (read from toggle buttons)
-  const dirsArr=[...$('adDirBtns')?.querySelectorAll('.s-btn.active')||[]].map(b=>parseInt(b.dataset.deg));
+  // Save wind dirs to spot_overrides (dirsArr was read + validated up top)
   const dirsLat=finalLat||cachedLoc?.latitude||null;
   const dirsLon=finalLon||cachedLoc?.longitude||null;
   if(dirsLat&&dirsLon){

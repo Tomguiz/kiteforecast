@@ -75,6 +75,9 @@ test('the admin edit form prefills and saves the live-wind URL', async ({ gotoAp
       spot_name: 'Wind Spot', _lat: 51, _lon: 3, _loc: 'BE',
       live_wind_url: 'https://windy.example/wind-spot',
     });
+    // A spot needs at least one good wind direction to be saveable
+    // (see wind-dirs-required.spec.ts); this test is about the other fields.
+    (document.querySelector('#adDirBtns .s-btn') as HTMLElement).classList.add('active');
   });
   await expect(page.locator('#adLiveWind')).toHaveValue('https://windy.example/wind-spot');
 
