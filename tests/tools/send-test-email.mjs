@@ -46,9 +46,12 @@ const token = Math.random().toString(36).slice(2, 6).toUpperCase()
 const spot = `TEST ${tpl} ${token} — ignore this email`
 
 // ON vs OFF is NOT a payload field — notif_type only ever carries 'spot' or
-// 'day'. The Make.com scenario picks reminderON<h> vs reminderOFF<h> from the
-// session figures, so --template OFF<h> sends a payload describing a session
-// that never materialised and lets the scenario reach its own conclusion.
+// 'day'. The Make.com router branches on session.rating CONTAINING ✅ or ❌,
+// and rateDay() in process-reminders always prefixes one or the other. A
+// rating without the emoji matches neither route, so the bundle is logged to
+// the sheet and then silently dropped with no email sent and no error — which
+// is indistinguishable from "the mail did not arrive". Keep these strings in
+// the shape rateDay() actually emits.
 const dead = onOff === 'OFF'
 
 const payload = {
@@ -69,15 +72,15 @@ const payload = {
   session: dead ? {
     start_time: `${dateStr}T11:00`, end_time: '',
     start_time_formatted: '11:00', end_time_formatted: '',
-    duration_hours: 0, wind_speed_peak_kn: 9, wind_speed_min_kn: 4,
-    wind_gusts_kn: 12, wind_direction: 'SE', wind_consistency_pct: 18,
-    rating: 'Too light',
+    duration_hours: 0, wind_speed_peak_kn: 12, wind_speed_min_kn: 5,
+    wind_gusts_kn: 15, wind_direction: 'SE', wind_consistency_pct: 18,
+    rating: '❌ Too light',
   } : {
     start_time: `${dateStr}T11:00`, end_time: `${dateStr}T16:00`,
     start_time_formatted: '11:00', end_time_formatted: '16:00',
     duration_hours: 5, wind_speed_peak_kn: 24, wind_speed_min_kn: 17,
     wind_gusts_kn: 29, wind_direction: 'SW', wind_consistency_pct: 82,
-    rating: 'Strong',
+    rating: '✅ 5h · Very Good',
   },
   conditions: {
     weather: 'Partly cloudy', temperature_max_c: 23, temperature_min_c: 16,
