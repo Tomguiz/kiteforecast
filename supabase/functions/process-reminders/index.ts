@@ -4,7 +4,7 @@ import {
 } from '../_shared/rideability.ts'
 import {
   fetchStations, nearestStation, toLiveWind,
-  type LiveWind, type RwsStation, type FetchLike,
+  type RwsStation, type FetchLike,
 } from '../_shared/rws.ts'
 import { renderLiveHtml } from '../_shared/live-html.ts'
 
