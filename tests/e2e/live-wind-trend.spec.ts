@@ -61,5 +61,67 @@ test('the panel says what window the line covers and how high the wind got', asy
   });
   const html = await page.locator('#liveWindPanel').innerHTML();
   expect(html).toContain('last 3h');
-  expect(html).toContain('8 kn');   // the window's high, labelled on the axis
+  expect(html).toContain('8 kn');   // the window's high, marked on the line
+  // and it arrives as a positioned overlay, not as text inside the stretched SVG
+  expect(html).toMatch(/position:absolute;[^"]*top:[\d.]+px/);
+});
+
+// ── Peak / trough markers ──
+//
+// The corner label used to read "19–25 kn", which says what the wind did but
+// never when it did it. The high and low are now marked on the line itself.
+// They are HTML rather than SVG because the trend SVG is drawn with
+// preserveAspectRatio="none" across the full card width — a <circle> inside it
+// comes out an ellipse and text comes out stretched.
+
+test('marks the high and the low with their values', async ({ gotoApp, page }) => {
+  await gotoApp('signedOut');
+  const html = await page.evaluate(() => rwsTrendPeaks([12, 18, 25, 20, 14]));
+  expect(html).toContain('25 kn');
+  expect(html).toContain('12 kn');
+  expect(html).toContain('&#8593;');  // ↑ on the peak
+  expect(html).toContain('&#8595;');  // ↓ on the trough
+});
+
+test('puts each marker at the reading it belongs to, not at the ends', async ({ gotoApp, page }) => {
+  await gotoApp('signedOut');
+  // peak is index 2 of 5 → 50%, trough is index 0 → 0%
+  const lefts = await page.evaluate(() =>
+    [...rwsTrendPeaks([12, 18, 25, 20, 14]).matchAll(/left:([\d.]+)%/g)].map(m => parseFloat(m[1])));
+  expect(lefts).toContain(50);
+  expect(lefts).toContain(0);
+});
+
+test('the marker sits on the drawn line, at the same y the SVG plots', async ({ gotoApp, page }) => {
+  await gotoApp('signedOut');
+  const { markerTop, svgY } = await page.evaluate(() => {
+    const data = [12, 18, 25, 20, 14];
+    // the peak marker's own top, and the y the polyline uses for that point
+    const markerTop = parseFloat(rwsTrendPeaks(data).match(/top:([\d.]+)px/)![1]);
+    const pts = [...rwsTrendSVG(data).matchAll(/([\d.]+),([\d.]+)/g)].map(m => parseFloat(m[2]));
+    return { markerTop, svgY: Math.min(...pts) };   // peak = smallest y
+  });
+  expect(markerTop).toBeCloseTo(svgY, 1);
+});
+
+test('a flat window names one value, not a high and a low that are equal', async ({ gotoApp, page }) => {
+  await gotoApp('signedOut');
+  const html = await page.evaluate(() => rwsTrendPeaks([7, 7, 7]));
+  expect(html).toContain('7 kn');
+  expect(html).not.toContain('&#8595;');            // no trough marker
+  expect(html.match(/7 kn/g)).toHaveLength(1);
+});
+
+test('a marker near the right edge flips its label inward', async ({ gotoApp, page }) => {
+  await gotoApp('signedOut');
+  // peak at the last reading — a label drawn rightward would leave the card
+  const html = await page.evaluate(() => rwsTrendPeaks([10, 12, 14, 30]));
+  expect(html).toContain('right:0.00%');
+  expect(html).toContain('30 kn');
+});
+
+test('renders nothing when there is no line to mark', async ({ gotoApp, page }) => {
+  await gotoApp('signedOut');
+  const empty = await page.evaluate(() => [rwsTrendPeaks([]), rwsTrendPeaks([9]), rwsTrendPeaks(null)]);
+  expect(empty).toEqual(['', '', '']);
 });

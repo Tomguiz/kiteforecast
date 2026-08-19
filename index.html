@@ -2074,6 +2074,45 @@ function rwsTrendSVG(knArr){
     +`<circle cx="${px(n-1).toFixed(1)}" cy="${py(pts[n-1]).toFixed(1)}" r="2.5" fill="${C}" vector-effect="non-scaling-stroke"/>`
     +`</svg>`;
 }
+// Where the wind peaked and dropped in the window, marked on the line itself.
+//
+// These are HTML, not SVG, on purpose. rwsTrendSVG paints a 280-unit viewBox
+// across the full card width with preserveAspectRatio="none", so everything
+// inside it is squashed horizontally — that is why the "now" dot renders as a
+// dash rather than a circle. A dot drawn here stays round and a label stays
+// readable at any card width. The maths mirrors rwsTrendSVG's px()/py() so the
+// markers land exactly on the drawn line: x as a percentage of the same
+// i/(n-1) step, y in px against the same fixed 44px height.
+function rwsTrendPeaks(knArr){
+  const pts=(knArr||[]).filter(v=>v!=null&&!isNaN(v));
+  if(pts.length<2) return '';
+  const {lo,hi}=rwsTrendRange(pts);
+  const H=RWS_TREND_H, PAD=RWS_TREND_PAD, n=pts.length;
+  let iMax=0,iMin=0;
+  for(let i=1;i<n;i++){ if(pts[i]>pts[iMax]) iMax=i; if(pts[i]<pts[iMin]) iMin=i; }
+  const marks=[{i:iMax,kn:pts[iMax],up:true}];
+  // A dead-flat window has one value, not a high and a low worth naming twice.
+  if(Math.round(pts[iMax])!==Math.round(pts[iMin])) marks.push({i:iMin,kn:pts[iMin],up:false});
+  return marks.map(({i,kn,up})=>{
+    const leftPct=i/(n-1)*100;
+    const top=H-PAD-((kn-lo)/(hi-lo))*(H-2*PAD);
+    // Flip the label to the dot's left once the point sits in the right-hand
+    // third, so a peak at "now" cannot spill outside the card.
+    const flip=leftPct>66;
+    const side=flip?`right:${(100-leftPct).toFixed(2)}%;margin-right:7px;`
+                   :`left:${leftPct.toFixed(2)}%;margin-left:7px;`;
+    // The label sits over the filled area, so it carries its own shadow rather
+    // than relying on contrast with whatever the line is doing underneath.
+    const dim=up?'':'opacity:.8;';
+    return `<span style="position:absolute;left:${leftPct.toFixed(2)}%;top:${top.toFixed(1)}px;`
+         +`width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;background:#5dd4f0;`
+         +`box-shadow:0 0 0 2px rgba(11,16,23,.85);${dim}"></span>`
+         +`<span style="position:absolute;${side}top:${top.toFixed(1)}px;transform:translateY(-50%);`
+         +`font-size:10px;font-weight:700;color:#5dd4f0;white-space:nowrap;pointer-events:none;`
+         +`text-shadow:0 1px 3px rgba(11,16,23,.95),0 0 6px rgba(11,16,23,.9);${dim}">`
+         +`${up?'&#8593;':'&#8595;'} ${Math.round(kn)} kn</span>`;
+  }).join('');
+}
 // Which spot the panel currently shows, and the exact markup it shows. Both
 // are needed because renderGrid() — which calls this — fires from ~10 unrelated
 // interactions (bell toggles, attendance confirm/cancel, notification changes,
@@ -2104,13 +2143,12 @@ async function renderLiveWindPanel(spot){
   const trend=await _rwsTrend(live.stationId);
   if(myGen!==_fetchGen) return;           // spot changed while the trend request was in flight
   const spark=rwsTrendSVG(trend);
-  // A line with no axis is decoration. These two labels are what make it
-  // readable: what span it covers, and how high and low the wind ran in it.
+  // A line with no axis is decoration. The span label says what window it
+  // covers; the high/low now sit on the line itself (rwsTrendPeaks) rather than
+  // as a "19–25 kn" range in the corner, which said what the wind did but never
+  // when it did it.
   const trendLabels=spark
-    ?`<div style="display:flex;justify-content:space-between;font-size:10px;color:#4a5568;margin-bottom:2px">`
-      +`<span>last 3h</span>`
-      +`<span>${Math.round(Math.min(...trend))}–${Math.round(Math.max(...trend))} kn</span>`
-     +`</div>`
+    ?`<div style="font-size:10px;color:#4a5568;margin-bottom:2px">last 3h</div>`
     :'';
   const dir=live.dirDeg===null?'':` ${['N','NE','E','SE','S','SW','W','NW'][Math.round(((live.dirDeg%360)+360)%360/45)%8]}`;
   const gust=live.gustKn===null?'':` · gusts ${live.gustKn} kn`;
@@ -2121,7 +2159,7 @@ async function renderLiveWindPanel(spot){
   paint(`<div class="spot-info-card" style="padding:14px 16px">
     <div style="font-size:10px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:#4a5568;margin-bottom:6px">🌬 Measured right now</div>
     <div style="font-size:22px;font-weight:700;color:#5dd4f0">${live.speedKn} kn${dir}${gust}</div>
-    ${spark?`<div style="margin:8px 0">${trendLabels}${spark}</div>`:''}
+    ${spark?`<div style="margin:8px 0">${trendLabels}<div style="position:relative">${spark}${rwsTrendPeaks(trend)}</div></div>`:''}
     <div style="font-size:11px;color:#4a5568">${escFriendName(live.stationName)} · ${live.distanceKm.toFixed(1)} km away · ${age}</div>
   </div>`);
 }
@@ -4240,7 +4278,6 @@ async function renderSpotInfoCard(spotName) {
   const facebookUrl  = safeHttpUrl(info.facebook_url);
   if(instagramUrl) socialLinks.push(`<a href="${escFriendName(instagramUrl)}" target="_blank" rel="noopener" data-cta="instagram">📸 Instagram</a>`);
   if(facebookUrl) socialLinks.push(`<a href="${escFriendName(facebookUrl)}" target="_blank" rel="noopener" data-cta="facebook">👥 Facebook</a>`);
-  if(livecamUrl) socialLinks.push(`<a href="${escFriendName(livecamUrl)}" target="_blank" rel="noopener" data-cta="livecam">📷 Live cam</a>`);
   const socialHTML = socialLinks.length ? `<div class="spot-info-social">${socialLinks.join('')}</div>` : '';
 
   const descHTML = info.description ? `<p style="margin:0;font-size:.78rem;color:var(--gray);line-height:1.6;">${escFriendName(info.description)}</p>` : '';
