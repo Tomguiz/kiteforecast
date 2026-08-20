@@ -1,9 +1,5 @@
 import type { LiveWind } from './rws.ts'
 
-const COMPASS_8 = ['N','NE','E','SE','S','SW','W','NW']
-export const dirLabel = (deg: number | null) =>
-  deg === null ? '' : COMPASS_8[Math.round(((deg % 360) + 360) % 360 / 45) % 8]
-
 // stationName is the one genuinely untrusted value in this payload: it comes
 // from a third-party feed via cleanName(), which does no sanitisation. Every
 // other interpolation below is a generated numeral or a literal from this file.
@@ -34,7 +30,12 @@ const LIVE_BADGE =
 // than passing a verdict on it.
 export function renderLiveHtml(live: LiveWind): string {
   const gust = live.gustKn === null ? '' : ` &middot; gusts ${live.gustKn} kn`
-  const dir  = live.dirDeg === null ? '' : ` ${dirLabel(live.dirDeg)}`
+  // The exact degree, not an 8-point compass letter. A letter hides where the
+  // wind sits inside its 45-degree sector, which is precisely what decides
+  // whether the spot's direction rule matches — the app shows degrees for the
+  // same reason (WIND_DIR_TOLERANCE_DEG is 30, so "W" spans both sides of the
+  // threshold). &deg; rather than a literal ° for older mail clients.
+  const dir  = live.dirDeg === null ? '' : ` ${Math.round(live.dirDeg)}&deg;`
   const age  = live.ageMin <= 1 ? 'just now' : `${live.ageMin} min ago`
   return `<tr>
           <td style="background-color:#0f1520;border:1px solid #1e2535;border-top:none;padding:16px 32px;">
