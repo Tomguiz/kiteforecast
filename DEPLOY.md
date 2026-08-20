@@ -34,6 +34,49 @@ running.
   set to `version: latest`, which resolves the release through an
   unauthenticated GitHub API call, and that call was rate-limited. The workflow
   now pins a version. Bump it deliberately.
+- **2026-08-20** — the merge of #48 emitted **no push event at all**. Not one
+  workflow ran: no `tests`, no `pages-build-deployment`, no `deploy-functions`.
+  The PR said "merged", `origin/main` had the commit, and nothing shipped. The
+  change had touched both `index.html` and `_shared/rideability.ts`, so the two
+  halves of one rule drifted apart in production: the edge functions were
+  redeployed by hand to a 30-degree tolerance while Pages still served the
+  build from the previous day at 22.5. See **When a push event goes missing**.
+
+## When a push event goes missing
+
+Everything here triggers on `push` to `main`. If GitHub does not emit that
+event, every job is skipped silently — there is no failed run to notice,
+because there is no run. A green PR page proves the merge, never the deploy.
+
+Check what is actually being served, not what `git log` says:
+
+```bash
+curl -sI https://tomguiz.github.io/kiteforecast/index.html | grep -i last-modified
+gh run list --limit 5 --json headSha,workflowName,status \
+  -q '.[]|"\(.headSha[0:7]) \(.workflowName) \(.status)"'
+```
+
+If `last-modified` predates the merge, or no run lists the merge commit's SHA,
+nothing shipped.
+
+Re-triggering differs per workflow, because only one of them can be dispatched:
+
+```bash
+# deploy-functions HAS workflow_dispatch — just re-run it
+gh workflow run deploy-functions --ref main
+
+# pages-build-deployment is GitHub-generated and has NO workflow_dispatch
+# (dispatching it returns HTTP 422). It needs a real push:
+git commit --allow-empty -m "chore(ci): re-trigger the deploy chain"
+git push origin main
+```
+
+An empty commit is the only lever for Pages. That is a deliberate exception to
+the PR-only flow: no PR can fix a push event that was never emitted.
+
+**Deploy a rule that lives in two places all at once.** `rideability.ts` and
+`index.html` hold the same wind rule. Half-deployed, the app and the emails
+disagree — which is the exact bug the shared module was created to prevent.
 
 ## Schema: applied by hand
 
@@ -113,6 +156,14 @@ looks gated on a device, check the served file before suspecting the code:
 ```bash
 curl -s https://tomguiz.github.io/kiteforecast/ | grep -o "NEARBY_RELEASED = [a-z]*"
 ```
+
+## Checklist after any merge to `main`
+
+- [ ] A run exists for the merge commit's SHA (`gh run list`)
+- [ ] `last-modified` on the live `index.html` is newer than the merge
+- [ ] If functions changed, `supabase functions list` post-dates the commit
+- [ ] If the change spans `index.html` **and** `supabase/functions/**`, confirm
+      both halves shipped before calling it done
 
 ## Checklist when adding a column or table
 
