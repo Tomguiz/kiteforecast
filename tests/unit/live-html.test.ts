@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { renderLiveHtml, dirLabel, escHtml } from '../../supabase/functions/_shared/live-html.ts'
+import { renderLiveHtml, escHtml } from '../../supabase/functions/_shared/live-html.ts'
 import type { LiveWind } from '../../supabase/functions/_shared/rws.ts'
 
 const base: LiveWind = {
@@ -42,12 +42,12 @@ describe('renderLiveHtml — LIVE badge', () => {
 
 describe('renderLiveHtml — reading', () => {
   it('renders speed, direction and gusts', () => {
-    expect(renderLiveHtml(base)).toContain('22 kn W &middot; gusts 26 kn')
+    expect(renderLiveHtml(base)).toContain('22 kn 270&deg; &middot; gusts 26 kn')
   })
 
   it('omits gusts when the gust feed had no entry for the station', () => {
     const html = renderLiveHtml({ ...base, gustKn: null })
-    expect(html).toContain('22 kn W')
+    expect(html).toContain('22 kn 270&deg;')
     expect(html).not.toContain('gusts')
   })
 
@@ -71,18 +71,30 @@ describe('renderLiveHtml — reading', () => {
   })
 })
 
-describe('dirLabel', () => {
-  it('maps degrees onto the 8-point compass', () => {
-    expect(dirLabel(0)).toBe('N')
-    expect(dirLabel(270)).toBe('W')
-    expect(dirLabel(350)).toBe('N')
+// The email used to render an 8-point compass letter. A letter hides where the
+// wind actually sits inside its 45-degree sector, which is exactly what decides
+// whether a spot's direction rule matches: with a 30-degree tolerance, a spot
+// listed "W" accepts 250 but refuses 235 — both of which print as "W". The app
+// shows the degree for the same reason, so the two now agree.
+describe('renderLiveHtml — direction', () => {
+  it('prints the exact degree, not a compass letter', () => {
+    const html = renderLiveHtml({ ...base, dirDeg: 250.1 })
+    expect(html).toContain('250&deg;')
+    expect(html).not.toMatch(/\b(NE|SE|SW|NW)\b/)
   })
-  it('normalises out-of-range degrees', () => {
-    expect(dirLabel(-90)).toBe('W')
-    expect(dirLabel(450)).toBe('E')
+
+  it('rounds to a whole degree rather than showing the raw reading', () => {
+    expect(renderLiveHtml({ ...base, dirDeg: 253.8 })).toContain('254&deg;')
   })
-  it('returns empty for a missing direction', () => {
-    expect(dirLabel(null)).toBe('')
+
+  it('normalises a degree outside 0-360', () => {
+    expect(renderLiveHtml({ ...base, dirDeg: 359.6 })).toContain('360&deg;')
+  })
+
+  it('says nothing at all when the mast reports no direction', () => {
+    const html = renderLiveHtml({ ...base, dirDeg: null })
+    expect(html).not.toContain('&deg;')
+    expect(html).toContain(`${base.speedKn} kn`)
   })
 })
 
