@@ -21,9 +21,14 @@ export function angleDiff(a: number, b: number): number {
 }
 
 // An empty dirs list means "this spot works in any direction".
+// How far the wind may sit from one of a spot's listed good directions and
+// still count. Mirrors WIND_DIR_TOLERANCE_DEG in index.html — if these two
+// diverge, a session the app shows as rideable never produces a reminder.
+export const WIND_DIR_TOLERANCE_DEG = 30
+
 export function isWindDirOK(dir: number, spotDirs: number[]): boolean {
   if (!spotDirs || !spotDirs.length) return true
-  return spotDirs.some(sd => angleDiff(dir, sd) <= 22.5)
+  return spotDirs.some(sd => angleDiff(dir, sd) <= WIND_DIR_TOLERANCE_DEG)
 }
 
 // Mirrors index.html `hourQualifies`.

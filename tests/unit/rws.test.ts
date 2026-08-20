@@ -331,13 +331,19 @@ describe('isFiringNow', () => {
     expect(isFiringNow(25, 90, DIRS)).toBe(false)
   })
 
-  // Tolerance is +/-22.5 deg per good dir. Tested against a SINGLE-dir spot on
-  // purpose: with [270,315] the two tolerance bands touch (247.5 -> 337.5 is
-  // continuous), so no direction between them can ever be excluded and the
-  // boundary would be untestable.
-  it('accepts a direction within 22.5 degrees of a good dir', () => {
-    expect(isFiringNow(20, 292, [270])).toBe(true)   // 22 deg off
-    expect(isFiringNow(20, 293, [270])).toBe(false)  // 23 deg off
+  // Tolerance is +/-30 deg per good dir. Tested against a SINGLE-dir spot on
+  // purpose: with [270,315] the two tolerance bands overlap, so no direction
+  // between them can ever be excluded and the boundary would be untestable.
+  it('accepts a direction within 30 degrees of a good dir', () => {
+    expect(isFiringNow(20, 300, [270])).toBe(true)   // 30 deg off, on the edge
+    expect(isFiringNow(20, 301, [270])).toBe(false)  // 31 deg off
+  })
+
+  // Riverwoods, live: 23 kn at 250.1 deg on a spot listed [270, 315]. Under
+  // the old +/-22.5 rule a swing to 246 deg silently stopped it firing.
+  it('fires on the WSW the old tolerance turned away', () => {
+    expect(isFiringNow(23, 250.1, [270, 315])).toBe(true)
+    expect(isFiringNow(26, 246.3, [270, 315])).toBe(true)
   })
 
   it('has continuous cover between two good dirs 45 deg apart', () => {

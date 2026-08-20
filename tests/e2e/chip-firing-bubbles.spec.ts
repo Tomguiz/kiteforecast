@@ -1,7 +1,7 @@
 import { test, expect } from '../fixtures/auth';
 
 // Favourite chips carry two independent signals:
-//   🔥 21 kn  — measured wind at a station within 30km, at or above 15kn
+//   🔥 21 kn 270°  — measured wind at a station within 30km, at or above 15kn
 //   (J)(M)    — one bubble per friend confirmed for today, initial only
 // They are deliberately independent: a mate going matters on a light day, and
 // wind matters with nobody going.
@@ -9,12 +9,13 @@ import { test, expect } from '../fixtures/auth';
 async function seedChip(page: any, opts: {
   live?: { speedKn: number; dirDeg: number | null } | null;
   friends?: string[];
+  dirs?: number[];
 }) {
   await page.evaluate(async (o: any) => {
     // @ts-expect-error app global
     await (window as any)._spotsReady;
     // @ts-expect-error app global
-    saveFavs([{ name: 'Riverwoods Beachclub', label: 'Riverwoods', lat: 51.3627, lon: 3.3062, dirs: [270, 315] }]);
+    saveFavs([{ name: 'Riverwoods Beachclub', label: 'Riverwoods', lat: 51.3627, lon: 3.3062, dirs: o.dirs || [270, 315] }]);
     // @ts-expect-error app global — stub the station lookup, no network in tests
     window._rwsNearest = async () => o.live
       ? { ...o.live, gustKn: null, stationName: 'Cadzand wind', distanceKm: 5.4, ageMin: 2, viewerUrl: 'https://x' }
@@ -33,7 +34,7 @@ test('shows the firing bubble at 15kn from a good direction', async ({ gotoApp, 
   await gotoApp('signedIn');
   await seedChip(page, { live: { speedKn: 21, dirDeg: 270 } });
 
-  await expect(page.locator('.chip-firing')).toHaveText('🔥 21 kn');
+  await expect(page.locator('.chip-firing')).toHaveText('🔥 21 kn 270°');
 });
 
 test('stays quiet below 15kn', async ({ gotoApp, page }) => {
@@ -82,7 +83,7 @@ test('shows both signals together when both are true', async ({ gotoApp, page })
   await gotoApp('signedIn');
   await seedChip(page, { live: { speedKn: 24, dirDeg: 300 }, friends: ['Ced'] });
 
-  await expect(page.locator('.chip-firing')).toHaveText('🔥 24 kn');
+  await expect(page.locator('.chip-firing')).toHaveText('🔥 24 kn 300°');
   await expect(page.locator('.chip-friend')).toHaveText('C');
 });
 
@@ -109,4 +110,30 @@ test('the good-days badge pluralises', async ({ gotoApp, page }) => {
     }, n);
     expect(text).toBe(expected);
   }
+});
+
+// The bubble carries the mast's exact degree, not the 8-point letter. Rounding
+// 250.1° to "W" hid how close a reading sat to the tolerance edge — the number
+// is what tells you the wind is about to swing out of (or into) the spot.
+test('the bubble reports the exact degree the mast measured', async ({ gotoApp, page }) => {
+  await gotoApp('signedIn');
+  await seedChip(page, { live: { speedKn: 23, dirDeg: 250.1 } });
+  await expect(page.locator('.chip-firing')).toHaveText('🔥 23 kn 250°');
+  await expect(page.locator('.chip-firing')).not.toContainText('W');
+});
+
+// 250.1° against a spot listed [270, 315] is 19.9° out — inside the new ±30°
+// but it was inside the old ±22.5° too. 246.3° is the one that changed: the
+// mast 16 km off Riverwoods was reading it while the app said "not ok".
+test('fires on the WSW that the old ±22.5° tolerance turned away', async ({ gotoApp, page }) => {
+  await gotoApp('signedIn');
+  await seedChip(page, { live: { speedKn: 26, dirDeg: 246.3 } });
+  await expect(page.locator('.chip-firing')).toHaveText('🔥 26 kn 246°');
+});
+
+test('still stays quiet once the wind is genuinely off the spot', async ({ gotoApp, page }) => {
+  await gotoApp('signedIn');
+  // 239° is just past the 240° edge of a spot listed 270°
+  await seedChip(page, { live: { speedKn: 26, dirDeg: 239 }, dirs: [270] });
+  await expect(page.locator('.chip-firing')).toHaveCount(0);
 });
