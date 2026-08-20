@@ -125,3 +125,36 @@ test('renders nothing when there is no line to mark', async ({ gotoApp, page }) 
   const empty = await page.evaluate(() => [rwsTrendPeaks([]), rwsTrendPeaks([9]), rwsTrendPeaks(null)]);
   expect(empty).toEqual(['', '', '']);
 });
+
+// The panel reports the mast's exact degree rather than the 8-point letter.
+// "W" covers 247.5°-292.5°, so it could not tell you whether the wind was
+// comfortably inside the spot's tolerance or one gust from falling outside it.
+test('the live panel shows the exact degree, not the compass letter', async ({ gotoApp, page }) => {
+  await gotoApp('signedOut');
+  await page.evaluate(async () => {
+    _rwsTrendCache.set('CAWI', { data: [20, 22, 23], ts: Date.now() });
+    (window as any)._rwsNearest = async () => ({
+      stationId: 'CAWI', stationName: 'Cadzand wind', distanceKm: 5.4,
+      speedKn: 23, gustKn: 28, dirDeg: 250.1, ageMin: 2, viewerUrl: 'https://x',
+    });
+    await renderLiveWindPanel({ name: 'Riverwoods Beachclub', latitude: 51.3627, longitude: 3.3062 });
+  });
+  const html = await page.locator('#liveWindPanel').innerHTML();
+  expect(html).toContain('23 kn 250°');
+  expect(html).not.toContain('23 kn W');
+});
+
+test('a mast with no direction reading just omits it', async ({ gotoApp, page }) => {
+  await gotoApp('signedOut');
+  await page.evaluate(async () => {
+    _rwsTrendCache.set('NODIR', { data: [20, 22], ts: Date.now() });
+    (window as any)._rwsNearest = async () => ({
+      stationId: 'NODIR', stationName: 'Quiet Mast', distanceKm: 3,
+      speedKn: 19, gustKn: null, dirDeg: null, ageMin: 1, viewerUrl: 'https://x',
+    });
+    await renderLiveWindPanel({ name: 'Nodir Spot', latitude: 51.3, longitude: 3.3 });
+  });
+  const html = await page.locator('#liveWindPanel').innerHTML();
+  expect(html).toContain('19 kn');
+  expect(html).not.toContain('°');
+});

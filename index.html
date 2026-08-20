@@ -1966,11 +1966,20 @@ let SMS_RELEASED = false;
 let NEARBY_RELEASED = true;
 
 const FIRING_MIN_KN=15;
+// How far the wind may sit from one of a spot's listed good directions and
+// still count. The dirs are stored on the 8-point compass, so ±22.5° covered
+// exactly one sector with no margin at all: a spot listed W rejected wind at
+// 246° — solid WSW, perfectly rideable — for being 1.2° outside. Two degrees
+// of shift flipped "works" to "no". 30° gives each listed direction a little
+// room either side without swallowing its neighbours whole.
+// Mirrored in supabase/functions/_shared/rideability.ts — the app and the
+// emails must answer this question identically or they contradict each other.
+const WIND_DIR_TOLERANCE_DEG=30;
 function _rwsIsFiringNow(speedKn,dirDeg,spotDirs){
   if(dirDeg===null||dirDeg===undefined) return false;
   if(speedKn<FIRING_MIN_KN) return false;
   if(!spotDirs||!spotDirs.length) return true;   // spot works in any direction
-  return spotDirs.some(sd=>angleDiff(dirDeg,sd)<=22.5);
+  return spotDirs.some(sd=>angleDiff(dirDeg,sd)<=WIND_DIR_TOLERANCE_DEG);
 }
 async function _rwsNearest(lat,lon){
   const sts=await _rwsFetchStations();
@@ -2150,7 +2159,10 @@ async function renderLiveWindPanel(spot){
   const trendLabels=spark
     ?`<div style="font-size:10px;color:#4a5568;margin-bottom:2px">last 3h</div>`
     :'';
-  const dir=live.dirDeg===null?'':` ${['N','NE','E','SE','S','SW','W','NW'][Math.round(((live.dirDeg%360)+360)%360/45)%8]}`;
+  // The exact degree the mast reports, not the 8-point letter. Rounding 250.1°
+  // to "W" hid how close the reading sat to the tolerance edge — the number is
+  // what tells you the wind is about to swing out of (or into) the spot.
+  const dir=live.dirDeg===null?'':` ${Math.round(live.dirDeg)}°`;
   const gust=live.gustKn===null?'':` · gusts ${live.gustKn} kn`;
   const age=live.ageMin<=1?'just now':`${live.ageMin} min ago`;
   // stationName is the ONLY untrusted value here — it comes from a third-party
@@ -2183,7 +2195,7 @@ function dirAnalysis(wd, sf){
 }
 function isWindDirOK(deg){
   if(windDirs.size===0) return true;
-  for(const d of windDirs){ if(angleDiff(deg,d)<=22.5) return true; }
+  for(const d of windDirs){ if(angleDiff(deg,d)<=WIND_DIR_TOLERANCE_DEG) return true; }
   return false;
 }
 // Render the wind-dir section as READ-ONLY chips: only the spot's selected
@@ -3128,7 +3140,7 @@ async function fetchChipQualDays(spot){
     const wx=await safeFetch(`https://api.open-meteo.com/v1/forecast?${p}`,8000);
     if(wx.error) throw new Error(wx.reason);
     const dirs=new Set(spot.dirs&&spot.dirs.length?spot.dirs:[]);
-    const isDirOK=d=>{ if(!dirs.size) return true; for(const sd of dirs) if(angleDiff(d,sd)<=22.5) return true; return false; };
+    const isDirOK=d=>{ if(!dirs.size) return true; for(const sd of dirs) if(angleDiff(d,sd)<=WIND_DIR_TOLERANCE_DEG) return true; return false; };
     // collect each day's daylight hours so both the badge count and the
     // per-day breakdown share the one rideable-day definition (dayGoodHours)
     const dayHoursOf=(dateStr,srH,ssH)=>{
@@ -3200,7 +3212,7 @@ function reconcileChipCacheFromDetail(){
     const dirsStr=dirsArr.slice().sort((a,b)=>a-b).join(',');
     const key=`${lat},${lon}|${dirsStr}`;
     const dirsSet=new Set(dirsArr);
-    const isDirOK=d=>{ if(!dirsSet.size) return true; for(const sd of dirsSet) if(angleDiff(d,sd)<=22.5) return true; return false; };
+    const isDirOK=d=>{ if(!dirsSet.size) return true; for(const sd of dirsSet) if(angleDiff(d,sd)<=WIND_DIR_TOLERANCE_DEG) return true; return false; };
     const dayHoursOf=(dateStr,srH,ssH)=>{
       const out=[];
       wx.hourly.time.forEach((t,j)=>{
@@ -3777,7 +3789,7 @@ function renderHintChips(){
       _rwsNearest(f.lat,f.lon).then(live=>{
         if(!live||!_rwsIsFiringNow(live.speedKn,live.dirDeg,_liveDirs)) return;
         fire.className='chip-firing';
-        fire.textContent=`🔥 ${live.speedKn} kn`;
+        fire.textContent=`🔥 ${live.speedKn} kn${live.dirDeg==null?'':` ${Math.round(live.dirDeg)}°`}`;
         fire.title=`Measured now at ${live.stationName} · ${live.distanceKm.toFixed(1)} km away`;
       }).catch(()=>{});
       // Friend bubbles are independent of wind: a mate going is worth knowing
