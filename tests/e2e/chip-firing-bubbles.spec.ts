@@ -133,7 +133,13 @@ test('fires on the WSW that the old ±22.5° tolerance turned away', async ({ go
 
 test('still stays quiet once the wind is genuinely off the spot', async ({ gotoApp, page }) => {
   await gotoApp('signedIn');
-  // 239° is just past the 240° edge of a spot listed 270°
-  await seedChip(page, { live: { speedKn: 26, dirDeg: 239 }, dirs: [270] });
+  // 135° (SE) is nowhere near Riverwoods' set. Deliberately NOT a near-edge
+  // figure: renderHintChips resolves dirs from the SPOTS catalogue in
+  // preference to the favourite's stored snapshot (`_liveDirs`), so a boundary
+  // case here silently re-aims itself whenever the catalogue data changes —
+  // which is exactly how this test broke when the Belgian coast was widened to
+  // N NE SW W NW. The ±30° edge is pinned on isWindDirOK directly, in
+  // tests/unit/rideability.test.ts, where the dirs are explicit.
+  await seedChip(page, { live: { speedKn: 26, dirDeg: 135 } });
   await expect(page.locator('.chip-firing')).toHaveCount(0);
 });
