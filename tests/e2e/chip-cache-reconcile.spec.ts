@@ -8,7 +8,9 @@ import { test, expect } from '../fixtures/auth';
 // Fix: opening a spot reconciles that spot's chip cache from the SAME fresh
 // data the detail page just fetched, so the two views always agree.
 
-// Riverwoods Beachclub — a static SPOT with good dirs W(270)/NW(315).
+// Riverwoods Beachclub — a catalogue SPOT. Its dirs are read from SPOTS at
+// runtime rather than written out here: the chip cache keys on them, so a
+// hardcoded pair silently stops matching the moment the spot is edited.
 const SPOT = { name: 'Riverwoods Beachclub', lat: 51.3627, lon: 3.3062 };
 
 // Build an Open-Meteo forecast where day index 2 has a clearly rideable
@@ -64,24 +66,33 @@ test('opening a spot reconciles its homepage badge with the fresh forecast', asy
   // Seed a STALE chip cache entry: 0 good days for this spot, under the spot's
   // real dirs key. This mimics a badge computed before the forecast revised up.
   await page.evaluate((s) => {
-    const key = `${s.lat},${s.lon}|270,315`;
+    // Key off the catalogue's own dirs, not a hardcoded pair — the chip builds
+    // its key from SPOTS, so a literal here goes stale the moment the spot's
+    // directions are edited.
+    // @ts-expect-error app global
+    const dirs = (SPOTS.find(x => x.name === s.name)?.dirs || []);
+    const key = `${s.lat},${s.lon}|${dirs.join(',')}`;
     // @ts-expect-error app globals
     chipFxCache[key] = 0;
     // @ts-expect-error app globals
-    chipBestCache[key] = { dateStr: null, peakKn: 0, startHr: null, nextDateStr: null, nextStartHr: null, nextPeakKn: 0, spotName: s.name, spot: { ...s, dirs: [270, 315] }, days10: [] };
+    chipBestCache[key] = { dateStr: null, peakKn: 0, startHr: null, nextDateStr: null, nextStartHr: null, nextPeakKn: 0, spotName: s.name, spot: { ...s, dirs }, days10: [] };
   }, SPOT);
 
   // Sanity: before opening the spot, the badge would read the stale 0.
   const staleVal = await page.evaluate((s) => {
     // @ts-expect-error app globals
-    return _chipCacheGet(s.lat, s.lon, [270, 315])?.val;
+    // @ts-expect-error app global
+    return _chipCacheGet(s.lat, s.lon, SPOTS.find(x => x.name === s.name)?.dirs || [])?.val;
   }, SPOT);
   expect(staleVal).toBe(0);
 
   // Open the spot detail page (same path the user took to see the good day).
   await page.evaluate((s) => {
     // @ts-expect-error app global
-    return pickSpot({ name: s.name, lat: s.lat, lon: s.lon, dirs: [270, 315] });
+    // @ts-expect-error app global
+    const dirs = SPOTS.find(x => x.name === s.name)?.dirs || [];
+    // @ts-expect-error app global
+    return pickSpot({ name: s.name, lat: s.lat, lon: s.lon, dirs });
   }, SPOT);
 
   // Wait for the detail grid to render with the rideable-day summary.
@@ -91,9 +102,11 @@ test('opening a spot reconciles its homepage badge with the fresh forecast', asy
   // forecast: at least 1 good day, and a nextDateStr of 2026-06-28.
   const reconciled = await page.evaluate((s) => {
     // @ts-expect-error app globals
-    const hit = _chipCacheGet(s.lat, s.lon, [270, 315]);
+    const dirs = SPOTS.find(x => x.name === s.name)?.dirs || [];
     // @ts-expect-error app globals
-    const best = chipBestCache[`${s.lat},${s.lon}|270,315`];
+    const hit = _chipCacheGet(s.lat, s.lon, dirs);
+    // @ts-expect-error app globals
+    const best = chipBestCache[`${s.lat},${s.lon}|${dirs.join(',')}`];
     return { qualDays: hit?.val, nextDateStr: best?.nextDateStr };
   }, SPOT);
 
