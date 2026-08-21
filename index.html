@@ -6278,9 +6278,9 @@ async function openOwnerEditFromMySpot(spotName){
   ]);
   // Populate _cachedSpotInfo so adminSaveSpotInfo owner-check passes
   _cachedSpotInfo={...(infoRow||{}),spot_name:spotName,_owner_email:claim.email};
-  if(!_adminSpots) _adminSpots=infoRow?[{...infoRow,_lat:ov?.lat,_lon:ov?.lon,_loc:ov?.loc}]:[];
-  else if(infoRow&&!_adminSpots.find(x=>x.spot_name===infoRow.spot_name)) _adminSpots.push({...infoRow,_lat:ov?.lat,_lon:ov?.lon,_loc:ov?.loc});
-  else{ const si=_adminSpots.findIndex(x=>x.spot_name===spotName); if(si>=0){_adminSpots[si]._lat=ov?.lat;_adminSpots[si]._lon=ov?.lon;_adminSpots[si]._loc=ov?.loc;} }
+  if(!_adminSpots) _adminSpots=infoRow?[{...infoRow,_lat:ov?.lat,_lon:ov?.lon,_loc:ov?.loc,dirs:ov?.dirs}]:[];
+  else if(infoRow&&!_adminSpots.find(x=>x.spot_name===infoRow.spot_name)) _adminSpots.push({...infoRow,_lat:ov?.lat,_lon:ov?.lon,_loc:ov?.loc,dirs:ov?.dirs});
+  else{ const si=_adminSpots.findIndex(x=>x.spot_name===spotName); if(si>=0){_adminSpots[si]._lat=ov?.lat;_adminSpots[si]._lon=ov?.lon;_adminSpots[si]._loc=ov?.loc;_adminSpots[si].dirs=ov?.dirs;} }
   const prefill={
     ...(infoRow||{}),
     spot_name: spotName,
@@ -7674,14 +7674,19 @@ async function renderAdminPanel(){
   const [{data:spotData},{data:suggData},{data:overrideData},{data:updateSuggData},{data:claimData}] = await Promise.all([
     sb.from('spot_info').select('*').order('spot_name'),
     sb.from('spot_suggestions').select('*').or('reviewed.eq.false,reviewed.is.null').order('created_at',{ascending:false}),
-    sb.from('spot_overrides').select('name,lat,lon,loc').eq('active',true),
+    sb.from('spot_overrides').select('name,lat,lon,loc,dirs').eq('active',true),
     sb.from('spot_update_suggestions').select('*').eq('reviewed',false).order('created_at',{ascending:false}),
     sb.from('spot_claims').select('*').eq('verified',false).neq('status','rejected').order('created_at',{ascending:false}),
   ]);
   _adminSpots = spotData||[];
   // Annotate each spot_info with coords from spot_overrides if available
   const overrideMap={}; for(const o of overrideData||[]) overrideMap[o.name]=o;
-  _adminSpots.forEach(s=>{ const o=overrideMap[s.spot_name]; if(o){s._lat=o.lat;s._lon=o.lon;s._loc=o.loc;s._hasOverride=true;} else{s._hasOverride=false;} });
+  // dirs live in spot_overrides, never in spot_info — carry them across or the
+  // edit form renders every direction unselected. That is not cosmetic: saving
+  // requires at least one direction and overwrites spot_overrides.dirs
+  // unconditionally, so an unselected form makes an admin editing an unrelated
+  // field replace the spot's real directions with whatever they click.
+  _adminSpots.forEach(s=>{ const o=overrideMap[s.spot_name]; if(o){s._lat=o.lat;s._lon=o.lon;s._loc=o.loc;s.dirs=o.dirs;s._hasOverride=true;} else{s._hasOverride=false;} });
   const pendingSuggs = suggData||[];
   _adminRequests = pendingSuggs;  // cache so click handlers can look up by id (avoids unsafe inline JSON)
   const pendingUpdates = updateSuggData||[];
