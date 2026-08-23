@@ -16,12 +16,24 @@ export type MockOptions = {
   overrides?: unknown[];  // rows returned for spot_overrides (admin-added spots)
   sessions?: unknown[];   // rows returned for session_attendances (stats)
   reminders?: unknown[];  // rows returned for reminders (Notifications schedule)
+  friendships?: unknown[];// rows returned for friendships (defaults to the seeded pair)
   spotInfo?: unknown;     // row returned for spot_info (.single() → one object)
   claims?: unknown[];     // rows returned for spot_claims (My Spot panel)
 };
 
 const json = (route: Route, body: unknown, status = 200) =>
   route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
+
+// Content-Range carries the row count for `count:'exact'` queries, but it is not
+// a CORS-safelisted response header: cross-origin JS cannot read it unless the
+// server says so, and every supabase call here is cross-origin. Real Supabase
+// sends this; without it supabase-js sees count === null and each count query
+// silently reads as zero — which is exactly how a badge test can pass while the
+// badge shows nothing.
+const countHeaders = (n: number) => ({
+  'Content-Range': `0-${Math.max(0, n - 1)}/${n}`,
+  'Access-Control-Expose-Headers': 'Content-Range',
+});
 
 // Per-table canned responses for GET/SELECT.
 function tableResponse(table: string, opts: MockOptions): unknown {
@@ -32,7 +44,7 @@ function tableResponse(table: string, opts: MockOptions): unknown {
     case 'public_profiles':
       return publicProfileRows;
     case 'friendships':
-      return friendshipsRows(email);
+      return opts.friendships ?? friendshipsRows(email);
     case 'favourites':
       return opts.favourites ?? emptyArray;
     case 'spot_suggestions':
@@ -96,16 +108,27 @@ export async function mockSupabase(page: Page, opts: MockOptions = {}) {
       if (wantEmail && table === 'favourites' && opts.adminFavourites) {
         const rows = opts.adminFavourites[wantEmail] ?? [];
         return route.fulfill({ status: 200, contentType: 'application/json',
-          headers: { 'Content-Range': `0-${Math.max(0, rows.length - 1)}/${rows.length}` },
-          body: JSON.stringify(rows) });
+          headers: countHeaders(rows.length), body: JSON.stringify(rows) });
       }
       if (wantEmail && table === 'reminders' && opts.adminReminders) {
         const rows = opts.adminReminders[wantEmail] ?? [];
         return route.fulfill({ status: 200, contentType: 'application/json',
-          headers: { 'Content-Range': `0-${Math.max(0, rows.length - 1)}/${rows.length}` },
-          body: JSON.stringify(rows) });
+          headers: countHeaders(rows.length), body: JSON.stringify(rows) });
       }
-      const rows = tableResponse(table, opts) as unknown[];
+      let rows = tableResponse(table, opts) as unknown[];
+      // A HEAD request is a count query (`count:'exact', head:true`). The row
+      // fetches below are filtered client-side by the app, so tableResponse
+      // ignoring query params is harmless there — but a count is ONLY the
+      // number the filters select, so an unfiltered count is meaningless and
+      // any assertion on it would pass whatever the code did. Apply the eq
+      // filters for counts, and only for counts, so the badge tests bite.
+      if (method === 'HEAD' && Array.isArray(rows)) {
+        const eqs = [...url.matchAll(/[?&]([a-z_]+)=eq\.([^&]+)/g)]
+          .map(m => [m[1], decodeURIComponent(m[2])] as const)
+          .filter(([col]) => col !== 'select');
+        rows = rows.filter(r => eqs.every(([col, val]) =>
+          String((r as Record<string, unknown>)[col]) === val));
+      }
       const n = Array.isArray(rows) ? rows.length : 0;
       // .single()/.maybeSingle() send Accept: application/vnd.pgrst.object+json
       // and expect a SINGLE OBJECT, not an array. Honour that so the client's
@@ -116,7 +139,7 @@ export async function mockSupabase(page: Page, opts: MockOptions = {}) {
       return route.fulfill({
         status: 200,
         contentType: 'application/json',
-        headers: { 'Content-Range': `0-${Math.max(0, n - 1)}/${n}` },
+        headers: countHeaders(n),
         body: method === 'HEAD' ? '' : body,
       });
     }

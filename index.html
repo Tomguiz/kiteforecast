@@ -9094,6 +9094,14 @@ async function initAuth(){
         _authSession=session;
         const p=loadProfile(); p.email=session.user.email; saveProfile(p);
         updateAuthUI(); updateProfileDot(); renderHintChips();
+        // Compute the tab badges now. updateProfileDot only re-reads badge text
+        // already in the DOM — it fetches nothing — and every other caller of
+        // updateTabBadges runs from openProfilePanel/renderBurgerList/openSection
+        // or an alert edit. So before this line nothing queried friendships at
+        // startup, and an incoming friend request only lit its badge AFTER the
+        // user opened the very menu the badge exists to draw them to. Eleven
+        // requests sat unanswered for months behind that.
+        updateTabBadges();
         // Sync favs + notifs on session restore
         if(event!=='SIGNED_IN'){
           syncFavsFromSupabase(session.user.email).then(()=>renderHintChips());

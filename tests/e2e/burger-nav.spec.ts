@@ -84,7 +84,13 @@ test('opening Stats while signed out shows a sign-in prompt', async ({ gotoApp, 
 // A notification badges ONLY the bubble it belongs to. Notifs → profile dot;
 // friends/contrib/admin → burger dot.
 test('an unread alert badges the profile dot but not the burger dot', async ({ gotoApp, page }) => {
-  await gotoApp('signedIn');
+  // No PENDING friend request in this fixture. The default seed carries one,
+  // and since the badges are now computed at page load it would legitimately
+  // light the burger dot — masking whether the alert leaked into it, which is
+  // the only thing this test is about. Isolate the source under test.
+  await gotoApp('signedIn', {
+    friendships: [{ id: 'f1', requester: 'ruben@test.dev', recipient: 'user@test.dev', status: 'accepted' }],
+  });
   await page.evaluate(() => {
     localStorage.setItem('kf_notifsSeenAt', '1');
     const notifs = [{
