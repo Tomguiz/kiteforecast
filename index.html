@@ -388,11 +388,31 @@
        the firing bubble on purpose: a friend going is worth surfacing whatever
        the wind is doing, and the wind is worth surfacing with nobody going. */
     .chip-friend { display:inline-flex; align-items:center; justify-content:center; width:16px; height:16px; border-radius:50%; margin-left:3px; font-size:.58rem; font-weight:800; line-height:1; background:rgba(56,189,248,.22); color:#7dd3fc; border:1px solid rgba(56,189,248,.45); flex-shrink:0; }
-    .chip-firing { font-size:.65rem; font-weight:700; padding:1px 5px; border-radius:99px; margin-left:3px; line-height:1.5; background:rgba(249,115,22,.18); color:#fb923c; white-space:nowrap; }
     .chip-days.cd-good    { background:rgba(34,197,94,.15);  color:#4ade80; }
     .chip-days.cd-ok      { background:rgba(34,197,94,.15);  color:#4ade80; }
     .chip-days.cd-none    { background:rgba(148,163,184,.1); color:var(--tdim); }
     .chip-days.cd-loading { color:var(--tdim); }
+    /* A favourite is a four-line card: name, locality, good days, live wind.
+       Everything used to be crammed onto one pill line, which truncated on
+       mobile and buried the live reading behind the spot name. Each line
+       leads with an icon naming what it carries. */
+    .fav-card { position:relative; display:flex; flex-direction:column; align-items:flex-start; gap:2px;
+      flex:1 1 210px; max-width:300px; text-align:left; padding:10px 30px 10px 12px;
+      border:1px solid rgba(251,191,36,.35); border-radius:14px; background:rgba(251,191,36,.06);
+      color:#fbbf24; cursor:pointer; transition:border-color .2s,background .2s; }
+    .fav-card:hover { border-color:#fbbf24; background:rgba(251,191,36,.13); }
+    .fav-card-line { display:flex; align-items:center; gap:6px; width:100%; min-width:0; font-size:.78rem; line-height:1.4; }
+    /* Fixed-width gutter so the four icons form a column and the text starts
+       at the same x on every line, whatever the emoji's own advance width. */
+    .fav-card-ico { flex:0 0 1.15em; text-align:center; font-size:.8em; opacity:.95; }
+    .fav-card-txt { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .fav-card-name .fav-card-txt { font-weight:700; }
+    .fav-card-loc { font-size:.72rem; color:var(--tdim); }
+    .fav-card-live { font-size:.72rem; color:var(--tdim); }
+    .fav-card-live.is-firing { color:#fb923c; font-weight:700; }
+    .fav-card-x { position:absolute; top:7px; right:8px; font-size:.7rem; opacity:.55; line-height:1;
+      padding:2px 4px; border-radius:5px; cursor:pointer; }
+    .fav-card-x:hover { opacity:1; background:rgba(239,68,68,.2); color:#f87171; }
     .fav-chip { display:inline-flex; align-items:center; gap:5px; padding:6px 10px 6px 13px; border:1px solid rgba(251,191,36,.35); border-radius:99px; font-size:.78rem; color:#fbbf24; cursor:pointer; transition:border-color .2s,background .2s; background:rgba(251,191,36,.06); }
     .fav-chip:hover { border-color:#fbbf24; background:rgba(251,191,36,.13); }
     .fav-chip-label { flex:1; }
@@ -3754,60 +3774,93 @@ function renderHintChips(){
     lbl.className='hints-section-label lbl-favs'; lbl.textContent='Your spots';
     wrap.appendChild(lbl);
     favs.forEach(f=>{
-      const chip=document.createElement('span');
-      chip.className='fav-chip';
-      const label=document.createElement('span');
-      label.className='fav-chip-label';
       const _ks=SPOTS.find(s=>s.name===f.name);
       const _city=_ks?.loc?_ks.loc.split(', ').slice(0,-1).join(', '):'';
-      const nameText='★ '+(_ks?f.name+(_city&&_city!==f.name?', '+_city:''):f.label);
-      label.appendChild(document.createTextNode(nameText));
+      const _liveDirs=(_ks?.dirs?.length?_ks.dirs:f.dirs)||[];
+
+      const card=document.createElement('div');
+      card.className='fav-card';
+      card.addEventListener('click',()=>pickFav(f));
+
+      // Each line is icon + text, built the same way so the gutter lines up.
+      const line=(cls,ico,txt)=>{
+        const d=document.createElement('div');
+        d.className='fav-card-line '+cls;
+        const i=document.createElement('span'); i.className='fav-card-ico'; i.textContent=ico;
+        const t=document.createElement('span'); t.className='fav-card-txt'; t.textContent=txt;
+        d.appendChild(i); d.appendChild(t);
+        return d;
+      };
+
+      // 1 — name. textContent throughout: spot names are user-suppliable.
+      const l1=line('fav-card-name','\u2605',_ks?f.name:f.label);
       if(signedIn&&loadNotifs().some(n=>n.spotName===f.name)){
         const bi=document.createElement('span');
         bi.className='chip-notif-bell active'; bi.innerHTML=bellSVG(10);
-        label.appendChild(bi);
+        bi.title='You have an alert on this spot';
+        l1.appendChild(bi);
       }
-      label.addEventListener('click',()=>pickFav(f));
+      card.appendChild(l1);
+
+      // 2 — locality. Falls back to the saved label when the spot is not in
+      // the catalogue, so the line is never a lone icon.
+      card.appendChild(line('fav-card-loc','\uD83D\uDCCD',_city||f.label||'\u2014'));
+
+      // 3 — good days, still rendered by setChipDayBadge (shared with search chips)
+      const l3=document.createElement('div');
+      l3.className='fav-card-line fav-card-days';
+      const i3=document.createElement('span'); i3.className='fav-card-ico'; i3.textContent='\uD83D\uDCC5';
       const fbadge=document.createElement('span');
-      // Use live SPOTS dirs (DB-sourced) so admin updates are reflected immediately
-      const _liveDirs=(_ks?.dirs?.length?_ks.dirs:f.dirs)||[];
       const _fhit=_chipCacheGet(f.lat,f.lon,_liveDirs);
       if(_fhit){ fbadge.className='chip-days'; setChipDayBadge(fbadge,_fhit.val,true); }
-      else{ fbadge.className='chip-days cd-loading'; fbadge.textContent='·'; }
-      label.appendChild(fbadge);
-      // Defer API fetch until SPOTS dirs are loaded; the re-render after _spotsReady will call this again
+      else{ fbadge.className='chip-days cd-loading'; fbadge.textContent='\u00b7'; }
+      l3.appendChild(i3); l3.appendChild(fbadge);
+      card.appendChild(l3);
+      // setChipDayBadge removes the badge outright on an API error — take the
+      // orphaned icon with it rather than leaving a bare calendar.
+      const _syncDaysLine=()=>{ if(!fbadge.isConnected) l3.remove(); };
       if(_spotsIsReady){
-        fetchChipQualDays({name:f.name,loc:f.label||'',lat:f.lat,lon:f.lon,dirs:_liveDirs}).then(n=>{setChipDayBadge(fbadge,n,true);updateBestWindowBar();});
+        fetchChipQualDays({name:f.name,loc:f.label||'',lat:f.lat,lon:f.lon,dirs:_liveDirs})
+          .then(n=>{setChipDayBadge(fbadge,n,true);_syncDaysLine();updateBestWindowBar();});
       }
-      // "Firing now" bubble, from the nearest RWS mast. Favourites carry
-      // .lat/.lon (NOT .latitude/.longitude like cachedLoc — see
-      // renderLiveWindPanel). Costs no extra request: _rwsNearest reads the
-      // 60s station cache, so every favourite is a pure comparison after the
-      // first one. Absent unless the spot is genuinely firing.
-      const fire=document.createElement('span');
-      label.appendChild(fire);
+
+      // 4 — the nearest mast, always shown. It used to appear only when the
+      // spot was firing, which left the commonest case (it isn't) with nothing
+      // at all and no way to tell "calm" from "not loaded yet".
+      // Satellite dish, not the wind-blowing face: at 12px that emoji is a pale
+      // indistinct blob (it reads as a flag), and 💨 already ends the days line.
+      // This one also says where the number comes from — a measuring mast.
+      const l4=line('fav-card-live','\uD83D\uDCE1','\u2026');
+      const l4txt=l4.querySelector('.fav-card-txt');
+      const l4ico=l4.querySelector('.fav-card-ico');
+      card.appendChild(l4);
       _rwsNearest(f.lat,f.lon).then(live=>{
-        if(!live||!_rwsIsFiringNow(live.speedKn,live.dirDeg,_liveDirs)) return;
-        fire.className='chip-firing';
-        fire.textContent=`🔥 ${live.speedKn} kn${live.dirDeg==null?'':` ${Math.round(live.dirDeg)}°`}`;
-        fire.title=`Measured now at ${live.stationName} · ${live.distanceKm.toFixed(1)} km away`;
-      }).catch(()=>{});
-      // Friend bubbles are independent of wind: a mate going is worth knowing
-      // even on a light day, so this is NOT gated on the firing check above.
+        if(!live){ l4txt.textContent='No live reading'; return; }
+        const deg=live.dirDeg==null?'':` ${Math.round(live.dirDeg)}\u00b0`;
+        l4txt.textContent=`${live.speedKn} kn${deg}`;
+        l4.title=`Measured now at ${live.stationName} \u00b7 ${live.distanceKm.toFixed(1)} km away`;
+        if(_rwsIsFiringNow(live.speedKn,live.dirDeg,_liveDirs)){
+          l4.classList.add('is-firing'); l4ico.textContent='\uD83D\uDD25';
+        }
+      }).catch(()=>{ l4txt.textContent='No live reading'; });
+
+      // Friends sit on the live line: independent of wind, so a mate going is
+      // worth seeing on a calm day too.
       _friendsGoingToday().then(map=>{
         for(const nick of (map[f.name]||[])){
           const b=document.createElement('span');
           b.className='chip-friend';
           b.textContent=(String(nick).trim()[0]||'?').toUpperCase();
           b.title=nick+' is going today';
-          label.appendChild(b);
+          l4.appendChild(b);
         }
       }).catch(()=>{});
+
       const rm=document.createElement('span');
-      rm.className='fav-chip-remove'; rm.textContent='✕'; rm.title='Remove from your spots';
+      rm.className='fav-card-x'; rm.textContent='\u2715'; rm.title='Remove from your spots';
       rm.addEventListener('click',e=>{e.stopPropagation();removeFav(f);});
-      chip.appendChild(label); chip.appendChild(rm);
-      wrap.appendChild(chip);
+      card.appendChild(rm);
+      wrap.appendChild(card);
     });
 
     // Upsell chip for free users at the limit

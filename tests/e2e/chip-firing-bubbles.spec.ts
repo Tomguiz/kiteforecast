@@ -1,5 +1,12 @@
 import { test, expect } from '../fixtures/auth';
 
+// The live reading moved out of a standalone bubble and onto the favourite
+// card's fourth line (`.fav-card-live`), which is ALWAYS rendered. "Quiet"
+// therefore no longer means "no element" — the line is there with the reading
+// on it, just not marked `is-firing`. Asserting a count of 0 on the old bubble
+// would now pass however broken the code was.
+const LIVE = '.fav-card .fav-card-live';
+
 // Favourite chips carry two independent signals:
 //   🔥 21 kn 270°  — measured wind at a station within 30km, at or above 15kn
 //   (J)(M)    — one bubble per friend confirmed for today, initial only
@@ -34,31 +41,37 @@ test('shows the firing bubble at 15kn from a good direction', async ({ gotoApp, 
   await gotoApp('signedIn');
   await seedChip(page, { live: { speedKn: 21, dirDeg: 270 } });
 
-  await expect(page.locator('.chip-firing')).toHaveText('🔥 21 kn 270°');
+  await expect(page.locator(LIVE)).toHaveClass(/is-firing/);
+  await expect(page.locator(LIVE)).toContainText('21 kn 270°');
 });
 
 test('stays quiet below 15kn', async ({ gotoApp, page }) => {
   await gotoApp('signedIn');
   await seedChip(page, { live: { speedKn: 14, dirDeg: 270 } });
 
-  await expect(page.locator('.chip-firing')).toHaveCount(0);
+  // the reading first: `is-firing` is added asynchronously, so asserting its
+  // absence on its own would pass before the lookup had even resolved
+  await expect(page.locator(LIVE)).toContainText('14 kn 270°');
+  await expect(page.locator(LIVE)).not.toHaveClass(/is-firing/);
 });
 
 test('stays quiet on a strong wind from the wrong direction', async ({ gotoApp, page }) => {
   await gotoApp('signedIn');
   await seedChip(page, { live: { speedKn: 30, dirDeg: 135 } });
 
-  await expect(page.locator('.chip-firing')).toHaveCount(0);
+  await expect(page.locator(LIVE)).toContainText('30 kn 135°');
+  await expect(page.locator(LIVE)).not.toHaveClass(/is-firing/);
 });
 
 test('shows nothing when the spot has no station in range', async ({ gotoApp, page }) => {
-  // Oostduinkerke's case: nearest mast is 54km away. No bubble, no placeholder
-  // — an empty chip is the honest answer, and "no data" would read as "no wind".
+  // Oostduinkerke's case: nearest mast is 54km away. The line says so outright;
+  // leaving it blank read as "no wind", which is a different claim.
   await gotoApp('signedIn');
   await seedChip(page, { live: null });
 
-  await expect(page.locator('.chip-firing')).toHaveCount(0);
-  await expect(page.locator('.fav-chip')).toBeVisible();
+  await expect(page.locator(LIVE)).not.toHaveClass(/is-firing/);
+  await expect(page.locator('.fav-card')).toBeVisible();
+  await expect(page.locator(LIVE)).toContainText('No live reading');
 });
 
 test('shows one initial bubble per friend going today', async ({ gotoApp, page }) => {
@@ -75,7 +88,8 @@ test('friend bubbles appear regardless of wind', async ({ gotoApp, page }) => {
   await gotoApp('signedIn');
   await seedChip(page, { live: { speedKn: 6, dirDeg: 270 }, friends: ['Vass'] });
 
-  await expect(page.locator('.chip-firing')).toHaveCount(0);
+  await expect(page.locator(LIVE)).toContainText('6 kn 270°');
+  await expect(page.locator(LIVE)).not.toHaveClass(/is-firing/);
   await expect(page.locator('.chip-friend')).toHaveText('V');
 });
 
@@ -83,7 +97,8 @@ test('shows both signals together when both are true', async ({ gotoApp, page })
   await gotoApp('signedIn');
   await seedChip(page, { live: { speedKn: 24, dirDeg: 300 }, friends: ['Ced'] });
 
-  await expect(page.locator('.chip-firing')).toHaveText('🔥 24 kn 300°');
+  await expect(page.locator(LIVE)).toHaveClass(/is-firing/);
+  await expect(page.locator(LIVE)).toContainText('24 kn 300°');
   await expect(page.locator('.chip-friend')).toHaveText('C');
 });
 
@@ -118,8 +133,9 @@ test('the good-days badge pluralises', async ({ gotoApp, page }) => {
 test('the bubble reports the exact degree the mast measured', async ({ gotoApp, page }) => {
   await gotoApp('signedIn');
   await seedChip(page, { live: { speedKn: 23, dirDeg: 250.1 } });
-  await expect(page.locator('.chip-firing')).toHaveText('🔥 23 kn 250°');
-  await expect(page.locator('.chip-firing')).not.toContainText('W');
+  await expect(page.locator(LIVE)).toHaveClass(/is-firing/);
+  await expect(page.locator(LIVE)).toContainText('23 kn 250°');
+  await expect(page.locator(LIVE)).not.toContainText('W');
 });
 
 // 250.1° against a spot listed [270, 315] is 19.9° out — inside the new ±30°
@@ -128,7 +144,8 @@ test('the bubble reports the exact degree the mast measured', async ({ gotoApp, 
 test('fires on the WSW that the old ±22.5° tolerance turned away', async ({ gotoApp, page }) => {
   await gotoApp('signedIn');
   await seedChip(page, { live: { speedKn: 26, dirDeg: 246.3 } });
-  await expect(page.locator('.chip-firing')).toHaveText('🔥 26 kn 246°');
+  await expect(page.locator(LIVE)).toHaveClass(/is-firing/);
+  await expect(page.locator(LIVE)).toContainText('26 kn 246°');
 });
 
 test('still stays quiet once the wind is genuinely off the spot', async ({ gotoApp, page }) => {
@@ -141,5 +158,6 @@ test('still stays quiet once the wind is genuinely off the spot', async ({ gotoA
   // N NE SW W NW. The ±30° edge is pinned on isWindDirOK directly, in
   // tests/unit/rideability.test.ts, where the dirs are explicit.
   await seedChip(page, { live: { speedKn: 26, dirDeg: 135 } });
-  await expect(page.locator('.chip-firing')).toHaveCount(0);
+  await expect(page.locator(LIVE)).toContainText('26 kn 135°');
+  await expect(page.locator(LIVE)).not.toHaveClass(/is-firing/);
 });
