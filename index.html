@@ -4023,16 +4023,28 @@ function renderHintChips(){
       // Webcam shortcut. Lives on the live line and stops the click there, so it
       // never falls through to the card's own "open the forecast" handler.
       _loadFavCamUrls().then(map=>{
-        if(!map[f.name]) return;
-        const cam=document.createElement('span');
+        const url=safeHttpUrl(map[f.name]||'');
+        if(!url) return;
+        // A real anchor, not a span with a click handler. Two reasons, both of
+        // which this button got wrong:
+        //  - On touch, a JS-only click on a small span nested inside a card
+        //    that is ITSELF clickable is unreliable; the tap gets taken by the
+        //    parent or eaten by scroll handling. An <a> is handled natively.
+        //  - It used to route through the spot page (_openCamOnLoad) and unfold
+        //    the info panel. That only ever showed the cam inline for the two
+        //    spots whose URL the app can embed; for the other five it just left
+        //    the rider in front of another button. Going straight to the source
+        //    is what "watch it right now" means, and it works for all of them.
+        const cam=document.createElement('a');
         cam.className='fav-cam-btn';
-        cam.innerHTML='\uD83C\uDFA5';
+        cam.href=url;
+        cam.target='_blank';
+        cam.rel='noopener noreferrer';
+        cam.textContent='\uD83C\uDFA5';
         cam.title=`Watch ${f.name} right now`;
-        cam.addEventListener('click',e=>{
-          e.stopPropagation();
-          window._openCamOnLoad=true;
-          pickFav(f);
-        });
+        // Without this the card's own handler also fires and navigates the app
+        // to the spot behind the newly opened tab.
+        cam.addEventListener('click',e=>{ e.stopPropagation(); trackCtaClick(f.name,'livecam'); });
         l4.appendChild(cam);
       }).catch(()=>{});
 
@@ -4582,22 +4594,6 @@ async function renderSpotInfoCard(spotName) {
   // container exists, whichever of the two rendered first.
   mountWindDirs();
 
-  // ── deep-link: arrived from a "LIVE CAM" button on the homepage ──
-  // The card renders collapsed, so without this the rider lands on a folded
-  // panel and has to hunt for the cam they just asked for. Cleared on use, the
-  // same one-shot contract as _deepLinkDate.
-  if(window._openCamOnLoad){
-    window._openCamOnLoad=false;
-    const cam=el.querySelector('[data-cta="livecam"]');
-    if(cam){
-      _spotInfoOpen=true;
-      const body=el.querySelector('.spot-info-body');
-      if(body) body.style.display='flex';
-      const btn=el.querySelector('.spot-info-open-btn');
-      if(btn) btn.textContent='\u25b2 Less';
-      setTimeout(()=>cam.scrollIntoView({behavior:'smooth',block:'center'}),150);
-    }
-  }
 }
 
 async function trackCtaClick(spotName, ctaType) {
