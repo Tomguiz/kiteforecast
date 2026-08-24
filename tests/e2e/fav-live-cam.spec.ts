@@ -120,3 +120,18 @@ test('landing without the flag leaves the panel collapsed as before', async ({ g
 
   await expect(page.locator('.spot-info-body')).toBeHidden();
 });
+
+// The cam shortcut is a primary action — "watch it right now" — but shipped at
+// .72rem with 1px padding inside an already-small line, measuring 26x20:
+// decoration, and a poor tap target on a phone. It is now 44x30. This pins the
+// floor rather than an exact size, so restyling stays free but shrinking it
+// back does not pass.
+test('the cam button is big enough to see and to tap', async ({ gotoApp, page }) => {
+  await gotoApp('signedIn');
+  await render(page, { cams: { 'Riverwoods Beachclub': 'https://cam.example/rw' } });
+
+  const box = await page.locator('.fav-cam-btn').boundingBox();
+  expect(box).not.toBeNull();
+  expect(box!.height).toBeGreaterThanOrEqual(28);
+  expect(box!.width).toBeGreaterThanOrEqual(40);
+});

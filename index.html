@@ -410,9 +410,13 @@
     .fav-live-badge .webcam-dot { width:4px; height:4px; }
     /* Opens the spot with its webcam already unfolded — a separate target from
        the card itself, which goes to the forecast. */
-    .fav-cam-btn { margin-left:auto; flex-shrink:0; display:inline-flex; align-items:center; gap:3px;
-      padding:1px 5px; border-radius:99px; font-size:.72rem; line-height:1.4;
-      background:rgba(239,68,68,.12); color:#f87171; border:1px solid rgba(239,68,68,.3); cursor:pointer; }
+    /* Watching the cam is a primary action, not a footnote: at .72rem inside an
+       already-small line it read as decoration and was a poor tap target on
+       mobile. min-height carries the touch area even if the glyph renders short. */
+    .fav-cam-btn { margin-left:auto; flex-shrink:0; display:inline-flex; align-items:center;
+      justify-content:center; gap:4px; padding:4px 11px; border-radius:99px;
+      font-size:1.05rem; line-height:1.2; min-height:30px;
+      background:rgba(239,68,68,.16); color:#f87171; border:1px solid rgba(239,68,68,.45); cursor:pointer; }
     .fav-cam-btn:hover { background:rgba(239,68,68,.24); border-color:#f87171; }
     .gd-spot { width:100%; margin-top:10px; }
     .gd-spot-name { display:flex; align-items:center; gap:5px; font-size:.72rem; font-weight:800;
