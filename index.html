@@ -401,6 +401,19 @@
        with an alert, so the answer to "when do I ride, and where" needs no
        tapping into each spot. Built entirely from chipBestCache.days10, which
        the favourite cards already populate — no extra forecast request. */
+    /* "LIVE" said outright, not implied by an icon. Reuses .webcam-dot, the
+       pulse the app already uses for live content, so the homepage and the spot
+       page carry the same signal. */
+    .fav-live-badge { display:inline-flex; align-items:center; gap:3px; flex-shrink:0;
+      padding:0 5px; border-radius:99px; font-size:.56rem; font-weight:800; letter-spacing:.08em;
+      background:rgba(239,68,68,.16); color:#f87171; border:1px solid rgba(239,68,68,.35); }
+    .fav-live-badge .webcam-dot { width:4px; height:4px; }
+    /* Opens the spot with its webcam already unfolded — a separate target from
+       the card itself, which goes to the forecast. */
+    .fav-cam-btn { margin-left:auto; flex-shrink:0; display:inline-flex; align-items:center; gap:3px;
+      padding:1px 5px; border-radius:99px; font-size:.72rem; line-height:1.4;
+      background:rgba(239,68,68,.12); color:#f87171; border:1px solid rgba(239,68,68,.3); cursor:pointer; }
+    .fav-cam-btn:hover { background:rgba(239,68,68,.24); border-color:#f87171; }
     .gd-spot { width:100%; margin-top:10px; }
     .gd-spot-name { display:flex; align-items:center; gap:5px; font-size:.72rem; font-weight:800;
       letter-spacing:.06em; text-transform:uppercase; color:#fbbf24; margin-bottom:6px; text-align:left; }
@@ -417,7 +430,7 @@
     .gd-rating { font-size:.63rem; font-weight:700; padding:1px 6px; border-radius:99px; margin-top:1px; }
     .gd-empty { font-size:.7rem; color:var(--tdim); text-align:left; }
     .fav-card { position:relative; display:flex; flex-direction:column; align-items:flex-start; gap:2px;
-      flex:1 1 210px; max-width:300px; text-align:left; padding:10px 30px 10px 12px;
+      flex:1 1 232px; max-width:300px; text-align:left; padding:10px 30px 10px 12px;
       border:1px solid rgba(251,191,36,.35); border-radius:14px; background:rgba(251,191,36,.06);
       color:#fbbf24; cursor:pointer; transition:border-color .2s,background .2s; }
     .fav-card:hover { border-color:#fbbf24; background:rgba(251,191,36,.13); }
@@ -3788,6 +3801,25 @@ async function _friendsGoingToday(){
 // Scoped to spots WITH a notification on purpose: those are the ones the rider
 // asked to be told about, so this is the same set the alerts cover — a preview
 // of what is coming rather than a second, wider list.
+// Which favourites have a webcam. livecam_url lives in spot_info, which the
+// homepage never queried — one batched lookup for every favourite, rather than
+// fetchSpotInfo's per-spot .single(). Cached for the session; a spot gaining a
+// cam shows up on the next load, which is soon enough for something an admin
+// edits by hand.
+let _favCamUrls=null;      // null = not fetched yet, {} = fetched
+async function _loadFavCamUrls(){
+  if(_favCamUrls) return _favCamUrls;
+  const sb=getSb(); const favs=loadFavs();
+  if(!sb||!favs.length){ _favCamUrls={}; return _favCamUrls; }
+  try{
+    const{data}=await sb.from('spot_info').select('spot_name,livecam_url').in('spot_name',favs.map(f=>f.name));
+    const out={};
+    for(const r of (data||[])){ const u=safeHttpUrl(r.livecam_url); if(u) out[r.spot_name]=u; }
+    _favCamUrls=out;
+  }catch{ _favCamUrls={}; }
+  return _favCamUrls;
+}
+
 function renderGoodDaysSection(){
   const host=$('goodDaysSection'); if(!host) return;
   host.innerHTML='';
@@ -3953,9 +3985,17 @@ function renderHintChips(){
       const l4=line('fav-card-live','\uD83D\uDCE1','\u2026');
       const l4txt=l4.querySelector('.fav-card-txt');
       const l4ico=l4.querySelector('.fav-card-ico');
+      // "LIVE" spelled out rather than left to the icon: 17 kn on a card full of
+      // forecast numbers reads as forecast unless something says otherwise.
+      const l4badge=document.createElement('span');
+      l4badge.className='fav-live-badge';
+      l4badge.style.display='none';
+      l4badge.innerHTML='<span class="webcam-dot"></span>LIVE';
+      l4.insertBefore(l4badge,l4txt);
       card.appendChild(l4);
       _rwsNearest(f.lat,f.lon).then(live=>{
         if(!live){ l4txt.textContent='No live reading'; return; }
+        l4badge.style.display='inline-flex';
         const deg=live.dirDeg==null?'':` ${Math.round(live.dirDeg)}\u00b0`;
         l4txt.textContent=`${live.speedKn} kn${deg}`;
         l4.title=`Measured now at ${live.stationName} \u00b7 ${live.distanceKm.toFixed(1)} km away`;
@@ -3974,6 +4014,22 @@ function renderHintChips(){
           b.title=nick+' is going today';
           l4.appendChild(b);
         }
+      }).catch(()=>{});
+
+      // Webcam shortcut. Lives on the live line and stops the click there, so it
+      // never falls through to the card's own "open the forecast" handler.
+      _loadFavCamUrls().then(map=>{
+        if(!map[f.name]) return;
+        const cam=document.createElement('span');
+        cam.className='fav-cam-btn';
+        cam.innerHTML='\uD83C\uDFA5';
+        cam.title=`Watch ${f.name} right now`;
+        cam.addEventListener('click',e=>{
+          e.stopPropagation();
+          window._openCamOnLoad=true;
+          pickFav(f);
+        });
+        l4.appendChild(cam);
       }).catch(()=>{});
 
       const rm=document.createElement('span');
@@ -4521,6 +4577,23 @@ async function renderSpotInfoCard(spotName) {
   // The card is async: mount (or re-mount) the wind-dirs block once its
   // container exists, whichever of the two rendered first.
   mountWindDirs();
+
+  // ── deep-link: arrived from a "LIVE CAM" button on the homepage ──
+  // The card renders collapsed, so without this the rider lands on a folded
+  // panel and has to hunt for the cam they just asked for. Cleared on use, the
+  // same one-shot contract as _deepLinkDate.
+  if(window._openCamOnLoad){
+    window._openCamOnLoad=false;
+    const cam=el.querySelector('[data-cta="livecam"]');
+    if(cam){
+      _spotInfoOpen=true;
+      const body=el.querySelector('.spot-info-body');
+      if(body) body.style.display='flex';
+      const btn=el.querySelector('.spot-info-open-btn');
+      if(btn) btn.textContent='\u25b2 Less';
+      setTimeout(()=>cam.scrollIntoView({behavior:'smooth',block:'center'}),150);
+    }
+  }
 }
 
 async function trackCtaClick(spotName, ctaType) {
