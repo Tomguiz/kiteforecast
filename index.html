@@ -396,6 +396,26 @@
        Everything used to be crammed onto one pill line, which truncated on
        mobile and buried the live reading behind the spot name. Each line
        leads with an icon naming what it carries. */
+    /* ── Good days ahead ──────────────────────────────────────────────────
+       Every upcoming rideable day across the favourites you actually track
+       with an alert, so the answer to "when do I ride, and where" needs no
+       tapping into each spot. Built entirely from chipBestCache.days10, which
+       the favourite cards already populate — no extra forecast request. */
+    .gd-spot { width:100%; margin-top:10px; }
+    .gd-spot-name { display:flex; align-items:center; gap:5px; font-size:.72rem; font-weight:800;
+      letter-spacing:.06em; text-transform:uppercase; color:#fbbf24; margin-bottom:6px; text-align:left; }
+    .gd-days { display:flex; flex-wrap:wrap; gap:6px; justify-content:flex-start; }
+    .gd-card { display:flex; flex-direction:column; align-items:flex-start; gap:3px;
+      min-width:132px; padding:8px 10px; border-radius:11px; text-align:left; cursor:pointer;
+      border:1px solid rgba(148,163,184,.22); background:rgba(148,163,184,.06);
+      transition:border-color .18s, background .18s; }
+    .gd-card:hover { border-color:rgba(148,163,184,.5); background:rgba(148,163,184,.13); }
+    .gd-date { font-size:.74rem; font-weight:800; color:var(--text); }
+    .gd-date span { font-weight:500; color:var(--tdim); margin-left:3px; }
+    .gd-kn { font-size:.8rem; font-weight:800; }
+    .gd-meta { font-size:.66rem; color:var(--tdim); }
+    .gd-rating { font-size:.63rem; font-weight:700; padding:1px 6px; border-radius:99px; margin-top:1px; }
+    .gd-empty { font-size:.7rem; color:var(--tdim); text-align:left; }
     .fav-card { position:relative; display:flex; flex-direction:column; align-items:flex-start; gap:2px;
       flex:1 1 210px; max-width:300px; text-align:left; padding:10px 30px 10px 12px;
       border:1px solid rgba(251,191,36,.35); border-radius:14px; background:rgba(251,191,36,.06);
@@ -3758,6 +3778,101 @@ async function _friendsGoingToday(){
   _todayAttendCache=out; _todayAttendTs=Date.now();
   return out;
 }
+// Every upcoming rideable day, for the favourites you track with an alert.
+//
+// Reads chipBestCache[key].days10, which fetchChipQualDays already builds for
+// each favourite card — so this costs no forecast request and survives a
+// reload (the cache is persisted). It re-renders whenever one of those fetches
+// resolves, because the cache is empty on a cold load.
+//
+// Scoped to spots WITH a notification on purpose: those are the ones the rider
+// asked to be told about, so this is the same set the alerts cover — a preview
+// of what is coming rather than a second, wider list.
+function renderGoodDaysSection(){
+  const host=$('goodDaysSection'); if(!host) return;
+  host.innerHTML='';
+  if(!_authSession?.user) return;
+  const notifs=loadNotifs();
+  const tracked=loadFavs().filter(f=>notifs.some(n=>n.spotName===f.name));
+  if(!tracked.length) return;
+
+  const lbl=document.createElement('div');
+  lbl.className='hints-section-label lbl-favs';
+  lbl.textContent='Good days ahead';
+  host.appendChild(lbl);
+
+  let rendered=0;
+  tracked.forEach(f=>{
+    const _ks=SPOTS.find(x=>x.name===f.name);
+    const dirs=(_ks?.dirs?.length?_ks.dirs:f.dirs)||[];
+    const key=`${f.lat},${f.lon}|${dirs.slice().sort((a,b)=>a-b).join(',')}`;
+    const days=(chipBestCache[key]?.days10)||null;
+    if(!days) return;                       // not fetched yet — a later pass fills it in
+    rendered++;
+
+    const block=document.createElement('div');
+    block.className='gd-spot';
+    const name=document.createElement('div');
+    name.className='gd-spot-name';
+    name.textContent='\u2605 '+(_ks?f.name:f.label);
+    block.appendChild(name);
+
+    const row=document.createElement('div');
+    row.className='gd-days';
+    // A day counts here on the same rule as the badge and the alerts:
+    // 2+ hours inside a run, not a lone windy hour.
+    const good=days.filter(d=>d.goodHours>=2);
+    if(!good.length){
+      const none=document.createElement('div');
+      none.className='gd-empty';
+      none.textContent='Nothing rideable in the forecast yet';
+      row.appendChild(none);
+    }
+    good.forEach(d=>{
+      const c=document.createElement('div');
+      c.className='gd-card';
+      c.title=`Open ${f.name}`;
+      c.addEventListener('click',()=>pickFav(f));
+
+      const dt=fmtDate(d.dateStr);
+      const dEl=document.createElement('div');
+      dEl.className='gd-date';
+      dEl.textContent=dt.short;
+      const num=document.createElement('span'); num.textContent=dt.num;
+      dEl.appendChild(num);
+      c.appendChild(dEl);
+
+      const kn=document.createElement('div');
+      kn.className='gd-kn';
+      kn.style.color=speedColor(d.peakKn);
+      kn.textContent=`\uD83D\uDCA8 ${d.peakKn} kn${d.dir?` \u00b7 ${d.dir}`:''}`;
+      c.appendChild(kn);
+
+      if(d.startHr!==null&&d.startHr!==undefined){
+        const m=document.createElement('div');
+        m.className='gd-meta';
+        m.textContent=`\uD83D\uDD52 from ${String(d.startHr).padStart(2,'0')}:00`;
+        c.appendChild(m);
+      }
+
+      // Same rateDay the detail cards use, so the wording never drifts. Its
+      // storm branch needs a weather code we do not keep — safe to pass 0here,
+      // because isRainy() covers every storm code, so a stormy hour never
+      // qualifies and such a day cannot reach the 2h bar above.
+      const r=rateDay(d.goodHours,d.peakKn,0,false,d.peakKn);
+      const rEl=document.createElement('div');
+      rEl.className='gd-rating '+r.cls;
+      rEl.textContent=r.label;
+      c.appendChild(rEl);
+
+      row.appendChild(c);
+    });
+    block.appendChild(row);
+    host.appendChild(block);
+  });
+  if(!rendered) host.innerHTML='';          // nothing resolved yet: no bare heading
+}
+
 function renderHintChips(){
   // Always clear search bar when rendering home screen chips
   const _si=$('searchInput'); if(_si&&!cachedLoc) _si.value='';
@@ -3821,7 +3936,7 @@ function renderHintChips(){
       const _syncDaysLine=()=>{ if(!fbadge.isConnected) l3.remove(); };
       if(_spotsIsReady){
         fetchChipQualDays({name:f.name,loc:f.label||'',lat:f.lat,lon:f.lon,dirs:_liveDirs})
-          .then(n=>{setChipDayBadge(fbadge,n,true);_syncDaysLine();updateBestWindowBar();});
+          .then(n=>{setChipDayBadge(fbadge,n,true);_syncDaysLine();updateBestWindowBar();renderGoodDaysSection();});
       }
 
       // 4 — the nearest mast, always shown. It used to appear only when the
@@ -3873,6 +3988,14 @@ function renderHintChips(){
       wrap.appendChild(upsell);
     }
   }
+
+  // Good days ahead — sits between the favourites and the suggestions: it is
+  // about the spots you already follow, not a discovery list.
+  const gdHost=document.createElement('div');
+  gdHost.id='goodDaysSection';
+  gdHost.style.cssText='width:100%';
+  wrap.appendChild(gdHost);
+  renderGoodDaysSection();
 
   // Popular spots section
   {
