@@ -158,16 +158,42 @@ test('sits between the favourites and the suggestions', async ({ gotoApp, page }
   expect(order.indexOf('GOOD_DAYS')).toBeLessThan(order.indexOf('POPULAR'));
 });
 
-test('a card opens its own spot', async ({ gotoApp, page }) => {
+test('a card opens its own spot, on the day it is about', async ({ gotoApp, page }) => {
+  // The card already answered "which day" — dropping the rider on the 16-day
+  // grid to find it again is a step backwards. _deepLinkDate is the hook
+  // renderGrid reads to open the hourly modal once the forecast has loaded,
+  // the same one the reminder emails use.
+  await gotoApp('signedIn');
+  await seed(page, {
+    favs: [RW], belled: ['Riverwoods Beachclub'],
+    cache: { 'Riverwoods Beachclub': [
+      day('2026-08-26', 6, 27, 9, 'SW'),
+      day('2026-08-29', 4, 21, 12, 'W'),
+    ] },
+  });
+
+  await page.evaluate(() => { (window as any)._opened = null; (window as any).pickFav = (f: any) => { (window as any)._opened = f.name; }; });
+  // click the SECOND card — the date must follow the card, not the first row
+  await page.locator('#goodDaysSection .gd-card').nth(1).click();
+
+  expect(await page.evaluate(() => (window as any)._opened)).toBe('Riverwoods Beachclub');
+  expect(await page.evaluate(() => (window as any)._deepLinkDate)).toBe('2026-08-29');
+});
+
+test('the day is armed before the spot loads, so the modal cannot race the fetch', async ({ gotoApp, page }) => {
   await gotoApp('signedIn');
   await seed(page, {
     favs: [RW], belled: ['Riverwoods Beachclub'],
     cache: { 'Riverwoods Beachclub': [day('2026-08-26', 6, 27, 9, 'SW')] },
   });
 
-  await page.evaluate(() => { (window as any)._opened = null; (window as any).pickFav = (f: any) => { (window as any)._opened = f.name; }; });
+  // record what _deepLinkDate held at the moment pickFav ran
+  await page.evaluate(() => {
+    (window as any)._seenAtPick = 'UNSET';
+    (window as any).pickFav = () => { (window as any)._seenAtPick = (window as any)._deepLinkDate; };
+  });
   await page.locator('#goodDaysSection .gd-card').first().click();
-  expect(await page.evaluate(() => (window as any)._opened)).toBe('Riverwoods Beachclub');
+  expect(await page.evaluate(() => (window as any)._seenAtPick)).toBe('2026-08-26');
 });
 
 test('the spot name is escaped, not injected as markup', async ({ gotoApp, page }) => {
@@ -181,4 +207,67 @@ test('the spot name is escaped, not injected as markup', async ({ gotoApp, page 
   const sec = page.locator('#goodDaysSection');
   await expect(sec).toContainText('<img src=x');
   expect(await sec.locator('img').count()).toBe(0);
+});
+
+// ── The chain end to end ───────────────────────────────────────────────────
+//
+// Everything above proves the card ARMS the deep link. This proves the link
+// actually lands: real pickFav, real forecast load, real renderGrid, and the
+// hourly modal open on the right day. Worth its own test because
+// `_deepLinkDate` — the hook the reminder emails also rely on — had no
+// coverage anywhere in the suite before this.
+
+const FX_DAYS = ['2026-08-24', '2026-08-25', '2026-08-26', '2026-08-27'];
+
+function forecastFixture(lat: number, lon: number) {
+  const time: string[] = [], windspeed_10m: number[] = [], winddirection_10m: number[] = [];
+  const windgusts_10m: number[] = [], weather_code: number[] = [], temperature_2m: number[] = [];
+  for (const d of FX_DAYS) {
+    for (let h = 0; h < 24; h++) {
+      time.push(`${d}T${String(h).padStart(2, '0')}:00`);
+      const good = d === '2026-08-26' && h >= 12 && h <= 17;   // the day we click
+      windspeed_10m.push(good ? 11.5 : 0.5);                   // ~22kn
+      winddirection_10m.push(270);
+      windgusts_10m.push(good ? 14 : 1);
+      weather_code.push(0);
+      temperature_2m.push(20);
+    }
+  }
+  return {
+    latitude: lat, longitude: lon, timezone: 'Europe/Brussels',
+    hourly: { time, temperature_2m, weather_code, windspeed_10m, winddirection_10m, windgusts_10m },
+    daily: {
+      time: FX_DAYS,
+      weather_code: FX_DAYS.map(() => 0),
+      temperature_2m_max: FX_DAYS.map(() => 24),
+      temperature_2m_min: FX_DAYS.map(() => 14),
+      windgusts_10m_max: FX_DAYS.map(() => 20),
+      sunrise: FX_DAYS.map(d => `${d}T05:30`),
+      sunset: FX_DAYS.map(d => `${d}T22:00`),
+    },
+  };
+}
+
+test('clicking a good day lands on that day’s hourly view, not the 16-day grid', async ({ gotoApp, page }) => {
+  // this one needs the forecast, so serve it instead of aborting
+  await page.unroute(/api\.open-meteo\.com/);
+  await page.route(/api\.open-meteo\.com\/v1\/forecast/, r =>
+    r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(forecastFixture(RW.lat, RW.lon)) }));
+  await page.route(/marine-api\.open-meteo\.com/, r =>
+    r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ hourly: { time: [], wave_height: [], wave_period: [], wave_direction: [] } }) }));
+
+  await gotoApp('signedIn');
+  await seed(page, {
+    favs: [RW], belled: ['Riverwoods Beachclub'],
+    cache: { 'Riverwoods Beachclub': [
+      day('2026-08-25', 3, 17, 11, 'W'),
+      day('2026-08-26', 6, 22, 12, 'W'),
+    ] },
+  });
+
+  await page.locator('#goodDaysSection .gd-card').nth(1).click();   // Aug 26
+
+  // the hourly modal opens on its own, headed with that date
+  await expect(page.locator('#modalOverlay')).toBeVisible({ timeout: 8000 });
+  await expect(page.locator('#mTitle')).toContainText('August 26');
 });
