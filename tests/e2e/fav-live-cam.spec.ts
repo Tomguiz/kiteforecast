@@ -25,7 +25,10 @@ async function render(page: any, o: { live?: any; cams?: Record<string, string> 
     ]);
     // _favCamUrls is a script-scope `let`, NOT a window property — assigning
     // window._favCamUrls would leave the real (empty) map in place.
+    // _favCamKey must be seeded too: the cache is keyed on the favourite set,
+    // so a map without its matching key is treated as stale and refetched.
     _favCamUrls = o.cams || {};
+    _favCamKey = loadFavs().map((f: any) => f.name).sort().join('\u0000');
     (window as any)._rwsNearest = async () => o.live === undefined
       ? { speedKn: 17, dirDeg: 61, gustKn: 21, stationName: 'Cadzand wind', distanceKm: 5.4, ageMin: 3, viewerUrl: 'x' }
       : o.live;
@@ -129,4 +132,79 @@ test('the cam button is big enough to see and to tap', async ({ gotoApp, page })
   expect(box).not.toBeNull();
   expect(box!.height).toBeGreaterThanOrEqual(28);
   expect(box!.width).toBeGreaterThanOrEqual(40);
+});
+
+// ── The cache that hid the cams ────────────────────────────────────────────
+//
+// Sycod has had a webcam in spot_info all along and still showed no button.
+// _loadFavCamUrls memoised its result including its FAILURES: there is an
+// unconditional renderHintChips() 800ms after load, which can beat the
+// Supabase client into existence, and caching {} at that moment hid every
+// webcam for the rest of the session. Adding a favourite had the same effect
+// from the other side — the cache was built before that spot existed.
+
+test('a miss is not memoised, so the cams appear once the client is ready', async ({ gotoApp, page }) => {
+  await gotoApp('signedIn');
+  await page.evaluate(async () => {
+    await (window as any)._spotsReady;
+    saveFavs([{ name: 'Sycod', label: 'Sycod', lat: 51.115, lon: 2.635 }]);
+    _favCamUrls = null; _favCamKey = '';
+    // first call lands before the client exists — exactly the 800ms render
+    (window as any).getSb = () => null;
+    (window as any)._firstCall = await _loadFavCamUrls();
+    // now the client is up, as it would be a moment later
+    (window as any).getSb = () => ({
+      from: () => ({ select: () => ({ in: async () => ({ data: [{ spot_name: 'Sycod', livecam_url: 'https://www.sycod.be/nl/meteo' }] }) }) }),
+    });
+    (window as any)._secondCall = await _loadFavCamUrls();
+  });
+
+  expect(await page.evaluate(() => (window as any)._firstCall)).toEqual({});
+  // the miss must not have stuck
+  expect(await page.evaluate(() => (window as any)._secondCall)).toEqual({ Sycod: 'https://www.sycod.be/nl/meteo' });
+});
+
+test('a fetch error does not blank the cams for the rest of the session', async ({ gotoApp, page }) => {
+  await gotoApp('signedIn');
+  await page.evaluate(async () => {
+    await (window as any)._spotsReady;
+    saveFavs([{ name: 'Sycod', label: 'Sycod', lat: 51.115, lon: 2.635 }]);
+    _favCamUrls = null; _favCamKey = '';
+    (window as any).getSb = () => ({ from: () => ({ select: () => ({ in: async () => { throw new Error('network'); } }) }) });
+    (window as any)._failed = await _loadFavCamUrls();
+    (window as any).getSb = () => ({
+      from: () => ({ select: () => ({ in: async () => ({ data: [{ spot_name: 'Sycod', livecam_url: 'https://www.sycod.be/nl/meteo' }] }) }) }),
+    });
+    (window as any)._recovered = await _loadFavCamUrls();
+  });
+
+  expect(await page.evaluate(() => (window as any)._failed)).toEqual({});
+  expect(await page.evaluate(() => (window as any)._recovered)).toEqual({ Sycod: 'https://www.sycod.be/nl/meteo' });
+});
+
+test('adding a favourite picks up its webcam without a reload', async ({ gotoApp, page }) => {
+  await gotoApp('signedIn');
+  await page.evaluate(async () => {
+    await (window as any)._spotsReady;
+    saveFavs([{ name: 'Riverwoods Beachclub', label: 'Riverwoods', lat: 51.3627, lon: 3.3062 }]);
+    _favCamUrls = null; _favCamKey = '';
+    const rows: Record<string, string> = {
+      'Riverwoods Beachclub': 'https://cam.example/rw',
+      'Sycod': 'https://www.sycod.be/nl/meteo',
+    };
+    (window as any).getSb = () => ({
+      from: () => ({ select: () => ({ in: async (_c: string, names: string[]) =>
+        ({ data: names.filter(n => rows[n]).map(n => ({ spot_name: n, livecam_url: rows[n] })) }) }) }),
+    });
+    (window as any)._before = await _loadFavCamUrls();
+    // the rider adds Sycod — renderHintChips runs again, the cache must follow
+    saveFavs([
+      { name: 'Riverwoods Beachclub', label: 'Riverwoods', lat: 51.3627, lon: 3.3062 },
+      { name: 'Sycod', label: 'Sycod', lat: 51.115, lon: 2.635 },
+    ]);
+    (window as any)._after = await _loadFavCamUrls();
+  });
+
+  expect(await page.evaluate(() => (window as any)._before)).toEqual({ 'Riverwoods Beachclub': 'https://cam.example/rw' });
+  expect(await page.evaluate(() => (window as any)._after)).toHaveProperty('Sycod', 'https://www.sycod.be/nl/meteo');
 });
