@@ -70,55 +70,50 @@ test('the cam button shows only for a spot that has one', async ({ gotoApp, page
   await expect(cards.filter({ hasText: 'Oostduinkerke' }).locator('.fav-cam-btn')).toHaveCount(0);
 });
 
-test('the cam button opens the spot and asks for the cam, without opening the forecast', async ({ gotoApp, page }) => {
+test('the cam button is a real link straight to the cam', async ({ gotoApp, page }) => {
+  await gotoApp('signedIn');
+  await render(page, { cams: { 'Riverwoods Beachclub': 'https://cam.example/rw' } });
+
+  const btn = page.locator('.fav-card .fav-cam-btn').first();
+  // An <a>, not a span with a click handler: on touch a JS-only click on a
+  // small element nested inside a card that is itself clickable is unreliable —
+  // the tap gets taken by the parent or eaten by scroll handling. This is why
+  // the button did nothing on mobile.
+  expect(await btn.evaluate(el => el.tagName)).toBe('A');
+  await expect(btn).toHaveAttribute('href', 'https://cam.example/rw');
+  await expect(btn).toHaveAttribute('target', '_blank');
+  await expect(btn).toHaveAttribute('rel', /noopener/);
+});
+
+test('it goes to the cam itself, not to the spot page', async ({ gotoApp, page }) => {
+  // It used to route through the spot page and unfold the info panel. That only
+  // showed the cam inline for the two spots the app can embed (both YouTube);
+  // for the other five it left the rider in front of another button — which is
+  // what "not always opening the live cam" meant.
   await gotoApp('signedIn');
   await render(page, { cams: { 'Riverwoods Beachclub': 'https://cam.example/rw' } });
 
   await page.evaluate(() => {
     (window as any)._picked = null;
-    (window as any)._deepLinkDate = null;
     (window as any).pickFav = (f: any) => { (window as any)._picked = f.name; };
+  });
+  // stop the real navigation, we only care that the app does not route itself
+  await page.locator('.fav-card .fav-cam-btn').first().evaluate((el: HTMLAnchorElement) => {
+    el.removeAttribute('target');
+    el.addEventListener('click', e => e.preventDefault());
   });
   await page.locator('.fav-card .fav-cam-btn').first().click();
 
-  expect(await page.evaluate(() => (window as any)._picked)).toBe('Riverwoods Beachclub');
-  expect(await page.evaluate(() => (window as any)._openCamOnLoad)).toBe(true);
-  // it must not also arm a day deep-link — that is the card's job, not the cam's
-  expect(await page.evaluate(() => (window as any)._deepLinkDate)).toBe(null);
+  expect(await page.evaluate(() => (window as any)._picked)).toBe(null);
 });
 
-test('landing with the flag unfolds the spot panel instead of leaving it collapsed', async ({ gotoApp, page }) => {
+test('a cam url that is not http is dropped rather than linked', async ({ gotoApp, page }) => {
+  // livecam_url is community-suggestable, so escaping the href is not enough —
+  // a javascript: URL would still run on click.
   await gotoApp('signedIn');
-  await page.evaluate(async () => {
-    (window as any).fetchSpotInfo = async () => ({
-      spot_name: 'Riverwoods Beachclub', verified: true,
-      livecam_url: 'https://www.clubnorthzeebrugge.be/meteo-webcam',   // a plain link, not an embed
-    });
-    (window as any)._openCamOnLoad = true;
-    await renderSpotInfoCard('Riverwoods Beachclub');
-    document.getElementById('results')!.style.display = 'block';
-  });
+  await render(page, { cams: { 'Riverwoods Beachclub': 'javascript:alert(1)' } });
 
-  // the body renders display:none; the flag must have opened it
-  await expect(page.locator('.spot-info-body')).toBeVisible();
-  await expect(page.locator('[data-cta="livecam"]')).toBeVisible();
-  // one-shot, like _deepLinkDate — a later render must not re-open it
-  expect(await page.evaluate(() => (window as any)._openCamOnLoad)).toBe(false);
-});
-
-test('landing without the flag leaves the panel collapsed as before', async ({ gotoApp, page }) => {
-  await gotoApp('signedIn');
-  await page.evaluate(async () => {
-    (window as any).fetchSpotInfo = async () => ({
-      spot_name: 'Riverwoods Beachclub', verified: true,
-      livecam_url: 'https://www.clubnorthzeebrugge.be/meteo-webcam',
-    });
-    (window as any)._openCamOnLoad = false;
-    await renderSpotInfoCard('Riverwoods Beachclub');
-    document.getElementById('results')!.style.display = 'block';
-  });
-
-  await expect(page.locator('.spot-info-body')).toBeHidden();
+  expect(await page.locator('.fav-card .fav-cam-btn').count()).toBe(0);
 });
 
 // The cam shortcut is a primary action — "watch it right now" — but shipped at
