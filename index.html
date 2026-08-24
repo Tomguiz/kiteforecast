@@ -3831,10 +3831,15 @@ function renderGoodDaysSection(){
     good.forEach(d=>{
       const c=document.createElement('div');
       c.className='gd-card';
-      c.title=`Open ${f.name}`;
-      c.addEventListener('click',()=>pickFav(f));
+      const dt0=fmtDate(d.dateStr), dt=dt0;
+      c.title=`Open ${f.name} \u2014 ${dt0.full}`;
+      // Land on the hourly breakdown for THIS day, not the spot's 16-day grid:
+      // the card already answered "which day", so making the rider find it
+      // again in the grid is a step backwards. _deepLinkDate is the same hook
+      // the reminder emails use — renderGrid opens the modal once the forecast
+      // for the spot has actually loaded, so this cannot race the fetch.
+      c.addEventListener('click',()=>{ window._deepLinkDate=d.dateStr; pickFav(f); });
 
-      const dt=fmtDate(d.dateStr);
       const dEl=document.createElement('div');
       dEl.className='gd-date';
       dEl.textContent=dt.short;
