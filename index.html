@@ -3810,18 +3810,27 @@ async function _friendsGoingToday(){
 // fetchSpotInfo's per-spot .single(). Cached for the session; a spot gaining a
 // cam shows up on the next load, which is soon enough for something an admin
 // edits by hand.
-let _favCamUrls=null;      // null = not fetched yet, {} = fetched
+let _favCamUrls=null;      // null = not fetched yet
+let _favCamKey='';         // the favourite set the cache was built for
 async function _loadFavCamUrls(){
-  if(_favCamUrls) return _favCamUrls;
   const sb=getSb(); const favs=loadFavs();
-  if(!sb||!favs.length){ _favCamUrls={}; return _favCamUrls; }
+  // Keyed on the favourites themselves: renderHintChips runs again when a spot
+  // is added, and a cache built before that would never learn the new spot's
+  // webcam.
+  const key=favs.map(f=>f.name).sort().join('\u0000');
+  if(_favCamUrls&&_favCamKey===key) return _favCamUrls;
+  // A MISS IS NEVER MEMOISED. There is an unconditional renderHintChips() 800ms
+  // after load, which can easily beat the Supabase client into existence;
+  // caching {} at that point hid every webcam for the rest of the session, and
+  // the same held for a transient fetch error. Sycod has had a cam all along.
+  if(!sb||!favs.length) return {};
   try{
     const{data}=await sb.from('spot_info').select('spot_name,livecam_url').in('spot_name',favs.map(f=>f.name));
     const out={};
     for(const r of (data||[])){ const u=safeHttpUrl(r.livecam_url); if(u) out[r.spot_name]=u; }
-    _favCamUrls=out;
-  }catch{ _favCamUrls={}; }
-  return _favCamUrls;
+    _favCamUrls=out; _favCamKey=key;
+    return out;
+  }catch{ return {}; }
 }
 
 function renderGoodDaysSection(){
