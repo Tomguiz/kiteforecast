@@ -4,6 +4,11 @@ export type Deal = {
   cta_label: string; cta_url: string;
   active: boolean; weight: number;
   starts_at?: string | null; ends_at?: string | null;
+  // Present on every row (email_deals.impressions is NOT NULL DEFAULT 0) and
+  // read back by the digest to increment the counter, but the type never
+  // declared it, so `deno check` failed on this branch before the rebase too.
+  // Optional because pickDeal is also fed hand-built rows in the tests.
+  impressions?: number;
 };
 
 function inRange(d: Deal, nowMs: number): boolean {
