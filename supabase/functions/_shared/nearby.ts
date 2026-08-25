@@ -66,9 +66,16 @@ export function selectNearbySpots(
 // A long drive has to buy its way in. Two rideable hours is a fine reason to
 // pop down the road and a poor reason to cross the country, so the minimum
 // session length scales with distance: the 2-hour session floor, plus an hour
-// for every 50km travelled.
+// for every 80km travelled.
+//
+// 80, not the original 50, because of where riders actually live relative to
+// the coast. From Waterloo every spot in a 120km radius sits at 100-120km, so
+// at 50km/hour the whole coast demanded a 4h session and the "near you"
+// section could essentially never fire: the 2026-08-24 digest logged
+// nearby_count 0 on a week whose best session anywhere was 3h. At 80 the same
+// coast asks 3h, which still refuses a one-hour blip two hours' drive away.
 export const DRIVE_FLOOR_HOURS = 2
-export const KM_PER_EXTRA_HOUR = 50
+export const KM_PER_EXTRA_HOUR = 80
 
 export function minHoursForDistance(distanceKm: number): number {
   return DRIVE_FLOOR_HOURS + Math.floor(distanceKm / KM_PER_EXTRA_HOUR)
