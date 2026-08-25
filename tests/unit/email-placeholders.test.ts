@@ -49,3 +49,24 @@ describe('reminder email placeholders', () => {
     }
   })
 })
+
+// The sponsor slot closes the digest, AFTER the reader's own call to action.
+// It shipped the other way round for one send: you hit the Billy Kite block
+// before "Check the full forecast", so the paid link came between the rider
+// and the thing they opened the email for.
+describe('digest section order', () => {
+  const digest = readFileSync(new URL('../../emails/digest.html', import.meta.url), 'utf8')
+
+  it('puts the forecast CTA before the deal slot', () => {
+    const cta = digest.indexOf('Check the full forecast')
+    const ad = digest.indexOf('[[ad_html]]')
+    expect(cta).toBeGreaterThan(-1)
+    expect(ad).toBeGreaterThan(-1)
+    expect(cta).toBeLessThan(ad)
+  })
+
+  it('still keeps the sessions above both of them', () => {
+    expect(digest.indexOf('[[spots_html]]')).toBeLessThan(digest.indexOf('Check the full forecast'))
+    expect(digest.indexOf('[[nearby_html]]')).toBeLessThan(digest.indexOf('Check the full forecast'))
+  })
+})
