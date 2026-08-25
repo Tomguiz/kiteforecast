@@ -67,3 +67,51 @@ describe('email deals', () => {
   expect(html).toContain('https://billykite.be/sale');
   });
 })
+
+// ── Billy Kite branding ────────────────────────────────────────────────────
+//
+// The slot used to wear KiteForecast's own palette (dark card, cyan headline),
+// which made a paid ad look like more forecast. It now wears the sponsor's:
+// #ff6600, sampled from billy.be, on a white card — the only light block in a
+// dark email, so it reads as an ad rather than as editorial.
+describe('deal ad branding', () => {
+  const deal: Deal = {
+    id: '1', shop_name: 'Billy Kite', headline: 'Gear up', body: 'Kites & boards',
+    image_url: null, cta_label: 'Shop →', cta_url: 'https://billykite.be',
+    active: true, weight: 1, starts_at: null, ends_at: null,
+  }
+
+  it("uses the sponsor's orange, not the app's cyan", () => {
+    const html = buildDealAdHTML(deal)
+    expect(html).toContain('#ff6600')
+    expect(html).not.toContain('#5dd4f0')   // KiteForecast's accent
+  })
+
+  it('never puts white text on the orange', () => {
+    // white on #ff6600 is 2.94:1 — it fails even the 3:1 large-text floor.
+    // Black is 6.43:1. billy.be's own top bar uses white; that ratio is not
+    // worth copying.
+    const html = buildDealAdHTML(deal)
+    const orangeBlocks = html.split('#ff6600').slice(1)
+    for (const b of orangeBlocks) {
+      const decl = b.slice(0, 300)
+      expect(decl).not.toMatch(/color:\s*#fff/i)
+      expect(decl).not.toMatch(/color:\s*white/i)
+    }
+  })
+
+  it('renders the photo when there is one, and nothing when there is not', () => {
+    const withImg = buildDealAdHTML({ ...deal, image_url: 'https://billy.be/cdn/shop/files/x.jpg?width=799' })
+    expect(withImg).toContain('<img')
+    expect(withImg).toContain('billy.be/cdn/shop/files/x.jpg')
+    // the query string has to survive escaping intact, or the crop is lost
+    expect(withImg).toContain('width=799')
+
+    expect(buildDealAdHTML(deal)).not.toContain('<img')
+  })
+
+  it('refuses a non-http image just as it refuses a non-http cta', () => {
+    const html = buildDealAdHTML({ ...deal, image_url: 'javascript:alert(1)' })
+    expect(html).not.toContain('javascript:')
+  })
+})
