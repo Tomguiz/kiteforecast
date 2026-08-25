@@ -319,7 +319,20 @@
 
     /* ── FETCH TIMESTAMP ── */
     .fetch-ts { position:fixed; bottom:0; left:0; right:0; z-index:1000; text-align:center; padding:5px 12px; font-size:.72rem; color:var(--tdim); letter-spacing:.02em; background:rgba(7,12,24,.82); backdrop-filter:blur(6px); -webkit-backdrop-filter:blur(6px); pointer-events:none; }
-    .fetch-ts.stale { color:rgba(251,146,60,.85); pointer-events:auto; cursor:pointer; }
+    /* The stale state is the only one you are meant to touch, so it stops
+       looking like the timestamp and becomes a bar: ~22px of .72rem text
+       pinned to the bottom edge — where the browser's own toolbar competes
+       for the tap — was neither visible nor reliably hittable on a phone.
+       The safe-area inset keeps it clear of the iOS home indicator. */
+    .fetch-ts.stale { pointer-events:auto; cursor:pointer;
+      display:flex; align-items:center; justify-content:center; gap:10px;
+      min-height:54px; padding:12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+      font-size:.85rem; font-weight:700; color:#fdba74;
+      background:rgba(88,38,8,.94); border-top:1px solid rgba(251,146,60,.55); }
+    .fetch-ts-btn { flex-shrink:0; display:inline-flex; align-items:center; gap:5px;
+      padding:7px 14px; border-radius:99px; font-size:.8rem; font-weight:800;
+      background:rgba(251,146,60,.22); border:1px solid rgba(251,146,60,.65); color:#ffd7b0; }
+    .fetch-ts.stale:active .fetch-ts-btn { background:rgba(251,146,60,.4); }
     .fetch-ts:empty { display:none; }
 
     /* ── LEGEND ── */
@@ -1851,10 +1864,16 @@ function _loadWxCache(lat,lon){
 function updateFetchTimestamp(){
   const el=$('fetchTimestamp'); if(!el) return;
   if(!lastFetchTime){ el.textContent=''; el.className='fetch-ts'; el.onclick=null; return; }
+  // textContent below also wipes the stale pill, so the bar cannot keep a
+  // Refresh button after a successful fetch.
   const ageMs=Date.now()-lastFetchTime;
   const stale=ageMs>3*60*60*1000;
   if(stale){
-    el.textContent='⚠️ Forecast may be outdated — tap to refresh';
+    // Literals only — no interpolation — so innerHTML carries no injection risk.
+    // The pill gives the bar a real "this is a button" affordance; "tap to
+    // refresh" as plain text did not read as one.
+    el.innerHTML='<span>\u26A0\uFE0F Forecast may be outdated</span>'
+      +'<span class="fetch-ts-btn">\u21BB Refresh</span>';
     el.className='fetch-ts stale';
     el.onclick=refreshForecast;
   } else {
