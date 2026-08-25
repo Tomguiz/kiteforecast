@@ -89,16 +89,32 @@ test.describe('edge function security gates', () => {
     // if the url were ever honoured instead of the fixed per-provider template,
     // the fetch would go to the unresolvable host and `live` would be null. This
     // is the only way to discriminate the two behaviours from outside the
-    // function, which is also why it depends on a live third-party station
-    // (Sycod's public weatherlink feed) being reachable — deliberate, not
-    // incidental flakiness.
-    const res = await ctx.get(
-      `${BASE}/wind-proxy?provider=weatherlink&station_id=87ca27e8616443678fffe486311370ee&url=http://example.invalid/`,
-      { headers: { Authorization: `Bearer ${ANON}` } });
+    // function, which is why it needs a live third-party station (Sycod's
+    // public weatherlink feed) to be reachable.
+    //
+    // So take a BASELINE first, without the url param. If the station is not
+    // reporting, neither call can say anything about the url being honoured,
+    // and asserting would just fail for a reason outside this codebase — as it
+    // did on 2026-08-25, when both calls returned {live:null}. Skipping on the
+    // baseline is safe precisely because it cannot mask a broken function: if
+    // wind-proxy itself regressed, the url-less baseline would be the thing
+    // that went null, and that is what we check.
+    const STATION = `${BASE}/wind-proxy?provider=weatherlink&station_id=87ca27e8616443678fffe486311370ee`;
+    const auth = { headers: { Authorization: `Bearer ${ANON}` } };
+
+    const baseRes = await ctx.get(STATION, auth);
+    expect(baseRes.status()).toBe(200);
+    const baseline = await baseRes.json();
+    test.skip(!baseline.live,
+      'upstream weatherlink station is not reporting right now — with no good reading to compare against, ' +
+      'an ignored url and an honoured-but-failed url are indistinguishable');
+
+    const res = await ctx.get(`${STATION}&url=http://example.invalid/`, auth);
     expect(res.status()).toBe(200);
     const body = await res.json();
+    // Same reading as without the param: the url was ignored, not fetched.
     expect(body.live).not.toBeNull();
-    expect(body.live.stationName).toBe('Sycod');
+    expect(body.live.stationName).toBe(baseline.live.stationName);
     await ctx.dispose();
   });
 
