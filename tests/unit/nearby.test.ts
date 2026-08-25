@@ -124,13 +124,26 @@ const rankable = (name: string, distanceKm: number, peakKn: number, totalHours: 
 describe('minHoursForDistance', () => {
   it('asks only for the session floor when the spot is close', () => {
     expect(minHoursForDistance(0)).toBe(2)
-    expect(minHoursForDistance(49)).toBe(2)
+    expect(minHoursForDistance(79)).toBe(2)
   })
 
-  it('asks for an extra hour per 50km', () => {
-    expect(minHoursForDistance(50)).toBe(3)
-    expect(minHoursForDistance(100)).toBe(4)
-    expect(minHoursForDistance(150)).toBe(5)
+  it('asks for an extra hour per 80km', () => {
+    expect(minHoursForDistance(80)).toBe(3)
+    expect(minHoursForDistance(160)).toBe(4)
+    expect(minHoursForDistance(240)).toBe(5)
+  })
+
+  // The case the rate was chosen for. An inland rider — Waterloo — has the
+  // whole coast sitting at 100-120km. At the old 50km/hour that band demanded
+  // a 4h session, so "near you" almost never fired: the 2026-08-24 digest
+  // logged nearby_count 0 on a week whose best session anywhere was 3h.
+  it('lets the coast qualify on 3h for a rider who lives inland', () => {
+    for (const km of [100, 105, 110, 119]) expect(minHoursForDistance(km)).toBe(3)
+  })
+
+  it('still refuses a short window at a serious distance', () => {
+    expect(minHoursForDistance(200)).toBe(4)
+    expect(minHoursForDistance(400)).toBe(7)
   })
 })
 
