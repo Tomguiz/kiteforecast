@@ -81,29 +81,34 @@
     /* ── HERO ── */
     .hero {
       background: linear-gradient(160deg, #070c18 0%, #0b1a35 55%, #070f1f 100%);
-      padding: clamp(24px,5vw,44px) 20px clamp(20px,4vw,32px);
+      padding: clamp(12px,2vw,18px) 20px clamp(12px,2vw,18px);
       text-align: center; border-bottom: 1px solid var(--border);
       position: sticky; top: 0; z-index: 300; overflow: visible;
     }
     .hero::before { content:''; position:absolute; inset:0; background:radial-gradient(ellipse at 50% 0%,rgba(0,212,255,.07) 0%,transparent 65%); pointer-events:none; overflow:hidden; border-radius:inherit; }
-    .logo { font-size: clamp(1.7rem,5vw,2.4rem); font-weight:800; letter-spacing:-1px; background:linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; margin-top:6px; }
+    /* Brand identity on ONE row. Stacked — 110px badge over a 50px wordmark
+       over a tagline — the header ate 37% of a 900px desktop screen and 34% of
+       a phone, before a single forecast was visible. Side by side it keeps the
+       same pieces at a third of the height. */
+    .brand-row { display:flex; align-items:center; justify-content:center; gap:12px; }
+    .logo { font-size: clamp(1.35rem,3.2vw,1.7rem); font-weight:800; letter-spacing:-1px; background:linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; margin-top:0; }
     .logo span { -webkit-text-fill-color:var(--text); }
-    .home-btn { background:none; border:none; cursor:pointer; padding:0; line-height:1; display:block; margin:0 auto 4px; }
+    .home-btn { background:none; border:none; cursor:pointer; padding:0; line-height:1; display:block; margin:0; flex-shrink:0; }
     .home-btn:hover { opacity:.82; transition:opacity .15s; }
     .site-logo {
-      display:block; margin:0 auto;
-      width:clamp(80px,14vw,110px); height:clamp(80px,14vw,110px);
+      display:block; margin:0;
+      width:clamp(44px,7vw,58px); height:clamp(44px,7vw,58px);
       border-radius:50%; object-fit:cover;
       box-shadow:0 4px 16px rgba(0,0,0,.5);
     }
     @media (max-width:599px) {
-      .site-logo { width:110px; height:110px; }
+      .site-logo { width:46px; height:46px; }
     }
     /* modal logo */
     .modal-logo-btn { background:none; border:none; cursor:pointer; padding:0; flex-shrink:0; opacity:.85; transition:opacity .15s; }
     .modal-logo-btn:hover { opacity:1; }
     .modal-logo { height:36px; width:36px; border-radius:50%; object-fit:cover; }
-    .tagline { color:var(--gray); margin:4px 0 18px; font-size:clamp(.78rem,.9rem + .2vw,.93rem); }
+    .tagline { color:var(--gray); margin:5px 0 11px; font-size:clamp(.72rem,.8rem + .15vw,.83rem); }
 
     /* ── SEARCH ── */
     .search-wrap { display:flex; max-width:520px; margin:0 auto; gap:8px; }
@@ -1223,9 +1228,11 @@
 
 <!-- ══ HEADER ══ -->
 <header class="hero">
-  <button class="home-btn" onclick="logoEasterEgg()" title="Home">
-    <img src="logo.png" alt="Tichkes" class="site-logo" onerror="this.style.display='none'">
-  </button>
+  <!-- brand row opens here; see .brand-row -->
+  <div class="brand-row">
+    <button class="home-btn" onclick="logoEasterEgg()" title="Home">
+      <img src="logo.png" alt="Tichkes" class="site-logo" onerror="this.style.display='none'">
+    </button>
   <button class="burger-btn" id="burgerBtn" onclick="openBurger()" title="Menu" aria-label="Menu">
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
     <span class="burger-dot" id="burgerDot"></span>
@@ -1237,7 +1244,8 @@
     </svg>
     <span class="profile-btn-dot" id="profileDot"></span>
   </button>
-  <div class="logo" id="logoHome" onclick="resetSearch()" style="cursor:pointer">🪁<span>Forecast</span></div>
+    <div class="logo" id="logoHome" onclick="resetSearch()" style="cursor:pointer">🪁<span>Forecast</span></div>
+  </div>
   <p class="tagline">Life starts at 25 knots 💨</p>
   <div class="search-wrap">
     <div class="search-input-wrap">
