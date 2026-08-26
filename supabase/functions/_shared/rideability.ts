@@ -20,11 +20,19 @@ export function angleDiff(a: number, b: number): number {
   return d > 180 ? 360 - d : d
 }
 
-// An empty dirs list means "this spot works in any direction".
-// How far the wind may sit from one of a spot's listed good directions and
-// still count. Mirrors WIND_DIR_TOLERANCE_DEG in index.html — if these two
-// diverge, a session the app shows as rideable never produces a reminder.
-export const WIND_DIR_TOLERANCE_DEG = 30
+// How far the wind may sit off a listed direction and still count. Mirrors
+// WIND_DIR_TOLERANCE_DEG in index.html — if these two drift, the app and the
+// emails disagree about the same spot on the same day.
+//
+// 20, tightened from 30 on 2026-08-26. The Knokke spots (Riverwoods, Het
+// Zoute, Surfers Paradise) genuinely need 250 deg or more; at 30 a listed W
+// reached down to 240. 20 puts the floor exactly on 250.
+//
+// Note this is BELOW the 22.5 that tiles 45-degree spacing seamlessly, so two
+// adjacent listed directions now leave a 5-degree hole between them (a spot
+// listing W and NW refuses 292 deg). That is the price of the precise floor;
+// widen the spot's own dirs rather than this constant if it bites.
+export const WIND_DIR_TOLERANCE_DEG = 20
 
 export function isWindDirOK(dir: number, spotDirs: number[]): boolean {
   if (!spotDirs || !spotDirs.length) return true

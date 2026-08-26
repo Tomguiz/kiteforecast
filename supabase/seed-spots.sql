@@ -1,5 +1,5 @@
 INSERT INTO spots (name, loc, lat, lon, dirs, active) VALUES
-  ('Riverwoods Beachclub', 'Knokke-Heist, Belgium', 51.3627, 3.3062, '{0,45,225,270,315}', true),
+  ('Riverwoods Beachclub', 'Knokke-Heist, Belgium', 51.3627, 3.3062, '{0,45,270,315}', true),
   ('Knokke Beach', 'Knokke-Heist, Belgium', 51.3613, 3.3273, '{270,315}', true),
   ('Duinbergen', 'Knokke-Heist, Belgium', 51.3468, 3.266, '{270,315}', true),
   ('Heist', 'Knokke-Heist, Belgium', 51.3427, 3.2326, '{270,315}', true),

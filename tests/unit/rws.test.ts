@@ -334,21 +334,28 @@ describe('isFiringNow', () => {
   // Tolerance is +/-30 deg per good dir. Tested against a SINGLE-dir spot on
   // purpose: with [270,315] the two tolerance bands overlap, so no direction
   // between them can ever be excluded and the boundary would be untestable.
-  it('accepts a direction within 30 degrees of a good dir', () => {
-    expect(isFiringNow(20, 300, [270])).toBe(true)   // 30 deg off, on the edge
-    expect(isFiringNow(20, 301, [270])).toBe(false)  // 31 deg off
+  it('accepts a direction within 20 degrees of a good dir', () => {
+    expect(isFiringNow(20, 290, [270])).toBe(true)   // 20 deg off, on the edge
+    expect(isFiringNow(20, 291, [270])).toBe(false)  // 21 deg off
   })
 
-  // Riverwoods, live: 23 kn at 250.1 deg on a spot listed [270, 315]. Under
-  // the old +/-22.5 rule a swing to 246 deg silently stopped it firing.
-  it('fires on the WSW the old tolerance turned away', () => {
+  // The Knokke floor. Riverwoods and its neighbours need 250 deg or more, so
+  // 250.1 fires and 246.3 must not — the reverse of what this test asserted
+  // while the tolerance was 30 and the rider believed 246 was rideable there.
+  it('holds the 250 deg floor on a spot listed W', () => {
     expect(isFiringNow(23, 250.1, [270, 315])).toBe(true)
-    expect(isFiringNow(26, 246.3, [270, 315])).toBe(true)
+    expect(isFiringNow(26, 246.3, [270, 315])).toBe(false)
   })
 
-  it('has continuous cover between two good dirs 45 deg apart', () => {
-    // The real reason the boundary test above needs a single-dir spot.
-    expect(isFiringNow(20, 293, DIRS)).toBe(true)
+  // KNOWN GAP, not an oversight. 45-degree spacing needs +/-22.5 to tile
+  // seamlessly; at 20 two adjacent listed directions leave 5 degrees
+  // uncovered. 293 deg on a spot listed W and NW is refused even though it
+  // sits between them. This is the cost of putting the floor exactly on 250 —
+  // pinned here so it is a decision on the record rather than a surprise.
+  it('leaves a 5 degree hole between two dirs 45 deg apart', () => {
+    expect(isFiringNow(20, 290, DIRS)).toBe(true)    // top of W's band
+    expect(isFiringNow(20, 293, DIRS)).toBe(false)   // the hole
+    expect(isFiringNow(20, 295, DIRS)).toBe(true)    // bottom of NW's band
   })
 
   it('treats an empty dirs list as "works in any direction"', () => {
