@@ -10832,7 +10832,13 @@ document.addEventListener('visibilitychange',()=>{
           ptr.style.opacity='0'; ptr.style.transform='scaleX(0)';
           spin.style.opacity='0'; spin.style.animation='';
         },600);
-        if(cachedLoc){ fetchForecastFromSpot({name:cachedLoc.name,loc:[cachedLoc.admin1,cachedLoc.country].filter(Boolean).join(', '),lat:cachedLoc.latitude,lon:cachedLoc.longitude,dirs:[...windDirs]},{force:true}); } else renderHintChips();
+        // Same call the stale bar makes. Pulling down used to run a bare
+        // renderHintChips() on the home screen: no cache clear, so the chips
+        // redrew from the 1-hour cache, and no lastFetchTime stamp, so "Last
+        // forecast update" kept showing the old time however often you pulled.
+        // Two refresh gestures with two implementations drifted apart twice;
+        // there is now one.
+        refreshForecast();
       } else {
         ptr.style.opacity='0'; ptr.style.transform='scaleX(0)';
         spin.style.opacity='0';

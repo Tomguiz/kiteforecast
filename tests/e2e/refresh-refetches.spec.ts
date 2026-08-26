@@ -152,3 +152,69 @@ test('refreshing with a spot open still refreshes that spot', async ({ gotoApp, 
   expect(await page.evaluate(() => (window as any)._navigated)).toBe('Riverwoods Beachclub');
   expect(await page.evaluate(() => (window as any)._forced)).toBe(true);
 });
+
+// ── The two gestures must not drift apart again ────────────────────────────
+//
+// "Last forecast update" kept showing an old time however often the rider
+// pulled down. Pull-to-refresh ran a bare renderHintChips() on the home
+// screen — no cache clear, so the chips redrew from the 1-hour cache, and no
+// lastFetchTime stamp, so the timestamp never moved. The stale bar had
+// already been fixed; this gesture had not, so the two disagreed a second
+// time. They now share one implementation.
+
+const pullToRefresh = (page: any) => page.evaluate(() => {
+  // Real Touch instances: TouchEventInit refuses plain objects.
+  const t = (y: number) => new Touch({ identifier: 1, target: document.body, clientX: 100, clientY: y });
+  document.dispatchEvent(new TouchEvent('touchstart', { touches: [t(10)], bubbles: true }));
+  document.dispatchEvent(new TouchEvent('touchmove',  { touches: [t(60)], bubbles: true }));
+  document.dispatchEvent(new TouchEvent('touchend',   { changedTouches: [t(120)], bubbles: true }));
+});
+
+test('pulling down on the home screen stamps the timestamp and clears the chip cache', async ({ gotoApp, page }) => {
+  await setup(page);
+  await gotoApp('signedIn');
+  await page.evaluate(async () => {
+    await (window as any)._spotsReady;
+    cachedLoc = null;
+    window.scrollTo(0, 0);
+    saveFavs([{ name: 'Riverwoods Beachclub', label: 'Riverwoods', lat: 51.3627, lon: 3.3062 }]);
+    chipFxCache['51.3627,3.3062|270,315'] = 3;
+    lastFetchTime = Date.now() - 47 * 60 * 1000;   // the "old timestamp"
+    updateFetchTimestamp();
+  });
+
+  const before = await page.evaluate(() =>
+    Math.round((Date.now() - lastFetchTime) / 60000));
+  expect(before).toBeGreaterThan(40);
+
+  await pullToRefresh(page);
+  await page.waitForTimeout(500);
+
+  const after = await page.evaluate(() => ({
+    ageMin: Math.round((Date.now() - lastFetchTime) / 60000),
+    cacheEmptied: Object.keys(chipFxCache).length === 0,
+    shown: document.getElementById('fetchTimestamp')!.textContent,
+  }));
+  expect(after.ageMin).toBe(0);            // the timestamp actually moved
+  expect(after.cacheEmptied).toBe(true);   // and the chips really refetch
+  expect(after.shown).toContain('Last forecast update');
+});
+
+test('pulling down with a spot open refreshes that spot, not the home screen', async ({ gotoApp, page }) => {
+  await setup(page);
+  await gotoApp('signedIn');
+  await page.evaluate(async () => {
+    await (window as any)._spotsReady;
+    window.scrollTo(0, 0);
+    cachedLoc = { name: 'Riverwoods Beachclub', latitude: 51.3627, longitude: 3.3062, admin1: 'Knokke-Heist', country: 'Belgium' };
+    (window as any)._picked = null;
+    (window as any)._forced = null;
+    (window as any).pickSpot = (s: any, o: any) => { (window as any)._picked = s.name; (window as any)._forced = o?.force; };
+  });
+
+  await pullToRefresh(page);
+  await page.waitForTimeout(400);
+
+  expect(await page.evaluate(() => (window as any)._picked)).toBe('Riverwoods Beachclub');
+  expect(await page.evaluate(() => (window as any)._forced)).toBe(true);
+});
