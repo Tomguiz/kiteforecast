@@ -2066,7 +2066,7 @@ const FIRING_MIN_KN=15;
 // room either side without swallowing its neighbours whole.
 // Mirrored in supabase/functions/_shared/rideability.ts — the app and the
 // emails must answer this question identically or they contradict each other.
-const WIND_DIR_TOLERANCE_DEG=30;
+const WIND_DIR_TOLERANCE_DEG = 20;
 function _rwsIsFiringNow(speedKn,dirDeg,spotDirs){
   if(dirDeg===null||dirDeg===undefined) return false;
   if(speedKn<FIRING_MIN_KN) return false;
@@ -2701,7 +2701,7 @@ function buildLegendHTML(){
 // ══════════════════════════════════
 const SPOTS=[
   // ── BELGIUM ──
-  {name:'Riverwoods Beachclub',loc:'Knokke-Heist, Belgium',lat:51.3627,lon:3.3062,dirs:[0,45,225,270,315]},
+  {name:'Riverwoods Beachclub',loc:'Knokke-Heist, Belgium',lat:51.3627,lon:3.3062,dirs:[0,45,270,315]},
   {name:'Knokke Beach',loc:'Knokke-Heist, Belgium',lat:51.3613,lon:3.3273,dirs:[270,315]},
   {name:'Duinbergen',loc:'Knokke-Heist, Belgium',lat:51.3468,lon:3.2660,dirs:[270,315]},
   {name:'Heist',loc:'Knokke-Heist, Belgium',lat:51.3427,lon:3.2326,dirs:[270,315]},

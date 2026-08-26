@@ -48,22 +48,23 @@ describe('hourQualifies', () => {
 })
 
 describe('isWindDirOK', () => {
-  it('accepts within ±30° of any listed direction', () => {
+  it('accepts within ±20° of any listed direction', () => {
     expect(isWindDirOK(270, DIRS)).toBe(true)
-    expect(isWindDirOK(292, DIRS)).toBe(true)
-    expect(isWindDirOK(248, DIRS)).toBe(true)
+    expect(isWindDirOK(289, DIRS)).toBe(true)
+    expect(isWindDirOK(252, DIRS)).toBe(true)
   })
 
-  // The reason the tolerance moved off 22.5. Riverwoods is listed [270, 315];
-  // the mast 16 km out was reading 246.3° — solid WSW, a direction anyone
-  // would ride there — and the old rule rejected it for being 1.2° too far.
-  it('accepts the WSW that the old ±22.5° rule rejected', () => {
-    expect(isWindDirOK(246.3, [270, 315])).toBe(true)
-    expect(isWindDirOK(250.1, [270, 315])).toBe(true)   // what Cadzand reported
+  // The Knokke floor, from the rider who sails there: Riverwoods, Het Zoute
+  // and Surfers Paradise need 250° or more. ±20 off a listed W puts the floor
+  // exactly there, which is why the tolerance is 20 and not 22.5 or 30.
+  it('puts the floor on 250° for a spot listed W', () => {
+    expect(isWindDirOK(250.1, [270, 315])).toBe(true)
+    expect(isWindDirOK(249, [270, 315])).toBe(false)
+    expect(isWindDirOK(246.3, [270, 315])).toBe(false)
   })
 
   it('still refuses a direction genuinely off the spot', () => {
-    expect(isWindDirOK(239, [270])).toBe(false)   // just past the 240° edge
+    expect(isWindDirOK(249, [270])).toBe(false)   // just past the 250° edge
     expect(isWindDirOK(180, [270])).toBe(false)
     expect(isWindDirOK(90,  [270, 315])).toBe(false)
   })

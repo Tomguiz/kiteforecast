@@ -138,14 +138,22 @@ test('the bubble reports the exact degree the mast measured', async ({ gotoApp, 
   await expect(page.locator(LIVE)).not.toContainText('W');
 });
 
-// 250.1° against a spot listed [270, 315] is 19.9° out — inside the new ±30°
-// but it was inside the old ±22.5° too. 246.3° is the one that changed: the
-// mast 16 km off Riverwoods was reading it while the app said "not ok".
-test('fires on the WSW that the old ±22.5° tolerance turned away', async ({ gotoApp, page }) => {
+// The Knokke floor. Riverwoods needs 250° or more, so 250.1° fires and 246.3°
+// does not — the tolerance is 20 precisely so that a listed W bottoms out on
+// 250. This test previously asserted the opposite, back when 246 was thought
+// rideable there.
+test('fires at the 250° floor and not below it', async ({ gotoApp, page }) => {
+  await gotoApp('signedIn');
+  await seedChip(page, { live: { speedKn: 26, dirDeg: 250.1 } });
+  await expect(page.locator(LIVE)).toHaveClass(/is-firing/);
+  await expect(page.locator(LIVE)).toContainText('26 kn 250°');
+});
+
+test('stays quiet just under the 250° floor', async ({ gotoApp, page }) => {
   await gotoApp('signedIn');
   await seedChip(page, { live: { speedKn: 26, dirDeg: 246.3 } });
-  await expect(page.locator(LIVE)).toHaveClass(/is-firing/);
-  await expect(page.locator(LIVE)).toContainText('26 kn 246°');
+  await expect(page.locator(LIVE)).toContainText('26 kn 246°');   // still reported
+  await expect(page.locator(LIVE)).not.toHaveClass(/is-firing/);  // but not firing
 });
 
 test('still stays quiet once the wind is genuinely off the spot', async ({ gotoApp, page }) => {
