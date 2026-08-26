@@ -1869,13 +1869,17 @@ function _loadWxCache(lat,lon){
   }catch(e){ return null; }
 }
 
+// 15 minutes, not the 3 hours it used to be. The old window was chosen when a
+// refresh could not actually refetch anyway; now that the gesture works, the
+// bar is worth offering while the reading is still plausibly worth rechecking.
+const STALE_AFTER_MS=15*60*1000;
 function updateFetchTimestamp(){
   const el=$('fetchTimestamp'); if(!el) return;
   if(!lastFetchTime){ el.textContent=''; el.className='fetch-ts'; el.onclick=null; return; }
   // textContent below also wipes the stale pill, so the bar cannot keep a
   // Refresh button after a successful fetch.
   const ageMs=Date.now()-lastFetchTime;
-  const stale=ageMs>3*60*60*1000;
+  const stale=ageMs>STALE_AFTER_MS;
   if(stale){
     // Literals only — no interpolation — so innerHTML carries no injection risk.
     // The pill gives the bar a real "this is a button" affordance; "tap to
@@ -1899,12 +1903,14 @@ function loadLastSpot(){
   try{ return JSON.parse(localStorage.getItem('kf_lastSpot')); }catch(e){ return null; }
 }
 function refreshForecast(){
-  // Prefer current in-memory spot; fall back to localStorage only if no spot loaded
+  // force: this is only ever called by an explicit user refresh (the stale
+  // bar, pull-to-refresh) or by coming back to a long-backgrounded tab.
+  // Without it the 1-hour cache answers and nothing changes on screen.
   if(cachedLoc){
-    pickSpot({name:cachedLoc.name,loc:[cachedLoc.admin1,cachedLoc.country].filter(Boolean).join(', '),lat:cachedLoc.latitude,lon:cachedLoc.longitude,dirs:[...windDirs]});
+    pickSpot({name:cachedLoc.name,loc:[cachedLoc.admin1,cachedLoc.country].filter(Boolean).join(', '),lat:cachedLoc.latitude,lon:cachedLoc.longitude,dirs:[...windDirs]},{force:true});
   } else {
     const s=loadLastSpot();
-    if(s) pickSpot(s);
+    if(s) pickSpot(s,{force:true});
   }
 }
 
@@ -3539,14 +3545,14 @@ function fillSpotFromAC(spot){
   pickSpot(spot);
 }
 // Called from chips, favs, recent — always fetches immediately
-function pickSpot(spot){
+function pickSpot(spot,opts){
   $('searchInput').value=spot.name;
   acSelectedSpot=null;
   closeAC();
   manualShoreSet=false;
   addRecentSpot(spot);
   saveLastSpot(spot);
-  fetchForecastFromSpot(spot);
+  fetchForecastFromSpot(spot,opts);
 }
 function pickSpotAndOpenDay(spot,dateStr){
   window._deepLinkDate=dateStr;
@@ -3576,7 +3582,12 @@ function _applyWxData(loc,wx,marineArr,tideExtremes){
   cachedTideExtremes=tideExtremes||null;
 }
 
-async function fetchForecastFromSpot(spot){
+// opts.force skips the 1-hour weather cache. A deliberate refresh — pulling
+// down, or tapping the stale bar — has to actually hit the network, or the
+// app redraws byte-identical data and looks broken. That was the bug: every
+// refresh path funnelled through the cache read below, so pulling to refresh
+// did nothing at all for the first hour after a spot was opened.
+async function fetchForecastFromSpot(spot,opts){
   const myGen=++_fetchGen;
   showOnly('loadingState');
   manualShoreSet=false;
@@ -3587,7 +3598,7 @@ async function fetchForecastFromSpot(spot){
     const loc={name:spot.name,country:locParts.pop()||'',admin1:locParts.join(', '),latitude:live?.lat||spot.lat,longitude:live?.lon||spot.lon};
 
     // Serve from cache if same spot and data is under 1 hour old
-    const cached=_loadWxCache(loc.latitude,loc.longitude);
+    const cached=opts?.force?null:_loadWxCache(loc.latitude,loc.longitude);
     if(cached&&cached.loc.name===spot.name){
       if(myGen!==_fetchGen) return;
       _applyWxData(cached.loc,cached.wx,cached.marineArr,cached.tideExtremes);
@@ -10807,7 +10818,7 @@ document.addEventListener('visibilitychange',()=>{
           ptr.style.opacity='0'; ptr.style.transform='scaleX(0)';
           spin.style.opacity='0'; spin.style.animation='';
         },600);
-        if(cachedLoc){ fetchForecastFromSpot({name:cachedLoc.name,loc:[cachedLoc.admin1,cachedLoc.country].filter(Boolean).join(', '),lat:cachedLoc.latitude,lon:cachedLoc.longitude,dirs:[...windDirs]}); } else renderHintChips();
+        if(cachedLoc){ fetchForecastFromSpot({name:cachedLoc.name,loc:[cachedLoc.admin1,cachedLoc.country].filter(Boolean).join(', '),lat:cachedLoc.latitude,lon:cachedLoc.longitude,dirs:[...windDirs]},{force:true}); } else renderHintChips();
       } else {
         ptr.style.opacity='0'; ptr.style.transform='scaleX(0)';
         spin.style.opacity='0';
