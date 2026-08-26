@@ -84,3 +84,71 @@ test('the bar clears once the refresh has actually landed', async ({ gotoApp, pa
   expect(after.stale).toContain('stale');
   expect(after.fresh).not.toContain('stale');
 });
+
+// ── Refresh refreshes the page you are on ──────────────────────────────────
+//
+// On the home screen refreshForecast did loadLastSpot() and navigated to
+// whichever spot the rider had opened last — a jarring answer to "refresh
+// what I am looking at", and the thing they actually reported: tapping the
+// bar threw them into a spot detail page.
+
+test('refreshing from the home screen does not navigate to a spot', async ({ gotoApp, page }) => {
+  await setup(page);
+  await gotoApp('signedIn');
+  await page.evaluate(async () => {
+    await (window as any)._spotsReady;
+    // a spot HAS been opened before, so loadLastSpot() would find one
+    saveLastSpot({ name: 'Riverwoods Beachclub', loc: 'Knokke-Heist, Belgium', lat: 51.3627, lon: 3.3062, dirs: [270, 315] });
+    cachedLoc = null;                       // but none is open now
+    (window as any)._navigated = null;
+    (window as any).pickSpot = (s: any) => { (window as any)._navigated = s.name; };
+  });
+
+  await page.evaluate(() => refreshForecast());
+  await page.waitForTimeout(400);
+
+  expect(await page.evaluate(() => (window as any)._navigated)).toBe(null);
+});
+
+test('it refreshes the home chips instead, and clears the stale bar', async ({ gotoApp, page }) => {
+  await setup(page);
+  await gotoApp('signedIn');
+  const r = await page.evaluate(async () => {
+    await (window as any)._spotsReady;
+    cachedLoc = null;
+    saveFavs([{ name: 'Riverwoods Beachclub', label: 'Riverwoods', lat: 51.3627, lon: 3.3062 }]);
+    // a warm chip cache, and a stale bar showing
+    chipFxCache['51.3627,3.3062|270,315'] = 3;
+    lastFetchTime = Date.now() - 20 * 60 * 1000;
+    updateFetchTimestamp();
+    const before = (document.getElementById('fetchTimestamp') as HTMLElement).className;
+
+    refreshForecast();
+
+    return {
+      before,
+      after: (document.getElementById('fetchTimestamp') as HTMLElement).className,
+      cacheEmptied: Object.keys(chipFxCache).length === 0,
+    };
+  });
+
+  expect(r.before).toContain('stale');
+  expect(r.cacheEmptied).toBe(true);   // the chips actually refetch
+  expect(r.after).not.toContain('stale');
+});
+
+test('refreshing with a spot open still refreshes that spot', async ({ gotoApp, page }) => {
+  await setup(page);
+  await gotoApp('signedIn');
+  await page.evaluate(async () => {
+    await (window as any)._spotsReady;
+    cachedLoc = { name: 'Riverwoods Beachclub', latitude: 51.3627, longitude: 3.3062, admin1: 'Knokke-Heist', country: 'Belgium' };
+    (window as any)._navigated = null;
+    (window as any)._forced = null;
+    (window as any).pickSpot = (s: any, o: any) => { (window as any)._navigated = s.name; (window as any)._forced = o?.force; };
+  });
+
+  await page.evaluate(() => refreshForecast());
+  expect(await page.evaluate(() => (window as any)._navigated)).toBe('Riverwoods Beachclub');
+  expect(await page.evaluate(() => (window as any)._forced)).toBe(true);
+});

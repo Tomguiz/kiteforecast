@@ -1909,8 +1909,10 @@ function refreshForecast(){
   if(cachedLoc){
     pickSpot({name:cachedLoc.name,loc:[cachedLoc.admin1,cachedLoc.country].filter(Boolean).join(', '),lat:cachedLoc.latitude,lon:cachedLoc.longitude,dirs:[...windDirs]},{force:true});
   } else {
-    const s=loadLastSpot();
-    if(s) pickSpot(s,{force:true});
+    // No spot open means the rider is on the home screen. Refresh THAT.
+    // This used to loadLastSpot() and navigate to whatever they opened last,
+    // which is a jarring answer to "refresh the page I am looking at".
+    refreshHomeChips();
   }
 }
 
@@ -3786,13 +3788,25 @@ function reloadForecast(){
     const loc=cachedLoc;
     pickSpot({name:loc.name,lat:loc.latitude,lon:loc.longitude,dirs:[...windDirs]});
   } else {
-    // Home screen — clear chip cache and retry all chip fetches
-    Object.keys(chipFxCache).forEach(k=>delete chipFxCache[k]);
-    Object.keys(chipBestCache).forEach(k=>delete chipBestCache[k]);
-    _chipCacheTs=0;
-    localStorage.removeItem(CHIP_CACHE_LS_KEY);
-    renderHintChips();
+    refreshHomeChips();
   }
+}
+
+// Refresh what the HOME screen shows: drop the 1-hour chip cache so every
+// favourite refetches. Used by the error-banner retry and by refreshForecast,
+// which used to send a rider on the home screen to whatever spot they had
+// opened last — a refresh should refresh the page you are on, not navigate.
+function refreshHomeChips(){
+  Object.keys(chipFxCache).forEach(k=>delete chipFxCache[k]);
+  Object.keys(chipBestCache).forEach(k=>delete chipBestCache[k]);
+  _chipCacheTs=0;
+  localStorage.removeItem(CHIP_CACHE_LS_KEY);
+  renderHintChips();
+  // The stale bar is driven by lastFetchTime, so a home refresh has to stamp
+  // it too — otherwise the bar sits there forever, unclearable from here.
+  lastFetchTime=Date.now();
+  try{localStorage.setItem('kf_lastFetch',lastFetchTime);}catch(e){}
+  updateFetchTimestamp();
 }
 function setChipDayBadge(el,n,isFav=false){
   if(n===null){
