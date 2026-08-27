@@ -1873,6 +1873,17 @@ function _loadWxCache(lat,lon){
 // refresh could not actually refetch anyway; now that the gesture works, the
 // bar is worth offering while the reading is still plausibly worth rechecking.
 const STALE_AFTER_MS=15*60*1000;
+// The bar and the automatic refresh must use the SAME threshold. They did not:
+// the bar appeared at 15 minutes while the auto-refresh only fired at 30, so
+// for a quarter of an hour the app asked the rider to do something it was
+// perfectly willing to do itself — and on a cold open, where visibilitychange
+// never fires at all, it just asked.
+function refreshIfStale(){
+  if(!lastFetchTime) return false;
+  if(Date.now()-lastFetchTime<=STALE_AFTER_MS) return false;
+  refreshForecast();
+  return true;
+}
 function updateFetchTimestamp(){
   const el=$('fetchTimestamp'); if(!el) return;
   if(!lastFetchTime){ el.textContent=''; el.className='fetch-ts'; el.onclick=null; return; }
@@ -4796,6 +4807,10 @@ updateShareBanner();
 // Re-render chips after auth settles in case sync finished before auth listener fired
 setTimeout(()=>renderHintChips(), 800);
 setTimeout(()=>renderHintChips(), 2500);
+// Opening the app IS a refresh request. Without this the rider launched it,
+// saw "Forecast may be outdated" straight away, and had to ask for something
+// the app could have done on its own.
+setTimeout(()=>refreshIfStale(), 900);
 
 // ══════════════════════════════════
 //  FETCH
@@ -10791,7 +10806,7 @@ async function handleSpotDeepLink(spotParam,dateParam){
 // ── AUTO-REFRESH: re-fetch when app comes back to foreground after 30+ min ──
 document.addEventListener('visibilitychange',()=>{
   if(document.visibilityState==='visible'){
-    if(cachedLoc&&lastFetchTime&&Date.now()-lastFetchTime>30*60*1000) refreshForecast();
+    refreshIfStale();
     const btn=$('ppManageSubBtn');
     if(btn&&btn.disabled) { btn.textContent='Manage subscription → cancel, change card'; btn.disabled=false; }
   }
