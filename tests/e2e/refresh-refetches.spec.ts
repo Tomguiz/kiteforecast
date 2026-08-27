@@ -218,3 +218,71 @@ test('pulling down with a spot open refreshes that spot, not the home screen', a
   expect(await page.evaluate(() => (window as any)._picked)).toBe('Riverwoods Beachclub');
   expect(await page.evaluate(() => (window as any)._forced)).toBe(true);
 });
+
+// ── Opening the app is itself a refresh request ────────────────────────────
+//
+// The rider launched the app and was met with "Forecast may be outdated"
+// immediately. Two thresholds disagreed: the bar showed at 15 minutes, the
+// automatic refresh only fired at 30 — and only when a spot was open, and
+// only via visibilitychange, which does not fire on a cold open at all. So
+// between 15 and 30 minutes the app asked for something it was willing to do
+// itself, and on launch it just asked.
+
+test('stale data refreshes itself instead of asking', async ({ gotoApp, page }) => {
+  await setup(page);
+  await gotoApp('signedIn');
+  const r = await page.evaluate(() => {
+    (window as any)._refreshed = false;
+    (window as any).refreshForecast = () => { (window as any)._refreshed = true; };
+    lastFetchTime = Date.now() - 20 * 60 * 1000;   // in the old 15-30 dead zone
+    const acted = refreshIfStale();
+    return { acted, refreshed: (window as any)._refreshed };
+  });
+  expect(r.acted).toBe(true);
+  expect(r.refreshed).toBe(true);
+});
+
+test('fresh data is left alone — no request on every resume', async ({ gotoApp, page }) => {
+  await setup(page);
+  await gotoApp('signedIn');
+  const r = await page.evaluate(() => {
+    (window as any)._refreshed = false;
+    (window as any).refreshForecast = () => { (window as any)._refreshed = true; };
+    lastFetchTime = Date.now() - 5 * 60 * 1000;
+    return { acted: refreshIfStale(), refreshed: (window as any)._refreshed };
+  });
+  expect(r.acted).toBe(false);
+  expect(r.refreshed).toBe(false);
+});
+
+test('a rider who has never fetched anything is not refreshed at', async ({ gotoApp, page }) => {
+  await setup(page);
+  await gotoApp('signedIn');
+  const acted = await page.evaluate(() => {
+    (window as any).refreshForecast = () => { throw new Error('should not run'); };
+    lastFetchTime = 0;
+    return refreshIfStale();
+  });
+  expect(acted).toBe(false);
+});
+
+test('the bar and the auto-refresh agree on when data is stale', async ({ gotoApp, page }) => {
+  // The actual defect was two numbers, 15 and 30, drifting apart. Pin that
+  // they are one number: whenever the bar decides to show, refreshIfStale
+  // would also have acted.
+  await setup(page);
+  await gotoApp('signedIn');
+  const rows = await page.evaluate(() => {
+    (window as any).refreshForecast = () => {};
+    return [5, 14, 16, 25, 40, 200].map(min => {
+      lastFetchTime = Date.now() - min * 60 * 1000;
+      updateFetchTimestamp();
+      return {
+        min,
+        barShown: (document.getElementById('fetchTimestamp') as HTMLElement).className.includes('stale'),
+        wouldRefresh: refreshIfStale(),
+      };
+    });
+  });
+  for (const r of rows) expect(r.barShown).toBe(r.wouldRefresh);
+});
