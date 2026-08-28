@@ -1,0 +1,203 @@
+import { test, expect } from '../fixtures/auth';
+
+// Tall viewport so the day rows sit in view without a scroll. Playwright
+// re-scrolls before every click and lands the target under the sticky hero,
+// which is an actionability artefact, not something a rider hits: they scroll
+// a row into view and click what they can see.
+test.use({ viewport: { width: 1280, height: 1400 } });
+
+// The spot view is now: the 16-day strip on top (on every screen), then one
+// row per day, and the Windguru-style hourly matrix inside the day you open.
+// It replaces a grid of 16 dense cards that showed every day's detail at once.
+
+const D0 = '2026-08-28';
+const days = (n: number) => Array.from({ length: n }, (_, i) => {
+  const d = new Date(D0 + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + i);
+  return d.toISOString().slice(0, 10);
+});
+
+async function seed(page: any, n = 3) {
+  await page.evaluate((dd: string[]) => {
+    cachedLoc = { name: 'Knokke', latitude: 51.35, longitude: 3.28, country: 'BE' };
+    const hr = new Map();
+    dd.forEach(d => {
+      const m = new Map();
+      for (let h = 0; h < 24; h++) {
+        // a solid rideable afternoon in a steady SW
+        const kn = h >= 11 && h <= 18 ? 22 : 8;
+        m.set(h, { kn, dir: 240, code: 1, temp: 19, gustKn: kn + 5 });
+      }
+      hr.set(d, m);
+    });
+    cachedHrMap = hr;
+    cachedWx = { daily: {
+      time: dd,
+      weather_code: dd.map(() => 1),
+      temperature_2m_max: dd.map(() => 24),
+      temperature_2m_min: dd.map(() => 15),
+      windgusts_10m_max: dd.map(() => 27),
+      sunrise: dd.map(d => `${d}T06:00`),
+      sunset: dd.map(d => `${d}T21:00`),
+    } };
+    windDirs = new Set([225, 270]);
+    // The kite column is only populated for a rider with a profile — without
+    // one, suggestKiteSize correctly returns nothing.
+    const pf = loadProfile();
+    // The rider's own calibration: a 12 m held from 14 to 22 kn.
+    pf.weightKg = 80; pf.kiteLevel = 'Advanced'; pf.powerPref = 'overpowered';
+    saveProfile(pf);
+    renderGrid();
+  }, days(n));
+}
+
+test('the day rows replace the card grid, one row per day', async ({ gotoApp, page }) => {
+  await gotoApp('signedOut');
+  await seed(page, 3);
+  await expect(page.locator('#forecastGrid .fday')).toHaveCount(3);
+  await expect(page.locator('#forecastGrid .day-card')).toHaveCount(0);
+  // the summary each row carries
+  const first = page.locator('#forecastGrid .fday').first();
+  await expect(first.locator('.fd-win')).toContainText('11:00');
+  await expect(first.locator('.fd-ribbon i')).toHaveCount(16);   // daylight hours 06–21
+});
+
+test('the 16-day strip is visible on desktop, not just mobile', async ({ gotoApp, page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await gotoApp('signedOut');
+  await seed(page, 3);
+  await expect(page.locator('#tenDayStripWrap')).toBeVisible();
+  await expect(page.locator('#tdsCols .tds-day-card').first()).toBeVisible();
+});
+
+test('opening a day reveals the hourly matrix, and closing it puts it away', async ({ gotoApp, page }) => {
+  await gotoApp('signedOut');
+  await seed(page, 3);
+  const row = page.locator('#forecastGrid .fday').first();
+  const body = page.locator(`#fdb-${days(1)[0]}`);
+
+  await expect(body).toBeHidden();
+  await row.evaluate(el => el.scrollIntoView({ block: 'center' }));
+  await row.locator('.fday-head').click();
+  await expect(body).toBeVisible();
+  await expect(row).toHaveClass(/open/);
+  await expect(row.locator('.fday-head')).toHaveAttribute('aria-expanded', 'true');
+
+  // the matrix: hours across, parameters down
+  await expect(body.locator('table.fg tr')).toHaveCount(7);
+  await expect(body.locator('tr.fg-hr td')).toHaveCount(16);
+  await expect(body.locator('tr.fg-kn td').nth(11)).toHaveText('22');   // 11:00 is rideable
+  await expect(body.locator('tr.fg-kite td').nth(11)).toHaveText('12'); // the rider's 12 m band
+
+  await row.locator('.fday-head').click();
+  await expect(body).toBeHidden();
+  await expect(row).not.toHaveClass(/open/);
+});
+
+test('an open day survives a re-render', async ({ gotoApp, page }) => {
+  // renderGrid runs again on refresh and on a "Going" confirmation. Collapsing
+  // the rider's open day underneath them would be its own small bug.
+  await gotoApp('signedOut');
+  await seed(page, 3);
+  const d = days(1)[0];
+  const r0 = page.locator('#forecastGrid .fday').first();
+  await r0.evaluate(el => el.scrollIntoView({ block: 'center' }));
+  await r0.locator('.fday-head').click();
+  await expect(page.locator(`#fdb-${d}`)).toBeVisible();
+  await page.evaluate(() => renderGrid());
+  await expect(page.locator(`#fdb-${d}`)).toBeVisible();
+  await expect(page.locator('#forecastGrid .fday').first()).toHaveClass(/open/);
+});
+
+test('the notification bell does not also open the day', async ({ gotoApp, page }) => {
+  await gotoApp('signedOut');
+  await seed(page, 3);
+  const row = page.locator('#forecastGrid .fday').first();
+  await row.evaluate(el => el.scrollIntoView({ block: 'center' }));
+  await row.locator('.card-bell').click();
+  await expect(page.locator(`#fdb-${days(1)[0]}`)).toBeHidden();
+});
+
+test('the row keeps the going indicator the attendance code writes into', async ({ gotoApp, page }) => {
+  // Five call sites do document.getElementById(`going-${date}`) and set
+  // textContent / display on it. The redesign must not strand them.
+  await gotoApp('signedOut');
+  await seed(page, 3);
+  const d = days(1)[0];
+  const ind = page.locator(`#going-${d}`);
+  await expect(ind).toHaveCount(1);
+  await expect(ind).toBeHidden();
+  await page.evaluate((dd: string) => {
+    const el = document.getElementById(`going-${dd}`)!;
+    el.style.display = 'block'; el.textContent = '✓ Going · 14:00';
+  }, d);
+  await expect(ind).toHaveText('✓ Going · 14:00');
+});
+
+test('the full-detail button still opens the day modal', async ({ gotoApp, page }) => {
+  await gotoApp('signedOut');
+  await seed(page, 3);
+  const r1 = page.locator('#forecastGrid .fday').first();
+  await r1.evaluate(el => el.scrollIntoView({ block: 'center' }));
+  await r1.locator('.fday-head').click();
+  await page.locator('.fg-more').first().click();
+  await expect(page.locator('#modalOverlay')).toBeVisible();
+});
+
+test('the row sizes the kite on the gust at the peak hour, not the day worst', async ({ gotoApp, page }) => {
+  // A day can peak at 22 kn in the afternoon and throw its hardest gust in a
+  // squall at 08:00. Pairing those two inflates effectiveWindKn and costs the
+  // rider a whole kite size on the summary row.
+  await gotoApp('signedOut');
+  await page.evaluate(() => {
+    const D = '2026-08-28';
+    const m = new Map();
+    for (let h = 0; h < 24; h++) {
+      const rideable = h >= 12 && h <= 18;
+      m.set(h, {
+        kn: rideable ? 22 : 9,
+        gustKn: h === 8 ? 40 : (rideable ? 26 : 11),   // the squall sits outside the session
+        dir: 240, code: 1, temp: 19,
+      });
+    }
+    cachedHrMap = new Map([[D, m]]);
+    cachedLoc = { name: 'K', latitude: 51.35, longitude: 3.28, country: 'BE' };
+    cachedWx = { daily: {
+      time: [D], weather_code: [1], temperature_2m_max: [24], temperature_2m_min: [15],
+      windgusts_10m_max: [20],                      // m/s — the app converts
+      sunrise: [`${D}T06:00`], sunset: [`${D}T21:00`],
+    } };
+    windDirs = new Set([225, 270]);
+    const pf = loadProfile();
+    pf.weightKg = 80; pf.kiteLevel = 'Advanced'; pf.powerPref = 'overpowered';
+    saveProfile(pf);
+    renderGrid();
+  });
+  // 22 kn with a 26 kn gust stays inside the 12 m band. Sized off the 08:00
+  // squall it would fall to 10 m or smaller.
+  await expect(page.locator('#forecastGrid .fday').first().locator('.fd-kite')).toHaveText('12 m');
+});
+
+test('no kite size on a day with no session', async ({ gotoApp, page }) => {
+  // Wind enough to size a kite, but blowing from the wrong quarter, so there
+  // is no session to size for. The row must not offer one.
+  await gotoApp('signedOut');
+  await page.evaluate(() => {
+    const D = '2026-08-28';
+    const m = new Map();
+    for (let h = 0; h < 24; h++) m.set(h, { kn: 18, gustKn: 22, dir: 90, code: 1, temp: 19 });
+    cachedHrMap = new Map([[D, m]]);
+    cachedLoc = { name: 'K', latitude: 51.35, longitude: 3.28, country: 'BE' };
+    cachedWx = { daily: {
+      time: [D], weather_code: [1], temperature_2m_max: [22], temperature_2m_min: [15],
+      windgusts_10m_max: [11], sunrise: [`${D}T06:00`], sunset: [`${D}T21:00`],
+    } };
+    windDirs = new Set([225, 270]);              // 90° is nowhere near
+    const pf = loadProfile();
+    pf.weightKg = 80; pf.kiteLevel = 'Advanced'; pf.powerPref = 'overpowered';
+    saveProfile(pf);
+    renderGrid();
+  });
+  const row = page.locator('#forecastGrid .fday').first();
+  await expect(row.locator('.fd-kite')).toHaveText('—');
+  await expect(row.locator('.fd-kite')).toHaveClass(/none/);
+});

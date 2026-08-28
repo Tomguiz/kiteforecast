@@ -44,7 +44,7 @@ test('the 16-day strip fades days 11-16 (index >= 10) only', async ({ gotoApp, p
 test('the forecast grid fades days 11-16 (index >= 10) only', async ({ gotoApp, page }) => {
   await gotoApp('signedOut');
   await seed16(page);
-  const cards = page.locator('#forecastGrid .day-card');
+  const cards = page.locator('#forecastGrid .fday');
   await expect(cards).toHaveCount(16);
   await expect(cards.nth(9)).not.toHaveClass(/day-lowconf/);
   await expect(cards.nth(10)).toHaveClass(/day-lowconf/);
