@@ -55,7 +55,7 @@ test('the daily card icon + rating ignore night-only rain (matches the hourly de
     } };
     windDirs = new Set([315]); // wind blows from 90 (E), not in W/NW → not rideable, but not rain either
     renderGrid();
-    const card = document.querySelector('#forecastGrid .day-card')!;
+    const card = document.querySelector('#forecastGrid .fday')!;
     return {
       icon: card.querySelector('.wx-icon')?.textContent || '',
       rating: card.querySelector('.rating-badge')!.textContent || '',

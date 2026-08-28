@@ -259,15 +259,81 @@
     .tds-dc-spark { margin-top:auto; line-height:0; }
     .tds-spark { display:block; width:100%; height:24px; }
     .rws-trend { display:block; width:100%; height:44px; }
-
-    .forecast-grid {
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 10px;
+    /* On desktop the 16 days fit across the width, so the rail becomes a full
+       summary bar instead of something to swipe. */
+    @media (min-width:760px) {
+      #tdsChart { overflow-x:visible; }
+      .tds-day-card { flex:1 1 0; min-width:0; }
+      .tds-swipe-hint { display:none; }
+      .tds-dc-day { font-size:.62rem; }
+      .tds-dc-range { font-size:.72rem; }
+      .tds-dc-gust { font-size:.62rem; }
+      .tds-spark { height:28px; }
     }
-    @media (max-width:700px)  { .forecast-grid { grid-template-columns:repeat(4,1fr); gap:8px; } }
-    @media (max-width:520px)  { .forecast-grid { grid-template-columns:repeat(3,1fr); gap:6px; } }
-    @media (max-width:360px)  { .forecast-grid { grid-template-columns:repeat(2,1fr); gap:6px; } }
+
+    /* One row per day, identical on desktop and mobile. */
+    .forecast-grid { display:flex; flex-direction:column; gap:7px; }
+    .fday { background:var(--card); border:1px solid var(--border); border-radius:12px; overflow:hidden;
+      /* the hero is sticky, so a row scrolled to the top would land under it */
+      scroll-margin-top:104px; }
+    .fday.has-session { border-color:rgba(34,197,94,.45); }
+    .fday.open { border-color:rgba(0,212,255,.45); }
+    .fday-head {
+      display:grid; align-items:center; gap:12px; padding:10px 13px; cursor:pointer;
+      grid-template-columns:74px 46px 1fr 118px 58px auto 26px 20px;
+    }
+    .fday-head:focus-visible { outline:2px solid var(--accent); outline-offset:-2px; }
+    .fd-date { font-size:.82rem; font-weight:700; color:var(--text); white-space:nowrap; }
+    .fd-num { display:block; font-size:.68rem; font-weight:500; color:var(--tdim); }
+    .fd-wx { display:flex; align-items:center; gap:5px; }
+    .fd-wx .wx-icon { font-size:1.05rem; }
+    .fd-temp { font-size:.72rem; color:var(--tdim); font-variant-numeric:tabular-nums; }
+    .fd-ribbon { display:flex; align-items:flex-end; gap:2px; height:26px; min-width:0; }
+    .fd-ribbon i { flex:1; border-radius:2px 2px 0 0; display:block; min-width:1px; }
+    .fd-win { font-size:.74rem; color:var(--gray); text-align:right; white-space:nowrap; font-variant-numeric:tabular-nums; }
+    .fd-kite { font-size:.78rem; font-weight:700; color:#5dd4f0; text-align:center; white-space:nowrap; }
+    .fd-kite.none { color:var(--tdim); font-weight:400; }
+    /* The bell was absolutely positioned for the old card. In a row it is just
+       another grid cell — left absolute it anchored to the page instead, so all
+       16 stacked in the top corner under the header. */
+    .fday-head .card-bell { position:static; opacity:.45; }
+    .fday-head .card-bell.active { opacity:1; }
+    .fd-caret { color:var(--tdim); font-size:.8rem; text-align:center; transition:transform .18s ease; }
+    .fday.open .fd-caret { transform:rotate(180deg); }
+    @media (prefers-reduced-motion:reduce) { .fd-caret { transition:none; } }
+    /* Below ~700px the window and rating drop out: the ribbon and the kite
+       size are what the rider actually scans for. */
+    @media (max-width:760px) {
+      .fday-head { grid-template-columns:62px 42px 1fr 52px 26px 18px; gap:8px; padding:9px 10px; }
+      .fd-win, .fd-rate { display:none; }
+      .fd-date { font-size:.78rem; }
+    }
+    /* ── hourly matrix inside an open day ── */
+    .fday-body { border-top:1px solid var(--border); background:rgba(0,0,0,.16); padding:10px 0 0; }
+    .fg-scroll { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    .fg-scroll::-webkit-scrollbar { height:4px; }
+    .fg-scroll::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+    table.fg { border-collapse:collapse; width:100%; min-width:600px; font-variant-numeric:tabular-nums; }
+    table.fg tr { border-bottom:1px solid rgba(37,52,80,.5); }
+    table.fg tr:last-child { border-bottom:0; }
+    table.fg td { height:27px; text-align:center; font-size:.76rem; color:var(--text);
+      border-right:1px solid rgba(37,52,80,.45); }
+    table.fg th.fg-rh {
+      width:60px; min-width:60px; text-align:left; padding:0 10px; font-size:.6rem; font-weight:700;
+      letter-spacing:.08em; text-transform:uppercase; color:var(--tdim);
+      background:var(--card); position:sticky; left:0; z-index:2;
+    }
+    .fg-hr td { font-size:.7rem; color:var(--gray); font-weight:600; }
+    .fg-hr td.fg-now { box-shadow:inset 0 0 0 1.5px var(--accent); border-radius:3px; color:var(--accent); }
+    .fg-wx td { font-size:.8rem; }
+    .fg-gust td, .fg-temp td { font-size:.7rem; color:var(--tdim); }
+    .fg-kite td { color:#5dd4f0; font-weight:700; }
+    .fg-kite td.fg-dim { color:var(--tdim); font-weight:400; }
+    .fg-arrow { display:inline-block; color:var(--accent); font-size:.85rem; line-height:1; }
+    .fg-foot { padding:9px 13px 11px; }
+    .fg-more { background:none; border:1px solid var(--border); border-radius:8px; color:var(--gray);
+      font-family:inherit; font-size:.74rem; font-weight:600; padding:6px 12px; cursor:pointer; }
+    .fg-more:hover { border-color:var(--accent); color:var(--accent); }
 
     .day-card {
       background:var(--card); border:1.5px solid var(--border); border-radius:13px;
@@ -1186,7 +1252,6 @@
     }
 
     /* strip is mobile-only */
-    @media (min-width:600px) { #tenDayStripWrap { display:none !important; } }
 
     /* strip is mobile-only (already declared below) */
 
@@ -5149,6 +5214,61 @@ async function fetchForecast(query){
 // ══════════════════════════════════
 //  BUILD DAY DATA
 // ══════════════════════════════════
+// Which days are expanded. Kept outside renderGrid so a re-render (a refresh,
+// a "Going" confirmation) does not collapse what the rider had open.
+let _openForecastDays=new Set();
+
+function toggleForecastDay(dateStr,idx){
+  if(_openForecastDays.has(dateStr)){
+    _openForecastDays.delete(dateStr);
+    const b=$('fdb-'+dateStr); if(b){ b.hidden=true; b.innerHTML=''; }
+    const r=document.querySelector(`.fday[data-date="${dateStr}"]`);
+    if(r){ r.classList.remove('open'); r.querySelector('.fday-head').setAttribute('aria-expanded','false'); }
+  } else {
+    _openForecastDays.add(dateStr);
+    openForecastDay(dateStr,idx);
+  }
+}
+
+function openForecastDay(dateStr,idx){
+  const body=$('fdb-'+dateStr); if(!body) return;
+  const row=document.querySelector(`.fday[data-date="${dateStr}"]`);
+  if(row){ row.classList.add('open'); row.querySelector('.fday-head').setAttribute('aria-expanded','true'); }
+  const daily=cachedWx.daily;
+  const{day}=buildDay(dateStr,daily.sunrise[idx],daily.sunset[idx]);
+  const pf=loadProfile();
+  // Hours in columns, parameters in rows — the Windguru reading. Only daylight
+  // hours: nobody is choosing a kite for 03:00.
+  const cell=(h,inner,style='')=>`<td style="${style}" title="${h.tStr.slice(11,16)}">${inner}</td>`;
+  const rowOf=(cls,label,cells)=>`<tr class="${cls}"><th class="fg-rh">${label}</th>${cells}</tr>`;
+  const nowH=new Date().getHours();
+  const isToday=dateStr===new Date().toISOString().slice(0,10);
+  let t='';
+  t+=rowOf('fg-hr','Hour',day.map(h=>{
+    const on=isToday&&h.hour===nowH;
+    return `<td class="${on?'fg-now':''}">${String(h.hour).padStart(2,'0')}</td>`;
+  }).join(''));
+  t+=rowOf('fg-wx','',day.map(h=>cell(h,wmoInfo(h.code)[0])).join(''));
+  t+=rowOf('fg-kn','Wind',day.map(h=>
+    cell(h,h.kn,`background:${windBarColor(h.kn)};color:#0b1220;font-weight:700`)).join(''));
+  t+=rowOf('fg-gust','Gusts',day.map(h=>cell(h,h.gustKn||'\u2014')).join(''));
+  t+=rowOf('fg-dir','Dir',day.map(h=>
+    `<td title="${compass(h.dir)} ${h.dir}\u00b0"><span class="fg-arrow" style="transform:rotate(${(h.dir+180)%360}deg)">\u2191</span></td>`).join(''));
+  t+=rowOf('fg-kite','Kite',day.map(h=>{
+    const k=suggestKiteSize({weightKg:pf.weightKg,level:pf.kiteLevel,pref:pf.powerPref,windKn:h.kn,gustKn:h.gustKn});
+    if(!k) return `<td class="fg-dim">\u2014</td>`;
+    const sfx=k.limit==='over'?'+':k.limit==='under'?'\u2212':'';
+    return `<td title="${k.exact} m for ${pf.weightKg} kg at ${h.kn} kn">${k.size}${sfx}</td>`;
+  }).join(''));
+  t+=rowOf('fg-temp','\u00b0C',day.map(h=>cell(h,h.temp+'\u00b0')).join(''));
+
+  body.innerHTML=`<div class="fg-scroll"><table class="fg">${t}</table></div>
+    <div class="fg-foot">
+      <button class="fg-more" onclick="openModal('${dateStr}',${idx})">Full detail, tides &amp; sessions \u2192</button>
+    </div>`;
+  body.hidden=false;
+}
+
 function buildDay(dateStr,sunrise,sunset){
   const hours=[];
   const dayMap=cachedHrMap.get(dateStr)||new Map();
@@ -5221,7 +5341,7 @@ function renderGrid(){
     const tMax=Math.round(daily.temperature_2m_max[i]);
     const tMin=Math.round(daily.temperature_2m_min[i]);
     const gust=toKnotsR(daily.windgusts_10m_max[i]);
-    const{goodHours,peakKn,peakDayKn,hasBadDir,domDir,day}=buildDay(dateStr,daily.sunrise[i],daily.sunset[i]);
+    const{goodHours,peakKn,peakDayKn,hasBadDir,domDir,day,good}=buildDay(dateStr,daily.sunrise[i],daily.sunset[i]);
     // icon + rating reflect the DAYLIGHT weather, not Open-Meteo's 24h daily
     // code (which would flag night-only rain — see daylightWeatherCode)
     const code=daylightWeatherCode(day,daily.weather_code[i]);
@@ -5273,29 +5393,53 @@ function renderGrid(){
       <span class="cw-gust-kn">↑${gust}</span>
     </div>`;
 
-    const card=document.createElement('div');
-    card.className='day-card'+(goodHours>=2?' has-session':'')+(i>=10?' day-lowconf':'');
-    card.title='Tap for hourly detail';
-    card.onclick=()=>openModal(dateStr,i);
-    card.innerHTML=`
-      <button class="card-bell${hasDayNotif(loc.name,dateStr)?' active':''}" onclick="toggleDayNotif(event,'${dateStr}',${i})" title="Notify me for this day">${bellSVG(12)}</button>
-      <div class="day-label">${short}<span class="dn">${num}</span></div>
-      <div class="card-top">
-        <div class="wx-icon">${icon}</div>
-        <div class="t-range"><strong>${tMax}°</strong>${tMin}°C</div>
+    // One row per day: the whole 16 days scan vertically, and the hour-by-hour
+    // table lives inside the day you open. The 16 dense cards this replaces
+    // showed every day's detail at once, which is what made the view unreadable.
+    const ribbon=day.map((h,idx)=>{
+      const pct=Math.max(12,windBarPct(h.kn));
+      const lit=inValidRun[idx];
+      return `<i style="height:${pct}%;background:${lit?windBarColor(h.kn):'var(--border)'}"
+        title="${h.tStr.slice(11,16)} \u00b7 ${h.kn}kn \u00b7 ${compass(h.dir)} ${h.dir}\u00b0"></i>`;
+    }).join('');
+
+    const winTxt=bestWindow(good)||(goodHours>0?`${goodHours}h`:'\u2014');
+    const _pf=loadProfile();
+    // Pair the peak wind with the gust AT that hour, not the day's worst gust.
+    // The two rarely coincide, and feeding effectiveWindKn a gust from another
+    // hour inflates it enough to drop the suggestion a whole size.
+    const _peakH=(good.length?good:day).slice().sort((a,b)=>b.kn-a.kn)[0]||null;
+    // Only for a day that actually has a session. A size next to a "—" window
+    // and a RAIN badge is noise: it answered a question nobody asked.
+    const _k=goodHours>=2?suggestKiteSize({weightKg:_pf.weightKg,level:_pf.kiteLevel,pref:_pf.powerPref,
+      windKn:peakKn,gustKn:_peakH?_peakH.gustKn:null}):null;
+    const kiteTxt=_k?`${_k.size}${_k.limit==='over'?'+':_k.limit==='under'?'\u2212':''} m`:'\u2014';
+
+    const row=document.createElement('div');
+    row.className='fday'+(goodHours>=2?' has-session':'')+(i>=10?' day-lowconf':'');
+    row.dataset.date=dateStr;
+    row.innerHTML=`
+      <div class="fday-head" role="button" tabindex="0" aria-expanded="false" title="Show the hour-by-hour table">
+        <div class="fd-date">${short}<span class="fd-num">${num}</span></div>
+        <div class="fd-wx"><span class="wx-icon">${icon}</span><span class="fd-temp">${tMax}\u00b0</span></div>
+        <div class="fd-ribbon">${ribbon||'<i style="height:12%;background:var(--border)"></i>'}</div>
+        <div class="fd-win">${winTxt}</div>
+        <div class="fd-kite${_k?'':' none'}">${kiteTxt}</div>
+        <div class="fd-rate"><span class="rating-badge ${rating.cls}">${rating.label}</span></div>
+        <button class="card-bell${hasDayNotif(loc.name,dateStr)?' active':''}"
+          onclick="toggleDayNotif(event,'${dateStr}',${i})" title="Notify me for this day">${bellSVG(12)}</button>
+        <span class="fd-caret">\u25be</span>
       </div>
-      <div class="hour-bar-wrap">
-        <div class="hour-bar">${barHTML||'<div style="color:var(--tdim);font-size:.58rem;width:100%;text-align:center">—</div>'}</div>
-        <div class="hour-axis"><span>${String(parseInt(daily.sunrise[i].slice(11,13),10)).padStart(2,'0')}</span><span>${String(Math.round((parseInt(daily.sunrise[i].slice(11,13),10)+parseInt(daily.sunset[i].slice(11,13),10))/2)).padStart(2,'0')}</span><span>${String(parseInt(daily.sunset[i].slice(11,13),10)).padStart(2,'0')}</span></div>
-      </div>
-      ${windBarEl}
-      ${dirPill}
-      ${hPill}
-      ${tideLine}
-      <div class="rating-badge ${rating.cls}">${rating.label}</div>
       ${goodHours>=2?`<div class="card-going-indicator" id="going-${dateStr}" style="display:none"></div>`:''}
-    `;
-    grid.appendChild(card);
+      <div class="fday-body" id="fdb-${dateStr}" hidden></div>`;
+    const head=row.querySelector('.fday-head');
+    // The bell sits inside the header, so it must not also toggle the day.
+    head.addEventListener('click',e=>{ if(e.target.closest('.card-bell')) return; toggleForecastDay(dateStr,i); });
+    head.addEventListener('keydown',e=>{
+      if(e.key==='Enter'||e.key===' '){ e.preventDefault(); toggleForecastDay(dateStr,i); }
+    });
+    grid.appendChild(row);
+    if(_openForecastDays.has(dateStr)) openForecastDay(dateStr,i);
   });
 
   // ── summary strip ──
