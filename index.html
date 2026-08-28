@@ -130,9 +130,18 @@
     .btn-map { padding:12px 16px; border-radius:12px; border:1.5px solid var(--border); background:transparent; color:var(--gray); font-weight:600; font-size:.93rem; cursor:pointer; transition:border-color .2s,color .2s; display:inline-flex; align-items:center; flex-shrink:0; white-space:nowrap; }
     .btn-map:hover { border-color:var(--accent); color:var(--accent); }
     #mapBtnMobileWrap { display:none; }
+    /* The planner is the answer to "I don't know where to go", which is mostly
+       a phone question — so it must NOT inherit .btn-map's mobile display:none.
+       It gets its own row under the search bar instead. */
+    .btn-plan { border-color:rgba(56,189,248,.45); color:var(--accent); }
+    #planBtnMobileWrap { display:none; }
     @media (max-width:599px) {
       .btn-map { display:none !important; }
       #mapBtnMobileWrap { display:block; }
+      #planBtnMobileWrap { display:block; }
+      .btn-plan-mobile { display:inline-flex; align-items:center; gap:7px; padding:11px 22px; border-radius:12px;
+        border:1.5px solid rgba(56,189,248,.45); background:rgba(56,189,248,.08); color:var(--accent);
+        font-weight:700; font-size:.93rem; cursor:pointer; white-space:nowrap; margin:14px auto 0; }
       .btn-map-mobile { display:inline-flex; align-items:center; gap:7px; padding:11px 22px; border-radius:12px; border:1.5px solid var(--border); background:transparent; color:var(--gray); font-weight:600; font-size:.93rem; cursor:pointer; transition:border-color .2s,color .2s; white-space:nowrap; margin:18px auto 0; }
       .btn-map-mobile:hover { border-color:var(--accent); color:var(--accent); }
       /* Sticky compact header when viewing a spot */
@@ -1261,6 +1270,7 @@
       <input type="text" id="searchInput" placeholder="Search for a spot, beach or city…" autocomplete="off" />
       <div class="autocomplete" id="acDropdown"></div>
     </div>
+    <button class="btn-map btn-plan" id="planBtn" onclick="openPlanner()" title="Find where to ride in the next few days"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:5px"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>Plan</button>
     <button class="btn-map" id="mapBtn" onclick="openSpotsMap()" title="Show all kite spots on map"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:5px"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Map</button>
     <button class="btn-reset" id="resetBtn" onclick="resetSearch()">← Back</button>
   </div>
@@ -1311,6 +1321,10 @@
       <div id="upgradeModalFeatures" style="font-size:.75rem;line-height:1.7;margin-bottom:12px;"></div>
       <button class="btn-premium" onclick="$('upgradeModal').style.display='none';startCheckout(this)">⚡ Get Lifetime Access — €19.99 →</button>
     </div>
+  </div>
+  <!-- mobile planner button -->
+  <div id="planBtnMobileWrap" style="text-align:center">
+    <button class="btn-plan-mobile" onclick="openPlanner()"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>Where should I ride?</button>
   </div>
   <!-- mobile map button -->
   <div id="mapBtnMobileWrap" style="text-align:center">
@@ -10988,6 +11002,195 @@ document.addEventListener('visibilitychange',()=>{
   }
 });
 
+// ══════════════════════════════════
+//  SESSION PLANNER
+// ══════════════════════════════════
+// MIRRORS supabase/functions/_shared/planner.ts — index.html is a plain script
+// and cannot import it. A unit test pins the two copies in step.
+const MAX_PLAN_DAYS = 4;              // today + 3: past that the forecast is
+                                      // not reliable enough to plan a drive on
+const KM_PER_DRIVE_HOUR = 90;
+const MAX_CANDIDATES = 14;            // each one is a forecast request
+const PLAN_MIN_SEPARATION_KM = 25;
+
+function planDates(todayISO, days=MAX_PLAN_DAYS){
+  const out=[], d=new Date(todayISO+'T12:00:00Z');
+  for(let i=0;i<Math.min(days,MAX_PLAN_DAYS);i++)
+    out.push(new Date(d.getTime()+i*86400000).toISOString().slice(0,10));
+  return out;
+}
+// The app already has this maths under an RWS-specific name; reuse it rather
+// than shipping a second copy. (The first version called haversineKm, which
+// only exists in the .ts module — the planner would have thrown on the very
+// first search.)
+const planDistanceKm=_rwsHaversineKm;
+function shortlistCandidates(spots,home,opts){
+  const radiusKm=(opts.maxDriveMin/60)*KM_PER_DRIVE_HOUR;
+  const style=(opts.waterType||'').toLowerCase();
+  const kept=[];
+  const inRange=spots
+    .filter(s=>Number.isFinite(s.lat)&&Number.isFinite(s.lon))
+    .filter(s=>!style||((s.waterType||'')+'').toLowerCase().includes(style))
+    .map(s=>({...s,distanceKm:planDistanceKm(home.lat,home.lon,s.lat,s.lon)}))
+    .filter(s=>s.distanceKm<=radiusKm)
+    .sort((a,b)=>a.distanceKm-b.distanceKm);
+  for(const s of inRange){
+    if(kept.length>=(opts.limit??MAX_CANDIDATES)) break;
+    if(kept.some(k=>planDistanceKm(k.lat,k.lon,s.lat,s.lon)<opts.minSeparationKm)) continue;
+    kept.push(s);
+  }
+  return kept;
+}
+function rankPlan(spots,opts){
+  const usable=spots
+    .map(s=>({...s,days:s.days.filter(d=>d.goodHours>=2&&d.peakKn>=opts.minWindKn)}))
+    .filter(s=>s.days.length>0)
+    .filter(s=>opts.maxDriveMin==null||s.driveMin==null||s.driveMin<=opts.maxDriveMin);
+  const peak=s=>Math.max(...s.days.map(d=>d.peakKn));
+  const hours=s=>Math.max(...s.days.map(d=>d.goodHours));
+  const drive=s=>s.driveMin??Infinity;
+  if(opts.sort==='wind') usable.sort((a,b)=>peak(b)-peak(a)||drive(a)-drive(b));
+  else if(opts.sort==='near') usable.sort((a,b)=>drive(a)-drive(b)||peak(b)-peak(a));
+  else usable.sort((a,b)=>(peak(b)+hours(b)*1.5-(drive(b)/60)*6)-(peak(a)+hours(a)*1.5-(drive(a)/60)*6));
+  return usable;
+}
+
+// One OSRM table call covers every candidate — 400 destinations answer in well
+// under a second. Degrades to straight-line distance rather than failing the
+// whole search: the public demo server has no SLA, and a plan with estimated
+// drive times still beats no plan.
+async function fetchDriveMinutes(home,spots){
+  if(!spots.length) return {};
+  const coords=[[home.lon,home.lat],...spots.map(s=>[s.lon,s.lat])]
+    .map(([a,b])=>`${a.toFixed(5)},${b.toFixed(5)}`).join(';');
+  try{
+    const r=await safeFetch(`https://router.project-osrm.org/table/v1/driving/${coords}?sources=0&annotations=duration`,12000);
+    if(r?.code!=='Ok'||!r.durations?.[0]) throw new Error('osrm');
+    const out={}; r.durations[0].slice(1).forEach((sec,i)=>{ if(sec!=null) out[spots[i].name]=Math.round(sec/60); });
+    return out;
+  }catch(e){
+    const out={};
+    spots.forEach(s=>{ out[s.name]=Math.round(s.distanceKm/KM_PER_DRIVE_HOUR*60); });
+    out.__estimated=true;
+    return out;
+  }
+}
+
+let _planState={maxDriveMin:180,minWindKn:15,waterType:'',sort:'best'};
+function openPlanner(){
+  const p=loadProfile();
+  if(!p.homeLat||!p.homeLon){
+    showToast('Set your home location in your profile first');
+    openProfilePanel('profile');
+    return;
+  }
+  $('plannerOverlay').style.display='block';
+  document.body.style.overflow='hidden';
+  renderPlannerForm();
+}
+function closePlanner(){ $('plannerOverlay').style.display='none'; document.body.style.overflow=''; }
+
+function renderPlannerForm(){
+  const p=loadProfile(), st=_planState;
+  const dates=planDates(new Date().toISOString().slice(0,10));
+  const opt=(v,l,cur)=>`<option value="${v}"${String(cur)===String(v)?' selected':''}>${l}</option>`;
+  $('plannerBody').innerHTML=`
+    <div style="font-size:.78rem;color:var(--tdim);margin-bottom:14px">
+      From <strong style="color:var(--text)">${escFriendName(p.homeLabel||'your home')}</strong>
+      · ${dates.length} days (${dates[0].slice(8)}–${dates[dates.length-1].slice(8)})
+      · by car
+    </div>
+    <label class="pp-label">Most I'll drive</label>
+    <select id="planDrive" class="pp-input" style="margin-bottom:10px">
+      ${opt(60,'1 hour',st.maxDriveMin)}${opt(120,'2 hours',st.maxDriveMin)}${opt(180,'3 hours',st.maxDriveMin)}${opt(300,'5 hours',st.maxDriveMin)}
+    </select>
+    <label class="pp-label">Minimum wind</label>
+    <select id="planWind" class="pp-input" style="margin-bottom:10px">
+      ${opt(12,'12 kn',st.minWindKn)}${opt(15,'15 kn',st.minWindKn)}${opt(20,'20 kn',st.minWindKn)}${opt(25,'25 kn',st.minWindKn)}
+    </select>
+    <label class="pp-label">Spot style</label>
+    <select id="planStyle" class="pp-input" style="margin-bottom:14px">
+      ${opt('','Any',st.waterType)}${opt('flat','Flat',st.waterType)}${opt('waves','Waves',st.waterType)}
+    </select>
+    <button class="btn" id="planGoBtn" style="width:100%" onclick="runPlanner()">Find where to ride →</button>
+    <div id="planResults" style="margin-top:16px"></div>`;
+}
+
+async function runPlanner(){
+  const btn=$('planGoBtn'); const out=$('planResults');
+  _planState={
+    maxDriveMin:+$('planDrive').value, minWindKn:+$('planWind').value,
+    waterType:$('planStyle').value, sort:_planState.sort,
+  };
+  const p=loadProfile(), home={lat:p.homeLat,lon:p.homeLon};
+  if(btn){btn.disabled=true;btn.textContent='Searching…';}
+  out.innerHTML='<div style="font-size:.78rem;color:var(--tdim)">Shortlisting spots…</div>';
+  try{
+    await window._spotsReady;
+    const cands=shortlistCandidates(
+      SPOTS.map(s=>({name:s.name,loc:s.loc,lat:s.lat,lon:s.lon,dirs:s.dirs,waterType:s.waterType})),
+      home,{maxDriveMin:_planState.maxDriveMin,minSeparationKm:PLAN_MIN_SEPARATION_KM,waterType:_planState.waterType});
+    if(!cands.length){ out.innerHTML='<div style="font-size:.8rem;color:var(--tdim)">No spot within that drive.</div>'; return; }
+
+    out.innerHTML=`<div style="font-size:.78rem;color:var(--tdim)">Driving times for ${cands.length} spots…</div>`;
+    const drive=await fetchDriveMinutes(home,cands);
+    const estimated=!!drive.__estimated;
+    cands.forEach(c=>{ c.driveMin=drive[c.name]; });
+    const within=cands.filter(c=>c.driveMin!=null&&c.driveMin<=_planState.maxDriveMin);
+
+    const dates=new Set(planDates(new Date().toISOString().slice(0,10)));
+    const planned=[];
+    for(let i=0;i<within.length;i++){
+      const c=within[i];
+      out.innerHTML=`<div style="font-size:.78rem;color:var(--tdim)">Reading forecasts… ${i+1}/${within.length}</div>`;
+      await fetchChipQualDays({name:c.name,loc:c.loc||'',lat:c.lat,lon:c.lon,dirs:c.dirs||[]});
+      const key=`${c.lat},${c.lon}|${(c.dirs||[]).slice().sort((a,b)=>a-b).join(',')}`;
+      const d10=chipBestCache[key]?.days10||[];
+      planned.push({...c,days:d10.filter(d=>dates.has(d.dateStr)).map(d=>({
+        dateStr:d.dateStr,goodHours:d.goodHours,peakKn:d.peakKn,startHr:d.startHr,dir:d.dir}))});
+    }
+    _planLast={planned,estimated};
+    renderPlanResults();
+  }catch(e){
+    out.innerHTML='<div style="font-size:.8rem;color:#f59e0b">Something went wrong — try again.</div>';
+  }finally{
+    if(btn){btn.disabled=false;btn.textContent='Find where to ride →';}
+  }
+}
+
+let _planLast=null;
+function setPlanSort(v){ _planState.sort=v; renderPlanResults(); }
+function renderPlanResults(){
+  if(!_planLast) return;
+  const out=$('planResults');
+  const ranked=rankPlan(_planLast.planned,{minWindKn:_planState.minWindKn,sort:_planState.sort,maxDriveMin:_planState.maxDriveMin});
+  const pf=loadProfile();
+  if(!ranked.length){
+    out.innerHTML=`<div style="font-size:.8rem;color:var(--tdim)">Nothing rideable in the next ${MAX_PLAN_DAYS} days within that drive. Try a longer drive or less wind.</div>`;
+    return;
+  }
+  const tab=(v,l)=>`<button onclick="setPlanSort('${v}')" style="flex:1;padding:7px;border-radius:8px;border:1px solid ${_planState.sort===v?'var(--accent)':'var(--border)'};background:${_planState.sort===v?'rgba(56,189,248,.15)':'transparent'};color:${_planState.sort===v?'var(--accent)':'var(--gray)'};font-size:.74rem;font-weight:700;cursor:pointer">${l}</button>`;
+  const hrs=n=>n>=60?`${Math.floor(n/60)}h${String(n%60).padStart(2,'0')}`:`${n} min`;
+  out.innerHTML=`
+    ${_planLast.estimated?'<div style="font-size:.7rem;color:#f59e0b;margin-bottom:8px">⚠️ Routing unavailable — drive times are estimated from distance.</div>':''}
+    <div style="display:flex;gap:6px;margin-bottom:12px">${tab('best','Best choice')}${tab('wind','Most wind')}${tab('near','Nearest')}</div>
+    ${ranked.map((s,i)=>{
+      const best=s.days.slice().sort((a,b)=>b.peakKn-a.peakKn)[0];
+      const k=suggestKiteSize({weightKg:pf.weightKg,level:pf.kiteLevel,pref:pf.powerPref,windKn:best.peakKn});
+      return `<div style="border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:8px;cursor:pointer"
+        onclick="closePlanner();pickSpot({name:'${escFriendName(s.name).replace(/'/g,'&#39;')}',loc:'',lat:${s.lat},lon:${s.lon},dirs:[${(s.dirs||[]).join(',')}]})">
+        <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px">
+          <div style="font-weight:800;color:var(--text);font-size:.9rem">${i+1}. ${escFriendName(s.name)}</div>
+          <div style="font-size:.74rem;color:var(--tdim);white-space:nowrap">🚗 ${hrs(s.driveMin)}</div>
+        </div>
+        <div style="font-size:.74rem;color:var(--tdim);margin-top:3px">${escFriendName(s.loc||'')}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px">
+          ${s.days.map(d=>`<span style="font-size:.7rem;padding:3px 7px;border-radius:99px;background:rgba(34,197,94,.13);color:#4ade80;font-weight:700">${fmtDate(d.dateStr).short} · ${d.peakKn}kn · ${d.goodHours}h</span>`).join('')}
+          ${k?`<span style="font-size:.7rem;padding:3px 7px;border-radius:99px;background:rgba(93,212,240,.13);color:#5dd4f0;font-weight:700">🪁 ${k.size} m</span>`:''}
+        </div>
+      </div>`;}).join('')}`;
+}
+
 // ── PULL TO REFRESH ──
 (function(){
   const ptr=document.createElement('div'); ptr.id='ptrIndicator'; document.body.appendChild(ptr);
@@ -11087,6 +11290,18 @@ document.addEventListener('visibilitychange',()=>{
     <button onclick="closeSpotsMap()" style="background:none;border:1.5px solid var(--border);color:var(--gray);border-radius:7px;padding:5px 12px;cursor:pointer;font-size:.8rem;font-weight:600;">✕ Close</button>
   </div>
   <div id="spotsMapContainer" style="flex:1;min-height:0;"></div>
+</div>
+<!-- ══ SESSION PLANNER ══ -->
+<div id="plannerOverlay" style="display:none;position:fixed;inset:0;z-index:3000;background:rgba(0,0,0,.72);backdrop-filter:blur(4px);overflow-y:auto;-webkit-overflow-scrolling:touch;" onclick="if(event.target===this)closePlanner()">
+  <div style="min-height:100%;display:flex;align-items:flex-start;justify-content:center;padding:20px 12px;">
+    <div style="background:#0d1b2e;border-radius:18px;width:100%;max-width:640px;border:1px solid rgba(0,212,255,.15);overflow:hidden;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid var(--border)">
+        <div style="font-size:1rem;font-weight:800;color:var(--text)">🧭 Where should I ride?</div>
+        <button onclick="closePlanner()" style="background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:8px;color:var(--gray);font-size:.8rem;padding:6px 12px;cursor:pointer;">✕ Close</button>
+      </div>
+      <div id="plannerBody" style="padding:16px 18px 22px"></div>
+    </div>
+  </div>
 </div>
 <!-- ══ FETCH TIMESTAMP BAR ══ -->
 <div id="fetchTimestamp" class="fetch-ts"></div>
