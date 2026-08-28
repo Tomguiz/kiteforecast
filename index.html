@@ -11076,7 +11076,23 @@ async function fetchDriveMinutes(home,spots){
   }
 }
 
-let _planState={maxDriveMin:180,minWindKn:15,waterType:'',sort:'best'};
+// Selected days as ISO strings. Defaults to today + tomorrow rather than the
+// whole window: "where should I ride" is usually asked about a day the rider
+// is actually free, and a four-day list buries that.
+let _planState={maxDriveMin:180,minWindKn:15,waterType:'',sort:'best',days:null};
+function _planDefaultDays(){ return planDates(new Date().toISOString().slice(0,10)).slice(0,2); }
+function _planSelectedDays(){
+  const all=planDates(new Date().toISOString().slice(0,10));
+  const sel=(_planState.days||_planDefaultDays()).filter(d=>all.includes(d));
+  return sel.length?sel:all.slice(0,1);   // never end up searching nothing
+}
+function togglePlanDay(d){
+  const cur=new Set(_planSelectedDays());
+  if(cur.has(d)&&cur.size===1) return;     // one day must stay selected
+  cur.has(d)?cur.delete(d):cur.add(d);
+  _planState.days=planDates(new Date().toISOString().slice(0,10)).filter(x=>cur.has(x));
+  renderPlannerForm();
+}
 function openPlanner(){
   const p=loadProfile();
   if(!p.homeLat||!p.homeLon){
@@ -11093,12 +11109,26 @@ function closePlanner(){ $('plannerOverlay').style.display='none'; document.body
 function renderPlannerForm(){
   const p=loadProfile(), st=_planState;
   const dates=planDates(new Date().toISOString().slice(0,10));
+  const sel=_planSelectedDays();
   const opt=(v,l,cur)=>`<option value="${v}"${String(cur)===String(v)?' selected':''}>${l}</option>`;
   $('plannerBody').innerHTML=`
     <div style="font-size:.78rem;color:var(--tdim);margin-bottom:14px">
       From <strong style="color:var(--text)">${escFriendName(p.homeLabel||'your home')}</strong>
-      · ${dates.length} days (${dates[0].slice(8)}–${dates[dates.length-1].slice(8)})
+      · ${sel.length===1?fmtDate(sel[0]).short.toLowerCase():sel.length+' days'}
       · by car
+    </div>
+    <label class="pp-label">Which day</label>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">
+      ${dates.map(d=>{
+        const on=sel.includes(d);
+        const f=fmtDate(d);
+        return `<button type="button" onclick="togglePlanDay('${d}')"
+          style="flex:1 1 auto;min-width:78px;padding:8px 6px;border-radius:10px;cursor:pointer;
+                 border:1px solid ${on?'var(--accent)':'var(--border)'};
+                 background:${on?'rgba(56,189,248,.15)':'transparent'};
+                 color:${on?'var(--accent)':'var(--gray)'};font-size:.74rem;font-weight:700;line-height:1.3">
+          ${f.short}<span style="display:block;font-weight:400;opacity:.75;font-size:.68rem">${f.num}</span></button>`;
+      }).join('')}
     </div>
     <label class="pp-label">Most I'll drive</label>
     <select id="planDrive" class="pp-input" style="margin-bottom:10px">
@@ -11138,7 +11168,9 @@ async function runPlanner(){
     cands.forEach(c=>{ c.driveMin=drive[c.name]; });
     const within=cands.filter(c=>c.driveMin!=null&&c.driveMin<=_planState.maxDriveMin);
 
-    const dates=new Set(planDates(new Date().toISOString().slice(0,10)));
+    // One request per SPOT returns every day, so narrowing the days does not
+    // save a call — it narrows what comes back to what the rider can act on.
+    const dates=new Set(_planSelectedDays());
     const planned=[];
     for(let i=0;i<within.length;i++){
       const c=within[i];
@@ -11166,7 +11198,9 @@ function renderPlanResults(){
   const ranked=rankPlan(_planLast.planned,{minWindKn:_planState.minWindKn,sort:_planState.sort,maxDriveMin:_planState.maxDriveMin});
   const pf=loadProfile();
   if(!ranked.length){
-    out.innerHTML=`<div style="font-size:.8rem;color:var(--tdim)">Nothing rideable in the next ${MAX_PLAN_DAYS} days within that drive. Try a longer drive or less wind.</div>`;
+    const _d=_planSelectedDays();
+    const _lbl=_d.length===1?`on ${fmtDate(_d[0]).short.toLowerCase()}`:`on those ${_d.length} days`;
+    out.innerHTML=`<div style="font-size:.8rem;color:var(--tdim)">Nothing rideable ${_lbl} within that drive. Try another day, a longer drive, or less wind.</div>`;
     return;
   }
   const tab=(v,l)=>`<button onclick="setPlanSort('${v}')" style="flex:1;padding:7px;border-radius:8px;border:1px solid ${_planState.sort===v?'var(--accent)':'var(--border)'};background:${_planState.sort===v?'rgba(56,189,248,.15)':'transparent'};color:${_planState.sort===v?'var(--accent)':'var(--gray)'};font-size:.74rem;font-weight:700;cursor:pointer">${l}</button>`;
