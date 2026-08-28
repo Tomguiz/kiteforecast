@@ -976,6 +976,11 @@
     .spot-attr-conditions { display:flex; flex-wrap:wrap; gap:12px; margin-top:4px; font-size:.72rem; color:var(--text); }
     .spot-attr-cond { white-space:nowrap; }
     .spot-attr-cond-lbl { color:var(--tdim); }
+    /* Only ever shown when the spot is ABOVE the rider — never a green
+       "you're fine", which would be an assurance the data cannot support. */
+    .spot-level-warn { margin-top:10px; padding:8px 11px; border-radius:9px; font-size:.74rem; line-height:1.45;
+      background:rgba(245,158,11,.10); border:1px solid rgba(245,158,11,.32); color:#fbbf24; }
+    .spot-level-warn.far { background:rgba(239,68,68,.10); border-color:rgba(239,68,68,.35); color:#f87171; }
     .spot-info-ctas { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
     .spot-cta-btn { display:flex; align-items:center; justify-content:center; gap:7px; padding:12px 10px; border-radius:10px; border:none; font-size:.82rem; font-weight:700; cursor:pointer; text-decoration:none; transition:opacity .15s; }
     .spot-cta-btn:hover { opacity:.85; }
@@ -4505,6 +4510,20 @@ function suggestKiteSize({weightKg,level,pref,windKn}){
   return {size, exact:r1(exact), limit:null, bandMaxKn:band.maxKn};
 }
 const riderLevelIdx = lvl => RIDER_LEVELS.indexOf(lvl);
+// Compares the rider against the spot. Returns null whenever the answer would
+// be a guess: no level on the profile, or none recorded for the spot. Silence
+// is correct there — telling a rider a spot is "fine" on no evidence is worse
+// than telling them nothing.
+//
+// Only warns UPWARDS. A confirmed rider on a beginner beach needs no notice;
+// a beginner on an advanced one does. The scales line up by index, which is
+// what makes this a comparison rather than a lookup table.
+function spotLevelVerdict(spotLevel, riderLevel){
+  const s=spotLevelIdx(spotLevel), r=riderLevelIdx(riderLevel);
+  if(s<0||r<0) return null;
+  if(s<=r) return {cls:'ok', gap:0};
+  return {cls:s-r>=2?'far':'above', gap:s-r};
+}
 const spotLevelIdx  = lvl => SPOT_SKILL_LEVELS.indexOf(lvl);
 const FACILITY_EMOJI = {'Free parking':'🅿️','Paid parking':'🅿️','Kiteshop':'🛍️','Kite rental':'🪁','Lessons':'🎓','Restaurant/bar':'🍽️','Showers':'🚿','Toilets':'🚻','Rescue':'🛟','Storage':'📦'};
 
@@ -4522,6 +4541,7 @@ function spotAttributesHTML(info){
     info.crowd_level?['👥','Crowd',info.crowd_level]:null,
     info.skill_level?['🟢','Level',info.skill_level]:null,
   ].filter(Boolean);
+  const _lvlVerdict=spotLevelVerdict(info.skill_level, loadProfile().kiteLevel);
   if(!disc.length&&!fac.length&&!conds.length) return '';
   let html='<div class="spot-attr-block">';
   if(disc.length){
@@ -4535,6 +4555,12 @@ function spotAttributesHTML(info){
   if(conds.length){
     html+='<div class="spot-attr-conditions">'
       +conds.map(([e,l,v])=>`<span class="spot-attr-cond">${e} <span class="spot-attr-cond-lbl">${l}</span> ${escFriendName(v)}</span>`).join('')+'</div>';
+  }
+  if(_lvlVerdict&&_lvlVerdict.cls!=='ok'){
+    const _msg=_lvlVerdict.cls==='far'
+      ? `This spot is rated ${escFriendName(info.skill_level)} — well above the level on your profile.`
+      : `This spot is rated ${escFriendName(info.skill_level)} — a step above the level on your profile.`;
+    html+=`<div class="spot-level-warn ${_lvlVerdict.cls}">\u26A0\uFE0F ${_msg}</div>`;
   }
   return html+'</div>';
 }
