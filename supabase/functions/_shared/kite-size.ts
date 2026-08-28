@@ -21,7 +21,11 @@ export type RiderLevel = 'Beginner' | 'Intermediate' | 'Advanced'
 export type PowerPref = 'underpowered' | 'neutral' | 'overpowered'
 
 export const QUIVER_SIZES = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
-export const MIN_WIND_KN = 14
+// Matches the app's own rideable floor (hourQualifies: 15 kn, or 12 with
+// gusts >= 20). A row the app calls rideable must never show a blank size —
+// the two rules disagreeing is what made the column say nothing on hours the
+// rest of the card had already marked as a session.
+export const MIN_WIND_KN = 12
 export const MAX_WIND_KN = 45
 
 // Upper bound of each band, and the size the reference rider flies in it.
@@ -45,11 +49,25 @@ const PREF_REL: Record<PowerPref, number> = {
   underpowered: 0.90, neutral: 0.95, overpowered: 1.00,
 }
 
+// A normal gust sits around 1.3x the average. Only the excess beyond that
+// counts, and only partly: 14 kn gusting 29 is not a 14 kn session, but 20
+// gusting 26 IS an ordinary 20 and must not be inflated — otherwise every
+// reference in the band table shifts.
+export const GUST_NORMAL_RATIO = 1.3
+export const GUST_EXCESS_WEIGHT = 0.8
+
+export function effectiveWindKn(windKn: number, gustKn?: number | null): number {
+  if (!gustKn || !Number.isFinite(gustKn)) return windKn
+  const normal = windKn * GUST_NORMAL_RATIO
+  return gustKn > normal ? windKn + GUST_EXCESS_WEIGHT * (gustKn - normal) : windKn
+}
+
 export interface KiteSizeInput {
   weightKg: number | null | undefined
   level: RiderLevel | null | undefined
   pref?: PowerPref | null
   windKn: number
+  gustKn?: number | null
 }
 export interface KiteSizeResult {
   size: number
@@ -72,7 +90,8 @@ export function suggestKiteSize(i: KiteSizeInput): KiteSizeResult | null {
   if (!(level in LEVEL_REL)) return null
   const pref: PowerPref = (i.pref && i.pref in PREF_REL) ? i.pref : 'neutral'
 
-  const band = WIND_BANDS.find(b => windKn <= b.maxKn)!
+  const eff = effectiveWindKn(windKn, i.gustKn)
+  const band = WIND_BANDS.find(b => eff <= b.maxKn)!
   const exact = band.refSize * riderScale(weightKg, level, pref)
 
   const MAXS = QUIVER_SIZES[QUIVER_SIZES.length - 1], MINS = QUIVER_SIZES[0]

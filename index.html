@@ -4484,7 +4484,7 @@ const POWER_PREFS = [
 // 22 kn, while the rider it was calibrated on holds one 12 m across that whole
 // range. Bands also stop the hourly column flickering between sizes.
 const QUIVER_SIZES = [5,6,7,8,9,10,11,12,13,14];
-const KITE_MIN_WIND_KN = 14;
+const KITE_MIN_WIND_KN = 12;
 const KITE_MAX_WIND_KN = 45;
 const WIND_BANDS = [{maxKn:22,refSize:12},{maxKn:32,refSize:10},{maxKn:Infinity,refSize:8}];
 const REF_WEIGHT_KG = 80;
@@ -4494,13 +4494,23 @@ function riderScale(weightKg,level,pref){
   return (weightKg/REF_WEIGHT_KG)*(_LEVEL_REL[level]||0)*(_PREF_REL[pref]||1);
 }
 // null means "cannot say" — never a default body weight.
-function suggestKiteSize({weightKg,level,pref,windKn}){
+const GUST_NORMAL_RATIO = 1.3;
+const GUST_EXCESS_WEIGHT = 0.8;
+// 14 kn gusting 29 is not a 14 kn session; 20 gusting 26 is an ordinary 20.
+// Only the excess beyond a normal 1.3x spread counts.
+function effectiveWindKn(windKn,gustKn){
+  if(!gustKn||!Number.isFinite(gustKn)) return windKn;
+  const normal=windKn*GUST_NORMAL_RATIO;
+  return gustKn>normal ? windKn+GUST_EXCESS_WEIGHT*(gustKn-normal) : windKn;
+}
+function suggestKiteSize({weightKg,level,pref,windKn,gustKn}){
   if(!weightKg||!level) return null;
   if(!Number.isFinite(weightKg)||weightKg<30||weightKg>150) return null;
   if(!Number.isFinite(windKn)||windKn<KITE_MIN_WIND_KN||windKn>KITE_MAX_WIND_KN) return null;
   if(!(level in _LEVEL_REL)) return null;
   const p=(pref&&pref in _PREF_REL)?pref:'neutral';
-  const band=WIND_BANDS.find(b=>windKn<=b.maxKn);
+  const _eff=effectiveWindKn(windKn,gustKn);
+  const band=WIND_BANDS.find(b=>_eff<=b.maxKn);
   const exact=band.refSize*riderScale(weightKg,level,p);
   const MAXS=QUIVER_SIZES[QUIVER_SIZES.length-1], MINS=QUIVER_SIZES[0];
   const r1=x=>Math.round(x*10)/10;
@@ -5466,7 +5476,7 @@ function openModal(dateStr,dayIdx){
         <span class="c-wind-val" style="left:${barPct}%;color:${barCol}">${h.kn}<span class="c-wind-kn">kn</span></span>
         ${showGust?`<span class="c-wind-val c-gust-val" style="left:${Math.min(gustPct,99)}%;color:${barCol}">↑${h.gustKn}</span>`:''}
       </div>
-      ${(()=>{const _k=suggestKiteSize({weightKg:_riderPf.weightKg,level:_riderPf.kiteLevel,pref:_riderPf.powerPref,windKn:h.kn});
+      ${(()=>{const _k=suggestKiteSize({weightKg:_riderPf.weightKg,level:_riderPf.kiteLevel,pref:_riderPf.powerPref,windKn:h.kn,gustKn:h.gustKn});
         if(!_k) return '<div class="c-kite none">\u2014</div>';
         const _sfx=_k.limit==='over'?'+':_k.limit==='under'?'\u2212':'';
         return `<div class="c-kite" title="${_k.exact} m for ${_riderPf.weightKg} kg at ${h.kn} kn">${_k.size}${_sfx}</div>`;})()}
