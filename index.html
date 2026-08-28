@@ -607,11 +607,14 @@
     /* table header — 5 cols (+ optional conditions) */
     .m-thead, .m-row {
       display:grid;
-      grid-template-columns: 50px 24px 42px 1fr 44px 56px;
+      grid-template-columns: 50px 24px 42px 1fr 46px 44px 56px;
       gap:0 7px; padding:8px 18px;
       align-items:center;
     }
-    .m-thead.ws, .m-row.ws { grid-template-columns: 50px 24px 42px 1fr 44px 56px 88px; }
+    .m-thead.ws, .m-row.ws { grid-template-columns: 50px 24px 42px 1fr 46px 44px 56px 88px; }
+    /* Size only, no unit — the header says Kite and the column is narrow. */
+    .c-kite { font-size:.78rem; font-weight:700; color:#5dd4f0; text-align:center; white-space:nowrap; }
+    .c-kite.none { color:var(--tdim); font-weight:400; }
     .m-thead {
       font-size:.6rem; font-weight:700; text-transform:uppercase; letter-spacing:.07em; color:var(--tdim);
       border-bottom:1px solid var(--border);
@@ -1186,9 +1189,9 @@
       /* single-row grid on mobile */
       .m-row, .m-row.ws {
         display: grid !important;
-        grid-template-columns: 50px 20px 36px 1fr auto;
+        grid-template-columns: 50px 20px 36px 1fr auto auto;
         grid-template-rows: auto;
-        grid-template-areas: "time wx temp wind right";
+        grid-template-areas: "time wx temp wind kite right";
         gap: 0 5px;
         padding: 9px 12px;
         min-height: auto;
@@ -1202,6 +1205,7 @@
       .c-temp { grid-area:temp; font-size:.78rem; align-self:center; white-space:nowrap; }
       /* wind cell: bar + inline gust text */
       .c-wind { grid-area:wind; align-self:center; justify-self:stretch; height:26px; overflow:visible; }
+      .c-kite { grid-area:kite; align-self:center; font-size:.72rem; padding-left:5px; }
       .c-wind-val { font-size:.88rem; }
       .c-wind-kn  { font-size:.58rem; }
       .c-gust-num { display:none; }
@@ -4471,32 +4475,34 @@ const POWER_PREFS = [
 // script and cannot import it, the same reason WIND_DIR_TOLERANCE_DEG is
 // duplicated. A unit test pins the two copies in step; change one, change both.
 //
-// Calibrated on real numbers rather than a table off the internet: 75 kg at
-// 20 kn is 10 m intermediate, 9 m beginner, 11-12 m experienced.
-const KITE_SIZE_K = 2.6667;
+// Bands, not a curve. An inverse-wind law wants 18.3 m at 14 kn and 11.6 m at
+// 22 kn, while the rider it was calibrated on holds one 12 m across that whole
+// range. Bands also stop the hourly column flickering between sizes.
 const QUIVER_SIZES = [5,6,7,8,9,10,11,12,13,14];
 const KITE_MIN_WIND_KN = 14;
-const KITE_MAX_WIND_KN = 40;
-const _LEVEL_FACTOR = {Beginner:0.90, Intermediate:1.00, Advanced:1.15};
-const _PREF_FACTOR  = {underpowered:0.92, neutral:1.00, overpowered:1.08};
-function kitePowerFactor(level,pref){
-  return Math.min(1.20, Math.max(0.85, (_LEVEL_FACTOR[level]||0)*(_PREF_FACTOR[pref]||1)));
+const KITE_MAX_WIND_KN = 45;
+const WIND_BANDS = [{maxKn:22,refSize:12},{maxKn:32,refSize:10},{maxKn:Infinity,refSize:8}];
+const REF_WEIGHT_KG = 80;
+const _LEVEL_REL = {Beginner:0.87, Intermediate:0.94, Advanced:1.00};
+const _PREF_REL  = {underpowered:0.90, neutral:0.95, overpowered:1.00};
+function riderScale(weightKg,level,pref){
+  return (weightKg/REF_WEIGHT_KG)*(_LEVEL_REL[level]||0)*(_PREF_REL[pref]||1);
 }
-// null means "cannot say". Never a default body weight — this advice puts a
-// person on the water.
+// null means "cannot say" — never a default body weight.
 function suggestKiteSize({weightKg,level,pref,windKn}){
   if(!weightKg||!level) return null;
   if(!Number.isFinite(weightKg)||weightKg<30||weightKg>150) return null;
   if(!Number.isFinite(windKn)||windKn<KITE_MIN_WIND_KN||windKn>KITE_MAX_WIND_KN) return null;
-  if(!(level in _LEVEL_FACTOR)) return null;
-  const p=(pref&&pref in _PREF_FACTOR)?pref:'neutral';
-  const exact=KITE_SIZE_K*weightKg/windKn*kitePowerFactor(level,p);
-  // Outside the quiver there is no honest answer — snapping 18.3 down to the
-  // biggest size in the list would look like advice and would not be any.
-  if(exact>QUIVER_SIZES[QUIVER_SIZES.length-1]+1) return null;
-  if(exact<QUIVER_SIZES[0]-1) return null;
-  const size=QUIVER_SIZES.reduce((b,s)=>Math.abs(s-exact)<Math.abs(b-exact)?s:b,QUIVER_SIZES[0]);
-  return {size, exact:Math.round(exact*10)/10};
+  if(!(level in _LEVEL_REL)) return null;
+  const p=(pref&&pref in _PREF_REL)?pref:'neutral';
+  const band=WIND_BANDS.find(b=>windKn<=b.maxKn);
+  const exact=band.refSize*riderScale(weightKg,level,p);
+  const MAXS=QUIVER_SIZES[QUIVER_SIZES.length-1], MINS=QUIVER_SIZES[0];
+  const r1=x=>Math.round(x*10)/10;
+  if(exact>MAXS) return {size:MAXS, exact:r1(exact), limit:'over',  bandMaxKn:band.maxKn};
+  if(exact<MINS) return {size:MINS, exact:r1(exact), limit:'under', bandMaxKn:band.maxKn};
+  const size=QUIVER_SIZES.reduce((b,x)=>Math.abs(x-exact)<Math.abs(b-exact)?x:b,QUIVER_SIZES[0]);
+  return {size, exact:r1(exact), limit:null, bandMaxKn:band.maxKn};
 }
 const riderLevelIdx = lvl => RIDER_LEVELS.indexOf(lvl);
 const spotLevelIdx  = lvl => SPOT_SKILL_LEVELS.indexOf(lvl);
@@ -5347,8 +5353,6 @@ function openModal(dateStr,dayIdx){
     <span class="rating-badge ${rating.cls}" style="width:auto;padding:5px 14px">${rating.label}</span>
     ${win?`<span class="m-badge green">🪁 ${win}</span>`:''}
     ${peakKn>0?`<span class="m-badge accent">Avg ${peakKn} kn</span>`:''}
-    ${(()=>{const _pf=loadProfile();const k=suggestKiteSize({weightKg:_pf.weightKg,level:_pf.kiteLevel,pref:_pf.powerPref,windKn:peakKn});
-      return k?`<span class="m-badge accent" title="Suggested for ${_pf.weightKg} kg, ${_pf.kiteLevel}, ${peakKn} kn">\uD83E\uDE81 ${k.size} m</span>`:'';})()}
     <button id="mBadgeMore" onclick="(function(b){var x=$('mBadgeExtra');var open=x.classList.toggle('open');var tr=$('mTideRow');if(tr)tr.style.display=open?'flex':'none';b.textContent=open?'▲ Less':'▼ More';})(this)">▼ More</button>
     <span id="mBadgeExtra">
     ${maxGust>0?`<span class="m-badge">Gusts ${maxGust} kn</span>`:''}
@@ -5387,11 +5391,14 @@ function openModal(dateStr,dayIdx){
   let html=`<div class="m-thead ${wsCls}">
     <div>Time</div><div></div><div>Temp</div>
     <div>Wind</div>
+    <div>Kite</div>
     <div>Waves</div>
     <div>Dir</div>
     ${condTH}
   </div>`;
 
+  // read once per render, not once per row
+  const _riderPf=loadProfile();
   let srDone=false,ssDone=false;
   hours.filter(h=>h.inDay).forEach(h=>{
     if(!srDone){ html+=`<div class="m-sun-row">🌅 Sunrise ${srTime}</div>`; srDone=true; }
@@ -5433,6 +5440,10 @@ function openModal(dateStr,dayIdx){
         <span class="c-wind-val" style="left:${barPct}%;color:${barCol}">${h.kn}<span class="c-wind-kn">kn</span></span>
         ${showGust?`<span class="c-wind-val c-gust-val" style="left:${Math.min(gustPct,99)}%;color:${barCol}">↑${h.gustKn}</span>`:''}
       </div>
+      ${(()=>{const _k=suggestKiteSize({weightKg:_riderPf.weightKg,level:_riderPf.kiteLevel,pref:_riderPf.powerPref,windKn:h.kn});
+        if(!_k) return '<div class="c-kite none">\u2014</div>';
+        const _sfx=_k.limit==='over'?'+':_k.limit==='under'?'\u2212':'';
+        return `<div class="c-kite" title="${_k.exact} m for ${_riderPf.weightKg} kg at ${h.kn} kn">${_k.size}${_sfx}</div>`;})()}
       <div class="c-wave">🌊 ${waveTxt}</div>
       <div class="c-right">
         <div class="c-dir">
