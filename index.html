@@ -134,6 +134,10 @@
        a phone question — so it must NOT inherit .btn-map's mobile display:none.
        It gets its own row under the search bar instead. */
     .btn-plan { border-color:rgba(56,189,248,.45); color:var(--accent); }
+    .plan-drive { font-family:inherit; font-size:.74rem; color:var(--gray); white-space:nowrap;
+      background:rgba(255,255,255,.04); border:1px solid var(--border); border-radius:8px;
+      padding:4px 9px; cursor:pointer; transition:border-color .15s,color .15s; }
+    .plan-drive:hover { border-color:var(--accent); color:var(--accent); }
     #planBtnMobileWrap { display:none; }
     @media (max-width:599px) {
       .btn-map { display:none !important; }
@@ -1270,8 +1274,8 @@
       <input type="text" id="searchInput" placeholder="Search for a spot, beach or city…" autocomplete="off" />
       <div class="autocomplete" id="acDropdown"></div>
     </div>
-    <button class="btn-map btn-plan" id="planBtn" onclick="openPlanner()" title="Find where to ride in the next few days"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:5px"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>Plan</button>
-    <button class="btn-map" id="mapBtn" onclick="openSpotsMap()" title="Show all kite spots on map"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:5px"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Map</button>
+    <button class="btn-map btn-plan" id="planBtn" onclick="openPlanner()" title="Find where to ride in the next few days"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:5px"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg>Where to ride?</button>
+    <button class="btn-map" id="mapBtn" onclick="openSpotsMap()" title="Show all kite spots on map"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:5px"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>All spots</button>
     <button class="btn-reset" id="resetBtn" onclick="resetSearch()">← Back</button>
   </div>
 </header>
@@ -2770,7 +2774,7 @@ const SPOTS=[
   {name:'De Punt',loc:'Zeeland, Netherlands',lat:51.7810,lon:3.8739,dirs:[225,270,315]},
   {name:'T\'Hekje Ouddorp',loc:'Zeeland, Netherlands',lat:51.8223,lon:3.8896,dirs:[225,270,315]},
   {name:'Vuurtoren Ouddorp',loc:'Zeeland, Netherlands',lat:51.8112,lon:3.8651,dirs:[225,270,315]},
-  {name:'Oesterdam',loc:'Zeeland, Netherlands',lat:51.7333,lon:3.8667,dirs:[180,225,270,315]},
+  {name:'Oesterdam',loc:'Zeeland, Netherlands',lat:51.4964,lon:4.1990,dirs:[180,225,270,315]},
   {name:'Neeltje Jans',loc:'Zeeland, Netherlands',lat:51.6273,lon:3.6857,dirs:[225,270,315]},
   {name:'Vrouwenpolder',loc:'Zeeland, Netherlands',lat:51.5869,lon:3.6268,dirs:[270,315,0]},
   {name:'Veersemeer',loc:'Zeeland, Netherlands',lat:51.5697,lon:3.6551,dirs:[225,270,315]},
@@ -11083,12 +11087,15 @@ let _planState={maxDriveMin:180,minWindKn:15,waterType:'',sort:'best',days:null}
 function _planDefaultDays(){ return planDates(new Date().toISOString().slice(0,10)).slice(0,2); }
 function _planSelectedDays(){
   const all=planDates(new Date().toISOString().slice(0,10));
-  const sel=(_planState.days||_planDefaultDays()).filter(d=>all.includes(d));
-  return sel.length?sel:all.slice(0,1);   // never end up searching nothing
+  // May legitimately be empty: the rider is mid-choice. Callers that search
+  // must check, rather than having a day invented for them here.
+  return (_planState.days||_planDefaultDays()).filter(d=>all.includes(d));
 }
 function togglePlanDay(d){
-  const cur=new Set(_planSelectedDays());
-  if(cur.has(d)&&cur.size===1) return;     // one day must stay selected
+  const cur=new Set(_planState.days||_planDefaultDays());
+  // No floor here any more. Refusing the tap left the rider poking a button
+  // that never responded; going empty and greying out the CTA says the same
+  // thing out loud.
   cur.has(d)?cur.delete(d):cur.add(d);
   _planState.days=planDates(new Date().toISOString().slice(0,10)).filter(x=>cur.has(x));
   renderPlannerForm();
@@ -11114,7 +11121,7 @@ function renderPlannerForm(){
   $('plannerBody').innerHTML=`
     <div style="font-size:.78rem;color:var(--tdim);margin-bottom:14px">
       From <strong style="color:var(--text)">${escFriendName(p.homeLabel||'your home')}</strong>
-      · ${sel.length===1?fmtDate(sel[0]).short.toLowerCase():sel.length+' days'}
+      · ${sel.length===0?'pick a day':sel.length===1?fmtDate(sel[0]).short.toLowerCase():sel.length+' days'}
       · by car
     </div>
     <label class="pp-label">Which day</label>
@@ -11142,11 +11149,14 @@ function renderPlannerForm(){
     <select id="planStyle" class="pp-input" style="margin-bottom:14px">
       ${opt('','Any',st.waterType)}${opt('flat','Flat',st.waterType)}${opt('waves','Waves',st.waterType)}
     </select>
-    <button class="btn" id="planGoBtn" style="width:100%" onclick="runPlanner()">Find where to ride →</button>
+    <button class="btn" id="planGoBtn" style="width:100%${sel.length?'':';opacity:.45;cursor:not-allowed'}"
+      ${sel.length?'':'disabled aria-disabled="true" title="Pick at least one day first"'}
+      onclick="runPlanner()">${sel.length?'Find where to ride →':'Pick a day to search'}</button>
     <div id="planResults" style="margin-top:16px"></div>`;
 }
 
 async function runPlanner(){
+  if(!_planSelectedDays().length) return;   // CTA is disabled, but never trust that alone
   const btn=$('planGoBtn'); const out=$('planResults');
   _planState={
     maxDriveMin:+$('planDrive').value, minWindKn:+$('planWind').value,
@@ -11200,6 +11210,24 @@ async function runPlanner(){
 let _planLast=null;
 function setPlanSort(v){ _planState.sort=v; renderPlanResults(); }
 function hrsPlan(n){ return n==null?'?':(n>=60?`${Math.floor(n/60)}h${String(n%60).padStart(2,'0')}`:`${n} min`); }
+// The drive time was the one number on the card you could not act on. It is a
+// button now: it hands the spot to the phone's maps app instead of making the
+// rider retype the name. stopPropagation, or the card's own click swallows it.
+function planRouteUrl(lat,lon){
+  const p=loadProfile();
+  const dest=`${lat},${lon}`;
+  return (p.homeLat!=null&&p.homeLon!=null)
+    ? `https://www.google.com/maps/dir/?api=1&origin=${p.homeLat},${p.homeLon}&destination=${dest}&travelmode=driving`
+    : `https://www.google.com/maps/dir/?api=1&destination=${dest}&travelmode=driving`;
+}
+function openPlanRoute(ev,lat,lon){
+  ev.stopPropagation();
+  window.open(planRouteUrl(lat,lon),'_blank','noopener');
+}
+function driveBtn(s){
+  return `<button type="button" class="plan-drive" onclick="openPlanRoute(event,${s.lat},${s.lon})"
+    title="Open driving directions">\u{1F697} ${hrsPlan(s.driveMin)}</button>`;
+}
 function renderPlanResults(){
   if(!_planLast) return;
   const out=$('planResults');
@@ -11223,7 +11251,7 @@ function renderPlanResults(){
           return `<div style="font-size:.76rem;color:var(--tdim);margin-bottom:5px">
             <span style="color:#4ade80;font-weight:700">${fmtDate(b.dateStr).short}</span>
             · ${escFriendName(s.name)} · ${b.peakKn}kn · ${b.goodHours}h
-            <span style="white-space:nowrap">· \u{1F697} ${hrsPlan(s.driveMin)}</span></div>`;}).join('')}
+            <span style="white-space:nowrap">· </span>${driveBtn(s)}</div>`;}).join('')}
       </div>`:`<div style="font-size:.8rem;color:var(--tdim);margin-top:6px">Try a longer drive or less wind.</div>`);
     return;
   }
@@ -11244,7 +11272,7 @@ function renderPlanResults(){
         onclick="closePlanner();pickSpot({name:'${escFriendName(s.name).replace(/'/g,'&#39;')}',loc:'',lat:${s.lat},lon:${s.lon},dirs:[${(s.dirs||[]).join(',')}]})">
         <div style="display:flex;align-items:baseline;justify-content:space-between;gap:8px">
           <div style="font-weight:800;color:var(--text);font-size:.9rem">${i+1}. ${escFriendName(s.name)}</div>
-          <div style="font-size:.74rem;color:var(--tdim);white-space:nowrap">🚗 ${hrs(s.driveMin)}</div>
+          ${driveBtn(s)}
         </div>
         <div style="font-size:.74rem;color:var(--tdim);margin-top:3px">${escFriendName(s.loc||'')}</div>
         <div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px">

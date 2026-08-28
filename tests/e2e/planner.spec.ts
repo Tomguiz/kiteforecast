@@ -121,18 +121,21 @@ test('a day can be turned off and the search follows', async ({ gotoApp, page })
   expect(after).toEqual([before[0]]);
 });
 
-test('the last selected day cannot be turned off', async ({ gotoApp, page }) => {
-  // searching zero days is not a state worth having
+test('the last selected day can be turned off', async ({ gotoApp, page }) => {
+  // Zero days is a legitimate mid-choice state. It used to be unreachable:
+  // the tap on the last chip was dropped, so the chip looked broken. The
+  // "at least one day" rule now lives on the CTA, where it is visible —
+  // see 'the last day can be deselected, and the CTA then says why'.
   await gotoApp('signedIn');
   await openPlanner(page);
   const after = await page.evaluate(() => {
     const d = _planSelectedDays();
     togglePlanDay(d[1]);                       // down to one
     const one = _planSelectedDays();
-    togglePlanDay(one[0]);                     // try to remove the last
+    togglePlanDay(one[0]);                     // and the last one goes too
     return _planSelectedDays();
   });
-  expect(after).toHaveLength(1);
+  expect(after).toHaveLength(0);
 });
 
 test('a day outside the window cannot be smuggled in', async ({ gotoApp, page }) => {
@@ -227,4 +230,90 @@ test('offers another day instead of a dead end', async ({ gotoApp, page }) => {
   expect(html).toContain('But another day works');
   expect(html).toContain('24kn');
   expect(html).toContain('1h30');          // the drive time still has to be shown
+});
+
+// ── Timing is a required input, and it should say so ───────────────────────
+//
+// The last day used to be undeselectable: the tap was ignored, which is
+// indistinguishable from a broken button. The selection may now go empty, and
+// the CTA carries the rule instead.
+
+test('the last day can be deselected, and the CTA then says why it cannot run', async ({ gotoApp, page }) => {
+  await gotoApp('signedIn');
+  await page.evaluate(() => {
+    const p = loadProfile(); p.homeLat = 50.7175; p.homeLon = 4.3978; p.homeLabel = 'Waterloo'; saveProfile(p);
+  });
+  await page.locator('#planBtn').click();
+  await page.waitForTimeout(250);
+
+  const days = await page.evaluate(() => planDates(new Date().toISOString().slice(0, 10)));
+  const go = page.locator('#planGoBtn');
+  await expect(go).toBeEnabled();
+
+  // Default is today + tomorrow, so clear both.
+  await page.evaluate((d) => togglePlanDay(d), days[0]);
+  await page.evaluate((d) => togglePlanDay(d), days[1]);
+
+  expect(await page.evaluate(() => _planSelectedDays().length)).toBe(0);
+  await expect(go).toBeDisabled();
+  await expect(go).toHaveText(/pick a day/i);
+  await expect(page.locator('#plannerBody')).toContainText('pick a day');
+
+  // and picking one back brings it to life
+  await page.evaluate((d) => togglePlanDay(d), days[2]);
+  await expect(go).toBeEnabled();
+  await expect(go).toHaveText(/find where to ride/i);
+});
+
+test('an empty selection cannot search even if the CTA is forced', async ({ gotoApp, page }) => {
+  await gotoApp('signedIn');
+  await page.evaluate(() => {
+    const p = loadProfile(); p.homeLat = 50.7175; p.homeLon = 4.3978; saveProfile(p);
+  });
+  await page.locator('#planBtn').click();
+  await page.waitForTimeout(250);
+  const ran = await page.evaluate(async () => {
+    _planState.days = [];
+    _planLast = null;
+    await runPlanner();
+    return _planLast !== null;
+  });
+  expect(ran).toBe(false);
+});
+
+// ── The drive time is a control, not a label ───────────────────────────────
+
+test('the drive time opens directions and does not open the spot', async ({ gotoApp, page }) => {
+  await gotoApp('signedIn');
+  await page.evaluate(() => {
+    const p = loadProfile(); p.homeLat = 50.7175; p.homeLon = 4.3978; saveProfile(p);
+  });
+  await page.locator('#planBtn').click();
+  await page.waitForTimeout(250);
+
+  await page.evaluate(() => {
+    const days = planDates(new Date().toISOString().slice(0, 10));
+    _planState = { maxDriveMin: 180, minWindKn: 15, waterType: '', sort: 'best', days: [days[0]] };
+    _planLast = { estimated: false, planned: [{
+      name: 'Oesterdam', loc: 'Zeeland', lat: 51.4964, lon: 4.199, dirs: [270], driveMin: 79,
+      days: [{ dateStr: days[0], goodHours: 4, peakKn: 20 }], otherDays: [],
+    }] };
+    renderPlanResults();
+  });
+
+  const btn = page.locator('.plan-drive').first();
+  await expect(btn).toContainText('1h19');
+
+  const url = await page.evaluate(() => planRouteUrl(51.4964, 4.199));
+  expect(url).toContain('origin=50.7175,4.3978');
+  expect(url).toContain('destination=51.4964,4.199');
+  expect(url).toContain('travelmode=driving');
+
+  // Clicking it must not fall through to the card, which would open the spot.
+  const [popup] = await Promise.all([
+    page.waitForEvent('popup'),
+    btn.click(),
+  ]);
+  await popup.close();
+  await expect(page.locator('#plannerOverlay')).toBeVisible();
 });

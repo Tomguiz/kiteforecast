@@ -19,7 +19,7 @@ INSERT INTO spots (name, loc, lat, lon, dirs, active) VALUES
   ('De Punt', 'Zeeland, Netherlands', 51.781, 3.8739, '{225,270,315}', true),
   ('T''Hekje Ouddorp', 'Zeeland, Netherlands', 51.8223, 3.8896, '{225,270,315}', true),
   ('Vuurtoren Ouddorp', 'Zeeland, Netherlands', 51.8112, 3.8651, '{225,270,315}', true),
-  ('Oesterdam', 'Zeeland, Netherlands', 51.7333, 3.8667, '{180,225,270,315}', true),
+  ('Oesterdam', 'Zeeland, Netherlands', 51.4964, 4.199, '{180,225,270,315}', true),
   ('Neeltje Jans', 'Zeeland, Netherlands', 51.6273, 3.6857, '{225,270,315}', true),
   ('Vrouwenpolder', 'Zeeland, Netherlands', 51.5869, 3.6268, '{270,315,0}', true),
   ('Veersemeer', 'Zeeland, Netherlands', 51.5697, 3.6551, '{225,270,315}', true),

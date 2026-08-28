@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
 import {
   shortlistCandidates, rankPlan, planDates,
   MAX_PLAN_DAYS, KM_PER_DRIVE_HOUR, MAX_CANDIDATES,
@@ -103,5 +104,21 @@ describe('the date window is bounded, and stays bounded', () => {
 
   it('crosses a month boundary correctly', () => {
     expect(planDates('2026-08-30')).toEqual(['2026-08-30','2026-08-31','2026-09-01','2026-09-02'])
+  })
+})
+
+// Oesterdam was catalogued 35 km north-west of the real dam, in the
+// Brouwersdam area. From Waterloo that is a 2h06 drive instead of 1h19, so the
+// planner ranked it as far more expensive than it is. Coordinates are the one
+// input the planner cannot sanity-check at runtime, so pin the fix.
+describe('spot coordinates used for routing', () => {
+  it('places Oesterdam on the actual Oesterdam', () => {
+    const html = readFileSync(new URL('../../index.html', import.meta.url), 'utf8')
+    const m = html.match(/\{name:'Oesterdam',loc:'([^']+)',lat:([\d.]+),lon:([\d.]+)/)
+    expect(m).toBeTruthy()
+    const lat = Number(m![2]), lon = Number(m![3])
+    // The dam runs between Tholen and Zuid-Beveland.
+    expect(lat).toBeGreaterThan(51.44); expect(lat).toBeLessThan(51.55)
+    expect(lon).toBeGreaterThan(4.15);  expect(lon).toBeLessThan(4.25)
   })
 })
