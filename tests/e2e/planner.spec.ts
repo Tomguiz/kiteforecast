@@ -145,3 +145,86 @@ test('a day outside the window cannot be smuggled in', async ({ gotoApp, page })
   const window4 = await page.evaluate(() => planDates(new Date().toISOString().slice(0,10)));
   expect(got.every((d: string) => window4.includes(d))).toBe(true);
 });
+
+// ── Days the rider did not ask for ─────────────────────────────────────────
+//
+// One request per spot returns the whole window, so a day outside the
+// selection has already been paid for. Saying nothing about it wastes
+// information the rider would want: "Sunday is better than the day you asked
+// about" is exactly the kind of thing a planner exists to say.
+
+test('mentions a good day the rider did not select', async ({ gotoApp, page }) => {
+  await gotoApp('signedIn');
+  await page.evaluate(() => {
+    const p = loadProfile();
+    p.homeLat = 50.7175; p.homeLon = 4.3978; p.homeLabel = 'Waterloo'; saveProfile(p);
+  });
+  await page.locator('#planBtn').click();
+  await page.waitForTimeout(250);
+
+  const html = await page.evaluate(() => {
+    const days = planDates(new Date().toISOString().slice(0, 10));
+    _planState = { maxDriveMin: 180, minWindKn: 15, waterType: '', sort: 'best', days: [days[0]] };
+    _planLast = { estimated: false, planned: [{
+      name: 'Somewhere', loc: 'BE', lat: 51.3, lon: 3.3, dirs: [270], driveMin: 90,
+      days:      [{ dateStr: days[0], goodHours: 3, peakKn: 18 }],
+      otherDays: [{ dateStr: days[2], goodHours: 6, peakKn: 27 },
+                  { dateStr: days[1], goodHours: 1, peakKn: 30 }],   // too short: not offered
+    }] };
+    renderPlanResults();
+    return document.getElementById('planResults')!.innerHTML;
+  });
+
+  expect(html).toContain('also rideable');
+  expect(html).toContain('27kn');      // the genuinely good other day
+  expect(html).not.toContain('30kn');  // one hour is not a session, whatever the wind
+});
+
+test('says nothing about other days when there is nothing to say', async ({ gotoApp, page }) => {
+  await gotoApp('signedIn');
+  await page.evaluate(() => {
+    const p = loadProfile(); p.homeLat = 50.7175; p.homeLon = 4.3978; saveProfile(p);
+  });
+  await page.locator('#planBtn').click();
+  await page.waitForTimeout(250);
+
+  const html = await page.evaluate(() => {
+    const days = planDates(new Date().toISOString().slice(0, 10));
+    _planState = { maxDriveMin: 180, minWindKn: 15, waterType: '', sort: 'best', days: [days[0]] };
+    _planLast = { estimated: false, planned: [{
+      name: 'Somewhere', loc: 'BE', lat: 51.3, lon: 3.3, dirs: [270], driveMin: 90,
+      days:      [{ dateStr: days[0], goodHours: 4, peakKn: 22 }],
+      otherDays: [{ dateStr: days[1], goodHours: 4, peakKn: 9 }],    // below the floor
+    }] };
+    renderPlanResults();
+    return document.getElementById('planResults')!.innerHTML;
+  });
+
+  expect(html).not.toContain('also rideable');
+});
+
+test('offers another day instead of a dead end', async ({ gotoApp, page }) => {
+  await gotoApp('signedIn');
+  await page.evaluate(() => {
+    const p = loadProfile(); p.homeLat = 50.7175; p.homeLon = 4.3978; saveProfile(p);
+  });
+  await page.locator('#planBtn').click();
+  await page.waitForTimeout(250);
+
+  const html = await page.evaluate(() => {
+    const days = planDates(new Date().toISOString().slice(0, 10));
+    _planState = { maxDriveMin: 180, minWindKn: 15, waterType: '', sort: 'best', days: [days[0]] };
+    _planLast = { estimated: false, planned: [{
+      name: 'Somewhere', loc: 'BE', lat: 51.3, lon: 3.3, dirs: [270], driveMin: 90,
+      days:      [{ dateStr: days[0], goodHours: 0, peakKn: 6 }],   // flat: nothing today
+      otherDays: [{ dateStr: days[2], goodHours: 5, peakKn: 24 }],
+    }] };
+    renderPlanResults();
+    return document.getElementById('planResults')!.innerHTML;
+  });
+
+  expect(html).toContain('Nothing rideable');
+  expect(html).toContain('But another day works');
+  expect(html).toContain('24kn');
+  expect(html).toContain('1h30');          // the drive time still has to be shown
+});
