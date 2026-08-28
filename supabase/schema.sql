@@ -602,3 +602,21 @@ SELECT 'Billy Kite',
        'https://billykite.be',
        true, 1
 WHERE NOT EXISTS (SELECT 1 FROM email_deals WHERE cta_url = 'https://billykite.be');
+
+-- ---------------------------------------------------------------------------
+-- Rider profile: level and weight
+-- ---------------------------------------------------------------------------
+-- Both feed the kite-size recommendation, and the level is matched against
+-- spot_info.skill_level to warn a beginner off an advanced spot. Nullable on
+-- purpose: the app must work for riders who never fill these in, so every
+-- consumer has to handle "unknown" rather than assume a default body weight.
+-- kite_level mirrors SPOT_SKILL_LEVELS in index.html by index, so the rider
+-- scale and the spot scale stay comparable.
+DO $$ BEGIN ALTER TABLE profiles ADD COLUMN kite_level text; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE profiles ADD COLUMN weight_kg integer; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE profiles ADD CONSTRAINT profiles_kite_level_chk
+  CHECK (kite_level IS NULL OR kite_level IN ('Beginner','Intermediate','Advanced')); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+-- A plausible human range. Not cosmetic: the size formula divides by weight,
+-- so a typo of 7 or 700 would produce a dangerous recommendation.
+DO $$ BEGIN ALTER TABLE profiles ADD CONSTRAINT profiles_weight_chk
+  CHECK (weight_kg IS NULL OR weight_kg BETWEEN 30 AND 150); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
