@@ -32,7 +32,9 @@ test('opens with the rider’s home, the day window and car spelled out', async 
 
   const body = page.locator('#plannerBody');
   await expect(body).toContainText('Waterloo');
-  await expect(body).toContainText('4 days');
+  // the header names the days actually selected, not the whole window — the
+  // default is today + tomorrow
+  await expect(body).toContainText('2 days');
   await expect(body).toContainText('by car');
 });
 
@@ -78,4 +80,68 @@ test('the date window really is capped at four days', async ({ gotoApp, page }) 
   const d = await page.evaluate(() => planDates('2026-08-28', 14));
   expect(d).toHaveLength(4);
   expect(d[3]).toBe('2026-08-31');
+});
+
+// ── Choosing the day ───────────────────────────────────────────────────────
+//
+// "Where should I ride" is normally asked about a day the rider is free, so a
+// four-day list buries the answer. Narrowing does NOT save forecast requests —
+// one call per spot returns every day — but it narrows the result to what can
+// actually be acted on.
+
+const openPlanner = async (page: any) => {
+  await page.evaluate(() => {
+    const p = loadProfile();
+    p.homeLat = 50.7175; p.homeLon = 4.3978; p.homeLabel = 'Waterloo'; saveProfile(p);
+    _planState.days = null;              // start from the default each time
+  });
+  await page.locator('#planBtn').click();
+  await page.waitForTimeout(250);
+};
+
+test('offers exactly the four days the window allows', async ({ gotoApp, page }) => {
+  await gotoApp('signedIn');
+  await openPlanner(page);
+  const btns = page.locator('#plannerBody button[onclick^="togglePlanDay"]');
+  await expect(btns).toHaveCount(4);
+});
+
+test('defaults to today and tomorrow, not the whole window', async ({ gotoApp, page }) => {
+  await gotoApp('signedIn');
+  await openPlanner(page);
+  expect(await page.evaluate(() => _planSelectedDays().length)).toBe(2);
+});
+
+test('a day can be turned off and the search follows', async ({ gotoApp, page }) => {
+  await gotoApp('signedIn');
+  await openPlanner(page);
+  const before = await page.evaluate(() => _planSelectedDays());
+  await page.evaluate((d: string) => togglePlanDay(d), before[1]);
+  const after = await page.evaluate(() => _planSelectedDays());
+  expect(after).toEqual([before[0]]);
+});
+
+test('the last selected day cannot be turned off', async ({ gotoApp, page }) => {
+  // searching zero days is not a state worth having
+  await gotoApp('signedIn');
+  await openPlanner(page);
+  const after = await page.evaluate(() => {
+    const d = _planSelectedDays();
+    togglePlanDay(d[1]);                       // down to one
+    const one = _planSelectedDays();
+    togglePlanDay(one[0]);                     // try to remove the last
+    return _planSelectedDays();
+  });
+  expect(after).toHaveLength(1);
+});
+
+test('a day outside the window cannot be smuggled in', async ({ gotoApp, page }) => {
+  await gotoApp('signedIn');
+  await openPlanner(page);
+  const got = await page.evaluate(() => {
+    _planState.days = ['2027-01-01'];
+    return _planSelectedDays();
+  });
+  const window4 = await page.evaluate(() => planDates(new Date().toISOString().slice(0,10)));
+  expect(got.every((d: string) => window4.includes(d))).toBe(true);
 });
