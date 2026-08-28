@@ -4491,6 +4491,10 @@ function suggestKiteSize({weightKg,level,pref,windKn}){
   if(!(level in _LEVEL_FACTOR)) return null;
   const p=(pref&&pref in _PREF_FACTOR)?pref:'neutral';
   const exact=KITE_SIZE_K*weightKg/windKn*kitePowerFactor(level,p);
+  // Outside the quiver there is no honest answer — snapping 18.3 down to the
+  // biggest size in the list would look like advice and would not be any.
+  if(exact>QUIVER_SIZES[QUIVER_SIZES.length-1]+1) return null;
+  if(exact<QUIVER_SIZES[0]-1) return null;
   const size=QUIVER_SIZES.reduce((b,s)=>Math.abs(s-exact)<Math.abs(b-exact)?s:b,QUIVER_SIZES[0]);
   return {size, exact:Math.round(exact*10)/10};
 }

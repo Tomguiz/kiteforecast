@@ -61,6 +61,12 @@ export function suggestKiteSize(i: KiteSizeInput): KiteSizeResult | null {
   if (!(level in LEVEL_FACTOR)) return null
   const pref: PowerPref = (i.pref && i.pref in PREF_FACTOR) ? i.pref : 'neutral'
   const exact = KITE_SIZE_K * weightKg / windKn * powerFactor(level, pref)
+  // Snapping only makes sense inside the quiver. An 80 kg rider who likes
+  // being overpowered wants 18.3 m at 14 kn; answering "14 m" is not a
+  // recommendation, it is the largest number in the list pretending to be
+  // one. Outside the range there is no honest answer.
+  if (exact > QUIVER_SIZES[QUIVER_SIZES.length - 1] + 1) return null
+  if (exact < QUIVER_SIZES[0] - 1) return null
   const size = QUIVER_SIZES.reduce((best, s) =>
     Math.abs(s - exact) < Math.abs(best - exact) ? s : best, QUIVER_SIZES[0])
   return { size, exact: Math.round(exact * 10) / 10 }
