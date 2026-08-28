@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
-  suggestKiteSize, riderScale, QUIVER_SIZES, WIND_BANDS, MIN_WIND_KN, MAX_WIND_KN,
+  suggestKiteSize, riderScale, effectiveWindKn,
+  QUIVER_SIZES, WIND_BANDS, MIN_WIND_KN, MAX_WIND_KN,
 } from '../../supabase/functions/_shared/kite-size.ts'
 
 // Bands, not a curve. The first version fitted size = K * weight / wind and
@@ -91,5 +92,49 @@ describe('outside the quiver it caps and says so', () => {
   })
   it('reports which band it used, so the UI can name the range', () => {
     expect(suggestKiteSize({ weightKg: 80, level: 'Advanced', windKn: 18 })!.bandMaxKn).toBe(WIND_BANDS[0].maxKn)
+  })
+})
+
+// From the rider, looking at a real forecast row: 14 kn gusting 29 with a
+// "Light wind" session on it. "Gusts at 29 is a lot — I'd rather take a 10.
+// Wind should be more around 22-23-24 knts."
+describe('gusts move the effective wind', () => {
+  const me = (windKn: number, gustKn?: number) =>
+    suggestKiteSize({ weightKg: 80, level: 'Advanced', pref: 'overpowered', windKn, gustKn })!
+
+  it('treats 14 kn gusting 29 as the low 20s, and drops a size', () => {
+    expect(effectiveWindKn(14, 29)).toBeGreaterThanOrEqual(22)
+    expect(effectiveWindKn(14, 29)).toBeLessThanOrEqual(24)
+    expect(me(14, 29).size).toBe(10)
+    expect(me(14).size).toBe(12)          // same average, no gust info: unchanged
+  })
+
+  it('leaves an ordinary gust spread alone, or the whole band table shifts', () => {
+    // 20 gusting 26 is a normal 20 kn day and must stay on the 12 m band.
+    expect(effectiveWindKn(20, 26)).toBe(20)
+    expect(me(20, 26).size).toBe(12)
+  })
+
+  it('is monotonic in gust', () => {
+    const sizes = [20, 26, 32, 38].map(g => me(16, g).size)
+    for (let i = 1; i < sizes.length; i++) expect(sizes[i]).toBeLessThanOrEqual(sizes[i - 1])
+  })
+})
+
+// The column said "—" on rows the rest of the card had already marked as a
+// session, because the kite floor (14) and the app's rideable floor (12 with
+// gusts >= 20) disagreed.
+describe('every rideable hour gets an answer', () => {
+  it('answers at the app’s own floor: 12 kn with gusts', () => {
+    const r = suggestKiteSize({ weightKg: 80, level: 'Advanced', pref: 'overpowered', windKn: 12, gustKn: 24 })
+    expect(r).not.toBeNull()
+  })
+
+  it('answers at 12 kn even with no gust recorded', () => {
+    expect(suggestKiteSize({ weightKg: 80, level: 'Advanced', windKn: 12 })).not.toBeNull()
+  })
+
+  it('still says nothing below anything the app would call rideable', () => {
+    expect(suggestKiteSize({ weightKg: 80, level: 'Advanced', windKn: 11 })).toBeNull()
   })
 })

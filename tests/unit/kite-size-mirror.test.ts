@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import {
   QUIVER_SIZES, WIND_BANDS, REF_WEIGHT_KG, MIN_WIND_KN, MAX_WIND_KN, riderScale,
+  GUST_NORMAL_RATIO, GUST_EXCESS_WEIGHT,
 } from '../../supabase/functions/_shared/kite-size.ts'
 
 // index.html is a plain script and cannot import the shared module, so the
@@ -20,6 +21,11 @@ describe('the two copies of the kite-size model agree', () => {
     const q = html.match(/const QUIVER_SIZES\s*=\s*\[([^\]]+)\]/)![1]
     expect(q.split(',').map(s => parseInt(s.trim(), 10))).toEqual(QUIVER_SIZES)
     expect(num('REF_WEIGHT_KG')).toBe(REF_WEIGHT_KG)
+  })
+
+  it('same gust handling — the whole point of it is that it is not a guess', () => {
+    expect(num('GUST_NORMAL_RATIO')).toBe(GUST_NORMAL_RATIO)
+    expect(num('GUST_EXCESS_WEIGHT')).toBe(GUST_EXCESS_WEIGHT)
   })
 
   it('same wind band', () => {
