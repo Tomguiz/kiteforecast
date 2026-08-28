@@ -1622,6 +1622,8 @@
 
         <label class="pp-label" style="margin:8px 0 0 0">Your riding level</label>
         <div id="ppLevelBtns" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px"></div>
+        <label class="pp-label" style="margin:8px 0 0 0">How you like to be powered</label>
+        <div id="ppPrefBtns" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px"></div>
         <label class="pp-label" style="margin:8px 0 0 0">Your weight</label>
         <div style="display:flex;gap:6px;align-items:center;width:100%">
           <input type="number" id="ppWeightInput" class="pp-input" placeholder="e.g. 78" min="30" max="150" step="1"
@@ -4460,6 +4462,38 @@ const SPOT_SKILL_LEVELS = ['Beginner-friendly','Intermediate','Advanced'];
 // "is this spot above my level" a comparison rather than a lookup table.
 // 'Beginner-friendly' describes a beach; 'Beginner' describes a person.
 const RIDER_LEVELS = ['Beginner','Intermediate','Advanced'];
+const POWER_PREFS = [
+  {v:'underpowered', label:'Under-powered'},
+  {v:'neutral',      label:'Neutral'},
+  {v:'overpowered',  label:'Over-powered'},
+];
+// MIRRORS supabase/functions/_shared/kite-size.ts. index.html is a plain
+// script and cannot import it, the same reason WIND_DIR_TOLERANCE_DEG is
+// duplicated. A unit test pins the two copies in step; change one, change both.
+//
+// Calibrated on real numbers rather than a table off the internet: 75 kg at
+// 20 kn is 10 m intermediate, 9 m beginner, 11-12 m experienced.
+const KITE_SIZE_K = 2.6667;
+const QUIVER_SIZES = [5,6,7,8,9,10,11,12,13,14];
+const KITE_MIN_WIND_KN = 14;
+const KITE_MAX_WIND_KN = 40;
+const _LEVEL_FACTOR = {Beginner:0.90, Intermediate:1.00, Advanced:1.15};
+const _PREF_FACTOR  = {underpowered:0.92, neutral:1.00, overpowered:1.08};
+function kitePowerFactor(level,pref){
+  return Math.min(1.20, Math.max(0.85, (_LEVEL_FACTOR[level]||0)*(_PREF_FACTOR[pref]||1)));
+}
+// null means "cannot say". Never a default body weight — this advice puts a
+// person on the water.
+function suggestKiteSize({weightKg,level,pref,windKn}){
+  if(!weightKg||!level) return null;
+  if(!Number.isFinite(weightKg)||weightKg<30||weightKg>150) return null;
+  if(!Number.isFinite(windKn)||windKn<KITE_MIN_WIND_KN||windKn>KITE_MAX_WIND_KN) return null;
+  if(!(level in _LEVEL_FACTOR)) return null;
+  const p=(pref&&pref in _PREF_FACTOR)?pref:'neutral';
+  const exact=KITE_SIZE_K*weightKg/windKn*kitePowerFactor(level,p);
+  const size=QUIVER_SIZES.reduce((b,s)=>Math.abs(s-exact)<Math.abs(b-exact)?s:b,QUIVER_SIZES[0]);
+  return {size, exact:Math.round(exact*10)/10};
+}
 const riderLevelIdx = lvl => RIDER_LEVELS.indexOf(lvl);
 const spotLevelIdx  = lvl => SPOT_SKILL_LEVELS.indexOf(lvl);
 const FACILITY_EMOJI = {'Free parking':'🅿️','Paid parking':'🅿️','Kiteshop':'🛍️','Kite rental':'🪁','Lessons':'🎓','Restaurant/bar':'🍽️','Showers':'🚿','Toilets':'🚻','Rescue':'🛟','Storage':'📦'};
@@ -5309,6 +5343,8 @@ function openModal(dateStr,dayIdx){
     <span class="rating-badge ${rating.cls}" style="width:auto;padding:5px 14px">${rating.label}</span>
     ${win?`<span class="m-badge green">🪁 ${win}</span>`:''}
     ${peakKn>0?`<span class="m-badge accent">Avg ${peakKn} kn</span>`:''}
+    ${(()=>{const _pf=loadProfile();const k=suggestKiteSize({weightKg:_pf.weightKg,level:_pf.kiteLevel,pref:_pf.powerPref,windKn:peakKn});
+      return k?`<span class="m-badge accent" title="Suggested for ${_pf.weightKg} kg, ${_pf.kiteLevel}, ${peakKn} kn">\uD83E\uDE81 ${k.size} m</span>`:'';})()}
     <button id="mBadgeMore" onclick="(function(b){var x=$('mBadgeExtra');var open=x.classList.toggle('open');var tr=$('mTideRow');if(tr)tr.style.display=open?'flex':'none';b.textContent=open?'▲ Less':'▼ More';})(this)">▼ More</button>
     <span id="mBadgeExtra">
     ${maxGust>0?`<span class="m-badge">Gusts ${maxGust} kn</span>`:''}
@@ -6338,6 +6374,7 @@ function openProfilePanel(tab){
     const _hi=$('ppHomeInput'); if(_hi) _hi.value=_p.homeLabel||'';
     const _wi=$('ppWeightInput'); if(_wi) _wi.value=_p.weightKg??'';
     renderRiderLevelBtns();
+    renderPowerPrefBtns();
     updateNicknameReq();
     // Set save button initial state: dim if nickname already saved, default if not yet set
     (function(){ const btn=$('ppNicknameSaveBtn'); if(!btn) return;
@@ -8966,7 +9003,7 @@ function updatePremiumUI(){
 
 async function syncPremiumFromSupabase(email){
   const sb=getSb(); if(!sb||!email) return;
-  const{data,error}=await sb.from('profiles').select('is_premium,sms_enabled,phone_number,is_admin,nickname,friend_session_notifs,notify_friends_on_confirm,avatar_url,contribution_points,premium_until,notifs_enabled,home_lat,home_lon,home_label,digest_nearby_enabled,digest_nearby_km,kite_level,weight_kg').eq('email',email).single();
+  const{data,error}=await sb.from('profiles').select('is_premium,sms_enabled,phone_number,is_admin,nickname,friend_session_notifs,notify_friends_on_confirm,avatar_url,contribution_points,premium_until,notifs_enabled,home_lat,home_lon,home_label,digest_nearby_enabled,digest_nearby_km,kite_level,weight_kg,power_pref').eq('email',email).single();
   console.log('[syncPremium] email=',email,'data=',data,'error=',error?.message);
   const p=loadProfile();
   if(data){
@@ -8985,7 +9022,7 @@ async function syncPremiumFromSupabase(email){
     p.contributionPoints=data.contribution_points||0;
     p.premiumUntil=data.premium_until||null;
     p.homeLat=data.home_lat; p.homeLon=data.home_lon; p.homeLabel=data.home_label;
-    p.kiteLevel=data.kite_level; p.weightKg=data.weight_kg;
+    p.kiteLevel=data.kite_level; p.weightKg=data.weight_kg; p.powerPref=data.power_pref;
     p.digestNearbyEnabled=data.digest_nearby_enabled===true;
     p.digestNearbyKm=data.digest_nearby_km||120;
     saveProfile(p);
@@ -9409,6 +9446,24 @@ async function findHomeLocation(){
 }
 // The level buttons are rebuilt rather than toggled in place so the panel can
 // be opened, closed and reopened without stale selection state.
+function renderPowerPrefBtns(){
+  const wrap=$('ppPrefBtns'); if(!wrap) return;
+  const cur=loadProfile().powerPref||'neutral';
+  wrap.innerHTML='';
+  POWER_PREFS.forEach(o=>{
+    const b=document.createElement('button');
+    b.type='button';
+    b.className='s-btn'+(cur===o.v?' active':'');
+    b.textContent=o.label;
+    b.dataset.pref=o.v;
+    b.addEventListener('click',()=>{
+      wrap.querySelectorAll('.s-btn').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+    });
+    wrap.appendChild(b);
+  });
+}
+
 function renderRiderLevelBtns(){
   const wrap=$('ppLevelBtns'); if(!wrap) return;
   const cur=loadProfile().kiteLevel||'';
@@ -9432,6 +9487,7 @@ function renderRiderLevelBtns(){
 async function saveRiderProfile(){
   const status=$('ppRiderStatus'), btn=$('ppRiderSaveBtn');
   const lvl=$('ppLevelBtns')?.querySelector('.s-btn.active')?.dataset.level||null;
+  const pref=$('ppPrefBtns')?.querySelector('.s-btn.active')?.dataset.pref||null;
   const raw=($('ppWeightInput')?.value||'').trim();
   let weight=raw===''?null:parseInt(raw,10);
   // Refuse rather than clamp: silently turning 7 into 30 would hand back a
@@ -9441,12 +9497,12 @@ async function saveRiderProfile(){
     return;
   }
   const p=loadProfile();
-  p.kiteLevel=lvl; p.weightKg=weight;
+  p.kiteLevel=lvl; p.weightKg=weight; p.powerPref=pref;
   saveProfile(p);
   if(btn){ btn.disabled=true; btn.textContent='Saving…'; }
   try{
     const sb=getSb();
-    if(sb&&p.email) await sb.from('profiles').upsert({email:p.email, kite_level:lvl, weight_kg:weight},{onConflict:'email'});
+    if(sb&&p.email) await sb.from('profiles').upsert({email:p.email, kite_level:lvl, weight_kg:weight, power_pref:pref},{onConflict:'email'});
     if(status){ status.textContent='✓ Saved'; status.style.color='#4ade80'; }
   }catch(e){
     if(status){ status.textContent='⚠️ Saved on this device, but not synced'; status.style.color='#f59e0b'; }
