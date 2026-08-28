@@ -55,8 +55,16 @@ Deno.serve(async (req) => {
   const joinUrl  = `https://tomguiz.github.io/kiteforecast/?join=${joinData}`
   const appLink  = `https://tomguiz.github.io/kiteforecast/?spot=${encodeURIComponent(spot_name)}`
 
-  // Send one webhook per friend
-  const sends = (friends || []).map(async (friend: any) => {
+  // Sent in small batches, NOT all at once. Every webhook starts its own Make
+  // execution, and each of those sends through one Outlook mailbox, which caps
+  // concurrent sends per mailbox. Firing a dozen friends in parallel produced
+  // exactly that on 2026-08-28 at 09:53: eleven notifications in one second,
+  // and Make answered with a wall of
+  //   [429] Application is over its MailboxConcurrency limit
+  //   [429] WASCL UserAction verdict ... Throttle
+  // Spacing them costs a couple of seconds and removes the whole class.
+  const BATCH = 2, GAP_MS = 400
+  const buildSend = (friend: any) => {
     // Plain app URL (not a single-use magic link): magic links get pre-consumed by
     // email link-scanners and expire, breaking the CTA. The app restores the user's
     // saved session on load, so returning users land signed-in.
@@ -81,18 +89,34 @@ Deno.serve(async (req) => {
         join_link,
       }),
     })
-  })
+  }
 
-  await Promise.all(sends)
+  const list = friends || []
+  // Only friends whose webhook was actually accepted get logged. The old code
+  // recorded every friend unconditionally, so email_log claimed eleven sends
+  // on a morning where most of them were throttled — a log that reports
+  // success it cannot observe is worse than no log.
+  const delivered: any[] = []
+  for (let i = 0; i < list.length; i += BATCH) {
+    const batch = list.slice(i, i + BATCH)
+    const results = await Promise.all(batch.map(async (friend: any) => {
+      try {
+        const res = await buildSend(friend)
+        return res && (res as Response).ok ? friend : null
+      } catch { return null }
+    }))
+    for (const f of results) if (f) delivered.push(f)
+    if (i + BATCH < list.length) await new Promise(r => setTimeout(r, GAP_MS))
+  }
 
-  // One row per friend notified, in a single insert. Never throws.
-  await recordEmails((friends || []).map((friend: any) => ({
+  // One row per friend actually notified, in a single insert. Never throws.
+  await recordEmails(delivered.map((friend: any) => ({
     email: friend.email,
     kind:  'session_attendance',
     meta:  { spot_name, session_date: dateLabel, attendee_nickname: nickname },
   })))
 
-  return new Response(JSON.stringify({ ok: true, notified: sends.length }), {
+  return new Response(JSON.stringify({ ok: true, notified: delivered.length, attempted: list.length }), {
     headers: { 'Content-Type': 'application/json', ...CORS },
   })
 })
