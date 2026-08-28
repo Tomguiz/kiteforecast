@@ -1,129 +1,95 @@
 import { describe, it, expect } from 'vitest'
 import {
-  suggestKiteSize, powerFactor, QUIVER_SIZES, MIN_WIND_KN, MAX_WIND_KN,
+  suggestKiteSize, riderScale, QUIVER_SIZES, WIND_BANDS, MIN_WIND_KN, MAX_WIND_KN,
 } from '../../supabase/functions/_shared/kite-size.ts'
 
-// The formula is calibrated on the rider's own numbers, so those are the
-// tests that matter: if these drift, the suggestion no longer reflects what
-// he actually rides.
-describe('kite size — the reference point it was built from', () => {
-  const at = (level: any, pref: any = 'neutral') =>
-    suggestKiteSize({ weightKg: 75, level, pref, windKn: 20 })!.size
+// Bands, not a curve. The first version fitted size = K * weight / wind and
+// was wrong in a way no smoothing could fix: it wanted 18.3 m at 14 kn and
+// 11.6 m at 22 kn, while the rider it was calibrated on flies ONE 12 m across
+// that whole range. These tests are his actual quiver.
+describe('the reference quiver it is built from', () => {
+  const me = (windKn: number) =>
+    suggestKiteSize({ weightKg: 80, level: 'Advanced', pref: 'overpowered', windKn })!.size
 
-  it('75 kg at 20 kn: 9 / 10 / 11-12 by level', () => {
-    expect(at('Beginner')).toBe(9)
-    expect(at('Intermediate')).toBe(10)
-    expect(at('Advanced')).toBeGreaterThanOrEqual(11)
-    expect(at('Advanced')).toBeLessThanOrEqual(12)
+  it('holds 12 m from 14 to 22 kn', () => {
+    for (const kn of [14, 16, 18, 20, 22]) expect(me(kn)).toBe(12)
   })
 
-  it('a heavier rider needs more kite, a lighter one less', () => {
-    const s = (w: number) => suggestKiteSize({ weightKg: w, level: 'Intermediate', windKn: 20 })!.size
-    expect(s(60)).toBeLessThan(s(75))
-    expect(s(90)).toBeGreaterThan(s(75))
+  it('holds 10 m from just above 22 to 32 kn', () => {
+    for (const kn of [23, 26, 30, 32]) expect(me(kn)).toBe(10)
   })
 
-  it('more wind means less kite, monotonically', () => {
-    const sizes = [16, 20, 25, 30, 35].map(kn =>
-      suggestKiteSize({ weightKg: 75, level: 'Intermediate', windKn: kn })!.size)
-    for (let i = 1; i < sizes.length; i++) expect(sizes[i]).toBeLessThanOrEqual(sizes[i - 1])
-  })
-})
-
-describe('power preference', () => {
-  it('shifts the size, in the direction the words mean', () => {
-    const s = (pref: any) => suggestKiteSize({ weightKg: 75, level: 'Intermediate', pref, windKn: 20 })!.size
-    expect(s('underpowered')).toBeLessThan(s('neutral'))
-    expect(s('overpowered')).toBeGreaterThan(s('neutral'))
+  it('drops to 8 m above 32 kn', () => {
+    for (const kn of [33, 38, 45]) expect(me(kn)).toBe(8)
   })
 
-  it('cannot outrank the level it refines', () => {
-    // A beginner who likes being overpowered must still end up on less kite
-    // than an advanced rider who likes being underpowered.
-    const begOver = suggestKiteSize({ weightKg: 75, level: 'Beginner', pref: 'overpowered', windKn: 20 })!.size
-    const advUnder = suggestKiteSize({ weightKg: 75, level: 'Advanced', pref: 'underpowered', windKn: 20 })!.size
-    expect(begOver).toBeLessThan(advUnder)
-  })
-
-  it('is clamped so advanced + overpowered stays inside the stated range', () => {
-    const s = suggestKiteSize({ weightKg: 75, level: 'Advanced', pref: 'overpowered', windKn: 20 })!.size
-    expect(s).toBeLessThanOrEqual(12)     // he said 11-12, not 13
-    expect(powerFactor('Advanced', 'overpowered')).toBeLessThanOrEqual(1.20)
-  })
-
-  it('defaults to neutral rather than refusing when unset', () => {
-    const a = suggestKiteSize({ weightKg: 75, level: 'Intermediate', windKn: 20 })
-    const b = suggestKiteSize({ weightKg: 75, level: 'Intermediate', pref: 'neutral', windKn: 20 })
-    expect(a!.size).toBe(b!.size)
+  it('changes size exactly at the stated thresholds, not around them', () => {
+    expect(me(22)).toBe(12); expect(me(23)).toBe(10)
+    expect(me(32)).toBe(10); expect(me(33)).toBe(8)
   })
 })
 
-// This is advice that puts a person on the water. Refusing to answer is a
-// valid answer; inventing a default body weight is not.
+// The two other points he gave, which is all the calibration there is for
+// scaling away from his own body and level.
+describe('scaling to other riders', () => {
+  it('a 60 kg advanced rider is on 9 m where he is on 12', () => {
+    const s = suggestKiteSize({ weightKg: 60, level: 'Advanced', pref: 'overpowered', windKn: 18 })!.size
+    expect(s).toBe(9)          // he said 9-10
+  })
+
+  it('a beginner at his own weight is on 10 m where he is on 12', () => {
+    const s = suggestKiteSize({ weightKg: 80, level: 'Beginner', pref: 'neutral', windKn: 18 })!.size
+    expect(s).toBe(10)         // he said 10-11
+  })
+
+  it('orders the levels without letting preference outrank them', () => {
+    const at = (level: any, pref: any) =>
+      suggestKiteSize({ weightKg: 80, level, pref, windKn: 18 })!.size
+    expect(at('Beginner', 'overpowered')).toBeLessThan(at('Advanced', 'underpowered'))
+  })
+
+  it('is linear in weight, which is the only scaling rule there is evidence for', () => {
+    expect(riderScale(80, 'Advanced', 'overpowered')).toBeCloseTo(1, 6)
+    expect(riderScale(40, 'Advanced', 'overpowered')).toBeCloseTo(0.5, 6)
+  })
+})
+
+// Bands are what stop the hourly column flickering. The previous version
+// needed explicit hysteresis to fake this; here it falls out of the model.
+describe('stability across the day', () => {
+  it('never changes size while the wind stays inside one band', () => {
+    const sizes = [15, 19, 16, 21, 18, 22].map(kn =>
+      suggestKiteSize({ weightKg: 80, level: 'Advanced', pref: 'overpowered', windKn: kn })!.size)
+    expect(new Set(sizes).size).toBe(1)
+  })
+})
+
 describe('refuses rather than guesses', () => {
   it('says nothing without a weight or a level', () => {
-    expect(suggestKiteSize({ weightKg: null, level: 'Intermediate', windKn: 20 })).toBeNull()
-    expect(suggestKiteSize({ weightKg: 75, level: null, windKn: 20 })).toBeNull()
-    expect(suggestKiteSize({ weightKg: null, level: null, windKn: 20 })).toBeNull()
+    expect(suggestKiteSize({ weightKg: null, level: 'Advanced', windKn: 20 })).toBeNull()
+    expect(suggestKiteSize({ weightKg: 80, level: null, windKn: 20 })).toBeNull()
   })
-
-  it('says nothing for an implausible weight, even if stored somehow', () => {
-    expect(suggestKiteSize({ weightKg: 7, level: 'Intermediate', windKn: 20 })).toBeNull()
-    expect(suggestKiteSize({ weightKg: 700, level: 'Intermediate', windKn: 20 })).toBeNull()
+  it('says nothing for an implausible weight or an unknown level', () => {
+    expect(suggestKiteSize({ weightKg: 7, level: 'Advanced', windKn: 20 })).toBeNull()
+    expect(suggestKiteSize({ weightKg: 80, level: 'Expert' as any, windKn: 20 })).toBeNull()
   })
-
   it('says nothing outside the wind band', () => {
-    expect(suggestKiteSize({ weightKg: 75, level: 'Intermediate', windKn: MIN_WIND_KN - 1 })).toBeNull()
-    expect(suggestKiteSize({ weightKg: 75, level: 'Intermediate', windKn: MAX_WIND_KN + 1 })).toBeNull()
-    expect(suggestKiteSize({ weightKg: 75, level: 'Intermediate', windKn: NaN })).toBeNull()
-  })
-
-  it('says nothing for a level it does not know', () => {
-    expect(suggestKiteSize({ weightKg: 75, level: 'Expert' as any, windKn: 20 })).toBeNull()
+    expect(suggestKiteSize({ weightKg: 80, level: 'Advanced', windKn: MIN_WIND_KN - 1 })).toBeNull()
+    expect(suggestKiteSize({ weightKg: 80, level: 'Advanced', windKn: MAX_WIND_KN + 1 })).toBeNull()
   })
 })
 
-describe('the number is usable', () => {
-  it('lands on a size people actually own', () => {
-    for (const w of [55, 65, 75, 85, 95]) for (const kn of [15, 18, 22, 28, 34]) {
-      const r = suggestKiteSize({ weightKg: w, level: 'Intermediate', windKn: kn })
-      if (r) expect(QUIVER_SIZES).toContain(r.size)
-    }
+describe('outside the quiver it caps and says so', () => {
+  it('flags the top rather than silently pretending', () => {
+    const r = suggestKiteSize({ weightKg: 150, level: 'Advanced', pref: 'overpowered', windKn: 15 })!
+    expect(r.size).toBe(QUIVER_SIZES[QUIVER_SIZES.length - 1])
+    expect(r.limit).toBe('over')
+    expect(r.exact).toBeGreaterThan(r.size)
   })
-
-  it('keeps the unrounded value, so the UI can show how close a call it was', () => {
-    const r = suggestKiteSize({ weightKg: 75, level: 'Intermediate', windKn: 20 })!
-    expect(r.exact).toBeCloseTo(10, 1)
+  it('marks nothing when the size lands inside the quiver', () => {
+    expect(suggestKiteSize({ weightKg: 80, level: 'Advanced', pref: 'overpowered', windKn: 18 })!.limit).toBeNull()
   })
-})
-
-// Snapping only makes sense inside the quiver. An 80 kg rider who likes being
-// overpowered computes 18.3 m at 14 kn; answering "14 m" is not advice, it is
-// the largest number in the list pretending to be advice — and 14 m in 14 kn
-// for someone who wanted 18 is a materially different session.
-describe('outside the quiver it says nothing', () => {
-  it('refuses when the rider would need more kite than the list holds', () => {
-    const r = suggestKiteSize({ weightKg: 80, level: 'Advanced', pref: 'overpowered', windKn: 14 })
-    expect(r).toBeNull()
-  })
-
-  it('answers again as soon as the number lands in the quiver', () => {
-    const r = suggestKiteSize({ weightKg: 80, level: 'Advanced', pref: 'overpowered', windKn: 18 })
-    expect(r).not.toBeNull()
-    expect(r!.size).toBe(14)
-  })
-
-  it('never returns the biggest size for a wildly bigger requirement', () => {
-    // the shape of the old bug: exact far above the quiver, snapped to its top
-    for (const kn of [14, 15, 16, 17]) {
-      const r = suggestKiteSize({ weightKg: 95, level: 'Advanced', pref: 'overpowered', windKn: kn })
-      if (r) expect(r.exact).toBeLessThanOrEqual(15)
-    }
-  })
-
-  it('still answers normally for an ordinary rider in ordinary wind', () => {
-    // the guard must not swallow the common case it was added around
-    expect(suggestKiteSize({ weightKg: 75, level: 'Intermediate', windKn: 20 })!.size).toBe(10)
-    expect(suggestKiteSize({ weightKg: 60, level: 'Beginner', windKn: 25 })!.size).toBeGreaterThan(0)
+  it('reports which band it used, so the UI can name the range', () => {
+    expect(suggestKiteSize({ weightKg: 80, level: 'Advanced', windKn: 18 })!.bandMaxKn).toBe(WIND_BANDS[0].maxKn)
   })
 })
