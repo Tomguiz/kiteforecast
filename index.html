@@ -1619,6 +1619,18 @@
         </div>
         <span id="ppHomeStatus" style="font-size:.65rem;color:var(--tdim);display:block;margin-top:4px"></span>
         <p class="pp-note" style="margin-top:4px;margin-bottom:6px">Used to find good sessions near you in the weekly digest.</p>
+
+        <label class="pp-label" style="margin:8px 0 0 0">Your riding level</label>
+        <div id="ppLevelBtns" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px"></div>
+        <label class="pp-label" style="margin:8px 0 0 0">Your weight</label>
+        <div style="display:flex;gap:6px;align-items:center;width:100%">
+          <input type="number" id="ppWeightInput" class="pp-input" placeholder="e.g. 78" min="30" max="150" step="1"
+                 style="margin:0;flex:1 1 0;width:0;min-width:0" inputmode="numeric"/>
+          <span style="flex:0 0 auto;color:var(--tdim);font-size:.8rem">kg</span>
+          <button class="btn pp-save-btn" id="ppRiderSaveBtn" onclick="saveRiderProfile()" style="margin:0;white-space:nowrap;flex:0 0 auto;width:auto;padding:11px 16px">Save</button>
+        </div>
+        <span id="ppRiderStatus" style="font-size:.65rem;color:var(--tdim);display:block;margin-top:4px"></span>
+        <p class="pp-note" style="margin-top:4px;margin-bottom:6px">Used to suggest a kite size for the wind, and to flag spots above your level. Optional.</p>
         <div style="border-top:1px solid var(--border);margin:4px 0 8px"></div>
 
         <!-- Share card -->
@@ -4444,6 +4456,12 @@ const SPOT_WATER_TYPES = ['Flat','Choppy','Waves','Flat & choppy','Choppy & wave
 const SPOT_TIDE_PREFS  = ['All tides','Best at high','Best at low'];
 const SPOT_CROWD_LEVELS = ['Quiet','Moderate','Crowded','Extremely crowded'];
 const SPOT_SKILL_LEVELS = ['Beginner-friendly','Intermediate','Advanced'];
+// The rider scale mirrors SPOT_SKILL_LEVELS *by index*, which is what makes
+// "is this spot above my level" a comparison rather than a lookup table.
+// 'Beginner-friendly' describes a beach; 'Beginner' describes a person.
+const RIDER_LEVELS = ['Beginner','Intermediate','Advanced'];
+const riderLevelIdx = lvl => RIDER_LEVELS.indexOf(lvl);
+const spotLevelIdx  = lvl => SPOT_SKILL_LEVELS.indexOf(lvl);
 const FACILITY_EMOJI = {'Free parking':'🅿️','Paid parking':'🅿️','Kiteshop':'🛍️','Kite rental':'🪁','Lessons':'🎓','Restaurant/bar':'🍽️','Showers':'🚿','Toilets':'🚻','Rescue':'🛟','Storage':'📦'};
 
 // Build the structured-attributes block for a spot-info card. The UI only offers
@@ -6318,6 +6336,8 @@ function openProfilePanel(tab){
     const _p=loadProfile();
     const _ni=$('ppNicknameInput'); if(_ni) _ni.value=_p.nickname||'';
     const _hi=$('ppHomeInput'); if(_hi) _hi.value=_p.homeLabel||'';
+    const _wi=$('ppWeightInput'); if(_wi) _wi.value=_p.weightKg??'';
+    renderRiderLevelBtns();
     updateNicknameReq();
     // Set save button initial state: dim if nickname already saved, default if not yet set
     (function(){ const btn=$('ppNicknameSaveBtn'); if(!btn) return;
@@ -8946,7 +8966,7 @@ function updatePremiumUI(){
 
 async function syncPremiumFromSupabase(email){
   const sb=getSb(); if(!sb||!email) return;
-  const{data,error}=await sb.from('profiles').select('is_premium,sms_enabled,phone_number,is_admin,nickname,friend_session_notifs,notify_friends_on_confirm,avatar_url,contribution_points,premium_until,notifs_enabled,home_lat,home_lon,home_label,digest_nearby_enabled,digest_nearby_km').eq('email',email).single();
+  const{data,error}=await sb.from('profiles').select('is_premium,sms_enabled,phone_number,is_admin,nickname,friend_session_notifs,notify_friends_on_confirm,avatar_url,contribution_points,premium_until,notifs_enabled,home_lat,home_lon,home_label,digest_nearby_enabled,digest_nearby_km,kite_level,weight_kg').eq('email',email).single();
   console.log('[syncPremium] email=',email,'data=',data,'error=',error?.message);
   const p=loadProfile();
   if(data){
@@ -8965,6 +8985,7 @@ async function syncPremiumFromSupabase(email){
     p.contributionPoints=data.contribution_points||0;
     p.premiumUntil=data.premium_until||null;
     p.homeLat=data.home_lat; p.homeLon=data.home_lon; p.homeLabel=data.home_label;
+    p.kiteLevel=data.kite_level; p.weightKg=data.weight_kg;
     p.digestNearbyEnabled=data.digest_nearby_enabled===true;
     p.digestNearbyKm=data.digest_nearby_km||120;
     saveProfile(p);
@@ -9386,6 +9407,54 @@ async function findHomeLocation(){
     if(btn){ btn.disabled=false; btn.textContent='📍 Find'; }
   }
 }
+// The level buttons are rebuilt rather than toggled in place so the panel can
+// be opened, closed and reopened without stale selection state.
+function renderRiderLevelBtns(){
+  const wrap=$('ppLevelBtns'); if(!wrap) return;
+  const cur=loadProfile().kiteLevel||'';
+  wrap.innerHTML='';
+  RIDER_LEVELS.forEach(lvl=>{
+    const b=document.createElement('button');
+    b.type='button';
+    b.className='s-btn'+(cur===lvl?' active':'');
+    b.textContent=lvl;
+    b.dataset.level=lvl;
+    // Selecting is local only; nothing is written until Save, so a mis-tap
+    // costs nothing.
+    b.addEventListener('click',()=>{
+      wrap.querySelectorAll('.s-btn').forEach(x=>x.classList.remove('active'));
+      b.classList.add('active');
+    });
+    wrap.appendChild(b);
+  });
+}
+
+async function saveRiderProfile(){
+  const status=$('ppRiderStatus'), btn=$('ppRiderSaveBtn');
+  const lvl=$('ppLevelBtns')?.querySelector('.s-btn.active')?.dataset.level||null;
+  const raw=($('ppWeightInput')?.value||'').trim();
+  let weight=raw===''?null:parseInt(raw,10);
+  // Refuse rather than clamp: silently turning 7 into 30 would hand back a
+  // kite size computed from a weight the rider never gave.
+  if(weight!==null&&(!Number.isFinite(weight)||weight<30||weight>150)){
+    if(status){ status.textContent='⚠️ Weight should be between 30 and 150 kg'; status.style.color='#f59e0b'; }
+    return;
+  }
+  const p=loadProfile();
+  p.kiteLevel=lvl; p.weightKg=weight;
+  saveProfile(p);
+  if(btn){ btn.disabled=true; btn.textContent='Saving…'; }
+  try{
+    const sb=getSb();
+    if(sb&&p.email) await sb.from('profiles').upsert({email:p.email, kite_level:lvl, weight_kg:weight},{onConflict:'email'});
+    if(status){ status.textContent='✓ Saved'; status.style.color='#4ade80'; }
+  }catch(e){
+    if(status){ status.textContent='⚠️ Saved on this device, but not synced'; status.style.color='#f59e0b'; }
+  }finally{
+    if(btn){ btn.disabled=false; btn.textContent='Save'; }
+  }
+}
+
 async function saveHomeLocation(lat, lon, label){
   const p=loadProfile();
   p.homeLat=lat; p.homeLon=lon; p.homeLabel=label;
