@@ -96,3 +96,34 @@ describe('the number is usable', () => {
     expect(r.exact).toBeCloseTo(10, 1)
   })
 })
+
+// Snapping only makes sense inside the quiver. An 80 kg rider who likes being
+// overpowered computes 18.3 m at 14 kn; answering "14 m" is not advice, it is
+// the largest number in the list pretending to be advice — and 14 m in 14 kn
+// for someone who wanted 18 is a materially different session.
+describe('outside the quiver it says nothing', () => {
+  it('refuses when the rider would need more kite than the list holds', () => {
+    const r = suggestKiteSize({ weightKg: 80, level: 'Advanced', pref: 'overpowered', windKn: 14 })
+    expect(r).toBeNull()
+  })
+
+  it('answers again as soon as the number lands in the quiver', () => {
+    const r = suggestKiteSize({ weightKg: 80, level: 'Advanced', pref: 'overpowered', windKn: 18 })
+    expect(r).not.toBeNull()
+    expect(r!.size).toBe(14)
+  })
+
+  it('never returns the biggest size for a wildly bigger requirement', () => {
+    // the shape of the old bug: exact far above the quiver, snapped to its top
+    for (const kn of [14, 15, 16, 17]) {
+      const r = suggestKiteSize({ weightKg: 95, level: 'Advanced', pref: 'overpowered', windKn: kn })
+      if (r) expect(r.exact).toBeLessThanOrEqual(15)
+    }
+  })
+
+  it('still answers normally for an ordinary rider in ordinary wind', () => {
+    // the guard must not swallow the common case it was added around
+    expect(suggestKiteSize({ weightKg: 75, level: 'Intermediate', windKn: 20 })!.size).toBe(10)
+    expect(suggestKiteSize({ weightKg: 60, level: 'Beginner', windKn: 25 })!.size).toBeGreaterThan(0)
+  })
+})
