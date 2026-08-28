@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "kiteforecast",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "4321",
+        "--directory",
+        "/Users/guiz/Documents/Claude/Claude Code/PFP"
+      ],
+      "port": 4321
+    }
+  ]
+}
