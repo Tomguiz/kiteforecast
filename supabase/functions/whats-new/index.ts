@@ -19,6 +19,9 @@ import {
   type ProfileLike, type Tier,
 } from './content.ts'
 import { recordEmail } from '../_shared/email-log-client.ts'
+import {
+  clampDelay, clampBudget, budgetExhausted, estimateRuntimeMs, sleep,
+} from '../_shared/pacing.ts'
 import { isServiceRoleCaller } from '../_shared/service-role-auth.ts'
 
 const SUPABASE_URL         = Deno.env.get('SUPABASE_URL')!
@@ -67,11 +70,15 @@ Deno.serve(async (req) => {
   let emailFilter: string | null = null
   let campaign = DEFAULT_CAMPAIGN
   let dryRun = false
+  let delayMs = clampDelay(undefined)
+  let budgetMs = clampBudget(undefined)
   try {
     const body = await req.json()
     emailFilter = body?.email_filter ?? null
     campaign    = body?.campaign ?? DEFAULT_CAMPAIGN
     dryRun      = body?.dry_run === true
+    delayMs     = clampDelay(body?.delay_ms)
+    budgetMs    = clampBudget(body?.budget_ms)
   } catch { /* no body — full live run */ }
 
   // Deliberately not filtered by notifs_enabled: this is a one-off announcement
@@ -109,12 +116,22 @@ Deno.serve(async (req) => {
   const now = new Date()
   const tiers: Record<Tier, number> = { lifetime: 0, earned_active: 0, earned_expired: 0, free: 0 }
   const failures: { email: string; reason: string }[] = []
+  const startedAt = Date.now()
   let sent = 0
   let skipped = 0
+  let deferred = 0
 
   for (const prof of recipients as Recipient[]) {
     const email = prof.email
     if (alreadySent.has(email)) { skipped++; continue }
+
+    // Stop before starting work this run cannot finish and record. Anyone left
+    // is picked up by the next invocation — broadcast_sends makes that a resume,
+    // not a repeat.
+    if (!dryRun && budgetExhausted(startedAt, Date.now(), budgetMs, delayMs)) {
+      deferred++
+      continue
+    }
 
     const tier = resolveTier(prof, now)
     tiers[tier]++
@@ -137,6 +154,10 @@ Deno.serve(async (req) => {
     }
 
     if (dryRun) { sent++; continue }
+
+    // The gap is the whole point: without it Make starts every scenario run at
+    // once and the mail module is throttled. Before the first send only, skip it.
+    if (sent > 0) await sleep(delayMs)
 
     try {
       const res = await fetch(MAKE_WEBHOOK_URL, {
@@ -178,6 +199,11 @@ Deno.serve(async (req) => {
     total: recipients.length,
     sent,
     skipped,
+    // Non-zero means the run hit its time budget: re-invoke to continue.
+    deferred,
+    delay_ms: delayMs,
+    elapsed_ms: Date.now() - startedAt,
+    estimated_ms: estimateRuntimeMs(recipients.length - skipped, delayMs),
     failed: failures.length,
     failures: failures.slice(0, 20),
     tiers,
