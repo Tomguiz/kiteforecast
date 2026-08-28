@@ -620,3 +620,10 @@ DO $$ BEGIN ALTER TABLE profiles ADD CONSTRAINT profiles_kite_level_chk
 -- so a typo of 7 or 700 would produce a dangerous recommendation.
 DO $$ BEGIN ALTER TABLE profiles ADD CONSTRAINT profiles_weight_chk
   CHECK (weight_kg IS NULL OR weight_kg BETWEEN 30 AND 150); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- Power preference: how the rider likes to be canvassed for the wind. Refines
+-- the kite-size suggestion; it never overrides the level, which carries the
+-- capability part. See _shared/kite-size.ts.
+DO $$ BEGIN ALTER TABLE profiles ADD COLUMN power_pref text; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
+DO $$ BEGIN ALTER TABLE profiles ADD CONSTRAINT profiles_power_pref_chk
+  CHECK (power_pref IS NULL OR power_pref IN ('underpowered','neutral','overpowered')); EXCEPTION WHEN duplicate_object THEN NULL; END $$;

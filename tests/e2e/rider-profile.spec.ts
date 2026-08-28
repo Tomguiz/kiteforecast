@@ -96,3 +96,49 @@ test('reopening the panel shows what was saved', async ({ gotoApp, page }) => {
   await expect(page.locator('#ppLevelBtns .s-btn.active')).toHaveText('Intermediate');
   expect(await page.locator('#ppLevelBtns .s-btn.active').count()).toBe(1);
 });
+
+// ── Power preference and the kite-size badge ───────────────────────────────
+
+test('the power preference saves alongside level and weight', async ({ gotoApp, page }) => {
+  await gotoApp('signedIn');
+  await openProfile(page);
+
+  const sent = page.waitForRequest(r =>
+    r.url().includes('/rest/v1/profiles') && r.method() !== 'GET' && (r.postData() || '').includes('power_pref'));
+
+  await page.locator('#ppLevelBtns .s-btn', { hasText: 'Advanced' }).click();
+  await page.locator('#ppPrefBtns .s-btn', { hasText: 'Over-powered' }).click();
+  await page.locator('#ppWeightInput').fill('75');
+  await page.locator('#ppRiderSaveBtn').click();
+
+  const body = JSON.parse((await sent).postData() || '{}');
+  const row = Array.isArray(body) ? body[0] : body;
+  expect(row.power_pref).toBe('overpowered');
+  expect(row.kite_level).toBe('Advanced');
+});
+
+test('the suggestion matches the rider’s own reference numbers', async ({ gotoApp, page }) => {
+  // 75 kg at 20 kn: 9 beginner, 10 intermediate, 11-12 experienced. These are
+  // his figures, not a table off the internet, so they are what the client
+  // copy of the formula has to reproduce.
+  await gotoApp('signedIn');
+  const r = await page.evaluate(() => ({
+    beg: suggestKiteSize({ weightKg: 75, level: 'Beginner',     pref: 'neutral', windKn: 20 })?.size,
+    int: suggestKiteSize({ weightKg: 75, level: 'Intermediate', pref: 'neutral', windKn: 20 })?.size,
+    adv: suggestKiteSize({ weightKg: 75, level: 'Advanced',     pref: 'neutral', windKn: 20 })?.size,
+  }));
+  expect(r.beg).toBe(9);
+  expect(r.int).toBe(10);
+  expect(r.adv).toBeGreaterThanOrEqual(11);
+  expect(r.adv).toBeLessThanOrEqual(12);
+});
+
+test('no weight or no level means no suggestion, not a guess', async ({ gotoApp, page }) => {
+  await gotoApp('signedIn');
+  const r = await page.evaluate(() => [
+    suggestKiteSize({ weightKg: null, level: 'Intermediate', windKn: 20 }),
+    suggestKiteSize({ weightKg: 75, level: null, windKn: 20 }),
+    suggestKiteSize({ weightKg: 75, level: 'Intermediate', windKn: 8 }),
+  ]);
+  expect(r).toEqual([null, null, null]);
+});
