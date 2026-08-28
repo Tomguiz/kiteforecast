@@ -11178,8 +11178,15 @@ async function runPlanner(){
       await fetchChipQualDays({name:c.name,loc:c.loc||'',lat:c.lat,lon:c.lon,dirs:c.dirs||[]});
       const key=`${c.lat},${c.lon}|${(c.dirs||[]).slice().sort((a,b)=>a-b).join(',')}`;
       const d10=chipBestCache[key]?.days10||[];
-      planned.push({...c,days:d10.filter(d=>dates.has(d.dateStr)).map(d=>({
-        dateStr:d.dateStr,goodHours:d.goodHours,peakKn:d.peakKn,startHr:d.startHr,dir:d.dir}))});
+      // The response already contains every day, so keep the whole window and
+      // mark which ones were asked for. Discarding the rest would throw away
+      // information already paid for — "Sunday is better" is worth saying.
+      const inWindow=new Set(planDates(new Date().toISOString().slice(0,10)));
+      const all=d10.filter(d=>inWindow.has(d.dateStr)).map(d=>({
+        dateStr:d.dateStr,goodHours:d.goodHours,peakKn:d.peakKn,startHr:d.startHr,dir:d.dir}));
+      planned.push({...c,
+        days:all.filter(d=>dates.has(d.dateStr)),
+        otherDays:all.filter(d=>!dates.has(d.dateStr))});
     }
     _planLast={planned,estimated};
     renderPlanResults();
@@ -11192,6 +11199,7 @@ async function runPlanner(){
 
 let _planLast=null;
 function setPlanSort(v){ _planState.sort=v; renderPlanResults(); }
+function hrsPlan(n){ return n==null?'?':(n>=60?`${Math.floor(n/60)}h${String(n%60).padStart(2,'0')}`:`${n} min`); }
 function renderPlanResults(){
   if(!_planLast) return;
   const out=$('planResults');
@@ -11200,16 +11208,37 @@ function renderPlanResults(){
   if(!ranked.length){
     const _d=_planSelectedDays();
     const _lbl=_d.length===1?`on ${fmtDate(_d[0]).short.toLowerCase()}`:`on those ${_d.length} days`;
-    out.innerHTML=`<div style="font-size:.8rem;color:var(--tdim)">Nothing rideable ${_lbl} within that drive. Try another day, a longer drive, or less wind.</div>`;
+    // A dead end is the worst possible answer here, because the forecast for
+    // the other days of the window is already sitting in _planLast. Rank the
+    // days the rider did not ask for and offer the best of them rather than
+    // making them re-run the search one day at a time.
+    const elsewhere=rankPlan(
+      _planLast.planned.map(s=>({...s,days:s.otherDays||[]})),
+      {minWindKn:_planState.minWindKn,sort:'best',maxDriveMin:_planState.maxDriveMin}).slice(0,3);
+    out.innerHTML=`<div style="font-size:.8rem;color:var(--tdim)">Nothing rideable ${_lbl} within that drive.</div>`
+      +(elsewhere.length?`<div style="margin-top:12px">
+        <div style="font-size:.78rem;color:var(--text);font-weight:700;margin-bottom:7px">But another day works:</div>
+        ${elsewhere.map(s=>{
+          const b=s.days.slice().sort((a,b2)=>b2.peakKn-a.peakKn)[0];
+          return `<div style="font-size:.76rem;color:var(--tdim);margin-bottom:5px">
+            <span style="color:#4ade80;font-weight:700">${fmtDate(b.dateStr).short}</span>
+            · ${escFriendName(s.name)} · ${b.peakKn}kn · ${b.goodHours}h
+            <span style="white-space:nowrap">· \u{1F697} ${hrsPlan(s.driveMin)}</span></div>`;}).join('')}
+      </div>`:`<div style="font-size:.8rem;color:var(--tdim);margin-top:6px">Try a longer drive or less wind.</div>`);
     return;
   }
   const tab=(v,l)=>`<button onclick="setPlanSort('${v}')" style="flex:1;padding:7px;border-radius:8px;border:1px solid ${_planState.sort===v?'var(--accent)':'var(--border)'};background:${_planState.sort===v?'rgba(56,189,248,.15)':'transparent'};color:${_planState.sort===v?'var(--accent)':'var(--gray)'};font-size:.74rem;font-weight:700;cursor:pointer">${l}</button>`;
-  const hrs=n=>n>=60?`${Math.floor(n/60)}h${String(n%60).padStart(2,'0')}`:`${n} min`;
+  const hrs=hrsPlan;
   out.innerHTML=`
     ${_planLast.estimated?'<div style="font-size:.7rem;color:#f59e0b;margin-bottom:8px">⚠️ Routing unavailable — drive times are estimated from distance.</div>':''}
     <div style="display:flex;gap:6px;margin-bottom:12px">${tab('best','Best choice')}${tab('wind','Most wind')}${tab('near','Nearest')}</div>
     ${ranked.map((s,i)=>{
       const best=s.days.slice().sort((a,b)=>b.peakKn-a.peakKn)[0];
+      // Days the rider did not ask for but which would work anyway. Free to
+      // compute — the forecast for them is already in hand.
+      const alsoGood=(s.otherDays||[])
+        .filter(d=>d.goodHours>=2&&d.peakKn>=_planState.minWindKn)
+        .sort((a,b)=>a.dateStr.localeCompare(b.dateStr));
       const k=suggestKiteSize({weightKg:pf.weightKg,level:pf.kiteLevel,pref:pf.powerPref,windKn:best.peakKn});
       return `<div style="border:1px solid var(--border);border-radius:12px;padding:12px;margin-bottom:8px;cursor:pointer"
         onclick="closePlanner();pickSpot({name:'${escFriendName(s.name).replace(/'/g,'&#39;')}',loc:'',lat:${s.lat},lon:${s.lon},dirs:[${(s.dirs||[]).join(',')}]})">
@@ -11222,6 +11251,9 @@ function renderPlanResults(){
           ${s.days.map(d=>`<span style="font-size:.7rem;padding:3px 7px;border-radius:99px;background:rgba(34,197,94,.13);color:#4ade80;font-weight:700">${fmtDate(d.dateStr).short} · ${d.peakKn}kn · ${d.goodHours}h</span>`).join('')}
           ${k?`<span style="font-size:.7rem;padding:3px 7px;border-radius:99px;background:rgba(93,212,240,.13);color:#5dd4f0;font-weight:700">🪁 ${k.size} m</span>`:''}
         </div>
+        ${alsoGood.length?`<div style="font-size:.7rem;color:var(--tdim);margin-top:7px">
+          \u2192 also rideable ${alsoGood.map(d=>`<span style="color:#4ade80;font-weight:600">${fmtDate(d.dateStr).short} (${d.peakKn}kn)</span>`).join(', ')}
+        </div>`:''}
       </div>`;}).join('')}`;
 }
 
