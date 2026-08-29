@@ -55,13 +55,10 @@ function buildForecast() {
 test('opening a spot reconciles its homepage badge with the fresh forecast', async ({ gotoApp, page }) => {
   const forecast = buildForecast();
 
-  // Mock Open-Meteo forecast + marine BEFORE navigation.
-  await page.route(/.*api\.open-meteo\.com\/v1\/forecast.*/, (route) =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(forecast) }));
-  await page.route(/.*marine-api\.open-meteo\.com\/.*/, (route) =>
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ hourly: { time: [], wave_height: [], wave_period: [], wave_direction: [] } }) }));
-
-  await gotoApp('signedIn');
+  // The forecast now arrives through the shared-cache function, so it is handed
+  // to the mock rather than routed at Open-Meteo: a route registered here would
+  // lose to the fixture's own, which is installed inside gotoApp.
+  await gotoApp('signedIn', { forecastWx: forecast });
 
   // Seed a STALE chip cache entry: 0 good days for this spot, under the spot's
   // real dirs key. This mimics a badge computed before the forecast revised up.

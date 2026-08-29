@@ -135,7 +135,12 @@ test('no heading at all when no favourite carries an alert', async ({ gotoApp, p
 
 test('no bare heading while the forecast is still loading', async ({ gotoApp, page }) => {
   await gotoApp('signedIn');
-  // belled, but nothing in the cache yet — the cold-load case
+  // The cold-load case: no forecast has arrived yet. The beforeEach cuts
+  // Open-Meteo off at the wire for exactly this reason; the shared-cache
+  // function is now the other end of that same wire, so it goes too. Without
+  // this the mock answers instantly and the app lands in the legitimately
+  // different "nothing coming up" state, which the test above already covers.
+  await page.route(/\/functions\/v1\/forecast/, r => r.abort());
   await seed(page, { favs: [RW], belled: ['Riverwoods Beachclub'], cache: {} });
 
   await expect(page.locator('#goodDaysSection')).toBeEmpty();
@@ -249,14 +254,8 @@ function forecastFixture(lat: number, lon: number) {
 }
 
 test('clicking a good day lands on that day’s hourly view, not the 16-day grid', async ({ gotoApp, page }) => {
-  // this one needs the forecast, so serve it instead of aborting
-  await page.unroute(/api\.open-meteo\.com/);
-  await page.route(/api\.open-meteo\.com\/v1\/forecast/, r =>
-    r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(forecastFixture(RW.lat, RW.lon)) }));
-  await page.route(/marine-api\.open-meteo\.com/, r =>
-    r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ hourly: { time: [], wave_height: [], wave_period: [], wave_direction: [] } }) }));
-
-  await gotoApp('signedIn');
+  // this one needs the forecast, so hand it to the shared-cache mock
+  await gotoApp('signedIn', { forecastWx: forecastFixture(RW.lat, RW.lon) });
   await seed(page, {
     favs: [RW], belled: ['Riverwoods Beachclub'],
     cache: { 'Riverwoods Beachclub': [
