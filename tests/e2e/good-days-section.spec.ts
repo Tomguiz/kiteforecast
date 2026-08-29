@@ -149,7 +149,8 @@ test('no bare heading while the forecast is still loading', async ({ gotoApp, pa
   // assertion's polling window and fills it straight back in. So clear and
   // read in ONE evaluate — nothing can interleave between the two statements.
   const html = await page.evaluate(() => {
-    chipBestCache = {};          // script-scope binding, not a window property
+    // chipBestCache is a const, so empty it in place rather than reassigning.
+    for (const k of Object.keys(chipBestCache)) delete chipBestCache[k];
     renderGoodDaysSection();
     return document.getElementById('goodDaysSection')!.innerHTML;
   });
