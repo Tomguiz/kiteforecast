@@ -135,15 +135,25 @@ test('no heading at all when no favourite carries an alert', async ({ gotoApp, p
 
 test('no bare heading while the forecast is still loading', async ({ gotoApp, page }) => {
   await gotoApp('signedIn');
-  // The cold-load case: no forecast has arrived yet. The beforeEach cuts
-  // Open-Meteo off at the wire for exactly this reason; the shared-cache
-  // function is now the other end of that same wire, so it goes too. Without
-  // this the mock answers instantly and the app lands in the legitimately
-  // different "nothing coming up" state, which the test above already covers.
-  await page.route(/\/functions\/v1\/forecast/, r => r.abort());
   await seed(page, { favs: [RW], belled: ['Riverwoods Beachclub'], cache: {} });
 
-  await expect(page.locator('#goodDaysSection')).toBeEmpty();
+  // The cold-load state is "no forecast has come back yet" — chipBestCache
+  // holding no entry at all. That is a different thing from an entry holding
+  // zero good days, which is the "nothing coming up" case the test above
+  // covers, and which renders a message rather than nothing.
+  //
+  // The beforeEach aborts Open-Meteo so no load-time fetch could ever reach it.
+  // The shared-cache function now answers that same fetch, and instantly, so
+  // the cache is already full by the time this test runs. Clearing it is not
+  // enough on its own either: a chip fetch still in flight lands during the
+  // assertion's polling window and fills it straight back in. So clear and
+  // read in ONE evaluate — nothing can interleave between the two statements.
+  const html = await page.evaluate(() => {
+    chipBestCache = {};          // script-scope binding, not a window property
+    renderGoodDaysSection();
+    return document.getElementById('goodDaysSection')!.innerHTML;
+  });
+  expect(html).toBe('');
 });
 
 test('sits between the favourites and the suggestions', async ({ gotoApp, page }) => {
