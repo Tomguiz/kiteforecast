@@ -135,10 +135,26 @@ test('no heading at all when no favourite carries an alert', async ({ gotoApp, p
 
 test('no bare heading while the forecast is still loading', async ({ gotoApp, page }) => {
   await gotoApp('signedIn');
-  // belled, but nothing in the cache yet — the cold-load case
   await seed(page, { favs: [RW], belled: ['Riverwoods Beachclub'], cache: {} });
 
-  await expect(page.locator('#goodDaysSection')).toBeEmpty();
+  // The cold-load state is "no forecast has come back yet" — chipBestCache
+  // holding no entry at all. That is a different thing from an entry holding
+  // zero good days, which is the "nothing coming up" case the test above
+  // covers, and which renders a message rather than nothing.
+  //
+  // The beforeEach aborts Open-Meteo so no load-time fetch could ever reach it.
+  // The shared-cache function now answers that same fetch, and instantly, so
+  // the cache is already full by the time this test runs. Clearing it is not
+  // enough on its own either: a chip fetch still in flight lands during the
+  // assertion's polling window and fills it straight back in. So clear and
+  // read in ONE evaluate — nothing can interleave between the two statements.
+  const html = await page.evaluate(() => {
+    // chipBestCache is a const, so empty it in place rather than reassigning.
+    for (const k of Object.keys(chipBestCache)) delete chipBestCache[k];
+    renderGoodDaysSection();
+    return document.getElementById('goodDaysSection')!.innerHTML;
+  });
+  expect(html).toBe('');
 });
 
 test('sits between the favourites and the suggestions', async ({ gotoApp, page }) => {
@@ -249,14 +265,8 @@ function forecastFixture(lat: number, lon: number) {
 }
 
 test('clicking a good day lands on that day’s hourly view, not the 16-day grid', async ({ gotoApp, page }) => {
-  // this one needs the forecast, so serve it instead of aborting
-  await page.unroute(/api\.open-meteo\.com/);
-  await page.route(/api\.open-meteo\.com\/v1\/forecast/, r =>
-    r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(forecastFixture(RW.lat, RW.lon)) }));
-  await page.route(/marine-api\.open-meteo\.com/, r =>
-    r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ hourly: { time: [], wave_height: [], wave_period: [], wave_direction: [] } }) }));
-
-  await gotoApp('signedIn');
+  // this one needs the forecast, so hand it to the shared-cache mock
+  await gotoApp('signedIn', { forecastWx: forecastFixture(RW.lat, RW.lon) });
   await seed(page, {
     favs: [RW], belled: ['Riverwoods Beachclub'],
     cache: { 'Riverwoods Beachclub': [

@@ -6,6 +6,11 @@ import {
 
 export type MockOptions = {
   email?: string;
+  // Forecast payload the shared-cache function should return. Tests that need
+  // particular weather pass it here rather than routing Open-Meteo themselves:
+  // the app no longer calls Open-Meteo, and a route registered before gotoApp
+  // would lose to this fixture's own anyway.
+  forecastWx?: unknown;
   isPremium?: boolean;
   isAdmin?: boolean;
   favourites?: unknown[];
@@ -23,6 +28,43 @@ export type MockOptions = {
 
 const json = (route: Route, body: unknown, status = 200) =>
   route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
+
+// A structurally complete 16-day forecast that is deliberately UNRIDEABLE:
+// light wind, all day, every day. Its job is only to keep the app off the
+// network and out of its error state. It must never manufacture a session,
+// or every "nothing coming up" assertion in the suite would start failing
+// against weather no test asked for. Tests that need wind pass forecastWx.
+function cannedForecast() {
+  const days: string[] = [];
+  const base = new Date(); base.setHours(0, 0, 0, 0);
+  for (let d = 0; d < 16; d++) {
+    const x = new Date(base); x.setDate(x.getDate() + d);
+    days.push(x.toISOString().slice(0, 10));
+  }
+  const time: string[] = [], temp: number[] = [], code: number[] = [],
+        ws: number[] = [], wd: number[] = [], wg: number[] = [];
+  for (const d of days) {
+    for (let h = 0; h < 24; h++) {
+      time.push(`${d}T${String(h).padStart(2, '0')}:00`);
+      temp.push(17); code.push(1);
+      ws.push(3);                            // m/s ≈ 6 kn — well under the floor
+      wd.push(250); wg.push(4);
+    }
+  }
+  return {
+    hourly: { time, temperature_2m: temp, weather_code: code,
+              windspeed_10m: ws, winddirection_10m: wd, windgusts_10m: wg },
+    daily: {
+      time: days,
+      weather_code: days.map(() => 1),
+      temperature_2m_max: days.map(() => 21),
+      temperature_2m_min: days.map(() => 13),
+      windgusts_10m_max: days.map(() => 4),
+      sunrise: days.map(d => `${d}T06:00`),
+      sunset: days.map(d => `${d}T21:00`),
+    },
+  };
+}
 
 // Content-Range carries the row count for `count:'exact'` queries, but it is not
 // a CORS-safelisted response header: cross-origin JS cannot read it unless the
@@ -92,6 +134,16 @@ export async function mockSupabase(page: Page, opts: MockOptions = {}) {
   // Edge functions: succeed with a benign payload.
   await page.route(/.*\.supabase\.co\/functions\/v1\/.*/, (route) =>
     json(route, { ok: true, url: 'https://stripe.test/checkout' }));
+
+  // Forecasts now come from the shared cache function, so the benign payload
+  // above no longer answers them: the app would see no `wx`, fall back to
+  // Open-Meteo, and every spot-opening test would make a real network call.
+  // That turned the suite from 1.5 minutes into 33. Serve a real shape here.
+  await page.route(/.*\.supabase\.co\/functions\/v1\/forecast(\?|$)/, (route) =>
+    json(route, {
+      wx: opts.forecastWx ?? cannedForecast(),
+      marine: null, fetched_at: new Date().toISOString(), source: 'cache',
+    }));
 
   // REST: respond per table. GET/HEAD return rows (+ a Content-Range header so
   // supabase-js can read counts for head:true queries). Writes echo success.

@@ -60,18 +60,18 @@ test('buildDay().goodHours and dayGoodHours agree on the same data (one definiti
   expect(fromBuildDay).toBeGreaterThanOrEqual(2); // the NW run at 11-14 qualifies
 });
 
-test('the homepage good-days fetch uses the same forecast window as the spot page (16 days)', async ({ gotoApp, page }) => {
+test('the homepage good-days fetch shares the spot page\'s forecast row', async ({ gotoApp, page }) => {
+  // The homepage badge and the spot header must never disagree on the count,
+  // which used to mean checking both asked Open-Meteo for the same 16 days.
+  // They now read the SAME cached row for the same coordinates, so agreement
+  // is structural rather than a coincidence of two matching URLs. What is left
+  // to check is that the chips really do go through that shared row.
   await gotoApp('signedOut');
-  // Capture the open-meteo forecast request fired by fetchChipQualDays and
-  // assert it asks for the same window as the spot detail page (16 days), so
-  // the homepage badge and the spot header can never disagree on the count.
-  const reqUrl = page.waitForRequest((req) =>
-    req.url().includes('api.open-meteo.com/v1/forecast') &&
-    req.url().includes('windspeed_10m'));
+  const req = page.waitForRequest((r) =>
+    r.url().includes('/functions/v1/forecast') && r.url().includes('lat=51.35'));
   await page.evaluate(() => {
     // fire the homepage chip fetch directly for a known spot
     fetchChipQualDays({ name: 'T', loc: '', lat: 51.35, lon: 3.28, dirs: [270, 315] });
   });
-  const url = (await reqUrl).url();
-  expect(url).toContain('forecast_days=16');
+  expect((await req).url()).toContain('lon=3.28');
 });

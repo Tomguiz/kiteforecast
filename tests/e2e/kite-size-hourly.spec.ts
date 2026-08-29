@@ -22,10 +22,8 @@ function forecast(knByHour: (h: number) => number) {
 const wander = (h: number) => h < 10 ? 18 : h < 14 ? 21 : h < 18 ? 19 : 36;
 
 async function openDay(page: any, opts: { noProfile?: boolean } = {}) {
-  await page.route(/api\.open-meteo\.com\/v1\/forecast/, (r: any) =>
-    r.fulfill({ status:200, contentType:'application/json', body: JSON.stringify(forecast(wander)) }));
-  await page.route(/marine-api\.open-meteo\.com/, (r: any) =>
-    r.fulfill({ status:200, contentType:'application/json', body: JSON.stringify({ hourly:{ time:[], wave_height:[], wave_period:[], wave_direction:[] } }) }));
+  // Served through the shared-cache mock — see openDay's caller, which passes
+  // the same wind profile to gotoApp.
   await page.evaluate((noProfile: boolean) => {
     const p = loadProfile();
     // the point of the last test is a rider who never filled this in
@@ -47,7 +45,7 @@ const sizes = (page: any) => page.evaluate(() =>
   [...document.querySelectorAll('.m-row .c-kite')].map(e => (e.textContent || '').trim()));
 
 test('every hour carries its own size', async ({ gotoApp, page }) => {
-  await gotoApp('signedIn');
+  await gotoApp('signedIn', { forecastWx: forecast(wander) });
   await openDay(page);
   const s = await sizes(page);
   expect(s.length).toBeGreaterThan(5);
@@ -57,7 +55,7 @@ test('every hour carries its own size', async ({ gotoApp, page }) => {
 test('the size holds across a run of hours inside one band', async ({ gotoApp, page }) => {
   // 18 → 21 → 19 kn all sit in the 14-22 band, so the rider is not asked to
   // land and swap kite because the forecast moved two knots.
-  await gotoApp('signedIn');
+  await gotoApp('signedIn', { forecastWx: forecast(wander) });
   await openDay(page);
   const s = (await sizes(page)).filter(x => x && x !== '—');
   const runs = s.reduce((acc: string[], v) => (acc[acc.length-1] === v ? acc : [...acc, v]), []);
@@ -65,14 +63,14 @@ test('the size holds across a run of hours inside one band', async ({ gotoApp, p
 });
 
 test('it does change when the wind genuinely changes band', async ({ gotoApp, page }) => {
-  await gotoApp('signedIn');
+  await gotoApp('signedIn', { forecastWx: forecast(wander) });
   await openDay(page);
   const s = await sizes(page);
   expect(new Set(s.filter(x => x && x !== '—')).size).toBeGreaterThan(1);
 });
 
 test('an hour below the model’s floor shows a dash, not a guess', async ({ gotoApp, page }) => {
-  await gotoApp('signedIn');
+  await gotoApp('signedIn', { forecastWx: forecast(wander) });
   await openDay(page, { noProfile: true });
   const s = await sizes(page);
   expect(s.every(x => x === '—')).toBe(true);

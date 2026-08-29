@@ -2,36 +2,36 @@ import { test, expect } from '../fixtures/auth';
 
 test.use({ viewport: { width: 390, height: 844 } });
 
-// The "16-day overview" strip should reflect a genuine 16-day forecast: every
-// open-meteo forecast fetch must request forecast_days=16, and the spot-detail
-// rideable header / strip must render up to 16 day-cards.
+// The "16-day overview" strip should reflect a genuine 16-day forecast, and the
+// spot-detail rideable header / strip must render up to 16 day-cards.
+//
+// forecast_days=16 is no longer the client's business: forecasts go through the
+// shared cache function, which builds the Open-Meteo URL server-side. These two
+// tests now pin what the client is still responsible for — that both the spot
+// view and the chips go through that function, on the same coordinates. The
+// 16-day window itself is asserted in unit/forecast-cache-mirror.test.ts,
+// against the function's own source.
 
-test('the spot-detail forecast fetch requests 16 forecast days', async ({ gotoApp, page }) => {
+test('the spot-detail forecast fetch goes through the shared cache', async ({ gotoApp, page }) => {
   await gotoApp('signedOut');
-  // capture the main wind forecast request (has windspeed_10m + temperature_2m)
-  const reqUrl = page.waitForRequest((req) =>
-    req.url().includes('api.open-meteo.com/v1/forecast') &&
-    req.url().includes('temperature_2m') &&
-    req.url().includes('windspeed_10m'));
+  const req = page.waitForRequest((r) => r.url().includes('/functions/v1/forecast'));
   await page.evaluate(() => {
     // fetchForecast geocodes by NAME first, so use a real place name
     fetchForecast('Knokke-Heist');
   });
-  const url = (await reqUrl).url();
-  expect(url).toContain('forecast_days=16');
+  expect((await req).url()).toContain('/functions/v1/forecast');
 });
 
-test('the homepage good-days fetch also requests 16 forecast days', async ({ gotoApp, page }) => {
+test('the homepage good-days fetch uses the same shared cache', async ({ gotoApp, page }) => {
   await gotoApp('signedOut');
-  const reqUrl = page.waitForRequest((req) =>
-    req.url().includes('api.open-meteo.com/v1/forecast') &&
-    req.url().includes('windspeed_10m') &&
-    !req.url().includes('temperature_2m')); // the chip fetch omits temperature
+  const req = page.waitForRequest((r) =>
+    r.url().includes('/functions/v1/forecast') && r.url().includes('lat=51.35'));
   await page.evaluate(() => {
     fetchChipQualDays({ name: 'T', loc: '', lat: 51.35, lon: 3.28, dirs: [270, 315] });
   });
-  const url = (await reqUrl).url();
-  expect(url).toContain('forecast_days=16');
+  // The chips used to ask Open-Meteo for their own narrower variable set. They
+  // now share the spot view's row, which is where the saved requests come from.
+  expect((await req).url()).toContain('lon=3.28');
 });
 
 test('the 16-day strip renders one day-card per day for a 16-day dataset', async ({ gotoApp, page }) => {

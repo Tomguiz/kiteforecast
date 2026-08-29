@@ -44,22 +44,33 @@ test('tapping it actually refreshes', async ({ gotoApp, page }) => {
   expect(await page.evaluate(() => (window as any)._refreshed)).toBe(true);
 });
 
-test('a fresh forecast leaves no Refresh button behind', async ({ gotoApp, page }) => {
-  // the stale state writes markup; the fresh branch must clear it, not just
-  // overwrite the text around it
+test('a fresh forecast drops the warning but keeps the refresh', async ({ gotoApp, page }) => {
+  // Refresh used to appear only once the app declared the data stale. With
+  // forecasts served from a shared row that is normally up to two hours old,
+  // that warning would have been the permanent state — so the alarm goes and
+  // the control stays. What must still clear is the warning text itself.
   await gotoApp('signedIn');
   await makeStale(page);
-  await expect(page.locator('#fetchTimestamp .fetch-ts-btn')).toBeVisible();
+  await expect(page.locator('#fetchTimestamp')).toContainText('Forecast may be outdated');
 
   await makeFresh(page);
-  expect(await page.locator('#fetchTimestamp .fetch-ts-btn').count()).toBe(0);
-  await expect(page.locator('#fetchTimestamp')).toContainText('Last forecast update');
+  await expect(page.locator('#fetchTimestamp')).not.toContainText('outdated');
+  await expect(page.locator('#fetchTimestamp')).not.toHaveClass(/stale/);
+  await expect(page.locator('#fetchTimestamp')).toContainText('Updated');
+  await expect(page.locator('#fetchTimestamp .fetch-ts-btn')).toBeVisible();
 });
 
-test('the fresh bar stays out of the way — no pointer events, no tap', async ({ gotoApp, page }) => {
+test('the fresh bar is quiet, but the rider can still ask for fresh data', async ({ gotoApp, page }) => {
   await gotoApp('signedIn');
+  await page.evaluate(() => { (window as any)._refreshed = false; (window as any).refreshForecast = () => { (window as any)._refreshed = true; }; });
   await makeFresh(page);
 
-  expect(await page.evaluate(() =>
-    getComputedStyle(document.getElementById('fetchTimestamp')!).pointerEvents)).toBe('none');
+  // quiet: no alarm colour, small type
+  await expect(page.locator('#fetchTimestamp')).not.toHaveClass(/stale/);
+  // but reachable: this bar was once .72rem of text pinned to the bottom edge
+  // and could not be hit on a phone. It must stay a real target.
+  const box = await page.locator('#fetchTimestamp').boundingBox();
+  expect(box!.height).toBeGreaterThanOrEqual(44);
+  await page.locator('#fetchTimestamp').click();
+  expect(await page.evaluate(() => (window as any)._refreshed)).toBe(true);
 });

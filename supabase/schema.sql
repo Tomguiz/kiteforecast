@@ -17,6 +17,24 @@ CREATE TABLE IF NOT EXISTS tide_cache (
   UNIQUE (spot_key, date)
 );
 
+-- Shared forecast cache. One row per spot, written by the `forecast` edge
+-- function: whichever rider looks first pays for the fetch and every rider
+-- after them is served from here until the row ages past 2 hours.
+CREATE TABLE IF NOT EXISTS forecast_cache (
+  spot_key   text        PRIMARY KEY,  -- 'lat,lon' rounded to 3 decimals
+  lat        double precision NOT NULL,
+  lon        double precision NOT NULL,
+  wx         jsonb       NOT NULL,
+  marine     jsonb,
+  fetched_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS forecast_cache_fetched_at_idx ON forecast_cache (fetched_at);
+
+-- No policies on purpose: only the service role touches this. Reads go through
+-- the edge function so a client cannot poison a row every other rider sees.
+ALTER TABLE forecast_cache ENABLE ROW LEVEL SECURITY;
+
 ALTER TABLE tide_cache ENABLE ROW LEVEL SECURITY;
 
 DO $$ BEGIN

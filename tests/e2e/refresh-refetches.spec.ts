@@ -23,16 +23,33 @@ function forecast() {
 }
 
 async function setup(page: any) {
-  let calls = 0;
-  await page.route(/api\.open-meteo\.com\/v1\/forecast/, (r: any) => {
-    // The favourites chips hit the SAME endpoint with their own cache, so
-    // counting every call to it measures the wrong thing. temperature_2m is
-    // requested only by the spot forecast; the chip fetch omits it.
-    if (decodeURIComponent(r.request().url()).includes('temperature_2m')) calls++;
-    r.fulfill({ status:200, contentType:'application/json', body: JSON.stringify(forecast()) });
+  // Forecasts now go through the shared Supabase cache, and the spot view and
+  // the chips call it with the same URL shape — so the old "count only the
+  // requests carrying temperature_2m" trick no longer separates them. What
+  // still distinguishes an explicit refresh is force=1, so count that.
+  // Count per coordinate. The favourites chips call the same endpoint on a
+  // queue, so a bare total picks up Tarifa and Dakhla arriving in the
+  // background and measures the wrong thing — which is exactly what the old
+  // temperature_2m filter existed to avoid.
+  const calls: string[] = [];
+  let forced = 0;
+  await page.route(/functions\/v1\/forecast/, (r: any) => {
+    const url = r.request().url();
+    calls.push(url);
+    if (url.includes('force=1')) forced++;
+    r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
+      wx: forecast(), marine: null, fetched_at: new Date().toISOString(), source: 'live' }) });
   });
+  // Safety net: nothing should reach Open-Meteo while the function answers.
+  await page.route(/api\.open-meteo\.com\/v1\/forecast/, (r: any) =>
+    r.fulfill({ status:200, contentType:'application/json', body: JSON.stringify(forecast()) }));
   await page.route(/marine-api\.open-meteo\.com/, (r: any) => r.fulfill({ status:200, contentType:'application/json', body: JSON.stringify({ hourly:{ time:[], wave_height:[], wave_period:[], wave_direction:[] } }) }));
-  return { calls: () => calls };
+  return {
+    calls: () => calls.length,
+    // calls for one spot only, which is what "did this spot refetch?" means
+    spotCalls: (lat: number) => calls.filter(u => u.includes(`lat=${lat}`)).length,
+    forced: () => forced,
+  };
 }
 
 const openSpot = (page: any) => page.evaluate(async () => {
@@ -41,42 +58,51 @@ const openSpot = (page: any) => page.evaluate(async () => {
 });
 
 test('a forced refresh hits the network even with a warm cache', async ({ gotoApp, page }) => {
-  const c = await setup(page);
   await gotoApp('signedIn');
+  const c = await setup(page);
   await openSpot(page);
   await page.waitForTimeout(900);
-  const afterOpen = c.calls();
+  const afterOpen = c.spotCalls(51.3627);
   expect(afterOpen).toBeGreaterThan(0);
+  expect(c.forced()).toBe(0);            // opening a spot never forces
 
-  // ordinary navigation to the same spot: the cache answers, no new request
+  // ordinary navigation to the same spot: the on-device cache answers
   await openSpot(page);
   await page.waitForTimeout(900);
-  expect(c.calls()).toBe(afterOpen);
+  expect(c.spotCalls(51.3627)).toBe(afterOpen);
 
   // the explicit gesture: this must go out to the network
   await page.evaluate(() => refreshForecast());
   await page.waitForTimeout(1200);
-  expect(c.calls()).toBeGreaterThan(afterOpen);
+  expect(c.spotCalls(51.3627)).toBeGreaterThan(afterOpen);
+  // and it must tell the server to skip the shared row, or a "refresh" would
+  // hand back the very same data it already had
+  expect(c.forced()).toBeGreaterThan(0);
 });
 
-test('the stale bar appears after 15 minutes, not 3 hours', async ({ gotoApp, page }) => {
+test('the bar warns only past the window the app itself uses', async ({ gotoApp, page }) => {
+  // The original bug this pinned: the bar warned at 15 min while the app only
+  // re-fetched at 30, so for a quarter of an hour it asked the rider to do
+  // something it was willing to do itself. Both are STALE_AFTER_MS, now two
+  // hours to match the shared cache — the invariant is that they agree.
   await gotoApp('signedIn');
   const states = await page.evaluate(() => {
     const read = () => (document.getElementById('fetchTimestamp') as HTMLElement).className;
-    lastFetchTime = Date.now() - 10 * 60 * 1000; updateFetchTimestamp();
-    const at10 = read();
-    lastFetchTime = Date.now() - 20 * 60 * 1000; updateFetchTimestamp();
-    const at20 = read();
-    return { at10, at20 };
+    lastFetchTime = Date.now() - 40 * 60 * 1000; updateFetchTimestamp();
+    const inside = read();
+    lastFetchTime = Date.now() - 3 * 60 * 60 * 1000; updateFetchTimestamp();
+    const outside = read();
+    return { inside, outside, window: STALE_AFTER_MS };
   });
-  expect(states.at10).not.toContain('stale');   // 10 min: still fresh
-  expect(states.at20).toContain('stale');       // 20 min: offer the refresh
+  expect(states.window).toBe(2 * 60 * 60 * 1000);
+  expect(states.inside).not.toContain('stale');   // 40 min: normal, served from cache
+  expect(states.outside).toContain('stale');      // 3 h: the refresh really did not land
 });
 
 test('the bar clears once the refresh has actually landed', async ({ gotoApp, page }) => {
   await gotoApp('signedIn');
   const after = await page.evaluate(() => {
-    lastFetchTime = Date.now() - 20 * 60 * 1000; updateFetchTimestamp();
+    lastFetchTime = Date.now() - 3 * 60 * 60 * 1000; updateFetchTimestamp();
     const stale = (document.getElementById('fetchTimestamp') as HTMLElement).className;
     lastFetchTime = Date.now(); updateFetchTimestamp();
     return { stale, fresh: (document.getElementById('fetchTimestamp') as HTMLElement).className };
@@ -93,8 +119,8 @@ test('the bar clears once the refresh has actually landed', async ({ gotoApp, pa
 // bar threw them into a spot detail page.
 
 test('refreshing from the home screen does not navigate to a spot', async ({ gotoApp, page }) => {
-  await setup(page);
   await gotoApp('signedIn');
+  await setup(page);
   await page.evaluate(async () => {
     await (window as any)._spotsReady;
     // a spot HAS been opened before, so loadLastSpot() would find one
@@ -111,15 +137,15 @@ test('refreshing from the home screen does not navigate to a spot', async ({ got
 });
 
 test('it refreshes the home chips instead, and clears the stale bar', async ({ gotoApp, page }) => {
-  await setup(page);
   await gotoApp('signedIn');
+  await setup(page);
   const r = await page.evaluate(async () => {
     await (window as any)._spotsReady;
     cachedLoc = null;
     saveFavs([{ name: 'Riverwoods Beachclub', label: 'Riverwoods', lat: 51.3627, lon: 3.3062 }]);
     // a warm chip cache, and a stale bar showing
     chipFxCache['51.3627,3.3062|270,315'] = 3;
-    lastFetchTime = Date.now() - 20 * 60 * 1000;
+    lastFetchTime = Date.now() - 3 * 60 * 60 * 1000;
     updateFetchTimestamp();
     const before = (document.getElementById('fetchTimestamp') as HTMLElement).className;
 
@@ -128,18 +154,18 @@ test('it refreshes the home chips instead, and clears the stale bar', async ({ g
     return {
       before,
       after: (document.getElementById('fetchTimestamp') as HTMLElement).className,
-      cacheEmptied: Object.keys(chipFxCache).length === 0,
+      stalePlantGone: chipFxCache['51.3627,3.3062|270,315'] !== 3,
     };
   });
 
   expect(r.before).toContain('stale');
-  expect(r.cacheEmptied).toBe(true);   // the chips actually refetch
+  expect(r.stalePlantGone).toBe(true);   // the chips actually refetch
   expect(r.after).not.toContain('stale');
 });
 
 test('refreshing with a spot open still refreshes that spot', async ({ gotoApp, page }) => {
-  await setup(page);
   await gotoApp('signedIn');
+  await setup(page);
   await page.evaluate(async () => {
     await (window as any)._spotsReady;
     cachedLoc = { name: 'Riverwoods Beachclub', latitude: 51.3627, longitude: 3.3062, admin1: 'Knokke-Heist', country: 'Belgium' };
@@ -171,38 +197,38 @@ const pullToRefresh = (page: any) => page.evaluate(() => {
 });
 
 test('pulling down on the home screen stamps the timestamp and clears the chip cache', async ({ gotoApp, page }) => {
-  await setup(page);
   await gotoApp('signedIn');
+  await setup(page);
   await page.evaluate(async () => {
     await (window as any)._spotsReady;
     cachedLoc = null;
     window.scrollTo(0, 0);
     saveFavs([{ name: 'Riverwoods Beachclub', label: 'Riverwoods', lat: 51.3627, lon: 3.3062 }]);
     chipFxCache['51.3627,3.3062|270,315'] = 3;
-    lastFetchTime = Date.now() - 47 * 60 * 1000;   // the "old timestamp"
+    lastFetchTime = Date.now() - 3 * 60 * 60 * 1000;   // the "old timestamp"
     updateFetchTimestamp();
   });
 
   const before = await page.evaluate(() =>
     Math.round((Date.now() - lastFetchTime) / 60000));
-  expect(before).toBeGreaterThan(40);
+  expect(before).toBeGreaterThan(120);
 
   await pullToRefresh(page);
   await page.waitForTimeout(500);
 
   const after = await page.evaluate(() => ({
     ageMin: Math.round((Date.now() - lastFetchTime) / 60000),
-    cacheEmptied: Object.keys(chipFxCache).length === 0,
+    stalePlantGone: chipFxCache['51.3627,3.3062|270,315'] !== 3,
     shown: document.getElementById('fetchTimestamp')!.textContent,
   }));
   expect(after.ageMin).toBe(0);            // the timestamp actually moved
-  expect(after.cacheEmptied).toBe(true);   // and the chips really refetch
-  expect(after.shown).toContain('Last forecast update');
+  expect(after.stalePlantGone).toBe(true); // and the chips really refetch
+  expect(after.shown).toContain('Updated');
 });
 
 test('pulling down with a spot open refreshes that spot, not the home screen', async ({ gotoApp, page }) => {
-  await setup(page);
   await gotoApp('signedIn');
+  await setup(page);
   await page.evaluate(async () => {
     await (window as any)._spotsReady;
     window.scrollTo(0, 0);
@@ -229,12 +255,12 @@ test('pulling down with a spot open refreshes that spot, not the home screen', a
 // itself, and on launch it just asked.
 
 test('stale data refreshes itself instead of asking', async ({ gotoApp, page }) => {
-  await setup(page);
   await gotoApp('signedIn');
+  await setup(page);
   const r = await page.evaluate(() => {
     (window as any)._refreshed = false;
     (window as any).refreshForecast = () => { (window as any)._refreshed = true; };
-    lastFetchTime = Date.now() - 20 * 60 * 1000;   // in the old 15-30 dead zone
+    lastFetchTime = Date.now() - 3 * 60 * 60 * 1000;   // past the 2h window
     const acted = refreshIfStale();
     return { acted, refreshed: (window as any)._refreshed };
   });
@@ -243,8 +269,8 @@ test('stale data refreshes itself instead of asking', async ({ gotoApp, page }) 
 });
 
 test('fresh data is left alone — no request on every resume', async ({ gotoApp, page }) => {
-  await setup(page);
   await gotoApp('signedIn');
+  await setup(page);
   const r = await page.evaluate(() => {
     (window as any)._refreshed = false;
     (window as any).refreshForecast = () => { (window as any)._refreshed = true; };
@@ -256,8 +282,8 @@ test('fresh data is left alone — no request on every resume', async ({ gotoApp
 });
 
 test('a rider who has never fetched anything is not refreshed at', async ({ gotoApp, page }) => {
-  await setup(page);
   await gotoApp('signedIn');
+  await setup(page);
   const acted = await page.evaluate(() => {
     (window as any).refreshForecast = () => { throw new Error('should not run'); };
     lastFetchTime = 0;
@@ -270,8 +296,8 @@ test('the bar and the auto-refresh agree on when data is stale', async ({ gotoAp
   // The actual defect was two numbers, 15 and 30, drifting apart. Pin that
   // they are one number: whenever the bar decides to show, refreshIfStale
   // would also have acted.
-  await setup(page);
   await gotoApp('signedIn');
+  await setup(page);
   const rows = await page.evaluate(() => {
     (window as any).refreshForecast = () => {};
     return [5, 14, 16, 25, 40, 200].map(min => {
