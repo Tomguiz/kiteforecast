@@ -281,8 +281,13 @@
     .fday-flash { animation:fday-flash 1.4s ease-out; }
     @keyframes fday-flash { 0%,100%{box-shadow:none} 20%{box-shadow:0 0 0 2px var(--accent)} }
     @media (prefers-reduced-motion:reduce) { .fday-flash { animation:none; } }
-    .fg-going { border-color:rgba(34,197,94,.45) !important; color:#4ade80 !important; }
-    .fg-going:hover { border-color:#4ade80 !important; }
+    /* Only a CONFIRMED session is green, and it is filled rather than merely
+       outlined: the undecided button keeps the neutral .fg-more look it shares
+       with Details and Columns, so green never appears before the rider has
+       actually committed. */
+    .fg-going { background:rgba(34,197,94,.16) !important; border-color:rgba(34,197,94,.5) !important;
+      color:#4ade80 !important; font-weight:700 !important; }
+    .fg-going:hover { background:rgba(34,197,94,.26) !important; border-color:#4ade80 !important; }
     .fday-head {
       display:grid; align-items:center; gap:12px; padding:10px 13px; cursor:pointer;
       grid-template-columns:74px 46px 1fr 118px 58px auto 26px 20px;
@@ -5561,9 +5566,28 @@ function openForecastDay(dateStr,idx){
            here, this is the only way to reach it from a day, so removing the
            old "Full detail" button without replacing this path would have quietly
            cost the rider the ability to confirm a session at all. -->
-      <button class="fg-more fg-going" onclick="openAttendSheet('${dateStr}',${idx},cachedLoc.name,cachedLoc.latitude,cachedLoc.longitude)" title="Confirm you are going, and notify your friends">\u{1F3C4} I'm going</button>
+      ${goingBtnHTML(dateStr,idx)}
     </div>`;
   body.hidden=false;
+}
+
+// "I'm going" is a question until you answer it, and an answer afterwards. It
+// used to be neither: one static green button that read the same whether the
+// rider had committed to 13:00 or had not decided at all. The only signal was
+// a separate green bar higher up the row, which said "\u2713 Going \u00b7 12:00" while the
+// button underneath still invited you to go \u2014 two controls about one decision,
+// disagreeing. Green now means committed, and nothing else does.
+function goingBtnHTML(dateStr,idx){
+  const mine=_attendCache[dateStr];
+  const label=mine
+    ? `\u2713 Going \u00b7 ${escFriendName(mine.start_time)}`
+    : '\u{1F3C4} I\'m going?';
+  const title=mine
+    ? 'Change or cancel this session'
+    : 'Confirm you are going, and notify your friends';
+  return `<button class="fg-more${mine?' fg-going':''}" id="goingBtn-${dateStr}"`
+    +` onclick="openAttendSheet('${dateStr}',${idx},cachedLoc.name,cachedLoc.latitude,cachedLoc.longitude)"`
+    +` title="${title}">${label}</button>`;
 }
 
 // The chips and tide times that used to sit at the top of the modal. They are
@@ -7940,6 +7964,10 @@ async function handlePendingJoin(){
 
 // ── SESSION ATTENDANCE ───────────────────────────────────────────────────────
 let _attendCache={}; // dateStr -> attendance row or null
+// Who else is going, kept beside _attendCache so refreshGoingUI can redraw
+// without another round trip — confirming a session has to repaint at once,
+// not after the next fetch.
+let _friendsAttendCache={}; // dateStr -> [{nickname}]
 
 async function loadAttendances(){
   const sb=getSb(); const email=_authSession?.user?.email||loadProfile().email;
@@ -7970,15 +7998,26 @@ async function loadAttendances(){
     }
   }
 
-  // Update all day card going indicators
+  _friendsAttendCache=friendsAttend;
+  refreshGoingUI();
+}
+
+// Every surface that says whether the rider is going, redrawn from
+// _attendCache. Confirming used to poke the DOM by hand from
+// confirmAttendance: it targeted `going-${dateStr}` (the BAR's id, not the
+// button's), added a class no stylesheet defines, wiped the friends line with
+// textContent, and never cleared the display:none the bar is born with — so
+// the bar stayed invisible until the next fetch. One function now, called from
+// everywhere the answer changes.
+function refreshGoingUI(){
   document.querySelectorAll('.card-going-indicator').forEach(ind=>{
     const dateStr=ind.id.replace('going-','');
     const myAttend=_attendCache[dateStr];
-    const theirList=friendsAttend[dateStr]||[];
+    const theirList=_friendsAttendCache[dateStr]||[];
     if(myAttend||theirList.length){
       ind.style.display='block';
       let html='';
-      if(myAttend) html+=`✓ Going · ${myAttend.start_time}`;
+      if(myAttend) html+=`✓ Going · ${escFriendName(myAttend.start_time)}`;
       if(theirList.length){
         const names=theirList.map(r=>escFriendName(r.nickname)).join(', ');
         html+=(html?'<br>':'')+`<span style="font-size:.58rem;color:#4ade80">👥 ${names}</span>`;
@@ -7987,6 +8026,15 @@ async function loadAttendances(){
     } else {
       ind.style.display='none';
     }
+  });
+  // The button only exists while its day row is open; querySelectorAll simply
+  // finds none when it is not.
+  document.querySelectorAll('[id^="goingBtn-"]').forEach(btn=>{
+    const dateStr=btn.id.replace('goingBtn-','');
+    const mine=_attendCache[dateStr];
+    btn.classList.toggle('fg-going',!!mine);
+    btn.textContent=mine?`✓ Going · ${mine.start_time}`:'🏄 I\'m going?';
+    btn.title=mine?'Change or cancel this session':'Confirm you are going, and notify your friends';
   });
 }
 
@@ -8065,9 +8113,7 @@ async function confirmAttendance(dateStr, spotName, lat, lon, startTimeOverride)
   await sb.from('session_attendances').upsert(row,{onConflict:'email,spot_name,session_date'});
   _attendCache[dateStr]=row;
 
-  // Update button immediately
-  const btn=$(`going-${dateStr}`)||document.getElementById(`going-${dateStr}`);
-  if(btn){ btn.classList.add('going'); btn.textContent=`✓ Going · ${startTime}`; }
+  refreshGoingUI();
 
   const notifyFriends=isPremium()&&loadProfile().notifyFriendsOnConfirm!==false;
   closeAttendSheet();
@@ -8100,12 +8146,12 @@ async function cancelAttendance(dateStr){
     showToast('Attendance cancelled.');
   }
 
-  // Update day card indicator
-  const ind=document.getElementById(`going-${dateStr}`);
-  if(ind){ ind.style.display='none'; ind.textContent=''; }
-
-  // renderGrid below repaints the day row, which is where "Going" now lives.
+  // renderGrid repaints the day row, which is where "Going" now lives; the
+  // refresh then fills the freshly built bar and button from _attendCache.
+  // Hiding the bar by hand here used to take the "friends going" line with it,
+  // even when a friend was still going.
   renderGrid();
+  refreshGoingUI();
 }
 
 // ── FRIENDS ──────────────────────────────────────────────────────────────────

@@ -224,3 +224,75 @@ test('a row showing only friends is not editable', async ({ gotoApp, page }) => 
   }, D);
   expect(openedMine).toBe(true);
 });
+
+// ── The going button answers the question it asks ──────────────────────────
+//
+// "🏄 I'm going" was one static green button. It read the same whether the
+// rider had committed to 13:00 or had not decided at all, and the only signal
+// either way was a separate green bar higher up the row — so the row could
+// show "✓ Going · 12:00" while the button under it still invited you to go.
+// Green means committed now, and the button says when.
+
+const openFirstDay = async (page: any) => {
+  await page.locator('#forecastGrid .fday').first().click();
+  await expect(page.locator('#forecastGrid table.fg').first()).toBeVisible();
+};
+
+test('undecided, the going button asks rather than claims', async ({ gotoApp, page }) => {
+  await gotoApp('signedOut');
+  await seed(page, 3);
+  await openFirstDay(page);
+  const btn = page.locator(`#goingBtn-${days(1)[0]}`);
+  await expect(btn).toBeVisible();
+  await expect(btn).toContainText("I'm going");
+  // Green is reserved for a confirmed session — an invitation must not wear it.
+  await expect(btn).not.toHaveClass(/fg-going/);
+});
+
+test('once confirmed, the same button shows the time and turns green', async ({ gotoApp, page }) => {
+  await gotoApp('signedOut');
+  await seed(page, 3);
+  await openFirstDay(page);
+  const d = days(1)[0];
+  await page.evaluate((dd: string) => {
+    _attendCache[dd] = { start_time: '13:00', session_date: dd };
+    refreshGoingUI();
+  }, d);
+  const btn = page.locator(`#goingBtn-${d}`);
+  await expect(btn).toContainText('✓ Going · 13:00');
+  await expect(btn).toHaveClass(/fg-going/);
+  // And the bar above it agrees, rather than being filled by a separate path.
+  await expect(page.locator(`#going-${d}`)).toContainText('✓ Going · 13:00');
+});
+
+test('cancelling puts the button back to the question', async ({ gotoApp, page }) => {
+  await gotoApp('signedOut');
+  await seed(page, 3);
+  await openFirstDay(page);
+  const d = days(1)[0];
+  await page.evaluate((dd: string) => {
+    _attendCache[dd] = { start_time: '13:00', session_date: dd };
+    refreshGoingUI();
+  }, d);
+  await expect(page.locator(`#goingBtn-${d}`)).toHaveClass(/fg-going/);
+  await page.evaluate((dd: string) => { delete _attendCache[dd]; refreshGoingUI(); }, d);
+  const btn = page.locator(`#goingBtn-${d}`);
+  await expect(btn).toContainText("I'm going");
+  await expect(btn).not.toHaveClass(/fg-going/);
+  await expect(page.locator(`#going-${d}`)).toBeHidden();
+});
+
+test('a friend going still shows when the rider has not decided', async ({ gotoApp, page }) => {
+  // Cancelling used to hide the whole bar by hand, taking the friends line
+  // with it even when a friend was still going.
+  await gotoApp('signedOut');
+  await seed(page, 3);
+  await openFirstDay(page);
+  const d = days(1)[0];
+  await page.evaluate((dd: string) => {
+    _friendsAttendCache[dd] = [{ nickname: 'Ruben' }];
+    refreshGoingUI();
+  }, d);
+  await expect(page.locator(`#going-${d}`)).toContainText('Ruben');
+  await expect(page.locator(`#goingBtn-${d}`)).not.toHaveClass(/fg-going/);
+});
