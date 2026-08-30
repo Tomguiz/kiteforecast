@@ -8041,7 +8041,19 @@ async function confirmAttendance(dateStr, spotName, lat, lon, startTimeOverride)
     session_date:dateStr,start_time:startTime,duration_h:durationH,
     note:note||null,cancelled:false};
 
-  await sb.from('session_attendances').upsert(row,{onConflict:'email,spot_name,session_date'});
+  // The write is CHECKED. It used to be awaited and thrown away: on 30 Aug a
+  // rider confirmed Riverwoods for the next day, twelve friends were emailed,
+  // the toast said "Session confirmed" — and the row in the database was still
+  // the cancelled one from four hours earlier. The rider found out by reloading
+  // and seeing nothing. Announcing a session to a dozen people on the strength
+  // of a write nobody looked at is the one thing this function must not do.
+  const{error:upErr}=await sb.from('session_attendances')
+    .upsert(row,{onConflict:'email,spot_name,session_date'});
+  if(upErr){
+    console.error('[attend] confirm failed:',upErr);
+    showToast(`Couldn't save that session — ${upErr.message||upErr.code||'try again'}`,5000,'#ef4444');
+    return;   // no local cache, no toast of success, and no email to the crew
+  }
   _attendCache[dateStr]=row;
 
   refreshGoingUI();
@@ -8063,7 +8075,19 @@ async function confirmAttendance(dateStr, spotName, lat, lon, startTimeOverride)
 async function cancelAttendance(dateStr){
   const sb=getSb(); const email=_authSession?.user?.email||loadProfile().email;
   if(!sb||!email) return;
-  await sb.from('session_attendances').update({cancelled:true}).eq('email',email).eq('session_date',dateStr);
+  // Scoped to the SPOT as well as the date. Without it, cancelling one session
+  // cancelled every spot the rider had confirmed that day — the table is unique
+  // on (email, spot_name, session_date), so a date alone can match several rows.
+  const spotName=_attendCache[dateStr]?.spot_name||cachedLoc?.name;
+  let q=sb.from('session_attendances').update({cancelled:true})
+    .eq('email',email).eq('session_date',dateStr);
+  if(spotName) q=q.eq('spot_name',spotName);
+  const{error:cancelErr}=await q;
+  if(cancelErr){
+    console.error('[attend] cancel failed:',cancelErr);
+    showToast(`Couldn't cancel that session — ${cancelErr.message||cancelErr.code||'try again'}`,5000,'#ef4444');
+    return;
+  }
   delete _attendCache[dateStr];
   _attendSessionStart=null; _attendDateStr=null;
 
