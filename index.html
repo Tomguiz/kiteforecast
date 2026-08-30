@@ -8263,18 +8263,27 @@ async function doFriendSearch(query){
   const el=$('friendSearchResults');
   if(!results.length){ el.style.display='flex'; el.innerHTML='<div class="stats-empty">No users found.</div>'; return; }
 
-  // Check existing friendships
-  const existingEmails=new Set((_friendsCache||[]).map(r=>r.requester===email?r.recipient:r.requester));
-  const pendingOut=new Set((_friendsCache||[]).filter(r=>r.status==='pending'&&r.requester===email).map(r=>r.recipient));
+  // Check existing friendships. Bucket by STATUS — a row's mere existence is
+  // not a friendship. `declined` rows stay in the table (respondFriendRequest
+  // updates the status, it does not delete), so lumping every row together
+  // labelled a refused request "✓ Friends" while "My friends" — which filters
+  // on status — left the person out, and the "Add friend" button never came
+  // back. Incoming pending needs its own bucket too: it is not a friendship
+  // either, and it is not something this user can cancel.
+  const _cache=_friendsCache||[];
+  const _other=r=>r.requester===email?r.recipient:r.requester;
+  const acceptedEmails=new Set(_cache.filter(r=>r.status==='accepted').map(_other));
+  const pendingOut=new Set(_cache.filter(r=>r.status==='pending'&&r.requester===email).map(r=>r.recipient));
+  const pendingIn=new Set(_cache.filter(r=>r.status==='pending'&&r.recipient===email).map(r=>r.requester));
 
   el.style.display='flex';
   el.innerHTML=results.map(u=>{
-    const isFriend=existingEmails.has(u.email);
-    const isPending=pendingOut.has(u.email);
-    const btn=isFriend
+    const btn=acceptedEmails.has(u.email)
       ?`<span style="font-size:.72rem;color:#4ade80">✓ Friends</span>`
-      :isPending
+      :pendingOut.has(u.email)
       ?`<span style="font-size:.72rem;color:var(--tdim)">⏳ Pending</span>`
+      :pendingIn.has(u.email)
+      ?`<span style="font-size:.72rem;color:#fbbf24">⏳ Pending — answer above</span>`
       // Untrusted values (email, nickname) must not be spliced into the JS
       // source of an inline onclick: HTML-escaping a nickname does not stop
       // it breaking out of the single-quoted JS string argument here, since
@@ -8298,7 +8307,22 @@ async function doFriendSearch(query){
 async function sendFriendRequest(recipientEmail, recipientNick){
   const sb=getSb(); const email=_authSession?.user?.email||loadProfile().email;
   if(!sb||!email) return;
-  await sb.from('friendships').insert({requester:email, recipient:recipientEmail, status:'pending'});
+  // A previously declined request leaves its row behind. friendships is UNIQUE
+  // on (requester, recipient), so re-asking the same person would hit that
+  // constraint; and a declined row in the other direction would linger next to
+  // the new one. Clear both before inserting, so a refusal is not permanent.
+  const stale=(_friendsCache||[]).filter(r=>r.status==='declined'&&
+    (r.requester===recipientEmail||r.recipient===recipientEmail));
+  for(const r of stale){
+    const status=await deleteFriendshipRow(r.id);
+    if(status===0||status>=300){ showToast('Could not send the request — please sign in again.'); return; }
+  }
+  const{error:insErr}=await sb.from('friendships').insert({requester:email, recipient:recipientEmail, status:'pending'});
+  if(insErr){
+    console.error('[friends] friend request insert error:',insErr);
+    showToast('Could not send the request — please try again.');
+    return;
+  }
   showToast('Friend request sent to '+recipientNick+' 👋');
   // Fire email notification — fire and forget
   const nickname=loadProfile().nickname||email.split('@')[0];
@@ -8320,28 +8344,34 @@ async function respondFriendRequest(id, status){
   showToast(status==='accepted'?'Friend added! 🎉':'Request declined.');
 }
 
-async function removeFriend(id){
-  const sb=getSb(); if(!sb) return;
+// Deletes one friendships row over REST with the user's real access token.
+// The supabase-js client has been seen sending the anon token here (custom
+// storage key), which RLS then rejects — so go through fetch with a token we
+// checked ourselves. Returns the HTTP status, or 0 if there is no session.
+async function deleteFriendshipRow(id){
   // Prefer _authSession.access_token (set by onAuthStateChange with full session object).
-  // Fall back to getSession() in case _authSession is the optimistic stub (no access_token).
+  // Fall back to ensureSession() in case _authSession is the optimistic stub (no access_token).
   let token=_authSession?.access_token;
-  if(!token){
-    const{data:{session}}=await sb.auth.getSession();
-    token=session?.access_token||null;
-    if(session) _authSession=session;
-  }
-  if(!token){ showToast('Session expired — please sign in again.'); return; }
-  const row=(_friendsCache||[]).find(r=>r.id===id);
-  if(!row){ showToast('Could not find friendship — refresh and try again.'); return; }
-  const res=await fetch(`https://kpwmajtxmcfpakvonimf.supabase.co/rest/v1/friendships?id=eq.${row.id}`,{
+  if(!token) token=(await ensureSession())?.access_token||null;
+  if(!token) return 0;
+  const res=await fetch(`${SB_URL}/rest/v1/friendships?id=eq.${id}`,{
     method:'DELETE',
     headers:{
-      'apikey':'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwd21hanR4bWNmcGFrdm9uaW1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTcyMjYsImV4cCI6MjA5MDczMzIyNn0.QfQuIQbnfVUOApPbOdvCRbNsVdb0SBAwMX-hvioGJmg',
+      'apikey':SB_ANON,
       'Authorization':`Bearer ${token}`,
       'Prefer':'count=exact',
     },
   });
-  if(!res.ok){ showToast('Error removing friend ('+res.status+')'); return; }
+  return res.status;
+}
+
+async function removeFriend(id){
+  const sb=getSb(); if(!sb) return;
+  const row=(_friendsCache||[]).find(r=>r.id===id);
+  if(!row){ showToast('Could not find friendship — refresh and try again.'); return; }
+  const status=await deleteFriendshipRow(row.id);
+  if(!status){ showToast('Session expired — please sign in again.'); return; }
+  if(status>=300){ showToast('Error removing friend ('+status+')'); return; }
   _friendsCache=(_friendsCache||[]).filter(r=>r.id!==id);
   await renderFriendsPanel();
   showToast('Friend removed.');
