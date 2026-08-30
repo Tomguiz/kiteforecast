@@ -246,7 +246,7 @@ test('undecided, the going button asks rather than claims', async ({ gotoApp, pa
   await expect(btn).toBeVisible();
   await expect(btn).toContainText("I'm going");
   // Green is reserved for a confirmed session — an invitation must not wear it.
-  await expect(btn).not.toHaveClass(/fg-going/);
+  await expect(btn).not.toHaveClass(/is-going/);
 });
 
 test('once confirmed, the same button shows the time and turns green', async ({ gotoApp, page }) => {
@@ -260,7 +260,7 @@ test('once confirmed, the same button shows the time and turns green', async ({ 
   }, d);
   const btn = page.locator(`#goingBtn-${d}`);
   await expect(btn).toContainText('✓ Going · 13:00');
-  await expect(btn).toHaveClass(/fg-going/);
+  await expect(btn).toHaveClass(/is-going/);
   // And the bar above it agrees, rather than being filled by a separate path.
   await expect(page.locator(`#going-${d}`)).toContainText('✓ Going · 13:00');
 });
@@ -274,11 +274,11 @@ test('cancelling puts the button back to the question', async ({ gotoApp, page }
     _attendCache[dd] = { start_time: '13:00', session_date: dd };
     refreshGoingUI();
   }, d);
-  await expect(page.locator(`#goingBtn-${d}`)).toHaveClass(/fg-going/);
+  await expect(page.locator(`#goingBtn-${d}`)).toHaveClass(/is-going/);
   await page.evaluate((dd: string) => { delete _attendCache[dd]; refreshGoingUI(); }, d);
   const btn = page.locator(`#goingBtn-${d}`);
   await expect(btn).toContainText("I'm going");
-  await expect(btn).not.toHaveClass(/fg-going/);
+  await expect(btn).not.toHaveClass(/is-going/);
   await expect(page.locator(`#going-${d}`)).toBeHidden();
 });
 
@@ -294,5 +294,5 @@ test('a friend going still shows when the rider has not decided', async ({ gotoA
     refreshGoingUI();
   }, d);
   await expect(page.locator(`#going-${d}`)).toContainText('Ruben');
-  await expect(page.locator(`#goingBtn-${d}`)).not.toHaveClass(/fg-going/);
+  await expect(page.locator(`#goingBtn-${d}`)).not.toHaveClass(/is-going/);
 });
