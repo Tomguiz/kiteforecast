@@ -1995,13 +1995,18 @@ let lastFetchTime = parseInt(localStorage.getItem('kf_lastFetch')||'0',10);
 const WX_CACHE_KEY='kf_wxCache_v2';
 const WX_CACHE_TTL=2*60*60*1000; // 2 hours — matches the shared cache window
 
-function _saveWxCache(loc,wx,marineHrMap,tideExtremes){
+// `fetchedAt` is when the FORECAST was taken; `ts` is when this device stored
+// it. They are not the same: the shared row can be two hours old when it
+// arrives. Ageing the cache from `ts` stacked one window on top of the other,
+// so a rider could be shown a four-hour-old forecast over the words "Updated"
+// and a recent time. Both the expiry and the timestamp read fetchedAt now.
+function _saveWxCache(loc,wx,marineHrMap,tideExtremes,fetchedAt){
   try{
     // Convert Map to plain array pairs for JSON serialisation
     // Dirs are intentionally NOT cached — they come from SPOTS (DB) so admin updates are always live
     const marineArr=marineHrMap?[...marineHrMap.entries()]:[];
     localStorage.setItem(WX_CACHE_KEY,JSON.stringify({
-      ts:Date.now(),loc,wx,marineArr,tideExtremes,
+      ts:Date.now(),fetchedAt:fetchedAt||Date.now(),loc,wx,marineArr,tideExtremes,
     }));
   }catch(e){}
 }
@@ -2009,7 +2014,9 @@ function _loadWxCache(lat,lon){
   try{
     const raw=localStorage.getItem(WX_CACHE_KEY); if(!raw) return null;
     const c=JSON.parse(raw);
-    if(Date.now()-c.ts>WX_CACHE_TTL){ localStorage.removeItem(WX_CACHE_KEY); return null; }
+    // Entries written before fetchedAt existed fall back to ts, as before.
+    c.fetchedAt=c.fetchedAt||c.ts;
+    if(Date.now()-c.fetchedAt>WX_CACHE_TTL){ localStorage.removeItem(WX_CACHE_KEY); return null; }
     // Must match same spot (within ~100 m)
     if(Math.abs(c.loc.latitude-lat)>0.001||Math.abs(c.loc.longitude-lon)>0.001) return null;
     return c;
@@ -2591,6 +2598,15 @@ function classifyHour(kn,dir,code,gustKn=0){
   }
   return {type:['good','verygood','perfect'][sp-1],qualifying:true};
 }
+// How far ahead the app is willing to COUNT a day as rideable. Open-Meteo hands
+// back 16 days, but days 11-16 are the free GFS outlook — the spot page already
+// fades them and captions them as a lower-confidence outlook. The homepage
+// badge counted all sixteen while its own tooltip said "in the next 10", so a
+// rider was told about sessions a fortnight out that the same app would not
+// stand behind, and "Best"/"Next" could point at one. Everything that makes a
+// PROMISE about a day counts inside this window; the spot page still SHOWS all
+// sixteen, faded, because looking is not the same as being told.
+const CONFIDENT_DAYS=10;
 // Single shared definition of an hour being rideable, and of a day's "good
 // hours": the count of qualifying daylight hours that are part of a 2+
 // consecutive (by clock hour) run. A day is rideable when this is >= 2.
@@ -2780,6 +2796,12 @@ const WEBHOOK_URL    = 'https://hook.eu1.make.com/6t9fgm6btixri2wf5lnx47requf416
 const REMINDER_HOURS = [72, 48, 24, 6, 1];
 const SB_URL  = 'https://kpwmajtxmcfpakvonimf.supabase.co';
 const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwd21hanR4bWNmcGFrdm9uaW1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTcyMjYsImV4cCI6MjA5MDczMzIyNn0.QfQuIQbnfVUOApPbOdvCRbNsVdb0SBAwMX-hvioGJmg';
+// Up here with the others, not beside fetchForecastBundle where it used to sit:
+// initAuth() runs at top level and reaches renderHintChips, which now asks for
+// the home screen's forecasts. A `const` declared further down the file is in
+// its temporal dead zone at that moment — the same trap that left a signed-in
+// rider looking signed out on every refresh (2026-08-16).
+const FORECAST_FN=`${SB_URL}/functions/v1/forecast`;
 
 // ── Cookie-backed storage adapter (must be top-level to avoid TDZ) ───────────
 // iOS Safari clears localStorage for PWAs after ~7 days. Cookies with an
@@ -3331,7 +3353,10 @@ let osmSearchCache={};
 const chipFxCache={};
 const chipBestCache={}; // key -> {dateStr,peakKn,spotName,spot} | null
 const CHIP_CACHE_TTL=60*60*1000; // 1 hour
-const CHIP_CACHE_LS_KEY='kf_chipCache_v2';
+// v3: entries written before CONFIDENT_DAYS hold sixteen days per spot, six of
+// them the GFS outlook this app no longer counts. Reading them back would put
+// day-14 sessions in the compare table for another hour.
+const CHIP_CACHE_LS_KEY='kf_chipCache_v3';
 let _chipCacheTs=0; // timestamp when this cache epoch started
 
 function _loadChipCacheFromLS(){
@@ -3378,10 +3403,82 @@ function chipBestForSpot(lat,lon){
 let _spotsIsReady=false; // flipped to true once _spotsReady resolves
 window._spotsReady?.then?.(()=>{ _spotsIsReady=true; });
 
+// ── Home-screen bundles: one request for every card ─────────────────────────
+// A rider with a favourite and six suggestions used to wait out SEVEN requests
+// for the badges, serialised one at a time behind the 400ms throttle below —
+// three seconds of pure queueing before the network even mattered. The home
+// screen knows every spot it is about to draw, so it asks for all of them at
+// once (`spots=` on the forecast function) and the cards read the answers out
+// of this map. `slim=1`: badges need wind, gusts, the weather code and the
+// daylight window, not temperature and not the whole marine block.
+const _chipBundleMemo=new Map();   // "lat,lon" -> {wx, fetchedAt}
+const _chipBundleWait=new Map();   // "lat,lon" -> Promise, resolves when the batch lands
+const _bundleKey=(lat,lon)=>`${lat},${lon}`;
+// The oldest row in the last batch. The home screen's data is only as fresh as
+// its stalest card, and that is what the "Updated HH:MM" bar must say.
+let _chipBundleOldest=0;
+// Mirrors MAX_BATCH_SPOTS in supabase/functions/forecast/index.ts.
+const MAX_BATCH_SPOTS=16;
+// A deployed function that predates `spots=` answers without a results array.
+// Asking it again on every render would cost one dead request per paint, so
+// stand the batch down for the session and let the per-spot path carry on.
+let _batchUnsupported=false;
+
+async function prefetchChipBundles(spots,force){
+  const want=[],seen=new Set();
+  for(const s of spots||[]){
+    if(s?.lat==null||s?.lon==null) continue;
+    const k=_bundleKey(s.lat,s.lon);
+    if(seen.has(k)) continue;
+    if(!force&&(_chipBundleMemo.has(k)||_chipBundleWait.has(k))) continue;
+    seen.add(k); want.push({k,lat:s.lat,lon:s.lon});
+    if(want.length>=MAX_BATCH_SPOTS) break;
+  }
+  if(!want.length||_batchUnsupported) return;
+  const qs=`spots=${encodeURIComponent(want.map(w=>w.k).join(';'))}&slim=1${force?'&force=1':''}`;
+  const p=(async()=>{
+    try{
+      const r=await safeFetch(`${FORECAST_FN}?${qs}`,15000,1,
+        {Authorization:`Bearer ${SB_ANON}`,apikey:SB_ANON});
+      if(!r||!Array.isArray(r.results)){ _batchUnsupported=true; return; }
+      let oldest=0;
+      for(const row of (r&&r.results)||[]){
+        // `q` is the token we sent, echoed back, so a card is matched by string
+        // identity rather than by re-deriving a key from a reformatted float.
+        if(!row||!row.q||!row.wx||row.error||row.wx.error) continue;
+        const at=Date.parse(row.fetched_at)||Date.now();
+        _chipBundleMemo.set(row.q,{wx:row.wx,fetchedAt:at});
+        if(!oldest||at<oldest) oldest=at;
+      }
+      if(oldest) _chipBundleOldest=oldest;
+    }catch(e){
+      // Not fatal: each card falls back to its own request, exactly as before.
+      console.warn('batched forecast unavailable, falling back per spot:',e.message);
+    }
+  })();
+  for(const w of want) _chipBundleWait.set(w.k,p);
+  try{ await p; } finally { for(const w of want) _chipBundleWait.delete(w.k); }
+}
+
+function _clearChipBundles(){ _chipBundleMemo.clear(); _chipBundleOldest=0; }
+
 async function fetchChipQualDays(spot){
   const dirsStr=(spot.dirs||[]).slice().sort((a,b)=>a-b).join(',');
   const key=`${spot.lat},${spot.lon}|${dirsStr}`;
   if(chipFxCache[key]!==undefined) return chipFxCache[key];
+  // Wait for a batch already in flight for this spot rather than racing it with
+  // a second request for the same row.
+  const bkey=_bundleKey(spot.lat,spot.lon);
+  const inflight=_chipBundleWait.get(bkey);
+  if(inflight) await inflight;
+  if(chipFxCache[key]!==undefined) return chipFxCache[key];
+  const bundled=_chipBundleMemo.get(bkey);
+  // A bundled answer costs no network, so it must not sit in the throttle queue
+  // — that queue exists to space out Open-Meteo requests, and there are none.
+  if(bundled){
+    try{ return _chipDaysFromWx(spot,key,bundled.wx); }
+    catch{ chipFxCache[key]=null; chipBestCache[key]=null; return null; }
+  }
   return queuedFetch(async()=>{
   if(chipFxCache[key]!==undefined) return chipFxCache[key]; // re-check after queue wait
   try{
@@ -3389,6 +3486,14 @@ async function fetchChipQualDays(spot){
     // this too — no separate request shape, no second cache to keep in step.
     const wx=(await fetchForecastBundle(spot.lat,spot.lon,false)).wx;
     if(wx.error) throw new Error(wx.reason);
+    return _chipDaysFromWx(spot,key,wx);
+  }catch{ chipFxCache[key]=null; chipBestCache[key]=null; return null; }
+  }); // end queuedFetch
+}
+
+// Count a spot's rideable days out of one forecast payload. Shared by the
+// bundled and the per-spot path so the two can never disagree.
+function _chipDaysFromWx(spot,key,wx){
     const dirs=new Set(spot.dirs&&spot.dirs.length?spot.dirs:[]);
     const isDirOK=d=>{ if(!dirs.size) return true; for(const sd of dirs) if(angleDiff(d,sd)<=WIND_DIR_TOLERANCE_DEG) return true; return false; };
     // collect each day's daylight hours so both the badge count and the
@@ -3407,6 +3512,7 @@ async function fetchChipQualDays(spot){
     let qualDays=0;
     let bestDateStr=null, bestPeakKn=0, bestStartHr=null, nextDateStr=null, nextStartHr=null, nextPeakKn=0;
     wx.daily.time.forEach((dateStr,i)=>{
+      if(i>=CONFIDENT_DAYS) return;   // days 11-16 are the GFS outlook — see CONFIDENT_DAYS
       const srH=parseInt(wx.daily.sunrise[i].slice(11,13),10);
       const ssH=parseInt(wx.daily.sunset[i].slice(11,13),10);
       const dayHours=dayHoursOf(dateStr,srH,ssH);
@@ -3424,6 +3530,7 @@ async function fetchChipQualDays(spot){
     // Build per-day breakdown for comparison view (reuse same fetch, no extra API call)
     const days10=[];
     wx.daily.time.forEach((dateStr,i)=>{
+      if(i>=CONFIDENT_DAYS) return;   // ten entries, as the name says
       const srH=parseInt(wx.daily.sunrise[i].slice(11,13),10);
       const ssH=parseInt(wx.daily.sunset[i].slice(11,13),10);
       const dayHours=dayHoursOf(dateStr,srH,ssH);
@@ -3441,8 +3548,6 @@ async function fetchChipQualDays(spot){
     if(!bestDateStr) chipBestCache[key]={dateStr:null,peakKn:0,startHr:null,nextDateStr:null,nextStartHr:null,nextPeakKn:0,spotName:spot.name,spot,days10};
     _saveChipCacheToLS();
     return qualDays;
-  }catch{ chipFxCache[key]=null; chipBestCache[key]=null; return null; }
-  }); // end queuedFetch
 }
 
 // Recompute a spot's homepage chip cache from the SAME fresh forecast the
@@ -3478,6 +3583,7 @@ function reconcileChipCacheFromDetail(){
     let bestDateStr=null,bestPeakKn=0,bestStartHr=null,nextDateStr=null,nextStartHr=null,nextPeakKn=0;
     const days10=[];
     wx.daily.time.forEach((dateStr,i)=>{
+      if(i>=CONFIDENT_DAYS) return;   // same window as fetchChipQualDays, or the two disagree
       const srH=parseInt(wx.daily.sunrise[i].slice(11,13),10);
       const ssH=parseInt(wx.daily.sunset[i].slice(11,13),10);
       const dayHours=dayHoursOf(dateStr,srH,ssH);
@@ -3767,7 +3873,7 @@ async function fetchForecastFromSpot(spot,opts){
         const effectiveDirs=live?.dirs?.length?live.dirs:spot.dirs;
         if(effectiveDirs?.length) setWindDirs(effectiveDirs);
       }
-      lastFetchTime=cached.ts; try{localStorage.setItem('kf_lastFetch',lastFetchTime);}catch(e){}
+      lastFetchTime=cached.fetchedAt; try{localStorage.setItem('kf_lastFetch',lastFetchTime);}catch(e){}
       renderGrid();
       recheckSpotSubscription();
       return;
@@ -3812,7 +3918,7 @@ async function fetchForecastFromSpot(spot,opts){
     // The shared row may have been fetched by another rider up to two hours
     // ago. Stamping now would claim a freshness the data does not have.
     lastFetchTime=bundle.fetchedAt; try{localStorage.setItem('kf_lastFetch',lastFetchTime);}catch(e){}
-    _saveWxCache(cachedLoc,cachedWx,[...cachedMarineHrMap.entries()],cachedTideExtremes);
+    _saveWxCache(cachedLoc,cachedWx,[...cachedMarineHrMap.entries()],cachedTideExtremes,bundle.fetchedAt);
     renderGrid();
     recheckSpotSubscription();
   }catch(err){
@@ -3953,13 +4059,28 @@ function refreshHomeChips(){
   Object.keys(chipFxCache).forEach(k=>delete chipFxCache[k]);
   Object.keys(chipBestCache).forEach(k=>delete chipBestCache[k]);
   _chipCacheTs=0;
+  _clearChipBundles();
   localStorage.removeItem(CHIP_CACHE_LS_KEY);
-  renderHintChips();
   // The stale bar is driven by lastFetchTime, so a home refresh has to stamp
   // it too — otherwise the bar sits there forever, unclearable from here.
   lastFetchTime=Date.now();
   try{localStorage.setItem('kf_lastFetch',lastFetchTime);}catch(e){}
   updateFetchTimestamp();
+  // Forced, and issued BEFORE the render: it registers itself as in flight
+  // synchronously, so the render's own prefetch joins it instead of opening a
+  // second batch for the same spots.
+  const _batch=prefetchChipBundles(_homeScreenSpots(),true);
+  renderHintChips();
+  _batch.then(()=>{
+    // A row older than the stamp above means some spot did not actually come
+    // back fresh. Say so rather than keep claiming the time we hoped for.
+    if(_chipBundleOldest&&_chipBundleOldest<lastFetchTime){
+      lastFetchTime=_chipBundleOldest;
+      try{localStorage.setItem('kf_lastFetch',lastFetchTime);}catch(e){}
+      updateFetchTimestamp();
+    }
+    renderHintChips();
+  });
 }
 function setChipDayBadge(el,n,isFav=false){
   if(n===null){
@@ -3971,11 +4092,16 @@ function setChipDayBadge(el,n,isFav=false){
   el.className='chip-days '+(n>=5?'cd-good':n>=1?'cd-ok':'cd-none');
   // Pluralise like the title attribute on the next line already does.
   el.textContent=n>0?`${n} good day${n!==1?'s':''} 💨`:'no wind this week';
-  el.title=`${n} day${n!==1?'s':''} with qualifying wind in the next 10`;
+  el.title=`${n} day${n!==1?'s':''} with qualifying wind in the next ${CONFIDENT_DAYS}`;
 }
 
 const FREE_FAV_LIMIT = 1;
-const _chipQueue={running:0,max:1,queue:[]};
+// Only the per-spot fallback goes through here now: a bundled answer costs no
+// request at all. One at a time with a 400ms gap was sized for seven chips
+// going straight to Open-Meteo; against the shared cache it was three seconds
+// of waiting for nothing. Three at a time still spaces a cold fallback out
+// enough to stay under Open-Meteo's rate limit.
+const _chipQueue={running:0,max:3,queue:[]};
 
 // Who else is going today, per spot. ONE query for every favourite, not one per
 // chip. RLS on session_attendances restricts reads to your own rows and your
@@ -4128,7 +4254,31 @@ function renderGoodDaysSection(){
   if(!rendered) host.innerHTML='';          // nothing resolved yet: no bare heading
 }
 
+// Every spot the home screen is about to draw, so the batched prefetch can ask
+// for all of them in one request before the cards start reading answers. It
+// mirrors the selection renderHintChips makes below; a spot this misses is not
+// broken, it just falls back to fetching on its own as it always did.
+function _homeScreenSpots(){
+  const out=[];
+  if(_authSession?.user) for(const f of loadFavs()) out.push({lat:f.lat,lon:f.lon});
+  const favNames=new Set(_authSession?.user?loadFavs().map(f=>f.name):[]);
+  const dismissed=_authSession?.user?new Set():new Set(loadDismissedSuggs());
+  const defaultNames=new Set(DEFAULT_CHIPS.map(c=>c.name));
+  const cands=[
+    ...DEFAULT_CHIPS.filter(c=>!favNames.has(c.name)&&!dismissed.has(c.name)),
+    ...loadRecent().filter(r=>!favNames.has(r.name)&&!defaultNames.has(r.name)&&!dismissed.has(r.name)),
+  ];
+  for(const c of cands){
+    const spot=SPOTS.find(x=>x.name===c.name)||c;
+    if(spot.lat!=null&&spot.lon!=null) out.push({lat:spot.lat,lon:spot.lon});
+  }
+  return out;
+}
 function renderHintChips(){
+  // One request for every card, rather than one request per card queued behind
+  // a 400ms throttle. Cards still call fetchChipQualDays; it reads the answer
+  // out of the bundle map, and falls back to its own request if this failed.
+  if(_spotsIsReady) prefetchChipBundles(_homeScreenSpots());
   // Always clear search bar when rendering home screen chips
   const _si=$('searchInput'); if(_si&&!cachedLoc) _si.value='';
   const signedIn=!!_authSession?.user;
@@ -5100,7 +5250,6 @@ function fmtTideBadges(extremes, dateStr) {
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
-const FORECAST_FN=`${SB_URL}/functions/v1/forecast`;
 // Forecasts go through Supabase so that one rider's fetch answers for every
 // rider on the same spot. The function stores what it fetches; a row inside
 // the 2-hour window is served straight back. If the function is unreachable
@@ -5120,8 +5269,12 @@ async function fetchForecastBundle(lat,lon,force){
       hourly:['temperature_2m','weather_code','windspeed_10m','winddirection_10m','windgusts_10m'].join(','),
       daily:['weather_code','temperature_2m_max','temperature_2m_min','windgusts_10m_max','sunrise','sunset'].join(','),
       forecast_days:16, timezone:'auto', windspeed_unit:'ms',
+      // Same cell the function asks for — see CELL_SELECTION in
+      // supabase/functions/forecast/index.ts. Without it the numbers would
+      // change the moment the shared cache is unreachable.
+      cell_selection:'sea',
     });
-    const mP=new URLSearchParams({latitude:lat,longitude:lon,hourly:'wave_height,wave_period,wave_direction',forecast_days:16,timezone:'auto'});
+    const mP=new URLSearchParams({latitude:lat,longitude:lon,hourly:'wave_height,wave_period,wave_direction',forecast_days:16,timezone:'auto',cell_selection:'sea'});
     const [wx,marine]=await Promise.all([
       safeFetch(`https://api.open-meteo.com/v1/forecast?${p}`,10000),
       safeFetch(`https://marine-api.open-meteo.com/v1/marine?${mP}`,8000).catch(()=>null),
@@ -5167,17 +5320,21 @@ function queuedFetch(fn){
   });
 }
 
-// Start the next queued fetch if a slot is free, `delayMs` after now. The 400ms
-// spacing between successive fetches is what keeps Open-Meteo from rate-limiting.
+// Start the next queued fetch if a slot is free, `delayMs` after now. The spacing
+// between successive fetches is what keeps Open-Meteo from rate-limiting.
 function _chipQueueDrain(delayMs){
   if(_chipQueue.running>=_chipQueue.max||!_chipQueue.queue.length) return;
   const task=_chipQueue.queue.shift();
   _chipQueue.running++; // claim the slot now so nothing starts ahead of the timer
-  const start=()=>{ task().finally(()=>{ _chipQueue.running--; _chipQueueDrain(400); }); };
+  const start=()=>{ task().finally(()=>{ _chipQueue.running--; _chipQueueDrain(250); }); };
   if(delayMs) setTimeout(start,delayMs); else start();
 }
 
-async function fetchForecast(query){
+// `opts` is accepted so the geocoded-search path can be forced like the others.
+// It used to reference a bare `opts` it never declared, so every search for a
+// place outside the catalogue died on a ReferenceError and showed "Forecast
+// unavailable" — the cache-hit branch above it was the only one that worked.
+async function fetchForecast(query,opts){
   showOnly('loadingState');
   manualShoreSet=false;
   try{
@@ -5219,7 +5376,7 @@ async function fetchForecast(query){
         if(effectiveDirs2?.length) setWindDirs(effectiveDirs2);
       }
       saveLastSpot({name:cachedLoc.name,loc:[cachedLoc.admin1,cachedLoc.country].filter(Boolean).join(', '),lat:cachedLoc.latitude,lon:cachedLoc.longitude,dirs:[...windDirs]});
-      lastFetchTime=cached2.ts; try{localStorage.setItem('kf_lastFetch',lastFetchTime);}catch(e){}
+      lastFetchTime=cached2.fetchedAt; try{localStorage.setItem('kf_lastFetch',lastFetchTime);}catch(e){}
       renderGrid();
       return;
     }
@@ -5258,7 +5415,7 @@ async function fetchForecast(query){
 
     buildMarineMap(marineData2);
     cachedTideExtremes=tidesData2;
-    _saveWxCache(cachedLoc,cachedWx,[...cachedMarineHrMap.entries()],cachedTideExtremes);
+    _saveWxCache(cachedLoc,cachedWx,[...cachedMarineHrMap.entries()],cachedTideExtremes,bundle2.fetchedAt);
     saveLastSpot({name:cachedLoc.name,loc:[cachedLoc.admin1,cachedLoc.country].filter(Boolean).join(', '),lat:cachedLoc.latitude,lon:cachedLoc.longitude,dirs:[...windDirs]});
     lastFetchTime=bundle2.fetchedAt; try{localStorage.setItem('kf_lastFetch',lastFetchTime);}catch(e){}
     renderGrid();
@@ -6261,12 +6418,21 @@ async function syncNotifsFromSupabase(email){
   } finally { _syncNotifsInFlight=false; }
 }
 
+// initAuth reaches this twice on every cold start — once from the
+// INITIAL_SESSION event, once from the getSession() that follows it — and it
+// used to be two round trips each, so signing in spent four requests marking
+// the rider present. It is one request, once.
+let _lastSeenSent='';
 async function updateLastSeen(email){
   const sb=getSb(); if(!sb||!email) return;
-  const{error}=await sb.from('profiles').upsert({email,last_seen_at:new Date().toISOString()},{onConflict:'email'});
+  if(_lastSeenSent===email) return;
+  _lastSeenSent=email;
+  // The upsert can return the row it just wrote, so the digest preference
+  // comes back with it instead of costing a second query.
+  const{data:prof,error}=await sb.from('profiles')
+    .upsert({email,last_seen_at:new Date().toISOString()},{onConflict:'email'})
+    .select('digest_enabled').maybeSingle();
   if(error) console.error('[updateLastSeen] error',error);
-  // Sync digest preference from server
-  const{data:prof}=await sb.from('profiles').select('digest_enabled').eq('email',email).single();
   if(prof){
     const p=loadProfile();
     p.digestEnabled=!!prof.digest_enabled;
