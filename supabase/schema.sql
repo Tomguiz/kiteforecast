@@ -33,22 +33,12 @@ CREATE INDEX IF NOT EXISTS forecast_cache_fetched_at_idx ON forecast_cache (fetc
 
 -- No policies on purpose: only the service role touches this. Reads go through
 -- the edge function so a client cannot poison a row every other rider sees.
-ALTER TABLE forecast_cache ENABLE ROW LEVEL SECURITY;
 
 -- Which rows a rider wants in the hourly table of a day, kept as one jsonb so
 -- a new toggle does not need a migration. Mirrored in localStorage, so it works
 -- signed out too; the column is what carries it between devices.
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS display_prefs jsonb;
 
-ALTER TABLE tide_cache ENABLE ROW LEVEL SECURITY;
-
-DO $$ BEGIN
-  CREATE POLICY "all_select_tide_cache" ON tide_cache FOR SELECT TO anon, authenticated USING (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
-DO $$ BEGIN
-  CREATE POLICY "all_insert_tide_cache" ON tide_cache FOR INSERT TO anon, authenticated WITH CHECK (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- 3. Favourites table
 CREATE TABLE IF NOT EXISTS favourites (
@@ -64,23 +54,6 @@ CREATE TABLE IF NOT EXISTS favourites (
   UNIQUE (email, spot_name)
 );
 
-ALTER TABLE favourites ENABLE ROW LEVEL SECURITY;
-
-DO $$ BEGIN
-  CREATE POLICY "all_insert_favs" ON favourites FOR INSERT TO anon, authenticated WITH CHECK (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
-DO $$ BEGIN
-  CREATE POLICY "all_select_favs" ON favourites FOR SELECT TO anon, authenticated USING (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
-DO $$ BEGIN
-  CREATE POLICY "all_delete_favs" ON favourites FOR DELETE TO anon, authenticated USING (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
-DO $$ BEGIN
-  CREATE POLICY "all_update_favs" ON favourites FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- 3. Profiles table (last_seen_at tracking)
 CREATE TABLE IF NOT EXISTS profiles (
@@ -163,25 +136,6 @@ CREATE TABLE IF NOT EXISTS spot_info (
   updated_at       timestamptz NOT NULL DEFAULT now()
 );
 
-ALTER TABLE spot_info ENABLE ROW LEVEL SECURITY;
-
-DO $$ BEGIN
-  CREATE POLICY "all_select_spot_info" ON spot_info FOR SELECT TO anon, authenticated USING (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
-DO $$ BEGIN
-  CREATE POLICY "owner_update_spot_info" ON spot_info FOR UPDATE TO authenticated
-    USING (true) WITH CHECK (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
-DO $$ BEGIN
-  CREATE POLICY "owner_insert_spot_info" ON spot_info FOR INSERT TO authenticated
-    WITH CHECK (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
-DO $$ BEGIN
-  CREATE POLICY "all_delete_spot_info" ON spot_info FOR DELETE TO authenticated USING (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- Admin-added spots (merged into SPOTS array at startup for all users)
 CREATE TABLE IF NOT EXISTS spot_overrides (
@@ -195,23 +149,6 @@ CREATE TABLE IF NOT EXISTS spot_overrides (
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
-ALTER TABLE spot_overrides ENABLE ROW LEVEL SECURITY;
-
-DO $$ BEGIN
-  CREATE POLICY "all_select_spot_overrides" ON spot_overrides FOR SELECT TO anon, authenticated USING (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
-DO $$ BEGIN
-  CREATE POLICY "all_insert_spot_overrides" ON spot_overrides FOR INSERT TO anon, authenticated WITH CHECK (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
-DO $$ BEGIN
-  CREATE POLICY "all_update_spot_overrides" ON spot_overrides FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
-DO $$ BEGIN
-  CREATE POLICY "all_delete_spot_overrides" ON spot_overrides FOR DELETE TO authenticated USING (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- User-submitted spot suggestions (when search finds nothing)
 CREATE TABLE IF NOT EXISTS spot_suggestions (
@@ -230,19 +167,6 @@ DO $$ BEGIN ALTER TABLE spot_suggestions ADD COLUMN lon double precision; EXCEPT
 DO $$ BEGIN ALTER TABLE spot_suggestions ADD COLUMN approved boolean NOT NULL DEFAULT false; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE spot_suggestions ADD COLUMN contact_name text; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
 
-ALTER TABLE spot_suggestions ENABLE ROW LEVEL SECURITY;
-
-DO $$ BEGIN
-  CREATE POLICY "all_insert_suggestions" ON spot_suggestions FOR INSERT TO anon, authenticated WITH CHECK (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
-DO $$ BEGIN
-  CREATE POLICY "all_select_suggestions" ON spot_suggestions FOR SELECT TO anon, authenticated USING (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
-DO $$ BEGIN
-  CREATE POLICY "all_delete_suggestions" ON spot_suggestions FOR DELETE TO authenticated USING (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- CTA click tracking (lesson, gear, website, instagram, facebook, livecam, live_wind)
 CREATE TABLE IF NOT EXISTS spot_cta_clicks (
@@ -253,47 +177,6 @@ CREATE TABLE IF NOT EXISTS spot_cta_clicks (
   clicked_at  timestamptz NOT NULL DEFAULT now()
 );
 
-ALTER TABLE spot_cta_clicks ENABLE ROW LEVEL SECURITY;
-
-DO $$ BEGIN
-  CREATE POLICY "all_insert_cta_clicks" ON spot_cta_clicks FOR INSERT TO anon, authenticated WITH CHECK (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
-DO $$ BEGIN
-  CREATE POLICY "all_select_cta_clicks" ON spot_cta_clicks FOR SELECT TO anon, authenticated USING (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
-ALTER TABLE spot_claims ENABLE ROW LEVEL SECURITY;
-
-DO $$ BEGIN
-  CREATE POLICY "all_insert_claims" ON spot_claims FOR INSERT TO anon, authenticated WITH CHECK (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
-DO $$ BEGIN
-  CREATE POLICY "all_select_claims" ON spot_claims FOR SELECT TO anon, authenticated USING (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
-DO $$ BEGIN
-  CREATE POLICY "all_update_claims" ON spot_claims FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
-DO $$ BEGIN
-  CREATE POLICY "all_delete_claims" ON spot_claims FOR DELETE TO anon, authenticated USING (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
-ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
-
-DO $$ BEGIN
-  CREATE POLICY "all_insert_profiles" ON profiles FOR INSERT TO anon, authenticated WITH CHECK (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
-DO $$ BEGIN
-  CREATE POLICY "all_select_profiles" ON profiles FOR SELECT TO anon, authenticated USING (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
-DO $$ BEGIN
-  CREATE POLICY "all_update_profiles" ON profiles FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- 4. Reminders table
 CREATE TABLE IF NOT EXISTS reminders (
@@ -334,20 +217,9 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_table THEN NULL; END $$;
 
 -- 4. Row Level Security
-ALTER TABLE reminders ENABLE ROW LEVEL SECURITY;
 
 -- Allow frontend (anon + authenticated) to insert, update, read reminders
-DO $$ BEGIN
-  CREATE POLICY "all_insert" ON reminders FOR INSERT TO anon, authenticated WITH CHECK (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-DO $$ BEGIN
-  CREATE POLICY "all_update" ON reminders FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
-DO $$ BEGIN
-  CREATE POLICY "all_select" ON reminders FOR SELECT TO anon, authenticated USING (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- Confirmed "I'm going" sessions — the source of truth for the Stats section.
 -- Wind stats are written by process-reminders when the 1h reminder fires and a
@@ -499,23 +371,6 @@ CREATE TABLE IF NOT EXISTS spot_update_suggestions (
   created_at       timestamptz      NOT NULL DEFAULT now()
 );
 
-ALTER TABLE spot_update_suggestions ENABLE ROW LEVEL SECURITY;
-
-DO $$ BEGIN
-  CREATE POLICY "all_insert_spot_update_suggestions" ON spot_update_suggestions FOR INSERT TO anon, authenticated WITH CHECK (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
-DO $$ BEGIN
-  CREATE POLICY "all_select_spot_update_suggestions" ON spot_update_suggestions FOR SELECT TO anon, authenticated USING (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
-DO $$ BEGIN
-  CREATE POLICY "all_update_spot_update_suggestions" ON spot_update_suggestions FOR UPDATE TO anon, authenticated USING (true) WITH CHECK (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
-
-DO $$ BEGIN
-  CREATE POLICY "all_delete_spot_update_suggestions" ON spot_update_suggestions FOR DELETE TO authenticated USING (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- Add spot_tip column to spot_info for community tips
 DO $$ BEGIN ALTER TABLE spot_info ADD COLUMN spot_tip text; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
@@ -593,7 +448,6 @@ CREATE TABLE IF NOT EXISTS broadcast_sends (
   PRIMARY KEY (campaign, email)
 );
 
-ALTER TABLE broadcast_sends ENABLE ROW LEVEL SECURITY;
 -- No policies: only the service role writes here, and the service role bypasses
 -- RLS. Enabling it with zero policies denies anon/authenticated outright.
 
@@ -621,15 +475,6 @@ CREATE INDEX IF NOT EXISTS email_log_email_sent_idx ON email_log (email, sent_at
 -- "Has this rider had the onboarding email?" — the dedupe check.
 CREATE INDEX IF NOT EXISTS email_log_kind_email_idx ON email_log (kind, email);
 
-ALTER TABLE email_log ENABLE ROW LEVEL SECURITY;
-
-DO $$ BEGIN
-  -- Same shape as profiles/reminders/favourites: your own row, or any row if
-  -- admin. No insert/update/delete policies at all — only the service role
-  -- writes here, and it bypasses RLS.
-  CREATE POLICY "email_log_select_own" ON email_log FOR SELECT TO authenticated
-    USING (email = auth_email() OR is_admin());
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- Email deal ads (shop sponsorships shown in the weekly digest)
@@ -649,10 +494,6 @@ CREATE TABLE IF NOT EXISTS email_deals (
   impressions integer     NOT NULL DEFAULT 0,
   created_at  timestamptz NOT NULL DEFAULT now()
 );
-ALTER TABLE email_deals ENABLE ROW LEVEL SECURITY;
-DO $$ BEGIN
-  CREATE POLICY "all_select_email_deals" ON email_deals FOR SELECT TO anon, authenticated USING (true);
-EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 -- writes are service-role / SQL only (no public write policy); the weekly-digest
 -- function uses the service-role key, which bypasses RLS.
 
@@ -690,3 +531,372 @@ DO $$ BEGIN ALTER TABLE profiles ADD CONSTRAINT profiles_weight_chk
 DO $$ BEGIN ALTER TABLE profiles ADD COLUMN power_pref text; EXCEPTION WHEN duplicate_column THEN NULL; END $$;
 DO $$ BEGIN ALTER TABLE profiles ADD CONSTRAINT profiles_power_pref_chk
   CHECK (power_pref IS NULL OR power_pref IN ('underpowered','neutral','overpowered')); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- ══════════════════════════════════════════════════════════════════════════
+-- ROW LEVEL SECURITY
+--
+-- Regenerated from the live database on 2026-08-30, because this file had
+-- drifted completely away from it: it declared 33 policies that no longer
+-- exist — the original `all_*` set, most of them `USING (true)` — and was
+-- missing all 43 that actually enforce access today. Only two names matched.
+--
+-- That was not a cosmetic gap. Replaying the old file would have re-opened
+-- profiles, favourites, reminders, spot_claims and the suggestion tables to
+-- `anon`, and dropped the friendship-scoped rule on session_attendances. The
+-- database was hardened at some point and this file was never told.
+--
+-- tests/backend/rls-invariants.sql asserts the BEHAVIOUR of these rules; this
+-- section is what creates them. If you change one, run that.
+-- ══════════════════════════════════════════════════════════════════════════
+
+
+-- ── email_deals ──
+ALTER TABLE email_deals ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  CREATE POLICY "all_select_email_deals" ON email_deals
+    FOR SELECT TO anon, authenticated
+    USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+
+-- ── email_log ──
+-- Same shape as profiles/reminders/favourites: your own row, or any row if
+-- admin. No insert/update/delete policies at all — only the service role
+-- writes here, and it bypasses RLS.
+ALTER TABLE email_log ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  CREATE POLICY "email_log_select_own" ON email_log
+    FOR SELECT TO authenticated
+    USING (((email = auth_email()) OR is_admin()));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+
+-- ── favourites ──
+ALTER TABLE favourites ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  CREATE POLICY "favs_delete_own" ON favourites
+    FOR DELETE TO authenticated
+    USING (((email = auth_email()) OR is_admin()));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "favs_insert_own" ON favourites
+    FOR INSERT TO authenticated
+    WITH CHECK ((email = auth_email()));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "favs_select_own" ON favourites
+    FOR SELECT TO authenticated
+    USING (((email = auth_email()) OR is_admin()));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "favs_update_own" ON favourites
+    FOR UPDATE TO authenticated
+    USING ((email = auth_email()))
+    WITH CHECK ((email = auth_email()));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+
+-- ── friendships ──
+ALTER TABLE friendships ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  CREATE POLICY "friendships_delete_party" ON friendships
+    FOR DELETE TO authenticated
+    USING (((requester = auth_email()) OR (recipient = auth_email())));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "friendships_insert_self" ON friendships
+    FOR INSERT TO authenticated
+    WITH CHECK ((requester = auth_email()));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "friendships_select_party" ON friendships
+    FOR SELECT TO authenticated
+    USING (((requester = auth_email()) OR (recipient = auth_email()) OR is_admin()));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "friendships_update_party" ON friendships
+    FOR UPDATE TO authenticated
+    USING (((requester = auth_email()) OR (recipient = auth_email())))
+    WITH CHECK (((requester = auth_email()) OR (recipient = auth_email())));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+
+-- ── profiles ──
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  CREATE POLICY "profiles_insert_own" ON profiles
+    FOR INSERT TO authenticated
+    WITH CHECK ((email = auth_email()));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "profiles_select_own" ON profiles
+    FOR SELECT TO authenticated
+    USING (((email = auth_email()) OR is_admin()));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "profiles_update_own" ON profiles
+    FOR UPDATE TO authenticated
+    USING (((email = auth_email()) OR is_admin()))
+    WITH CHECK (((email = auth_email()) OR is_admin()));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+
+-- ── reminders ──
+ALTER TABLE reminders ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  CREATE POLICY "reminders_delete_own" ON reminders
+    FOR DELETE TO authenticated
+    USING (((email = auth_email()) OR is_admin()));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "reminders_insert_own" ON reminders
+    FOR INSERT TO authenticated
+    WITH CHECK ((email = auth_email()));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "reminders_select_own" ON reminders
+    FOR SELECT TO authenticated
+    USING (((email = auth_email()) OR is_admin()));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "reminders_update_own" ON reminders
+    FOR UPDATE TO authenticated
+    USING (((email = auth_email()) OR is_admin()))
+    WITH CHECK (((email = auth_email()) OR is_admin()));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+
+-- ── session_attendances ──
+ALTER TABLE session_attendances ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  CREATE POLICY "attend_delete_own" ON session_attendances
+    FOR DELETE TO authenticated
+    USING (((email = auth_email()) OR is_admin()));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "attend_insert_own" ON session_attendances
+    FOR INSERT TO authenticated
+    WITH CHECK ((email = auth_email()));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "attend_select_own_or_friend" ON session_attendances
+    FOR SELECT TO authenticated
+    USING (((email = auth_email()) OR is_admin() OR (EXISTS ( SELECT 1
+   FROM friendships f
+  WHERE ((f.status = 'accepted'::text) AND (((f.requester = auth_email()) AND (f.recipient = session_attendances.email)) OR ((f.recipient = auth_email()) AND (f.requester = session_attendances.email))))))));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "attend_update_own" ON session_attendances
+    FOR UPDATE TO authenticated
+    USING ((email = auth_email()))
+    WITH CHECK ((email = auth_email()));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+
+-- ── spot_claims ──
+ALTER TABLE spot_claims ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  CREATE POLICY "claims_delete_own_or_admin" ON spot_claims
+    FOR DELETE TO authenticated
+    USING (((email = auth_email()) OR is_admin()));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "claims_insert_own" ON spot_claims
+    FOR INSERT TO authenticated
+    WITH CHECK ((email = auth_email()));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "claims_select_own_or_admin" ON spot_claims
+    FOR SELECT TO authenticated
+    USING (((email = auth_email()) OR is_admin()));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "claims_update_own_or_admin" ON spot_claims
+    FOR UPDATE TO authenticated
+    USING (((email = auth_email()) OR is_admin()))
+    WITH CHECK (((email = auth_email()) OR is_admin()));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+
+-- ── spot_cta_clicks ──
+ALTER TABLE spot_cta_clicks ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  CREATE POLICY "cta_insert_all" ON spot_cta_clicks
+    FOR INSERT TO anon, authenticated
+    WITH CHECK (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "cta_select_admin" ON spot_cta_clicks
+    FOR SELECT TO authenticated
+    USING (is_admin());
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+
+-- ── spot_info ──
+ALTER TABLE spot_info ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  CREATE POLICY "spot_info_delete" ON spot_info
+    FOR DELETE TO authenticated
+    USING (is_admin());
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "spot_info_insert" ON spot_info
+    FOR INSERT TO authenticated
+    WITH CHECK ((is_admin() OR (email = auth_email())));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "spot_info_select_all" ON spot_info
+    FOR SELECT TO anon, authenticated
+    USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "spot_info_update" ON spot_info
+    FOR UPDATE TO authenticated
+    USING ((is_admin() OR (email = auth_email())))
+    WITH CHECK ((is_admin() OR (email = auth_email())));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+
+-- ── spot_overrides ──
+ALTER TABLE spot_overrides ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  CREATE POLICY "overrides_admin_delete" ON spot_overrides
+    FOR DELETE TO authenticated
+    USING (is_admin());
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "overrides_admin_insert" ON spot_overrides
+    FOR INSERT TO authenticated
+    WITH CHECK (is_admin());
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "overrides_select_all" ON spot_overrides
+    FOR SELECT TO anon, authenticated
+    USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "overrides_admin_update" ON spot_overrides
+    FOR UPDATE TO authenticated
+    USING (is_admin())
+    WITH CHECK (is_admin());
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+
+-- ── spot_suggestions ──
+ALTER TABLE spot_suggestions ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  CREATE POLICY "suggestions_delete_admin" ON spot_suggestions
+    FOR DELETE TO authenticated
+    USING (is_admin());
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "suggestions_insert_auth" ON spot_suggestions
+    FOR INSERT TO authenticated
+    WITH CHECK (((submitted_by = auth_email()) OR (submitted_by IS NULL)));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "suggestions_select_own_or_admin" ON spot_suggestions
+    FOR SELECT TO authenticated
+    USING (((submitted_by = auth_email()) OR is_admin()));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "suggestions_update_admin" ON spot_suggestions
+    FOR UPDATE TO authenticated
+    USING (is_admin())
+    WITH CHECK (is_admin());
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+
+-- ── spot_update_suggestions ──
+ALTER TABLE spot_update_suggestions ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  CREATE POLICY "upd_suggestions_delete_admin" ON spot_update_suggestions
+    FOR DELETE TO authenticated
+    USING (is_admin());
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "upd_suggestions_insert_auth" ON spot_update_suggestions
+    FOR INSERT TO authenticated
+    WITH CHECK ((email = auth_email()));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "upd_suggestions_select_own_or_admin" ON spot_update_suggestions
+    FOR SELECT TO authenticated
+    USING (((email = auth_email()) OR is_admin()));
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "upd_suggestions_update_admin" ON spot_update_suggestions
+    FOR UPDATE TO authenticated
+    USING (is_admin())
+    WITH CHECK (is_admin());
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+
+-- ── spots ──
+ALTER TABLE spots ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  CREATE POLICY "spots_write_admin" ON spots
+    FOR ALL TO authenticated
+    USING (is_admin())
+    WITH CHECK (is_admin());
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+DO $$ BEGIN
+  CREATE POLICY "spots_select_all" ON spots
+    FOR SELECT TO authenticated
+    USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+
+-- ── tide_cache ──
+ALTER TABLE tide_cache ENABLE ROW LEVEL SECURITY;
+
+DO $$ BEGIN
+  CREATE POLICY "tide_select_all" ON tide_cache
+    FOR SELECT TO anon, authenticated
+    USING (true);
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
