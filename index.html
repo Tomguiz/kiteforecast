@@ -8029,6 +8029,42 @@ function closeAttendSheet(){
 }
 
 
+// Session writes go out with the RIDER's token, not the anon key.
+//
+// The edge log for 30 Aug tells the whole story in three rows:
+//   17:52  POST  ?on_conflict=...  role=authenticated  201   session created
+//   20:27  PATCH ?session_date=... role=authenticated  204   cancelled
+//   21:16  POST  ?on_conflict=...  role=ANON           401   REJECTED
+//
+// The rider had signed in again at 21:14 after an SMTP outage, and two minutes
+// later the supabase-js client was still sending the anon JWT (iat 1775157226,
+// the key hardcoded in this file). PostgREST refused it, confirmAttendance did
+// not look, and twelve friends were emailed about a session that was never
+// stored. Taking the token explicitly is the same fix deleteFriendshipRow
+// already uses for exactly this client behaviour.
+async function attendanceWrite(query, method, body, prefer){
+  let token=_authSession?.access_token;
+  if(!token) token=(await ensureSession())?.access_token||null;
+  if(!token) return {ok:false,error:'you are signed out — sign in and try again'};
+  let res;
+  try{
+    res=await fetch(`${SB_URL}/rest/v1/session_attendances${query}`,{
+      method,
+      headers:{
+        'apikey':SB_ANON,
+        'Authorization':`Bearer ${token}`,
+        'Content-Type':'application/json',
+        'Prefer':prefer||'return=minimal',
+      },
+      body:JSON.stringify(body),
+    });
+  }catch(e){ return {ok:false,error:e.message||'network error'}; }
+  if(res.ok) return {ok:true};
+  let msg=`HTTP ${res.status}`;
+  try{ const j=await res.json(); msg=j.message||j.hint||msg; }catch{}
+  return {ok:false,error:msg};
+}
+
 async function confirmAttendance(dateStr, spotName, lat, lon, startTimeOverride){
   const sb=getSb(); const email=_authSession?.user?.email||loadProfile().email;
   if(!sb||!email) return;
@@ -8041,17 +8077,14 @@ async function confirmAttendance(dateStr, spotName, lat, lon, startTimeOverride)
     session_date:dateStr,start_time:startTime,duration_h:durationH,
     note:note||null,cancelled:false};
 
-  // The write is CHECKED. It used to be awaited and thrown away: on 30 Aug a
-  // rider confirmed Riverwoods for the next day, twelve friends were emailed,
-  // the toast said "Session confirmed" — and the row in the database was still
-  // the cancelled one from four hours earlier. The rider found out by reloading
-  // and seeing nothing. Announcing a session to a dozen people on the strength
-  // of a write nobody looked at is the one thing this function must not do.
-  const{error:upErr}=await sb.from('session_attendances')
-    .upsert(row,{onConflict:'email,spot_name,session_date'});
-  if(upErr){
-    console.error('[attend] confirm failed:',upErr);
-    showToast(`Couldn't save that session — ${upErr.message||upErr.code||'try again'}`,5000,'#ef4444');
+  // CHECKED, and sent with the rider's own token — see attendanceWrite.
+  // Announcing a session to a dozen people on the strength of a write nobody
+  // looked at is the one thing this function must not do.
+  const w=await attendanceWrite('?on_conflict=email,spot_name,session_date','POST',row,
+    'resolution=merge-duplicates,return=minimal');
+  if(!w.ok){
+    console.error('[attend] confirm failed:',w.error);
+    showToast(`Couldn't save that session — ${w.error}`,5000,'#ef4444');
     return;   // no local cache, no toast of success, and no email to the crew
   }
   _attendCache[dateStr]=row;
@@ -8079,13 +8112,12 @@ async function cancelAttendance(dateStr){
   // cancelled every spot the rider had confirmed that day — the table is unique
   // on (email, spot_name, session_date), so a date alone can match several rows.
   const spotName=_attendCache[dateStr]?.spot_name||cachedLoc?.name;
-  let q=sb.from('session_attendances').update({cancelled:true})
-    .eq('email',email).eq('session_date',dateStr);
-  if(spotName) q=q.eq('spot_name',spotName);
-  const{error:cancelErr}=await q;
-  if(cancelErr){
-    console.error('[attend] cancel failed:',cancelErr);
-    showToast(`Couldn't cancel that session — ${cancelErr.message||cancelErr.code||'try again'}`,5000,'#ef4444');
+  const params=new URLSearchParams({email:`eq.${email}`,session_date:`eq.${dateStr}`});
+  if(spotName) params.set('spot_name',`eq.${spotName}`);
+  const w=await attendanceWrite(`?${params}`,'PATCH',{cancelled:true});
+  if(!w.ok){
+    console.error('[attend] cancel failed:',w.error);
+    showToast(`Couldn't cancel that session — ${w.error}`,5000,'#ef4444');
     return;
   }
   delete _attendCache[dateStr];
