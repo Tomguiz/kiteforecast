@@ -3,7 +3,17 @@ import { toKnots, hourQualifies, consecutiveRuns } from '../_shared/rideability.
 
 const SUPABASE_URL         = Deno.env.get('SUPABASE_URL')
 const SUPABASE_SERVICE_KEY = Deno.env.get('SB_SERVICE_ROLE_KEY')
-const REMINDER_HOURS       = [72, 48, 24, 6, 1]
+// One email per session, at 24 hours. The ladder used to be [72,48,24,6,1],
+// which meant five emails for one spot on one day — one rider watching a single
+// spot took 35 emails in a week, which is indistinguishable from spam. At 72h a
+// wind forecast is not reliable enough to act on, and at 1h it is too late to
+// arrange anything, so 24h is the one worth sending.
+//
+// The 1h row is still created, and process-reminders still runs it: it is what
+// records session_peak_kn and the ground-truth wind the Stats page reads, and
+// what fires the premium SMS. It just no longer sends an email.
+const REMINDER_HOURS       = [24, 1]
+export const EMAIL_REMINDER_HOURS = [24]
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
