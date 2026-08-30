@@ -30,17 +30,26 @@ on:
       - '.github/workflows/forecast-accuracy.yml'
   # RWS's 1-minute feed is a live push and keeps only the last hour or two, so
   # a day cannot be fetched — it has to be COLLECTED. Every two hours, with the
-  # measured hours merged into the day's reference file and committed, so a
-  # full day accumulates and can then be scored properly. One afternoon is an
-  # anecdote; a fortnight of days is a record, and a configuration that only
-  # wins on August sea breezes shows itself in one.
+  # measured hours merged into the day's reference file, so a full day
+  # accumulates and can then be scored properly. One afternoon is an anecdote;
+  # a fortnight of days is a record, and a configuration that only wins on
+  # August sea breezes shows itself in one.
+  #
+  # The measurements land on their own branch, NOT on main. Twelve data commits
+  # a day on main would each run the full e2e suite and redeploy the site — the
+  # tests workflow triggers on every push to main with no path filter, and the
+  # built-in Pages deployment cannot be filtered at all. A side branch costs one
+  # shallow clone per run and keeps main's history about the app.
   schedule:
     - cron: '5 */2 * * *'
+
+env:
+  MEASUREMENTS_BRANCH: forecast-measurements
 
 jobs:
   compare:
     runs-on: ubuntu-latest
-    # Only the scheduled collection writes, and only to tests/tools/refs/measured.
+    # Only the scheduled collection writes, and only to its own branch.
     permissions:
       contents: write
     defaults:
@@ -48,13 +57,26 @@ jobs:
         working-directory: tests
     steps:
       - uses: actions/checkout@v4
-        with:
-          # The collection step rebases onto whatever landed while it ran, and
-          # a depth-1 clone has no history to rebase onto.
-          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 20
+
+      - name: Restore the hours already measured
+        working-directory: ${{ github.workspace }}
+        run: |
+          # The accumulated days live on their own branch. Clone it beside the
+          # checkout so the tool can merge into it and push it back without
+          # main ever seeing a data commit.
+          URL="https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          if git clone --quiet --branch "$MEASUREMENTS_BRANCH" --single-branch --depth 1 "$URL" .measurements; then
+            echo "restored $(find .measurements -name '*.json' | wc -l) measured day(s)"
+          else
+            # First run: an orphan branch, so it carries data and nothing else.
+            echo "no measurements branch yet — starting one"
+            mkdir -p .measurements && cd .measurements
+            git init --quiet && git remote add origin "$URL"
+            git checkout --quiet --orphan "$MEASUREMENTS_BRANCH"
+          fi
 
       - name: Score the request shapes
         run: |
@@ -72,7 +94,7 @@ jobs:
           [ -n "$DATE" ] && ARGS+=(--date "$DATE")
           # Only the scheduled run collects. A pull request must not write
           # measurements into the branch it is testing.
-          [ "$GITHUB_EVENT_NAME" = schedule ] && ARGS+=(--save-ref tools/refs/measured)
+          [ "$GITHUB_EVENT_NAME" = schedule ] && ARGS+=(--save-ref "$GITHUB_WORKSPACE/.measurements/refs")
           # Both to the log and to the run summary, so the table is readable
           # without unfolding a job.
           node tools/forecast-accuracy.mjs "${ARGS[@]}" | tee /tmp/out.txt
@@ -87,19 +109,19 @@ jobs:
           REFERENCE: ${{ inputs.reference }}
           DATE: ${{ inputs.date }}
 
-      - name: Commit the hours this run measured
-        if: github.event_name == 'schedule' && github.ref_name == github.event.repository.default_branch
-        working-directory: ${{ github.workspace }}
+      - name: Store the hours this run measured
+        if: github.event_name == 'schedule'
+        working-directory: ${{ github.workspace }}/.measurements
         run: |
           git config user.name  'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git add tests/tools/refs/measured
+          git add -A refs
           git diff --cached --quiet && { echo 'no new measurements'; exit 0; }
-          git commit -m 'chore(forecast): measured wind for the hours just past'
-          # Another collection may have landed while this one ran; rebase onto
-          # it rather than failing the run or clobbering its hours.
+          git commit --quiet -m "measured wind through $(date -u '+%Y-%m-%d %H:%M')Z"
+          # Nothing but this job writes here, so a plain push is enough; retry
+          # only for the network.
           for i in 1 2 3; do
-            git pull --rebase --autostash origin "${GITHUB_REF_NAME}" && git push && exit 0
+            git push --quiet origin "HEAD:$MEASUREMENTS_BRANCH" && exit 0
             sleep 5
           done
           echo '::warning::could not push the measurements after three attempts'
