@@ -16,9 +16,9 @@ on:
       spot:
         description: 'Spot name as it appears in the catalogue'
         default: 'Riverwoods Beachclub'
-      ref_file:
-        description: 'Reference observations to score against ("none" = side-by-side only)'
-        default: 'tools/refs/riverwoods-2026-08-31.json'
+      reference:
+        description: 'rws = score against the measured mast; a path = a reference file; none = side-by-side'
+        default: 'rws'
       date:
         description: 'Date to compare, YYYY-MM-DD (blank = the reference date, else tomorrow)'
         default: ''
@@ -28,6 +28,12 @@ on:
       - 'tests/tools/refs/**'
       - 'supabase/functions/forecast/index.ts'
       - '.github/workflows/forecast-accuracy.yml'
+  # One row is an anecdote. A daily score against the masts turns the model
+  # question into a record: if a configuration only wins on sea breezes it
+  # shows up within a fortnight, which a single August afternoon cannot say.
+  # 21:10 UTC, late enough that the whole local day has been measured.
+  schedule:
+    - cron: '10 21 * * *'
 
 jobs:
   compare:
@@ -44,22 +50,27 @@ jobs:
       - name: Score the request shapes
         run: |
           ARGS=(--spot "${SPOT:-Riverwoods Beachclub}")
-          # `:-`, not `-`: on a pull_request event the inputs are set to the
-          # empty string rather than left unset, and an empty ref would silently
-          # downgrade the run to a side-by-side with nothing to score against.
-          REF="${REF_FILE:-tools/refs/riverwoods-2026-08-31.json}"
-          [ "$REF" != none ] && ARGS+=(--ref "$REF")
+          # `:-`, not `-`: on a pull_request or schedule event the inputs are
+          # set to the empty string rather than left unset, and an empty value
+          # would silently downgrade the run to a side-by-side with nothing to
+          # score against.
+          REF="${REFERENCE:-rws}"
+          case "$REF" in
+            rws)  ARGS+=(--rws) ;;
+            none) ;;
+            *)    ARGS+=(--ref "$REF") ;;
+          esac
           [ -n "$DATE" ] && ARGS+=(--date "$DATE")
           # Both to the log and to the run summary, so the table is readable
           # without unfolding a job.
           node tools/forecast-accuracy.mjs "${ARGS[@]}" | tee /tmp/out.txt
           {
-            echo '## Forecast accuracy'
+            echo "## Forecast accuracy — ${SPOT:-Riverwoods Beachclub}"
             echo '```'
             cat /tmp/out.txt
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
         env:
           SPOT: ${{ inputs.spot }}
-          REF_FILE: ${{ inputs.ref_file }}
+          REFERENCE: ${{ inputs.reference }}
           DATE: ${{ inputs.date }}
