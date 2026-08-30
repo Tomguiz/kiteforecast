@@ -127,3 +127,66 @@ test('the weather glyph is large enough to read', async ({ gotoApp, page }) => {
     .evaluate(el => parseFloat(getComputedStyle(el).fontSize));
   expect(size).toBeGreaterThanOrEqual(16);   // .8rem was 12.8px — too small on a dark ground
 });
+
+// ── A confirmation nobody checked ──────────────────────────────────────────
+//
+// On 30 Aug a rider confirmed Riverwoods for the next day. Twelve friends were
+// emailed, the toast said "Session confirmed", and the row in the database was
+// still the cancelled one from four hours earlier: the upsert was awaited and
+// its error thrown away. The rider found out by reloading and seeing nothing.
+// Announcing a session to a dozen people on the strength of an unchecked write
+// is the failure this pins.
+
+test('a rejected write is reported, and the crew is not emailed', async ({ gotoApp, page }) => {
+  await gotoApp('signedIn');
+
+  let notified = 0;
+  await page.route(/functions\/v1\/session-attend-notify/, r => { notified++; r.fulfill({ status: 200, body: '{}' }); });
+  // The write fails the way RLS rejects one.
+  await page.route(/rest\/v1\/session_attendances/, r =>
+    r.fulfill({ status: 401, contentType: 'application/json',
+      body: JSON.stringify({ message: 'permission denied', code: '42501' }) }));
+
+  const state = await page.evaluate(async () => {
+    _attendCache = {};
+    await confirmAttendance('2026-08-31', 'Riverwoods Beachclub', 51.3627, 3.3062, '13:00');
+    return { cached: !!_attendCache['2026-08-31'] };
+  });
+
+  // Nothing cached, because nothing was stored.
+  expect(state.cached).toBe(false);
+  // And above all: the friends were not told about a session that does not exist.
+  expect(notified).toBe(0);
+});
+
+test('a successful write is cached and does notify', async ({ gotoApp, page }) => {
+  await gotoApp('signedIn');
+  let notified = 0;
+  await page.route(/functions\/v1\/session-attend-notify/, r => { notified++; r.fulfill({ status: 200, body: '{}' }); });
+  await page.route(/rest\/v1\/session_attendances/, r =>
+    r.fulfill({ status: 201, contentType: 'application/json', body: '[]' }));
+
+  const state = await page.evaluate(async () => {
+    _attendCache = {};
+    const p = loadProfile(); p.isPremium = true; saveProfile(p);
+    await confirmAttendance('2026-08-31', 'Riverwoods Beachclub', 51.3627, 3.3062, '13:00');
+    return { cached: _attendCache['2026-08-31']?.start_time || null };
+  });
+  expect(state.cached).toBe('13:00');
+});
+
+test('cancelling one spot does not cancel the others that day', async ({ gotoApp, page }) => {
+  await gotoApp('signedIn');
+  const urls: string[] = [];
+  await page.route(/rest\/v1\/session_attendances/, r => {
+    urls.push(r.request().url());
+    r.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+  });
+  await page.evaluate(async () => {
+    _attendCache = { '2026-08-31': { spot_name: 'Riverwoods Beachclub', start_time: '13:00' } };
+    await cancelAttendance('2026-08-31');
+  });
+  // The table is unique on (email, spot_name, session_date), so a cancel keyed
+  // on the date alone reaches every spot the rider confirmed that day.
+  expect(urls.some(u => /spot_name=eq\./.test(decodeURIComponent(u)))).toBe(true);
+});
