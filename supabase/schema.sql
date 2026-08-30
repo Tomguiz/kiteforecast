@@ -35,6 +35,11 @@ CREATE INDEX IF NOT EXISTS forecast_cache_fetched_at_idx ON forecast_cache (fetc
 -- the edge function so a client cannot poison a row every other rider sees.
 ALTER TABLE forecast_cache ENABLE ROW LEVEL SECURITY;
 
+-- Which rows a rider wants in the hourly table of a day, kept as one jsonb so
+-- a new toggle does not need a migration. Mirrored in localStorage, so it works
+-- signed out too; the column is what carries it between devices.
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS display_prefs jsonb;
+
 ALTER TABLE tide_cache ENABLE ROW LEVEL SECURITY;
 
 DO $$ BEGIN

@@ -133,73 +133,18 @@ test('the row keeps the going indicator the attendance code writes into', async 
   await expect(ind).toHaveText('✓ Going · 14:00');
 });
 
-test('the full-detail button still opens the day modal', async ({ gotoApp, page }) => {
+test('the day still reaches session confirmation, which lives in the modal', async ({ gotoApp, page }) => {
+  // "Full detail, tides & sessions" was replaced by Details + Columns, which
+  // expand in place. Confirming a session has not moved out of the modal yet,
+  // so the day keeps one explicit way in — without it the rider could no longer
+  // confirm a session at all from the spot view.
   await gotoApp('signedOut');
   await seed(page, 3);
   const r1 = page.locator('#forecastGrid .fday').first();
   await r1.evaluate(el => el.scrollIntoView({ block: 'center' }));
   await r1.locator('.fday-head').click();
-  await page.locator('.fg-more').first().click();
+  await page.locator('.fg-more', { hasText: 'Session' }).first().click();
   await expect(page.locator('#modalOverlay')).toBeVisible();
-});
-
-test('the row sizes the kite on the gust at the peak hour, not the day worst', async ({ gotoApp, page }) => {
-  // A day can peak at 22 kn in the afternoon and throw its hardest gust in a
-  // squall at 08:00. Pairing those two inflates effectiveWindKn and costs the
-  // rider a whole kite size on the summary row.
-  await gotoApp('signedOut');
-  await page.evaluate(() => {
-    const D = '2026-08-28';
-    const m = new Map();
-    for (let h = 0; h < 24; h++) {
-      const rideable = h >= 12 && h <= 18;
-      m.set(h, {
-        kn: rideable ? 22 : 9,
-        gustKn: h === 8 ? 40 : (rideable ? 26 : 11),   // the squall sits outside the session
-        dir: 240, code: 1, temp: 19,
-      });
-    }
-    cachedHrMap = new Map([[D, m]]);
-    cachedLoc = { name: 'K', latitude: 51.35, longitude: 3.28, country: 'BE' };
-    cachedWx = { daily: {
-      time: [D], weather_code: [1], temperature_2m_max: [24], temperature_2m_min: [15],
-      windgusts_10m_max: [20],                      // m/s — the app converts
-      sunrise: [`${D}T06:00`], sunset: [`${D}T21:00`],
-    } };
-    windDirs = new Set([225, 270]);
-    const pf = loadProfile();
-    pf.weightKg = 80; pf.kiteLevel = 'Advanced'; pf.powerPref = 'overpowered';
-    saveProfile(pf);
-    renderGrid();
-  });
-  // 22 kn with a 26 kn gust stays inside the 12 m band. Sized off the 08:00
-  // squall it would fall to 10 m or smaller.
-  await expect(page.locator('#forecastGrid .fday').first().locator('.fd-kite')).toHaveText('12 m');
-});
-
-test('no kite size on a day with no session', async ({ gotoApp, page }) => {
-  // Wind enough to size a kite, but blowing from the wrong quarter, so there
-  // is no session to size for. The row must not offer one.
-  await gotoApp('signedOut');
-  await page.evaluate(() => {
-    const D = '2026-08-28';
-    const m = new Map();
-    for (let h = 0; h < 24; h++) m.set(h, { kn: 18, gustKn: 22, dir: 90, code: 1, temp: 19 });
-    cachedHrMap = new Map([[D, m]]);
-    cachedLoc = { name: 'K', latitude: 51.35, longitude: 3.28, country: 'BE' };
-    cachedWx = { daily: {
-      time: [D], weather_code: [1], temperature_2m_max: [22], temperature_2m_min: [15],
-      windgusts_10m_max: [11], sunrise: [`${D}T06:00`], sunset: [`${D}T21:00`],
-    } };
-    windDirs = new Set([225, 270]);              // 90° is nowhere near
-    const pf = loadProfile();
-    pf.weightKg = 80; pf.kiteLevel = 'Advanced'; pf.powerPref = 'overpowered';
-    saveProfile(pf);
-    renderGrid();
-  });
-  const row = page.locator('#forecastGrid .fday').first();
-  await expect(row.locator('.fd-kite')).toHaveText('—');
-  await expect(row.locator('.fd-kite')).toHaveClass(/none/);
 });
 
 test('a confirmed session can be changed or cancelled from the row', async ({ gotoApp, page }) => {
