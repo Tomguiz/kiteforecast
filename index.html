@@ -2801,6 +2801,12 @@ const WEBHOOK_URL    = 'https://hook.eu1.make.com/6t9fgm6btixri2wf5lnx47requf416
 const REMINDER_HOURS = [72, 48, 24, 6, 1];
 const SB_URL  = 'https://kpwmajtxmcfpakvonimf.supabase.co';
 const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwd21hanR4bWNmcGFrdm9uaW1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTcyMjYsImV4cCI6MjA5MDczMzIyNn0.QfQuIQbnfVUOApPbOdvCRbNsVdb0SBAwMX-hvioGJmg';
+// Up here with the others, not beside fetchForecastBundle where it used to sit:
+// initAuth() runs at top level and reaches renderHintChips, which now asks for
+// the home screen's forecasts. A `const` declared further down the file is in
+// its temporal dead zone at that moment — the same trap that left a signed-in
+// rider looking signed out on every refresh (2026-08-16).
+const FORECAST_FN=`${SB_URL}/functions/v1/forecast`;
 
 // ── Cookie-backed storage adapter (must be top-level to avoid TDZ) ───────────
 // iOS Safari clears localStorage for PWAs after ~7 days. Cookies with an
@@ -5241,7 +5247,6 @@ function fmtTideBadges(extremes, dateStr) {
 }
 // ─────────────────────────────────────────────────────────────────────────────
 
-const FORECAST_FN=`${SB_URL}/functions/v1/forecast`;
 // Forecasts go through Supabase so that one rider's fetch answers for every
 // rider on the same spot. The function stores what it fetches; a row inside
 // the 2-hour window is served straight back. If the function is unreachable
