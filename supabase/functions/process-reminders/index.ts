@@ -9,6 +9,7 @@ import {
 import { renderLiveHtml } from '../_shared/live-html.ts'
 import { buildManageLink } from '../_shared/manage-link.ts'
 import { recordEmail } from '../_shared/email-log-client.ts'
+import { mailerReady, sendTemplate } from '../_shared/mailer.ts'
 
 const SUPABASE_URL            = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_KEY    = Deno.env.get('SB_SERVICE_ROLE_KEY')!
@@ -19,6 +20,14 @@ const MAKE_WEBHOOK_URL        = 'https://hook.eu1.make.com/6t9fgm6btixri2wf5lnx4
 // SMS — it simply does not send a second email about a session the rider was
 // already told about.
 const REMINDER_EMAIL_HOURS    = [24]
+
+// Subjects, copied verbatim from the Make scenario so the switch is invisible
+// in an inbox. ON = the session is on, OFF = the wind did not show up; the
+// scenario routed on the tick or cross in session.rating and these keep that.
+const SUBJECTS: Record<string, string> = {
+  ON24:  '🔔 Tomorrow at [[spot]] — conditions confirmed, [[session.wind_speed_peak_kn]] kts [[session.wind_direction]]',
+  OFF24: '😮‍💨 [[spot]] tomorrow — the wind gods aren\'t cooperating',
+}
 const TWILIO_ACCOUNT_SID      = Deno.env.get('TWILIO_ACCOUNT_SID') ?? ''
 const TWILIO_AUTH_TOKEN       = Deno.env.get('TWILIO_AUTH_TOKEN') ?? ''
 const TWILIO_FROM_NUMBER      = Deno.env.get('TWILIO_FROM_NUMBER') ?? ''
@@ -352,16 +361,38 @@ Deno.serve(async () => {
       const sendEmail = REMINDER_EMAIL_HOURS.includes(rh) && !alreadyToldThem
 
       if (sendEmail) {
-        await fetch(MAKE_WEBHOOK_URL, {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify(payload),
-        })
+        // Resend once the key is set, Make until then. Both paths send the same
+        // template with the same payload, so the cutover is a secret, not a
+        // deploy — and setting the key back to empty rolls it straight back.
+        const isOn  = rating.includes('✅')
+        const key   = `${isOn ? 'ON' : 'OFF'}${rh}`
+        const via   = mailerReady() ? 'resend' : 'make'
+
+        if (via === 'resend') {
+          const sent = await sendTemplate({
+            to: r.email,
+            template: `reminder${key}`,
+            subject: SUBJECTS[key] ?? `[[spot]] — [[date_label]]`,
+            vars: payload,
+          })
+          if (!sent.ok) {
+            // Leave the row unsent so the next run retries it, rather than
+            // recording a delivery that never happened.
+            console.error(`[reminders] resend failed for ${r.email}: ${sent.error}`)
+            continue
+          }
+        } else {
+          await fetch(MAKE_WEBHOOK_URL, {
+            method:  'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body:    JSON.stringify(payload),
+          })
+        }
 
         // Never throws, so a logging failure cannot cost a rider their reminder.
         await recordEmail({
           email: r.email, kind: r.notif_type,
-          meta: { spot_name: r.spot_name, hours_before: rh },
+          meta: { spot_name: r.spot_name, hours_before: rh, via },
         })
       }
 
