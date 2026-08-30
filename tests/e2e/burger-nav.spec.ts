@@ -5,7 +5,7 @@ test('burger menu opens and lists feature sections', async ({ gotoApp, page }) =
   await page.locator('#burgerBtn').click();
   await expect(page.locator('#burgerOverlay')).toBeVisible();
   const list = page.locator('#burgerList');
-  await expect(list).toContainText('Notifications');
+  await expect(list).toContainText('Manage notifications');
   await expect(list).toContainText('Stats');
   await expect(list).toContainText('Friends');
 });

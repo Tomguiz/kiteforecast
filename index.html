@@ -6959,7 +6959,7 @@ function renderSignInOnboarding(){
 // so they're HOISTED — referencing them here is fine even though some are defined
 // later in the file.
 const SECTIONS = {
-  notifs:  { title: 'Notifications', icon: '🔔', badge: 'ppNotifCount',     render: renderNotifList,        panel: 'ppPanelNotifs' },
+  notifs:  { title: 'Manage notifications', icon: '🔔', badge: 'ppNotifCount',     render: renderNotifList,        panel: 'ppPanelNotifs' },
   stats:   { title: 'Stats',         icon: '📊', badge: null,               render: renderStats,            panel: 'ppPanelStats' },
   friends: { title: 'Friends',       icon: '👥', badge: 'ppFriendReqCount', render: renderFriendsPanel,     panel: 'ppPanelFriends' },
   myspot:  { title: 'My Spot',       icon: '📍', badge: null,               render: renderMySpot,           panel: 'ppPanelMySpot' },
@@ -8128,6 +8128,19 @@ async function ensureSession(){
 }
 
 let _friendsCache=null;
+
+// Everything in memory that belongs to ONE signed-in rider. Signing into another
+// account left these behind: renderFriendsPanel skips its fetch when
+// _friendsCache is set, so the new account was shown the previous rider's
+// friendships — and since the "other person" in each row is computed against
+// the *current* email, every row the previous rider had initiated rendered as
+// that same previous rider, over and over. One friendship in the database, the
+// same name five times on screen.
+function clearPerUserCaches(){
+  _friendsCache=null;
+  _attendCache={};
+  _adminSpots=null;
+}
 
 async function renderFriendsPanel(){
   const sb=getSb(); const email=_authSession?.user?.email||loadProfile().email;
@@ -10252,6 +10265,7 @@ async function initAuth(){
       if(isNew){
         // Clear stale profile (avatar, nickname) from previous account before rendering
         const fresh={email}; saveProfile(fresh);
+        clearPerUserCaches();
         // Force profile button to initials immediately so old avatar is never visible
         const _btn=$('profileBtn');
         if(_btn) _btn.innerHTML=`<span class="profile-btn-initials">${getInitials(email)}</span><span class="profile-btn-dot" id="profileDot"></span>`;
@@ -10452,6 +10466,10 @@ async function signOut(){
   delete p.nickname;
   saveProfile(p);
   localStorage.removeItem('kf_notifs');
+  // The in-memory caches belong to the rider who just left. Signing out wiped
+  // the stored profile but not these, so signing straight back in as someone
+  // else could still be shown the previous rider's friends and sessions.
+  clearPerUserCaches();
   updateAuthUI(); updateProfileDot(); renderNotifList(); renderHintChips();
   try{ await getSb().auth.signOut(); }catch(e){ /* ignore network errors on sign-out */ }
   showToast('Signed out');
