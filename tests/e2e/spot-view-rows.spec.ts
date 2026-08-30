@@ -133,18 +133,18 @@ test('the row keeps the going indicator the attendance code writes into', async 
   await expect(ind).toHaveText('✓ Going · 14:00');
 });
 
-test('the day still reaches session confirmation, which lives in the modal', async ({ gotoApp, page }) => {
-  // "Full detail, tides & sessions" was replaced by Details + Columns, which
-  // expand in place. Confirming a session has not moved out of the modal yet,
-  // so the day keeps one explicit way in — without it the rider could no longer
-  // confirm a session at all from the spot view.
-  await gotoApp('signedOut');
+test('the day reaches session confirmation without leaving the view', async ({ gotoApp, page }) => {
+  // Step 2: the modal is gone. Confirming a session happens in the attend
+  // sheet, which already did the whole job — start time, duration, confirm,
+  // cancel, notify friends — and is now reachable straight from the day.
+  await gotoApp('premium');
   await seed(page, 3);
   const r1 = page.locator('#forecastGrid .fday').first();
   await r1.evaluate(el => el.scrollIntoView({ block: 'center' }));
   await r1.locator('.fday-head').click();
-  await page.locator('.fg-more', { hasText: 'Session' }).first().click();
-  await expect(page.locator('#modalOverlay')).toBeVisible();
+  await page.locator('.fg-going').first().click();
+  await expect(page.locator('#attendSheet')).toBeVisible();
+  await expect(page.locator('#modalOverlay')).toBeHidden();
 });
 
 test('a confirmed session can be changed or cancelled from the row', async ({ gotoApp, page }) => {
