@@ -1,0 +1,65 @@
+name: forecast-accuracy
+
+# What the app asks Open-Meteo for is an accuracy decision, and it was settled
+# once by argument already: the forecast came out of a land grid cell for spots
+# on beaches, 4.6 kn low and 1.93x gusty against Windfinder. This runs the
+# scoring tool on a runner, which unlike a sandboxed agent can actually reach
+# api.open-meteo.com, so the next such change is settled by the table instead.
+#
+# Informational: it prints the comparison and never fails the build on an
+# unfavourable score. It fails only when the tool itself errors, which means
+# the tool has rotted and the numbers can no longer be checked at all.
+
+on:
+  workflow_dispatch:
+    inputs:
+      spot:
+        description: 'Spot name as it appears in the catalogue'
+        default: 'Riverwoods Beachclub'
+      ref_file:
+        description: 'Reference observations to score against ("none" = side-by-side only)'
+        default: 'tools/refs/riverwoods-2026-08-31.json'
+      date:
+        description: 'Date to compare, YYYY-MM-DD (blank = the reference date, else tomorrow)'
+        default: ''
+  pull_request:
+    paths:
+      - 'tests/tools/forecast-accuracy.mjs'
+      - 'tests/tools/refs/**'
+      - 'supabase/functions/forecast/index.ts'
+      - '.github/workflows/forecast-accuracy.yml'
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Score the request shapes
+        run: |
+          ARGS=(--spot "${SPOT:-Riverwoods Beachclub}")
+          # `:-`, not `-`: on a pull_request event the inputs are set to the
+          # empty string rather than left unset, and an empty ref would silently
+          # downgrade the run to a side-by-side with nothing to score against.
+          REF="${REF_FILE:-tools/refs/riverwoods-2026-08-31.json}"
+          [ "$REF" != none ] && ARGS+=(--ref "$REF")
+          [ -n "$DATE" ] && ARGS+=(--date "$DATE")
+          # Both to the log and to the run summary, so the table is readable
+          # without unfolding a job.
+          node tools/forecast-accuracy.mjs "${ARGS[@]}" | tee /tmp/out.txt
+          {
+            echo '## Forecast accuracy'
+            echo '```'
+            cat /tmp/out.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+        env:
+          SPOT: ${{ inputs.spot }}
+          REF_FILE: ${{ inputs.ref_file }}
+          DATE: ${{ inputs.date }}
