@@ -201,3 +201,81 @@ test('no kite size on a day with no session', async ({ gotoApp, page }) => {
   await expect(row.locator('.fd-kite')).toHaveText('—');
   await expect(row.locator('.fd-kite')).toHaveClass(/none/);
 });
+
+test('a confirmed session can be changed or cancelled from the row', async ({ gotoApp, page }) => {
+  // Once "Going" was set there was no way back: the green bar was an inert div,
+  // and the sheet that can edit or cancel the session was unreachable from the
+  // day row. Tapping the bar now reopens that sheet.
+  //
+  // The session is seeded through the Supabase mock rather than by poking
+  // _attendCache: loadAttendances() rebuilds that cache from the server a
+  // moment after load and would wipe anything set by hand.
+  const D = '2026-08-28';
+  await gotoApp('premium', { sessions: [{
+    email: 'test@example.com', spot_name: 'Knokke', session_date: D,
+    start_time: '09:00', duration_h: 2,
+  }] });
+  await page.evaluate((D: string) => {
+    const m = new Map();
+    for (let h = 0; h < 24; h++) m.set(h, { kn: h >= 10 && h <= 18 ? 20 : 8, gustKn: 24, dir: 250, code: 1, temp: 19 });
+    cachedHrMap = new Map([[D, m]]);
+    cachedLoc = { name: 'Knokke', latitude: 51.35, longitude: 3.28, country: 'BE' };
+    cachedWx = { daily: {
+      time: [D], weather_code: [1], temperature_2m_max: [22], temperature_2m_min: [15],
+      windgusts_10m_max: [12], sunrise: [`${D}T06:00`], sunset: [`${D}T21:00`] } };
+    windDirs = new Set([225, 270]);
+    showOnly('results');
+    renderGrid();
+  }, D);
+
+  const bar = page.locator(`#going-${D}`);
+  await expect(bar).toBeVisible({ timeout: 10000 });
+  await bar.evaluate(el => el.scrollIntoView({ block: 'center' }));
+  await bar.click();
+
+  await expect(page.locator('#attendSheet')).toBeVisible();
+  await expect(page.locator('#attendStartTime')).toHaveValue('09:00');
+  // and it must not have toggled the day open underneath
+  await expect(page.locator(`#fdb-${D}`)).toBeHidden();
+});
+
+test('a row showing only friends is not editable', async ({ gotoApp, page }) => {
+  // The same bar carries friends' names, and those are not the rider's to
+  // change. What is under test is the handler's guard, not the bar's
+  // visibility — and the mock cannot tell "my session" from "a friend's",
+  // since both come from session_attendances and it ignores the email filter.
+  // So the click is dispatched directly at the element: the real listener runs,
+  // without a fight over whether the async repaint has hidden the bar again.
+  const D = '2026-08-28';
+  await gotoApp('premium');                       // no session of our own
+  await page.evaluate((D: string) => {
+    const m = new Map();
+    for (let h = 0; h < 24; h++) m.set(h, { kn: h >= 10 && h <= 18 ? 20 : 8, gustKn: 24, dir: 250, code: 1, temp: 19 });
+    cachedHrMap = new Map([[D, m]]);
+    cachedLoc = { name: 'Knokke', latitude: 51.35, longitude: 3.28, country: 'BE' };
+    cachedWx = { daily: {
+      time: [D], weather_code: [1], temperature_2m_max: [22], temperature_2m_min: [15],
+      windgusts_10m_max: [12], sunrise: [`${D}T06:00`], sunset: [`${D}T21:00`] } };
+    windDirs = new Set([225, 270]);
+    showOnly('results');
+    renderGrid();
+  }, D);
+
+  const opened = await page.evaluate((D: string) => {
+    delete _attendCache[D];                       // nobody of ours is going
+    const el = document.getElementById(`going-${D}`)!;
+    el.innerHTML = '\u{1F465} Sam';
+    el.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    return !!document.getElementById('attendSheet');
+  }, D);
+  expect(opened).toBe(false);
+
+  // and the guard is the only thing stopping it: with a session of our own the
+  // very same click does open the sheet
+  const openedMine = await page.evaluate((D: string) => {
+    _attendCache[D] = { session_date: D, start_time: '09:00', duration_h: 2, spot_name: 'Knokke' };
+    document.getElementById(`going-${D}`)!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    return !!document.getElementById('attendSheet');
+  }, D);
+  expect(openedMine).toBe(true);
+});

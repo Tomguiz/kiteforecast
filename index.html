@@ -1209,6 +1209,12 @@
     .card-going-btn.going { background:rgba(34,197,94,.25); color:#fff; border-color:rgba(34,197,94,.5); }
     /* Going indicator on day card */
     .card-going-indicator { width:100%;margin-top:5px;padding:5px 0;border-radius:7px;font-size:.62rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;background:rgba(34,197,94,.2);color:#4ade80;border:1px solid rgba(34,197,94,.4);text-align:center; }
+    /* Inside a day row this bar is the only way back to the session sheet, so
+       it has to look like a control. ::after survives the innerHTML repaint. */
+    .fday .card-going-indicator { cursor:pointer; padding:8px 0; }
+    .fday .card-going-indicator::after { content:' \00b7 tap to change'; opacity:.7; font-weight:600; text-transform:none; letter-spacing:0; }
+    .fday .card-going-indicator:hover { background:rgba(34,197,94,.3); }
+    .fday .card-going-indicator:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
     /* Hour row session selection */
     .modal-hour-row { cursor:pointer; transition:background .12s; border-radius:6px; -webkit-tap-highlight-color:rgba(34,197,94,.15); user-select:none; -webkit-user-select:none; }
     .modal-hour-row:hover { background:rgba(255,255,255,.04); }
@@ -2479,17 +2485,26 @@ function speedBg(kn){
   const t=speedTier(kn);
   return t===3?'#4ade80':t===2?'#86efac':t===1?'#bef264':'rgba(100,116,139,.25)';
 }
-// Wind bar: 0–50 kn mapped to 0–100%, color reflects actual speed
-// <8 dark red → 8-15 orange → 15-20 yellow-green → 20-25 green → 25-35 bright green → >35 purple
+// Wind colour, and it has to read in one direction: the stronger the wind, the
+// hotter the colour. It did not. Orange sat at 10-14 kn and dark red below,
+// so the lightest hours on an hourly row looked like the most alarming ones,
+// sitting next to bright green at 17 kn. Light wind is now pale green, and
+// orange finally means what it looks like: strong enough to overpower you.
+//
+// pale green → green → bright green → orange → purple
 function windBarColor(kn){
   if(kn>=40) return '#7c3aed'; // purple — dangerous
-  if(kn>=35) return '#a855f7'; // light purple
-  if(kn>=25) return '#4ade80'; // bright green — perfect
+  if(kn>=35) return '#a855f7'; // light purple — very strong
+  if(kn>=30) return '#f59e0b'; // orange — strong, expect to be overpowered
+  if(kn>=25) return '#4ade80'; // bright green — prime
   if(kn>=20) return '#86efac'; // soft green — very good
   if(kn>=15) return '#bef264'; // yellow-green — good
-  if(kn>=10) return '#f97316'; // orange — getting there
-  return '#b91c1c';            // dark red — too light
+  if(kn>=12) return '#d9f99d'; // pale green — rideable, but only just
+  return '#334155';            // slate — under the floor, nothing to ride
 }
+// Text that stays legible on windBarColor. The pale/green/orange stops take
+// dark ink; the slate and purple ends need light, or the number vanishes.
+function windTextColor(kn){ return (kn>=35||kn<12)?'#e2e8f0':'#0b1220'; }
 function windBarPct(kn){ return Math.min(Math.round(kn/45*100),100); }
 
 // Day-card sparkline vertical mapping: knots → 0..1 height fraction. Non-linear
@@ -5271,8 +5286,14 @@ function openForecastDay(dateStr,idx){
     return `<td class="${on?'fg-now':''}">${String(h.hour).padStart(2,'0')}</td>`;
   }).join(''));
   t+=rowOf('fg-wx','',day.map(h=>cell(h,wmoInfo(h.code)[0])).join(''));
-  t+=rowOf('fg-kn','Wind',day.map(h=>
-    cell(h,h.kn,`background:${windBarColor(h.kn)};color:#0b1220;font-weight:700`)).join(''));
+  // Colour marks the hours you can actually ride. Speed alone was misleading:
+  // 20 kn from the wrong quarter came out bright green, indistinguishable from
+  // a genuine session, while the whole row competed for attention. Hours that
+  // do not qualify — too light, wrong direction, rain — recede instead, so the
+  // ones that do stand out on their own.
+  t+=rowOf('fg-kn','Wind',day.map(h=>h.qualifying
+    ? cell(h,h.kn,`background:${windBarColor(h.kn)};color:${windTextColor(h.kn)};font-weight:700`)
+    : cell(h,h.kn,'background:rgba(51,65,85,.35);color:var(--tdim);font-weight:500')).join(''));
   t+=rowOf('fg-gust','Gusts',day.map(h=>cell(h,h.gustKn||'\u2014')).join(''));
   t+=rowOf('fg-dir','Dir',day.map(h=>
     `<td title="${compass(h.dir)} ${h.dir}\u00b0"><span class="fg-arrow" style="transform:rotate(${(h.dir+180)%360}deg)">\u2191</span></td>`).join(''));
@@ -5452,8 +5473,18 @@ function renderGrid(){
           onclick="toggleDayNotif(event,'${dateStr}',${i})" title="Notify me for this day">${bellSVG(12)}</button>
         <span class="fd-caret">\u25be</span>
       </div>
-      ${goodHours>=2?`<div class="card-going-indicator" id="going-${dateStr}" style="display:none"></div>`:''}
+      ${goodHours>=2?`<div class="card-going-indicator" id="going-${dateStr}" role="button" tabindex="0" title="Change or cancel this session" style="display:none"></div>`:''}
       <div class="fday-body" id="fdb-${dateStr}" hidden></div>`;
+    const going=row.querySelector('.card-going-indicator');
+    if(going){
+      const openSheet=e=>{
+        e.stopPropagation();                       // never also toggle the day
+        if(!_attendCache[dateStr]) return;         // friends-only line: not ours to edit
+        openAttendSheet(dateStr,i,loc.name,loc.latitude,loc.longitude);
+      };
+      going.addEventListener('click',openSheet);
+      going.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' ') openSheet(e); });
+    }
     const head=row.querySelector('.fday-head');
     // The bell sits inside the header, so it must not also toggle the day.
     head.addEventListener('click',e=>{ if(e.target.closest('.card-bell')) return; toggleForecastDay(dateStr,i); });
