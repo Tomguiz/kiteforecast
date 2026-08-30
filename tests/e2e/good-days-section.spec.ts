@@ -277,7 +277,9 @@ test('clicking a good day lands on that day’s hourly view, not the 16-day grid
 
   await page.locator('#goodDaysSection .gd-card').nth(1).click();   // Aug 26
 
-  // the hourly modal opens on its own, headed with that date
-  await expect(page.locator('#modalOverlay')).toBeVisible({ timeout: 8000 });
-  await expect(page.locator('#mTitle')).toContainText('August 26');
+  // The hourly view is the day row itself now — no modal in the way. Same
+  // intent as before: land on THAT day's hours, not the 16-day overview.
+  await expect(page.locator('#fdb-2026-08-26')).toBeVisible({ timeout: 8000 });
+  await expect(page.locator('#fdb-2026-08-26 table.fg')).toBeVisible();
+  await expect(page.locator('#modalOverlay')).toBeHidden();
 });

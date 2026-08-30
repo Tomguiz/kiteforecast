@@ -278,6 +278,11 @@
       scroll-margin-top:104px; }
     .fday.has-session { border-color:rgba(34,197,94,.45); }
     .fday.open { border-color:rgba(0,212,255,.45); }
+    .fday-flash { animation:fday-flash 1.4s ease-out; }
+    @keyframes fday-flash { 0%,100%{box-shadow:none} 20%{box-shadow:0 0 0 2px var(--accent)} }
+    @media (prefers-reduced-motion:reduce) { .fday-flash { animation:none; } }
+    .fg-going { border-color:rgba(34,197,94,.45) !important; color:#4ade80 !important; }
+    .fg-going:hover { border-color:#4ade80 !important; }
     .fday-head {
       display:grid; align-items:center; gap:12px; padding:10px 13px; cursor:pointer;
       grid-template-columns:74px 46px 1fr 118px 58px auto 26px 20px;
@@ -5399,7 +5404,7 @@ function openForecastDay(dateStr,idx){
            here, this is the only way to reach it from a day, so removing the
            old "Full detail" button without replacing this path would have quietly
            cost the rider the ability to confirm a session at all. -->
-      <button class="fg-more" onclick="openModal('${dateStr}',${idx})" title="Confirm you are going, and notify your friends">\u{1F3C4} Session</button>
+      <button class="fg-more fg-going" onclick="openAttendSheet('${dateStr}',${idx},cachedLoc.name,cachedLoc.latitude,cachedLoc.longitude)" title="Confirm you are going, and notify your friends">\u{1F3C4} I'm going</button>
     </div>`;
   body.hidden=false;
 }
@@ -5488,6 +5493,21 @@ function openDayPrefs(){
   });
 }
 function closeDayPrefs(){ const el=$('dayPrefsSheet'); if(el) el.remove(); }
+
+// Every path that used to open the modal now lands on the day itself.
+function revealForecastDay(dateStr,idx){
+  const row=document.querySelector(`.fday[data-date="${dateStr}"]`);
+  if(!row) return false;
+  if(!_openForecastDays.has(dateStr)){
+    _openForecastDays.add(dateStr);
+    openForecastDay(dateStr,idx);
+  }
+  row.scrollIntoView({behavior:'smooth',block:'center'});
+  // A brief highlight, because scrolling alone does not say "this is the one".
+  row.classList.add('fday-flash');
+  setTimeout(()=>row.classList.remove('fday-flash'),1400);
+  return true;
+}
 
 function toggleForecastDetail(dateStr,idx){
   if(_detailForecastDays.has(dateStr)) _detailForecastDays.delete(dateStr);
@@ -5717,7 +5737,7 @@ function renderGrid(){
       const rangeTxt=hasData?`${dispKn}<span class="tds-dc-gust"> ↑${gustKn}</span>`:'—';
       const titleTxt=hasData?`${dispKn}kn · ↑${gustKn}kn gust · ${gh}h qualifying`:'no data';
 
-      return `<div class="tds-day-card${hasSession?' has-session':''}${i>=10?' tds-lowconf':''}" onclick="openModal('${dateStr}',${i})" title="${titleTxt}">
+      return `<div class="tds-day-card${hasSession?' has-session':''}${i>=10?' tds-lowconf':''}" onclick="revealForecastDay('${dateStr}',${i})" title="${titleTxt}">
         <div class="tds-dc-head"><span class="tds-dc-day">${lbl} ${dayNum}</span><span class="tds-dc-wx">${emoji}</span></div>
         <div class="tds-dc-range">${rangeTxt}</div>
         <div class="tds-dc-spark">${spark}</div>
@@ -5741,7 +5761,7 @@ function renderGrid(){
     const target=window._deepLinkDate;
     window._deepLinkDate=null;
     const idx=daily.time.indexOf(target);
-    if(idx>=0) setTimeout(()=>openModal(target,idx),200);
+    if(idx>=0) setTimeout(()=>revealForecastDay(target,idx),200);
   }
 
   // Keep the homepage "good days" badge / Best-Next bar in sync with the fresh
@@ -7693,7 +7713,11 @@ async function confirmSessionFromModal(dateStr, startTime){
         if(sb&&email){
           const sessionMs=localForecastToUtcMs(dateStr+'T'+startTime+':00');
           const now=Date.now();
-          for(const h of [72,48,24,6,1]){
+          // Must match REMINDER_HOURS in check-new-sessions: a step named here
+          // that the backend no longer creates simply matches nothing, but a
+          // step missing here would leave a real reminder pointing at the old
+          // session time.
+          for(const h of [24,1]){
             const send_at=new Date(sessionMs-h*3600*1000).toISOString();
             if(new Date(send_at).getTime()>now){
               sb.from('reminders').update({send_at})
@@ -7711,8 +7735,7 @@ async function confirmSessionFromModal(dateStr, startTime){
   // Reset confirm button
   const cb2=$('mAttendConfirm'); if(cb2){ cb2.disabled=false; cb2.textContent='✓ Confirm'; }
 
-  // Re-render modal and grid bell
-  openModal(dateStr, _modalDayIdx);
+  // The rider is looking at the day row, not a modal — repaint that.
   renderGrid();
   const ind=document.getElementById(`going-${dateStr}`);
   if(ind){ ind.style.display='block'; ind.textContent=`✓ Going · ${startTime}`; }
@@ -7734,7 +7757,7 @@ async function handlePendingJoin(){
       const idx=daily.time.indexOf(j.date);
       if(idx>=0){
         setTimeout(()=>{
-          openModal(j.date,idx);
+          revealForecastDay(j.date,idx);
           // Pre-select the suggested start time
           if(j.start_time){
             _attendSessionStart=j.start_time; _attendDateStr=j.date;
@@ -7915,8 +7938,7 @@ async function cancelAttendance(dateStr){
   const ind=document.getElementById(`going-${dateStr}`);
   if(ind){ ind.style.display='none'; ind.textContent=''; }
 
-  // Re-render modal if open on this date
-  if(_modalDateStr===dateStr) openModal(dateStr, _modalDayIdx);
+  // renderGrid below repaints the day row, which is where "Going" now lives.
   renderGrid();
 }
 

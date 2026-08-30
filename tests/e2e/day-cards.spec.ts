@@ -69,39 +69,31 @@ test('16-day rail renders one day-card per day with min/max, emoji and session g
   await expect(card1).not.toHaveClass(/has-session/);
 });
 
-test('tapping a day-card opens the day modal for that date', async ({ gotoApp, page }) => {
+test('tapping a day-card opens that day in place', async ({ gotoApp, page }) => {
+  // It used to open a modal. The day's hours now live in the row itself, so a
+  // strip card expands and scrolls to that row instead — one view throughout.
   await gotoApp('signedOut');
-
-  await page.evaluate(() => {
-    // @ts-expect-error app globals
-    const w: any = window;
-    const D0 = '2026-06-26';
+  const D0 = '2026-06-26';
+  await page.evaluate((D0: string) => {
     const day0 = new Map<number, any>();
+    for (let hr = 0; hr < 24; hr++) day0.set(hr, { kn: 8, dir: 315, code: 0, gustKn: 12, temp: 18 });
     [[10, 18], [11, 22], [12, 25], [13, 20]].forEach(([hr, kn]) =>
-      day0.set(hr, { kn, dir: 315, code: 0, gustKn: kn + 4 }));
-
-    // @ts-expect-error app globals — let cachedHrMap is not on window
+      day0.set(hr as number, { kn, dir: 315, code: 0, gustKn: (kn as number) + 4, temp: 20 }));
     cachedHrMap = new Map([[D0, day0]]);
-    // @ts-expect-error app globals — let cachedLoc is not on window
     cachedLoc = { name: 'Test Spot', latitude: 50, longitude: 4, country: 'BE' };
-    // @ts-expect-error app globals — let cachedWx is not on window
     cachedWx = { daily: {
       time: [D0], weather_code: [0],
       temperature_2m_max: [24], temperature_2m_min: [16], windgusts_10m_max: [14.4],
       sunrise: [`${D0}T05:54`], sunset: [`${D0}T21:29`],
     } };
-    // @ts-expect-error app globals — let windDirs is not on window
     windDirs = new Set([315]);
-
-    // spy on openModal
-    w.__openedWith = null;
-    w.openModal = (dateStr: string, i: number) => { w.__openedWith = [dateStr, i]; };
-
-    w.renderGrid();
-  });
+    showOnly('results');
+    renderGrid();
+  }, D0);
 
   await page.locator('#tdsCols .tds-day-card').first().click();
-
-  const opened = await page.evaluate(() => (window as any).__openedWith);
-  expect(opened).toEqual(['2026-06-26', 0]);
+  await expect(page.locator(`#fdb-${D0}`)).toBeVisible();
+  await expect(page.locator(`#fdb-${D0} table.fg`)).toBeVisible();
+  await expect(page.locator('#modalOverlay')).toBeHidden();
 });
+
