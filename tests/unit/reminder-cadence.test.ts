@@ -32,15 +32,17 @@ describe('one email per rider, per spot, per session', () => {
   })
 
   it('the sender gates the email, not the whole reminder', () => {
-    // The stats write and the SMS must stay outside the email guard.
-    const guardIdx = sender.indexOf('const sendEmail')
-    const webhookIdx = sender.indexOf('await fetch(MAKE_WEBHOOK_URL')
-    const statsIdx = sender.indexOf('session_peak_kn')
-    const smsIdx = sender.indexOf('TWILIO_ACCOUNT_SID)')
+    // The stats write and the SMS must stay OUTSIDE the email guard: the 1h
+    // row exists to record session_peak_kn and fire the premium SMS, and it
+    // must keep doing both while sending no email.
+    const guardIdx  = sender.indexOf('const sendEmail')
+    const deliverIdx = sender.indexOf('await deliver(payload')
+    const statsIdx  = sender.indexOf('session_peak_kn')
+    const smsIdx    = sender.indexOf('TWILIO_ACCOUNT_SID)')
     expect(guardIdx).toBeGreaterThan(-1)
-    expect(webhookIdx).toBeGreaterThan(guardIdx)   // the webhook sits inside the guard
-    expect(statsIdx).toBeGreaterThan(webhookIdx)   // stats come after, ungated
-    expect(smsIdx).toBeGreaterThan(webhookIdx)     // so does the SMS
+    expect(deliverIdx).toBeGreaterThan(guardIdx)   // the send sits inside the guard
+    expect(statsIdx).toBeGreaterThan(deliverIdx)   // stats come after, ungated
+    expect(smsIdx).toBeGreaterThan(deliverIdx)     // so does the SMS
   })
 
   it('dedupes on rider + spot + date, ignoring notif_type', () => {
