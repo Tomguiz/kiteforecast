@@ -1658,6 +1658,7 @@
       <button class="pp-back" id="ppBackBtn" onclick="backToBurger()" style="display:none" aria-label="Back">‹</button>
       <span class="pp-hdr-title" id="ppHdrTitle">Profile</span>
       <!-- badge carriers kept (hidden) so updateTabBadges/_setTabBadge still find them -->
+      <span id="ppActivityCount" style="display:none"></span>
       <span id="ppNotifCount" style="display:none"></span>
       <span id="ppFriendReqCount" style="display:none"></span>
       <span id="ppContribCount" style="display:none"></span>
@@ -1853,6 +1854,9 @@
           <div class="stats-empty">Loading…</div>
         </div>
       </div>
+    </div>
+    <div id="ppPanelActivity" class="pp-body" style="display:none;flex-direction:column;gap:16px">
+      <div id="activityFeed"><div class="stats-empty">Loading…</div></div>
     </div>
     <div id="ppPanelStats" class="pp-body" style="display:none">
       <div id="ppStatsContent"></div>
@@ -6909,6 +6913,7 @@ function renderSignInOnboarding(){
 // so they're HOISTED — referencing them here is fine even though some are defined
 // later in the file.
 const SECTIONS = {
+  activity:{ title: 'Activity',      icon: '🌊', badge: 'ppActivityCount',  render: renderActivity,         panel: 'ppPanelActivity' },
   notifs:  { title: 'Manage notifications', icon: '🔔', badge: 'ppNotifCount',     render: renderNotifList,        panel: 'ppPanelNotifs' },
   stats:   { title: 'Stats',         icon: '📊', badge: null,               render: renderStats,            panel: 'ppPanelStats' },
   friends: { title: 'Friends',       icon: '👥', badge: 'ppFriendReqCount', render: renderFriendsPanel,     panel: 'ppPanelFriends' },
@@ -8112,6 +8117,141 @@ function clearPerUserCaches(){
   _friendsCache=null;
   _attendCache={};
   _adminSpots=null;
+}
+
+// ══════════════════════════════════
+//  ACTIVITY
+// ══════════════════════════════════
+//
+// One place answering "what is happening". Four sources, deliberately in this
+// order — the first two are the point, the last two are what keeps the section
+// from being empty while "I'm going" is still barely used. On the day this was
+// written the whole database held two upcoming confirmed sessions, both
+// cancelled, so a friends-only feed would have shown nothing to anyone.
+//
+// Everything here is readable by the rider directly: RLS scopes reminders and
+// email_log to their own rows, and session_attendances to their own AND their
+// friends' — which is exactly the join this needs, with no RPC.
+
+function _actCard(inner, accent){
+  return `<div style="border:1px solid var(--border);border-left:3px solid ${accent};border-radius:10px;padding:11px 13px;background:var(--card)">${inner}</div>`;
+}
+function _actSection(title, count, body){
+  if(!body) return '';
+  return `<div>
+    <div class="stats-section-title" style="margin-bottom:8px">${title}${count?` <span style="color:var(--tdim);font-weight:400">· ${count}</span>`:''}</div>
+    <div style="display:flex;flex-direction:column;gap:6px">${body}</div>
+  </div>`;
+}
+// "Sat 5 Sep", and "Today"/"Tomorrow" where that reads better.
+function _actDay(dateStr){
+  const today=new Date().toISOString().slice(0,10);
+  const tm=new Date(); tm.setDate(tm.getDate()+1);
+  if(dateStr===today) return 'Today';
+  if(dateStr===tm.toISOString().slice(0,10)) return 'Tomorrow';
+  return new Date(dateStr+'T12:00:00').toLocaleDateString('en',{weekday:'short',day:'numeric',month:'short'});
+}
+
+async function renderActivity(){
+  const el=$('activityFeed'); if(!el) return;
+  const sb=getSb(); const email=_authSession?.user?.email||loadProfile().email;
+  if(!sb||!email){ el.innerHTML='<div class="stats-empty">Sign in to see what is happening.</div>'; return; }
+  const session=await ensureSession();
+  if(!session){
+    el.innerHTML='<div class="stats-empty">Your session expired — please sign in again.</div>';
+    return;
+  }
+  el.innerHTML='<div class="stats-empty">Loading…</div>';
+
+  const today=new Date().toISOString().slice(0,10);
+  // One round trip each, in parallel: a feed that loads in four sequential
+  // steps feels broken even when every step is fast.
+  const [fr, att, rem, log] = await Promise.all([
+    sb.from('friendships').select('*').eq('recipient',email).eq('status','pending'),
+    sb.from('session_attendances').select('*').gte('session_date',today).eq('cancelled',false)
+      .order('session_date',{ascending:true}),
+    sb.from('reminders').select('spot_name,session_date,reminder_hours,send_at')
+      .eq('email',email).eq('sent',false).eq('cancelled',false)
+      .gte('session_date',today).lt('send_at','2099-01-01')
+      .order('session_date',{ascending:true}),
+    sb.from('email_log').select('kind,meta,sent_at').eq('email',email)
+      .order('sent_at',{ascending:false}).limit(8),
+  ]);
+
+  const incoming=fr.data||[];
+  const sessions=att.data||[];
+  const alerts=rem.data||[];
+  const emails=log.data||[];
+
+  // Nicknames for everyone who appears, in one lookup.
+  const who=[...new Set([...incoming.map(r=>r.requester), ...sessions.map(r=>r.email)])].filter(e=>e!==email);
+  const nick={};
+  if(who.length){
+    const{data:profs}=await sb.from('public_profiles').select('email,nickname').in('email',who);
+    (profs||[]).forEach(p=>{ nick[p.email]=p.nickname||p.email.split('@')[0]; });
+  }
+  const nameOf=e=>e===email?'You':escFriendName(nick[e]||e.split('@')[0]);
+
+  // ── 1. requests waiting on you ──
+  const reqHtml=incoming.map(r=>_actCard(
+    `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+      <div>
+        <div style="font-size:.84rem;font-weight:700;color:#fbbf24">${nameOf(r.requester)}</div>
+        <div style="font-size:.72rem;color:var(--tdim)">wants to be your friend</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <button class="btn pp-save-btn" style="font-size:.72rem;padding:5px 10px" onclick="respondFriendRequest('${r.id}','accepted');renderActivity()">Accept</button>
+        <button class="btn-reset" style="font-size:.72rem;padding:5px 10px;border:1px solid var(--border);border-radius:8px;color:var(--tdim)" onclick="respondFriendRequest('${r.id}','declined');renderActivity()">Decline</button>
+      </div>
+    </div>`,'#fbbf24')).join('');
+
+  // ── 2. who is riding, and where ──
+  const sessHtml=sessions.map(r=>_actCard(
+    `<div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+      <div>
+        <div style="font-size:.84rem;font-weight:700;color:var(--text)">${nameOf(r.email)} \u{1F3C4} ${escFriendName(r.spot_name)}</div>
+        <div style="font-size:.72rem;color:var(--tdim)">${_actDay(r.session_date)}${r.start_time?` \u00b7 from ${r.start_time}`:''}${r.duration_h?` \u00b7 ${r.duration_h}h`:''}</div>
+      </div>
+      <span style="font-size:.7rem;color:#4ade80;white-space:nowrap">\u2713 going</span>
+    </div>`,'#4ade80')).join('');
+
+  // ── 3. what the app will tell you, and when ──
+  const byDay={};
+  alerts.forEach(a=>{ const k=`${a.spot_name}|${a.session_date}`; (byDay[k]=byDay[k]||[]).push(a); });
+  const alertHtml=Object.entries(byDay).slice(0,8).map(([k,list])=>{
+    const[spot,date]=k.split('|');
+    const hrs=[...new Set(list.map(a=>a.reminder_hours))].sort((a,b)=>b-a);
+    return _actCard(
+    `<div style="font-size:.84rem;font-weight:700;color:var(--text)">${escFriendName(spot)}</div>
+     <div style="font-size:.72rem;color:var(--tdim)">${_actDay(date)} \u00b7 we will email you ${hrs.map(h=>h===1?'1h':h+'h').join(' and ')} before</div>`,'#38bdf8');
+  }).join('');
+
+  // ── 4. what you were actually sent ──
+  const KIND={spot:'Session alert',day:'Session alert',digest:'Weekly digest',whats_new:"What's new",
+    confirmation:'Spot confirmation',friend_request:'Friend request',session_attendance:'A friend is going',
+    onboarding:'Welcome',claim:'Spot claim',claim_accepted:'Claim accepted'};
+  const logHtml=emails.map(e=>{
+    const spot=e.meta?.spot_name?` \u00b7 ${escFriendName(e.meta.spot_name)}`:'';
+    const when=new Date(e.sent_at).toLocaleDateString('en',{day:'numeric',month:'short'});
+    return _actCard(
+    `<div style="display:flex;align-items:baseline;justify-content:space-between;gap:10px">
+      <div style="font-size:.8rem;color:var(--text)">${KIND[e.kind]||escFriendName(e.kind)}${spot}</div>
+      <span style="font-size:.7rem;color:var(--tdim);white-space:nowrap">${when}</span>
+    </div>`,'var(--border)');
+  }).join('');
+
+  const html=[
+    _actSection('Waiting for you', incoming.length, reqHtml),
+    _actSection('Riding soon', sessions.length, sessHtml),
+    _actSection('Alerts you will get', Object.keys(byDay).length, alertHtml),
+    _actSection('Recently sent to you', 0, logHtml),
+  ].filter(Boolean).join('<div style="height:6px"></div>');
+
+  el.innerHTML=html||`<div class="stats-empty">Nothing yet. Follow a spot and confirm a session — this is where it all shows up.</div>`;
+
+  // The badge counts only what needs the rider to DO something.
+  const badge=$('ppActivityCount');
+  if(badge){ badge.textContent=incoming.length; badge.style.display=incoming.length?'inline':'none'; }
 }
 
 async function renderFriendsPanel(){
