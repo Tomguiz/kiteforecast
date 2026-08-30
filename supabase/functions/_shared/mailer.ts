@@ -23,7 +23,9 @@ const env = (k: string): string | undefined => {
 const RESEND_API_KEY = () => env('RESEND_API_KEY')
 // Must be a domain verified in Resend, or Resend refuses the send.
 const MAIL_FROM  = () => env('MAIL_FROM')  ?? 'KiteForecast <hello@kiteforecast.app>'
-const MAIL_REPLY = () => env('MAIL_REPLY') ?? 'tom.guisgand@gmail.com'
+// Replies land on the domain, not a personal inbox. Cloudflare Email Routing
+// forwards the whole domain onward, so this is a real address, not a black hole.
+const MAIL_REPLY = () => env('MAIL_REPLY') ?? 'hello@kiteforecast.app'
 
 const TEMPLATE_BASE =
   'https://raw.githubusercontent.com/Tomguiz/kiteforecast/main/emails/'
@@ -76,6 +78,45 @@ export function renderSubject(subject: string, vars: Record<string, unknown>): s
   return renderTemplate(subject, vars).html
 }
 
+// ── Which template and subject belong to each kind of email ───────────────
+//
+// One table rather than the same two lines repeated in ten functions. Both
+// values are copied verbatim from the Make scenario that used to render them,
+// so the switch is invisible in an inbox. Subjects carry [[placeholders]] and
+// go through the same renderer as the body.
+//
+// A `to` function says which field of the payload holds the recipient, because
+// the notifications do not agree: some mail the rider, some mail the admin.
+export type Delivery = {
+  template: string
+  subject: string
+  to?: (p: Record<string, any>) => string | undefined
+}
+
+export const DELIVERIES: Record<string, Delivery> = {
+  digest:                 { template: 'digest',            subject: '\u{1FA81} Your kite week \u2014 [[week_start]]' },
+  whats_new:              { template: 'whats-new',         subject: '\u{1F381} More days on the water - what\'s new in KiteForecast' },
+  friend_request:         { template: 'friend-request',    subject: '[[requester_nickname]] wants to kite with you \u{1FA81}' },
+  session_attendance:     { template: 'session-attendance', subject: '\u{1F3C4} [[attendee_nickname]] is going kiting at [[spot_name]]!' },
+  claim:                  { template: 'spot-claim',        subject: '\u{1F3F4} New spot claim \u2014 [[spot_name]]' },
+  claim_accepted:         { template: 'claim-accepted',    subject: '\u{1F389} Your spot claim has been accepted \u2014 [[spot_name]]' },
+  spot_suggestion:        { template: 'spot-request',      subject: '\u{1FA81} New spot request \u2014 [[spot_name]]' },
+  spot_update:            { template: 'spot-update',       subject: '\u270D\uFE0F New spot update by the community \u2014 [[spot_name]]' },
+  spot_request_approved:  { template: 'claim-accepted',    subject: '\u{1F389} Your spot request has been approved \u2014 [[spot_name]]' },
+  onboarding:             { template: 'onboarding',        subject: 'Welcome to KiteForecast \u{1FA81}' },
+}
+
+// Reminders pick their template from the ladder step and whether the session is
+// on, so they are resolved separately rather than by notification_type.
+export function reminderDelivery(hours: number, isOn: boolean): Delivery {
+  const key = `${isOn ? 'ON' : 'OFF'}${hours}`
+  const subjects: Record<string, string> = {
+    ON24:  '\u{1F514} Tomorrow at [[spot]] \u2014 conditions confirmed, [[session.wind_speed_peak_kn]] kts [[session.wind_direction]]',
+    OFF24: '\u{1F62E}\u200D\u{1F4A8} [[spot]] tomorrow \u2014 the wind gods aren\'t cooperating',
+  }
+  return { template: `reminder${key}`, subject: subjects[key] ?? '[[spot]] \u2014 [[date_label]]' }
+}
+
 export type SendResult = { ok: boolean; id?: string; error?: string }
 
 export async function sendEmail(args: {
@@ -123,4 +164,36 @@ export async function sendTemplate(args: {
     html,
     replyTo: args.replyTo,
   })
+}
+
+
+// The single door every notifier goes through. Resend once the key is set,
+// Make until then — so a deploy changes nothing on its own, and clearing the
+// secret rolls every email type back at once.
+export async function deliver(
+  payload: Record<string, any>,
+  opts: { to?: string; delivery?: Delivery; makeWebhookUrl: string },
+): Promise<{ ok: boolean; via: 'resend' | 'make'; error?: string }> {
+  const kind = String(payload?.notification_type ?? '')
+  const d = opts.delivery ?? DELIVERIES[kind]
+
+  if (mailerReady() && d) {
+    const to = opts.to ?? d.to?.(payload) ?? payload.email
+    if (!to) return { ok: false, via: 'resend', error: `no recipient for ${kind}` }
+    const r = await sendTemplate({ to, template: d.template, subject: d.subject, vars: payload })
+    return { ok: r.ok, via: 'resend', error: r.error }
+  }
+
+  // Either no key yet, or a kind with no mapping — Make still knows how to
+  // render it, so falling back is safer than dropping the email.
+  try {
+    const res = await fetch(opts.makeWebhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    })
+    return { ok: res.ok, via: 'make', error: res.ok ? undefined : `webhook ${res.status}` }
+  } catch (err) {
+    return { ok: false, via: 'make', error: String(err) }
+  }
 }

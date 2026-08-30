@@ -20,6 +20,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { buildNextStepHtml, resolveStage, type OnboardingStage } from './content.ts'
 import { recordEmail } from '../_shared/email-log-client.ts'
 import { isServiceRoleCaller } from '../_shared/service-role-auth.ts'
+import { deliver } from '../_shared/mailer.ts'
 
 const SUPABASE_URL         = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_KEY = Deno.env.get('SB_SERVICE_ROLE_KEY')!
@@ -159,12 +160,8 @@ Deno.serve(async (req) => {
     if (dryRun) { sent++; continue }
 
     try {
-      const res = await fetch(MAKE_WEBHOOK_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      if (!res.ok) { failures.push({ email, reason: `webhook ${res.status}` }); continue }
+      const res = await deliver(payload, { to: email, makeWebhookUrl: MAKE_WEBHOOK_URL })
+      if (!res.ok) { failures.push({ email, reason: res.error ?? 'send failed' }); continue }
     } catch (e) {
       failures.push({ email, reason: String(e) })
       continue

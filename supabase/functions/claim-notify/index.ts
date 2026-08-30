@@ -2,9 +2,10 @@
 // Uses the same Make.com webhook with notif_type: 'claim'
 
 import { recordEmail } from '../_shared/email-log-client.ts'
+import { deliver } from '../_shared/mailer.ts'
 
 const MAKE_WEBHOOK_URL = 'https://hook.eu1.make.com/6t9fgm6btixri2wf5lnx47requf416vs'
-const ADMIN_EMAIL      = Deno.env.get('ADMIN_EMAIL') ?? 'tom.guisgand@gmail.com'
+const ADMIN_EMAIL      = Deno.env.get('ADMIN_EMAIL') ?? 'hello@kiteforecast.app'
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -40,11 +41,7 @@ Deno.serve(async (req) => {
     verify_url:     claimDeepLink,
   }
 
-  await fetch(MAKE_WEBHOOK_URL, {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify(payload),
-  })
+  await deliver(payload, { makeWebhookUrl: MAKE_WEBHOOK_URL })
 
   // Goes to the admin, not the rider, so that is the address recorded; the
   // rider who triggered it is kept in meta. Never throws.

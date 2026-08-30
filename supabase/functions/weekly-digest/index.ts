@@ -3,6 +3,7 @@ import { fetchForecast, getGoodSessions } from './session-logic.ts'
 import { selectNearbySpots, rankNearbySpots } from '../_shared/nearby.ts'
 import { recordEmail } from '../_shared/email-log-client.ts'
 import { pickDeal, buildDealAdHTML, type Deal } from './deals.ts'
+import { deliver } from '../_shared/mailer.ts'
 
 const SUPABASE_URL         = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_KEY = Deno.env.get('SB_SERVICE_ROLE_KEY')!
@@ -425,11 +426,7 @@ Deno.serve(async (req) => {
       ad_html: adHtml,
     }
 
-    await fetch(MAKE_WEBHOOK_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
+    await deliver(payload, { makeWebhookUrl: MAKE_WEBHOOK_URL })
     // Never throws, so a logging failure cannot cost a rider their digest.
     await recordEmail({
       email, kind: 'digest',

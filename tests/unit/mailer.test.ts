@@ -84,20 +84,23 @@ describe('against the real templates', () => {
 describe('the cutover is a secret, not a deploy', () => {
   const sender = readFileSync(
     new URL('../../supabase/functions/process-reminders/index.ts', import.meta.url), 'utf8')
+  const mailer = readFileSync(
+    new URL('../../supabase/functions/_shared/mailer.ts', import.meta.url), 'utf8')
 
   it('keeps the Make path for when the key is not set', () => {
-    // Deploying the mailer must change nothing on its own: without
-    // RESEND_API_KEY, mailerReady() is false and reminders keep leaving
-    // through Make exactly as before. Setting the key back to empty is the
-    // rollback.
-    expect(sender).toContain('mailerReady() ?')
-    expect(sender).toContain('MAKE_WEBHOOK_URL')
+    // Deploying must change nothing on its own: without RESEND_API_KEY,
+    // mailerReady() is false and deliver() falls back to the webhook. Setting
+    // the key is the cutover; clearing it is the rollback, for every email
+    // type at once.
+    expect(mailer).toContain('if (mailerReady() && d)')
+    expect(mailer).toContain('opts.makeWebhookUrl')
+    expect(sender).toContain('makeWebhookUrl: MAKE_WEBHOOK_URL')
   })
 
   it('does not record a delivery that failed', () => {
-    // recordEmail must sit after the send, and a failed send must leave the
-    // row unsent so the next run retries rather than logging a phantom email.
-    const sendIdx   = sender.indexOf('await sendTemplate(')
+    // A failed send must leave the row unsent so the next run retries, rather
+    // than logging a phantom email.
+    const sendIdx   = sender.indexOf('await deliver(payload')
     const failIdx   = sender.indexOf('if (!sent.ok)')
     const recordIdx = sender.indexOf('await recordEmail(')
     expect(sendIdx).toBeGreaterThan(-1)
@@ -107,6 +110,7 @@ describe('the cutover is a secret, not a deploy', () => {
   })
 
   it('records which route the email actually took', () => {
-    expect(sender).toMatch(/via:\s*mailerReady\(\)|hours_before: rh, via/)
+    expect(sender).toContain('const via = sent.via')
+    expect(sender).toMatch(/hours_before: rh, via/)
   })
 })

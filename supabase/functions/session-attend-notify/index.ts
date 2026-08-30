@@ -1,6 +1,7 @@
 // Notifies friends when a user confirms they're going kiting
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { recordEmails } from '../_shared/email-log-client.ts'
+import { deliver } from '../_shared/mailer.ts'
 
 const MAKE_WEBHOOK_URL = 'https://hook.eu1.make.com/6t9fgm6btixri2wf5lnx47requf416vs'
 const SUPABASE_URL     = Deno.env.get('SUPABASE_URL')     ?? 'https://kpwmajtxmcfpakvonimf.supabase.co'
@@ -70,10 +71,9 @@ Deno.serve(async (req) => {
     // saved session on load, so returning users land signed-in.
     const join_link = joinUrl
 
-    return fetch(MAKE_WEBHOOK_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    // The recipient is the friend, not the attendee, so it is passed explicitly
+    // rather than read off the payload.
+    return deliver({
         notification_type:  'session_attendance',
         recipient_email:    friend.email,
         recipient_nickname: friend.nickname || friend.email.split('@')[0],
@@ -87,8 +87,7 @@ Deno.serve(async (req) => {
         maps_link:          `https://maps.google.com/?q=${encodeURIComponent(spot_name)}`,
         app_link:           appLink,
         join_link,
-      }),
-    })
+    }, { to: friend.email, makeWebhookUrl: MAKE_WEBHOOK_URL })
   }
 
   const list = friends || []
@@ -102,7 +101,7 @@ Deno.serve(async (req) => {
     const results = await Promise.all(batch.map(async (friend: any) => {
       try {
         const res = await buildSend(friend)
-        return res && (res as Response).ok ? friend : null
+        return res?.ok ? friend : null
       } catch { return null }
     }))
     for (const f of results) if (f) delivered.push(f)

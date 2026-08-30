@@ -8,9 +8,10 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { recordEmail } from '../_shared/email-log-client.ts'
+import { deliver } from '../_shared/mailer.ts'
 
 const MAKE_WEBHOOK_URL  = 'https://hook.eu1.make.com/6t9fgm6btixri2wf5lnx47requf416vs'
-const ADMIN_EMAIL       = Deno.env.get('ADMIN_EMAIL')        ?? 'tom.guisgand@gmail.com'
+const ADMIN_EMAIL       = Deno.env.get('ADMIN_EMAIL')        ?? 'hello@kiteforecast.app'
 const SUPABASE_URL         = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_KEY = Deno.env.get('SB_SERVICE_ROLE_KEY')!
 
@@ -84,11 +85,7 @@ Deno.serve(async (req) => {
   // that's the part the admin panel depends on.
   let notified = true
   try {
-    await fetch(MAKE_WEBHOOK_URL, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify(payload),
-    })
+    await deliver(payload, { makeWebhookUrl: MAKE_WEBHOOK_URL })
   } catch (e) {
     notified = false
     console.error('Make webhook failed:', (e as Error).message)

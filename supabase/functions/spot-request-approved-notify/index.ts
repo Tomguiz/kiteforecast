@@ -1,6 +1,7 @@
 // Notifies a user when their spot request has been approved and added to KiteForecast
 
 import { recordEmail } from '../_shared/email-log-client.ts'
+import { deliver } from '../_shared/mailer.ts'
 
 const MAKE_WEBHOOK_URL = 'https://hook.eu1.make.com/6t9fgm6btixri2wf5lnx47requf416vs'
 
@@ -26,11 +27,7 @@ Deno.serve(async (req) => {
     reward_premium:    '1 free month of Premium',
   }
 
-  await fetch(MAKE_WEBHOOK_URL, {
-    method:  'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify(payload),
-  })
+  await deliver(payload, { makeWebhookUrl: MAKE_WEBHOOK_URL })
 
   // Logged after the webhook accepts, so a row means "handed to Make". Never
   // throws, so a logging failure cannot stop the notification.

@@ -23,6 +23,7 @@ import {
   clampDelay, clampBudget, budgetExhausted, estimateRuntimeMs, sleep,
 } from '../_shared/pacing.ts'
 import { isServiceRoleCaller } from '../_shared/service-role-auth.ts'
+import { deliver } from '../_shared/mailer.ts'
 
 const SUPABASE_URL         = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_KEY = Deno.env.get('SB_SERVICE_ROLE_KEY')!
@@ -32,7 +33,7 @@ const APP_BASE    = 'https://tomguiz.github.io/kiteforecast/'
 // ?tab=profile is on the app's allowlist and opens the profile panel, which is
 // where both the home-location field and the lifetime upgrade card live.
 const PROFILE_URL = `${APP_BASE}?tab=profile`
-const REPLY_TO    = 'tom.guisgand@gmail.com'
+const REPLY_TO    = 'hello@kiteforecast.app'
 
 // Namespacing the campaign means a future announcement gets its own broadcast_sends
 // rows rather than being suppressed by this one.
@@ -160,16 +161,12 @@ Deno.serve(async (req) => {
     if (sent > 0) await sleep(delayMs)
 
     try {
-      const res = await fetch(MAKE_WEBHOOK_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
+      const res = await deliver(payload, { to: email, makeWebhookUrl: MAKE_WEBHOOK_URL })
       // weekly-digest ignores the webhook response. Here a swallowed failure
       // would be recorded as delivered and then skipped forever on re-run, so
       // the send is only recorded once Make has actually accepted it.
       if (!res.ok) {
-        failures.push({ email, reason: `webhook ${res.status}` })
+        failures.push({ email, reason: res.error ?? 'send failed' })
         continue
       }
     } catch (e) {
