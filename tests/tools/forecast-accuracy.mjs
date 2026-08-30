@@ -35,7 +35,8 @@
 // issued means archiving it at issue time and scoring it days later, which is
 // a standing job, not a script.
 
-import { readFileSync } from 'node:fs'
+import { readFileSync, writeFileSync, mkdirSync, existsSync } from 'node:fs'
+import { join } from 'node:path'
 
 const args = process.argv.slice(2)
 const arg = (n, d = null) => { const i = args.indexOf(`--${n}`); return i >= 0 ? args[i + 1] : d }
@@ -126,14 +127,50 @@ async function rwsReference(lat, lon, date, tzOffsetMin) {
     rwsSeries(st.id, 'WS1', 'datapush-1min', date, tzOffsetMin),
     rwsSeries(st.id, 'WS10MXS3', 'datapush-10min', date, tzOffsetMin).catch(() => new Map()),
   ])
-  const hours = new Map()
+  const hours = new Map(), samples = new Map()
   for (const [hr, vals] of speed) {
     if (!vals.length) continue
     const mean = vals.reduce((s, v) => s + v, 0) / vals.length
     const g = gust.get(hr)
     hours.set(hr, [mean * MS_TO_KN, g && g.length ? Math.max(...g) * MS_TO_KN : null])
+    samples.set(hr, vals.length)
   }
-  return { hours, station: st }
+  return { hours, station: st, samples }
+}
+
+// ── Accumulating a day out of a feed that only remembers the last hour ──────
+// The 1-minute feed is a live push: ask it for a whole day and it answers with
+// the last hour or two. So a day is not fetched, it is COLLECTED — run often,
+// merge each reading into the day's file, and after a full rotation the file
+// holds a real measured day that can be scored properly.
+const slug = t => String(t).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+
+function saveReference(dir, spotLabel, date, station, hours, samples) {
+  mkdirSync(dir, { recursive: true })
+  const file = join(dir, `${slug(spotLabel)}-${date}.json`)
+  const prev = existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : null
+  const outHours = { ...(prev?.hours || {}) }
+  const outSamples = { ...(prev?.samples || {}) }
+  let added = 0, improved = 0
+  for (const [hr, v] of hours) {
+    const n = samples.get(hr) || 0
+    if (!(hr in outHours)) { added++ }
+    // A later run can catch an hour it previously saw only the tail of. More
+    // samples means a truer mean, so the fuller reading wins.
+    else if (n <= (outSamples[hr] || 0)) continue
+    else { improved++ }
+    outHours[hr] = [Number(v[0].toFixed(1)), v[1] == null ? null : Number(v[1].toFixed(1))]
+    outSamples[hr] = n
+  }
+  writeFileSync(file, JSON.stringify({
+    date, unit: 'kn',
+    source: `RWS mast ${station.name} (${station.distanceKm.toFixed(1)} km) — measured`,
+    spot: spotLabel,
+    hours: outHours, samples: outSamples,
+  }, null, 2) + '\n')
+  const total = Object.keys(outHours).length
+  console.log(`saved ${file}: ${total} hour(s) measured (+${added} new, ${improved} refined)`)
+  return { file, total }
 }
 
 // The configurations worth arguing about. `label` is what gets printed.
@@ -171,6 +208,14 @@ function hoursOf(data, date) {
 }
 
 const mean = a => a.reduce((s, x) => s + x, 0) / a.length
+
+// Below this many hours a ranking is noise wearing a decimal point. The first
+// --rws run scored two hours and still announced a winner by 0.2 kn, which is
+// precisely the false confidence this tool exists to remove: RWS's 1-minute
+// feed is a live push and retains only the last hour or two, so a request for
+// a whole day comes back nearly empty. A verdict is withheld until there are
+// enough hours to carry one.
+const MIN_SCORED_HOURS = 6
 
 function score(got, ref) {
   const hs = [...ref.keys()].filter(h => got.has(h)).sort((a, b) => a - b)
@@ -225,8 +270,17 @@ if (useRws) {
     // first purely to learn that offset, so the mast can be bucketed to match.
     const probe = await fetchCase(here.lat, here.lon, { cell_selection: 'sea' }, window)
     const tzOffsetMin = Math.round((probe.utc_offset_seconds ?? 0) / 60)
-    const { hours, station } = await rwsReference(here.lat, here.lon, date, tzOffsetMin)
-    refHours = hours
+    const { hours, station, samples } = await rwsReference(here.lat, here.lon, date, tzOffsetMin)
+    const saveDir = arg('save-ref')
+    if (saveDir) {
+      const { file } = saveReference(saveDir, spotName || `${here.lat},${here.lon}`, date, station, hours, samples)
+      // Score against the accumulated file, not just this run's slice: that is
+      // the whole point of collecting, and it is what makes a verdict possible.
+      const merged = JSON.parse(readFileSync(file, 'utf8'))
+      refHours = new Map(Object.entries(merged.hours).map(([h, v]) => [Number(h), v]))
+    } else {
+      refHours = hours
+    }
     refLabel = `RWS mast ${station.name}, ${station.distanceKm.toFixed(1)} km away — MEASURED`
   } catch (e) {
     // A stack trace here says nothing useful: the two ways this fails are a
@@ -272,7 +326,20 @@ if (refHours) {
       String(s.n).padStart(4))
   }
   const ranked = results.filter(r => r.score).sort((a, b) => a.score.maeWind - b.score.maeWind)
-  if (ranked.length) console.log(`\nclosest to the reference: ${ranked[0].label} (MAE ${ranked[0].score.maeWind.toFixed(1)} kn)`)
+  const scoredHours = ranked.length ? Math.max(...ranked.map(r => r.score.n)) : 0
+  if (!ranked.length) {
+    // nothing to say
+  } else if (scoredHours < MIN_SCORED_HOURS) {
+    console.log(`\nNO VERDICT: ${scoredHours} hour(s) overlap the reference, ` +
+      `fewer than the ${MIN_SCORED_HOURS} needed to separate these rows.`)
+    if (useRws) console.log(
+      "      RWS's 1-minute feed is a live push and keeps only the last hour or two,\n" +
+      '      so a whole day cannot be scored in one go. Run this often and accumulate,\n' +
+      '      rather than once a day.')
+  } else {
+    console.log(`\nclosest to the reference: ${ranked[0].label} ` +
+      `(MAE ${ranked[0].score.maeWind.toFixed(1)} kn over ${scoredHours} hours)`)
+  }
 }
 
 console.log()

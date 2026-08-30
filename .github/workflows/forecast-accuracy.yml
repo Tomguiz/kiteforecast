@@ -28,21 +28,30 @@ on:
       - 'tests/tools/refs/**'
       - 'supabase/functions/forecast/index.ts'
       - '.github/workflows/forecast-accuracy.yml'
-  # One row is an anecdote. A daily score against the masts turns the model
-  # question into a record: if a configuration only wins on sea breezes it
-  # shows up within a fortnight, which a single August afternoon cannot say.
-  # 21:10 UTC, late enough that the whole local day has been measured.
+  # RWS's 1-minute feed is a live push and keeps only the last hour or two, so
+  # a day cannot be fetched — it has to be COLLECTED. Every two hours, with the
+  # measured hours merged into the day's reference file and committed, so a
+  # full day accumulates and can then be scored properly. One afternoon is an
+  # anecdote; a fortnight of days is a record, and a configuration that only
+  # wins on August sea breezes shows itself in one.
   schedule:
-    - cron: '10 21 * * *'
+    - cron: '5 */2 * * *'
 
 jobs:
   compare:
     runs-on: ubuntu-latest
+    # Only the scheduled collection writes, and only to tests/tools/refs/measured.
+    permissions:
+      contents: write
     defaults:
       run:
         working-directory: tests
     steps:
       - uses: actions/checkout@v4
+        with:
+          # The collection step rebases onto whatever landed while it ran, and
+          # a depth-1 clone has no history to rebase onto.
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -61,6 +70,9 @@ jobs:
             *)    ARGS+=(--ref "$REF") ;;
           esac
           [ -n "$DATE" ] && ARGS+=(--date "$DATE")
+          # Only the scheduled run collects. A pull request must not write
+          # measurements into the branch it is testing.
+          [ "$GITHUB_EVENT_NAME" = schedule ] && ARGS+=(--save-ref tools/refs/measured)
           # Both to the log and to the run summary, so the table is readable
           # without unfolding a job.
           node tools/forecast-accuracy.mjs "${ARGS[@]}" | tee /tmp/out.txt
@@ -74,3 +86,20 @@ jobs:
           SPOT: ${{ inputs.spot }}
           REFERENCE: ${{ inputs.reference }}
           DATE: ${{ inputs.date }}
+
+      - name: Commit the hours this run measured
+        if: github.event_name == 'schedule' && github.ref_name == github.event.repository.default_branch
+        working-directory: ${{ github.workspace }}
+        run: |
+          git config user.name  'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add tests/tools/refs/measured
+          git diff --cached --quiet && { echo 'no new measurements'; exit 0; }
+          git commit -m 'chore(forecast): measured wind for the hours just past'
+          # Another collection may have landed while this one ran; rebase onto
+          # it rather than failing the run or clobbering its hours.
+          for i in 1 2 3; do
+            git pull --rebase --autostash origin "${GITHUB_REF_NAME}" && git push && exit 0
+            sleep 5
+          done
+          echo '::warning::could not push the measurements after three attempts'
