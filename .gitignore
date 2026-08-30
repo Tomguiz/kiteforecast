@@ -13,3 +13,6 @@ supabase/.branches/
 # Superpowers brainstorm/scratch artifacts
 .superpowers/
 test-results/
+
+# Node deps and build caches
+node_modules/

@@ -12,7 +12,7 @@ const read = (rel: string) =>
 const template = read('../../emails/onboarding.html')
 const fnSource = read('../../supabase/functions/onboarding/index.ts')
 
-const CONTRACT = ['nickname', 'app_link', 'upgrade_link', 'next_step_html', 'unsubscribe_link'] as const
+const CONTRACT = ['nickname', 'app_link', 'next_step_html', 'unsubscribe_link'] as const
 
 const placeholdersIn = (s: string) =>
   [...new Set((s.match(/\[\[([a-z_]+)\]\]/g) ?? []).map(m => m.slice(2, -2)))].sort()
@@ -48,11 +48,20 @@ describe('onboarding template/payload contract', () => {
     expect(fnSource).not.toContain('/functions/v1/unsubscribe?t=')
   })
 
-  // Premium claims must match the app's own feature list (index.html), or the
-  // first email a rider gets is already lying to them.
-  it('prices premium the same as the in-app checkout button', () => {
-    const app = read('../../index.html')
-    expect(app).toContain('19.99')
-    expect(template).toContain('19.99')
+  // The welcome email is the free half of the product, deliberately: the paid
+  // pitch is a separate email two weeks later. A price or a checkout link
+  // creeping back in here is the regression this guards.
+  it('sells nothing', () => {
+    expect(template).not.toContain('19.99')
+    expect(template).not.toContain('upgrade_link')
+    expect(template).not.toMatch(/Go Premium/i)
+  })
+
+  // The features it does describe have to be ones a free account actually has,
+  // or the first email a rider gets is already lying to them.
+  it('names the free features, including the planner riders find late', () => {
+    for (const claim of ['Where should I ride', 'measured', '72h', '1h']) {
+      expect(template, `template no longer mentions "${claim}"`).toContain(claim)
+    }
   })
 })
