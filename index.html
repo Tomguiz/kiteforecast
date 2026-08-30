@@ -335,7 +335,19 @@
     table.fg tr.fg-kite td { color:#5dd4f0; font-weight:700; }
     table.fg tr.fg-kite td.fg-dim { color:var(--tdim); font-weight:400; }
     .fg-arrow { display:inline-block; color:var(--accent); font-size:.85rem; line-height:1; }
-    .fg-foot { padding:9px 13px 11px; }
+    .fd-summary { display:flex; flex-wrap:wrap; gap:6px; padding:0 13px 10px; }
+    .fd-tides { padding-top:8px; border-top:1px solid var(--border); margin:0 13px 10px; padding-left:0; padding-right:0; }
+    .fg-deg { display:block; font-size:.58rem; color:var(--tdim); line-height:1; margin-top:1px; }
+    table.fg tr.fg-wave td { font-size:.7rem; color:#7dd3fc; }
+    .fg-pill { display:inline-block; font-size:.58rem; font-weight:700; padding:2px 5px; border-radius:5px; white-space:nowrap; }
+    .dp-list { display:flex; flex-direction:column; gap:2px; margin-top:10px; }
+    .dp-row { display:flex; align-items:center; justify-content:space-between; gap:14px;
+      padding:10px 2px; border-bottom:1px solid rgba(37,52,80,.5); cursor:pointer; }
+    .dp-row:last-child { border-bottom:0; }
+    .dp-name { display:block; font-size:.86rem; font-weight:600; color:var(--text); }
+    .dp-hint { display:block; font-size:.72rem; color:var(--tdim); margin-top:1px; }
+    .dp-row input { width:20px; height:20px; accent-color:var(--accent); flex-shrink:0; cursor:pointer; }
+    .fg-foot { padding:9px 13px 11px; display:flex; gap:8px; flex-wrap:wrap; }
     .fg-more { background:none; border:1px solid var(--border); border-radius:8px; color:var(--gray);
       font-family:inherit; font-size:.74rem; font-weight:600; padding:6px 12px; cursor:pointer; }
     .fg-more:hover { border-color:var(--accent); color:var(--accent); }
@@ -5256,9 +5268,60 @@ async function fetchForecast(query){
 // ══════════════════════════════════
 //  BUILD DAY DATA
 // ══════════════════════════════════
+// ── What the rider wants to see in a day's hourly table ───────────────────
+//
+// Riders do not want the same table. Some read direction in degrees, some only
+// want the arrow; a wave forecast is essential on the coast and noise on a lake.
+// One jsonb blob rather than a column per toggle, so adding a row later is not
+// a migration.
+const DAY_PREF_KEYS=['gusts','dir','degrees','kite','temp','waves','conditions'];
+const DEFAULT_DAY_PREFS={
+  gusts:true, dir:true, degrees:false, kite:true, temp:true, waves:false, conditions:false,
+};
+const DAY_PREFS_LS='kf_dayPrefs_v1';
+
+function loadDayPrefs(){
+  let stored={};
+  try{ stored=JSON.parse(localStorage.getItem(DAY_PREFS_LS))||{}; }catch(e){}
+  // Merged over the defaults, never replaced by them: a blob written before a
+  // new key existed must not switch that key off.
+  const out={...DEFAULT_DAY_PREFS};
+  for(const k of DAY_PREF_KEYS) if(typeof stored[k]==='boolean') out[k]=stored[k];
+  return out;
+}
+function saveDayPrefs(prefs){
+  const clean={};
+  for(const k of DAY_PREF_KEYS) clean[k]=!!prefs[k];
+  try{ localStorage.setItem(DAY_PREFS_LS,JSON.stringify(clean)); }catch(e){}
+  // Signed in, the column is what carries these to the rider's other devices.
+  // A failed write must not lose the local change, so it is fire-and-forget —
+  // but a supabase-js builder is lazy: without the .then() the request is
+  // constructed and never sent, and the preference silently stays on one device.
+  try{
+    const sb=getSb(), email=loadProfile().email;
+    if(sb&&email){
+      sb.from('profiles').upsert({email,display_prefs:clean},{onConflict:'email'})
+        .then(()=>{},()=>{});
+    }
+  }catch(e){}
+  return clean;
+}
+// Called once the session is known. The server copy wins, because the point of
+// storing it there is that it follows the rider onto a device that has never
+// seen their preferences.
+function applyDayPrefsFromProfile(row){
+  if(!row||!row.display_prefs) return;
+  const out={...DEFAULT_DAY_PREFS};
+  for(const k of DAY_PREF_KEYS) if(typeof row.display_prefs[k]==='boolean') out[k]=row.display_prefs[k];
+  try{ localStorage.setItem(DAY_PREFS_LS,JSON.stringify(out)); }catch(e){}
+  if(typeof renderGrid==='function'&&cachedWx) renderGrid();
+}
+
 // Which days are expanded. Kept outside renderGrid so a re-render (a refresh,
 // a "Going" confirmation) does not collapse what the rider had open.
 let _openForecastDays=new Set();
+// Days whose second tier (tides, sun, the rows the rider keeps hidden) is open.
+let _detailForecastDays=new Set();
 
 function toggleForecastDay(dateStr,idx){
   if(_openForecastDays.has(dateStr)){
@@ -5277,44 +5340,159 @@ function openForecastDay(dateStr,idx){
   const row=document.querySelector(`.fday[data-date="${dateStr}"]`);
   if(row){ row.classList.add('open'); row.querySelector('.fday-head').setAttribute('aria-expanded','true'); }
   const daily=cachedWx.daily;
-  const{day}=buildDay(dateStr,daily.sunrise[idx],daily.sunset[idx]);
+  const{day,good,goodHours,peakKn,peakDayKn,domDir,hasBadDir}=buildDay(dateStr,daily.sunrise[idx],daily.sunset[idx]);
   const pf=loadProfile();
+  const prefs=loadDayPrefs();
+  const detail=_detailForecastDays.has(dateStr);
+
   // Hours in columns, parameters in rows — the Windguru reading. Only daylight
   // hours: nobody is choosing a kite for 03:00.
   const cell=(h,inner,style='')=>`<td style="${style}" title="${h.tStr.slice(11,16)}">${inner}</td>`;
   const rowOf=(cls,label,cells)=>`<tr class="${cls}"><th class="fg-rh">${label}</th>${cells}</tr>`;
   const nowH=new Date().getHours();
   const isToday=dateStr===new Date().toISOString().slice(0,10);
+  // The second tier shows what the rider chose to hide, rather than a different
+  // set of facts — "Details" is a wider table, not another view.
+  const on=k=>prefs[k]||detail;
+
   let t='';
   t+=rowOf('fg-hr','Hour',day.map(h=>{
-    const on=isToday&&h.hour===nowH;
-    return `<td class="${on?'fg-now':''}">${String(h.hour).padStart(2,'0')}</td>`;
+    const isNow=isToday&&h.hour===nowH;
+    return `<td class="${isNow?'fg-now':''}">${String(h.hour).padStart(2,'0')}</td>`;
   }).join(''));
   t+=rowOf('fg-wx','',day.map(h=>cell(h,wmoInfo(h.code)[0])).join(''));
   // Colour marks the hours you can actually ride. Speed alone was misleading:
   // 20 kn from the wrong quarter came out bright green, indistinguishable from
-  // a genuine session, while the whole row competed for attention. Hours that
-  // do not qualify — too light, wrong direction, rain — recede instead, so the
-  // ones that do stand out on their own.
+  // a genuine session, while the whole row competed for attention.
   t+=rowOf('fg-kn','Wind',day.map(h=>h.qualifying
     ? cell(h,h.kn,`background:${windBarColor(h.kn)};color:${windTextColor(h.kn)};font-weight:700`)
     : cell(h,h.kn,'background:rgba(51,65,85,.35);color:var(--tdim);font-weight:500')).join(''));
-  t+=rowOf('fg-gust','Gusts',day.map(h=>cell(h,h.gustKn||'\u2014')).join(''));
-  t+=rowOf('fg-dir','Dir',day.map(h=>
-    `<td title="${compass(h.dir)} ${h.dir}\u00b0"><span class="fg-arrow" style="transform:rotate(${(h.dir+180)%360}deg)">\u2191</span></td>`).join(''));
-  t+=rowOf('fg-kite','Kite',day.map(h=>{
+  if(on('gusts')) t+=rowOf('fg-gust','Gusts',day.map(h=>cell(h,h.gustKn||'\u2014')).join(''));
+  if(on('dir')) t+=rowOf('fg-dir','Dir',day.map(h=>
+    `<td title="${compass(h.dir)} ${h.dir}\u00b0"><span class="fg-arrow" style="transform:rotate(${(h.dir+180)%360}deg)">\u2191</span>${
+      on('degrees')?`<span class="fg-deg">${h.dir}\u00b0</span>`:''}</td>`).join(''));
+  if(on('kite')) t+=rowOf('fg-kite','Kite',day.map(h=>{
     const k=suggestKiteSize({weightKg:pf.weightKg,level:pf.kiteLevel,pref:pf.powerPref,windKn:h.kn,gustKn:h.gustKn});
     if(!k) return `<td class="fg-dim">\u2014</td>`;
     const sfx=k.limit==='over'?'+':k.limit==='under'?'\u2212':'';
     return `<td title="${k.exact} m for ${pf.weightKg} kg at ${h.kn} kn">${k.size}${sfx}</td>`;
   }).join(''));
-  t+=rowOf('fg-temp','\u00b0C',day.map(h=>cell(h,h.temp+'\u00b0')).join(''));
+  if(on('waves')){
+    t+=rowOf('fg-wave','Waves',day.map(h=>{
+      const w=cachedMarineHrMap?cachedMarineHrMap.get(h.tStr.slice(0,13)):null;
+      return cell(h,w!=null?w.h.toFixed(1):'\u2014');
+    }).join(''));
+  }
+  if(on('conditions')) t+=rowOf('fg-cond','State',day.map(h=>{
+    const{label,cls}=conditionLabel(h.kn,h.dir,h.code,h.temp,h.gustKn||0);
+    return `<td><span class="fg-pill ${cls}">${label}</span></td>`;
+  }).join(''));
+  if(on('temp')) t+=rowOf('fg-temp','\u00b0C',day.map(h=>cell(h,h.temp+'\u00b0')).join(''));
 
-  body.innerHTML=`<div class="fg-scroll"><table class="fg">${t}</table></div>
+  body.innerHTML=daySummaryHTML(dateStr,idx,{day,good,goodHours,peakKn,peakDayKn,domDir,hasBadDir,detail})
+    +`<div class="fg-scroll"><table class="fg">${t}</table></div>
     <div class="fg-foot">
-      <button class="fg-more" onclick="openModal('${dateStr}',${idx})">Full detail, tides &amp; sessions \u2192</button>
+      <button class="fg-more" onclick="toggleForecastDetail('${dateStr}',${idx})">${
+        detail?'\u25b4 Less':'\u25be Details'}</button>
+      <button class="fg-more" onclick="openDayPrefs()" title="Choose which rows appear here">\u2699 Columns</button>
+      <!-- Session confirmation still lives in the modal. Until it moves in
+           here, this is the only way to reach it from a day, so removing the
+           old "Full detail" button without replacing this path would have quietly
+           cost the rider the ability to confirm a session at all. -->
+      <button class="fg-more" onclick="openModal('${dateStr}',${idx})" title="Confirm you are going, and notify your friends">\u{1F3C4} Session</button>
     </div>`;
   body.hidden=false;
+}
+
+// The chips and tide times that used to sit at the top of the modal. They are
+// facts about the day, so they belong with the day, not behind a second click.
+function daySummaryHTML(dateStr,idx,d){
+  const daily=cachedWx.daily;
+  const sunrise=daily.sunrise[idx], sunset=daily.sunset[idx];
+  const srH=parseInt(sunrise.slice(11,13),10), ssH=parseInt(sunset.slice(11,13),10);
+  const win=bestWindow(d.good);
+  const maxGust=d.day.length?Math.max(...d.day.map(h=>h.gustKn)):0;
+  const avgTemp=d.day.length?Math.round(d.day.reduce((s,h)=>s+h.temp,0)/d.day.length):null;
+  const swell=getSwellSummary(dateStr,srH,ssH);
+  const chip=(txt,cls='')=>`<span class="m-badge ${cls}">${txt}</span>`;
+  let html='<div class="fd-summary">';
+  if(win) html+=chip(`\u{1FA81} ${win}`,'green');
+  if(d.peakKn>0) html+=chip(`Avg ${d.peakKn} kn`,'accent');
+  if(maxGust>0) html+=chip(`Gusts ${maxGust} kn`);
+  if(d.domDir!==null) html+=chip(`${isWindDirOK(d.domDir)?'\u2713':'\u2717'} ${compass(d.domDir)}`);
+  if(avgTemp!==null) html+=chip(`\u{1F321} avg ${avgTemp}\u00b0C`);
+  html+=chip(`\u{1F305} ${sunrise.slice(11,16)} \u00b7 \u{1F307} ${sunset.slice(11,16)}`);
+  if(swell) html+=chip(`\u{1F30A} ${swell.h}m${swell.p?' \u00b7 '+swell.p+'s':''}${swell.dir?' \u00b7 '+swell.dir:''}`);
+  html+='</div>';
+  // Tides are the one premium-gated fact here, and only worth the space once
+  // the rider has asked for detail.
+  if(d.detail){
+    html+='<div class="fd-summary fd-tides">'+(isPremium()
+      ? fmtTideBadges(cachedTideExtremes,dateStr)
+      : `<span class="m-badge" style="cursor:pointer;background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.4);color:#f59e0b" onclick="showUpgradeModal()">\u{1F30A} Tide times \u00b7 <strong>Upgrade to Premium \u2197</strong></span>`)
+      +'</div>';
+  }
+  return html;
+}
+
+const DAY_PREF_LABELS={
+  gusts:['Gusts','the gust row under the wind'],
+  dir:['Wind direction','an arrow per hour'],
+  degrees:['Degrees','the exact bearing, e.g. 237\u00b0'],
+  kite:['Kite size','from your weight and level'],
+  temp:['Temperature','air temperature per hour'],
+  waves:['Waves','swell height per hour'],
+  conditions:['Verdict','Good / Light / Bad per hour'],
+};
+function openDayPrefs(){
+  if($('dayPrefsSheet')) return;
+  const prefs=loadDayPrefs();
+  const ov=document.createElement('div');
+  ov.className='attend-sheet-overlay'; ov.id='dayPrefsSheet';
+  ov.onclick=e=>{ if(e.target===ov) closeDayPrefs(); };
+  ov.innerHTML=`
+    <div class="attend-sheet">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+        <div>
+          <div style="font-size:1rem;font-weight:800;color:#f1f5f9">\u2699 Columns</div>
+          <div style="font-size:.78rem;color:#64748b;margin-top:2px">Shown in every day you open. Details still shows everything.</div>
+        </div>
+        <button onclick="closeDayPrefs()" style="background:none;border:none;color:#64748b;font-size:1.2rem;cursor:pointer;padding:4px">\u2715</button>
+      </div>
+      <div class="dp-list">
+        ${DAY_PREF_KEYS.map(k=>`
+          <label class="dp-row">
+            <span>
+              <span class="dp-name">${DAY_PREF_LABELS[k][0]}</span>
+              <span class="dp-hint">${DAY_PREF_LABELS[k][1]}</span>
+            </span>
+            <input type="checkbox" data-daypref="${k}" ${prefs[k]?'checked':''}>
+          </label>`).join('')}
+      </div>
+      <div id="dayPrefsStatus" style="font-size:.74rem;color:#64748b;margin-top:10px;min-height:1em"></div>
+    </div>`;
+  document.body.appendChild(ov);
+  ov.querySelectorAll('[data-daypref]').forEach(cb=>{
+    cb.addEventListener('change',()=>{
+      const next=loadDayPrefs();
+      next[cb.dataset.daypref]=cb.checked;
+      saveDayPrefs(next);
+      const st=$('dayPrefsStatus');
+      if(st) st.textContent=loadProfile().email?'\u2713 Saved to your profile':'\u2713 Saved on this device';
+      // Repaint every open day so the change is visible behind the sheet.
+      _openForecastDays.forEach(d=>{
+        const i=cachedWx?.daily?.time?.indexOf(d);
+        if(i>=0) openForecastDay(d,i);
+      });
+    });
+  });
+}
+function closeDayPrefs(){ const el=$('dayPrefsSheet'); if(el) el.remove(); }
+
+function toggleForecastDetail(dateStr,idx){
+  if(_detailForecastDays.has(dateStr)) _detailForecastDays.delete(dateStr);
+  else _detailForecastDays.add(dateStr);
+  openForecastDay(dateStr,idx);
 }
 
 function buildDay(dateStr,sunrise,sunset){
@@ -9277,7 +9455,7 @@ function updatePremiumUI(){
 
 async function syncPremiumFromSupabase(email){
   const sb=getSb(); if(!sb||!email) return;
-  const{data,error}=await sb.from('profiles').select('is_premium,sms_enabled,phone_number,is_admin,nickname,friend_session_notifs,notify_friends_on_confirm,avatar_url,contribution_points,premium_until,notifs_enabled,home_lat,home_lon,home_label,digest_nearby_enabled,digest_nearby_km,kite_level,weight_kg,power_pref').eq('email',email).single();
+  const{data,error}=await sb.from('profiles').select('is_premium,sms_enabled,phone_number,is_admin,nickname,friend_session_notifs,notify_friends_on_confirm,avatar_url,contribution_points,premium_until,notifs_enabled,home_lat,home_lon,home_label,digest_nearby_enabled,digest_nearby_km,kite_level,weight_kg,power_pref,display_prefs').eq('email',email).single();
   console.log('[syncPremium] email=',email,'data=',data,'error=',error?.message);
   const p=loadProfile();
   if(data){
@@ -9300,6 +9478,9 @@ async function syncPremiumFromSupabase(email){
     p.digestNearbyEnabled=data.digest_nearby_enabled===true;
     p.digestNearbyKm=data.digest_nearby_km||120;
     saveProfile(p);
+    // The stored copy wins: the whole point of the column is that a rider's
+    // choices follow them onto a device that has never seen them.
+    applyDayPrefsFromProfile(data);
     const fst=$('ppFriendSessionToggle');
     if(fst) fst.classList.toggle('on', p.friendSessionNotifs!==false);
     const nft=$('ppNotifyFriendsToggle');
