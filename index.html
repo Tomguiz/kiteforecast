@@ -5744,6 +5744,11 @@ function bellSVG(size){
 }
 
 function renderGrid(){
+  // Nothing to repaint without a forecast. This used to destructure straight
+  // through and throw, which mattered because cancelAttendance calls it AFTER
+  // the row is already cancelled in the database: the write succeeded, then the
+  // repaint threw, and the toast and the going-state refresh after it never ran.
+  if(!cachedWx?.daily) return;
   const{daily}=cachedWx;
   const loc=cachedLoc;
 
