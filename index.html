@@ -323,12 +323,17 @@
       letter-spacing:.08em; text-transform:uppercase; color:var(--tdim);
       background:var(--card); position:sticky; left:0; z-index:2;
     }
-    .fg-hr td { font-size:.7rem; color:var(--gray); font-weight:600; }
-    .fg-hr td.fg-now { box-shadow:inset 0 0 0 1.5px var(--accent); border-radius:3px; color:var(--accent); }
-    .fg-wx td { font-size:.8rem; }
-    .fg-gust td, .fg-temp td { font-size:.7rem; color:var(--tdim); }
-    .fg-kite td { color:#5dd4f0; font-weight:700; }
-    .fg-kite td.fg-dim { color:var(--tdim); font-weight:400; }
+    /* All of these must out-rank `table.fg td` (0,1,2). Written as `.fg-hr td`
+       they scored (0,1,1) and lost every one of these declarations: the glyphs
+       stayed at .76rem and the gust and temperature rows never dimmed, so the
+       whole table read at one flat weight. */
+    table.fg tr.fg-hr td { font-size:.7rem; color:var(--gray); font-weight:600; }
+    table.fg tr.fg-hr td.fg-now { box-shadow:inset 0 0 0 1.5px var(--accent); border-radius:3px; color:var(--accent); }
+    /* Rain, drizzle and cloud are barely separable below ~16px on a dark ground. */
+    table.fg tr.fg-wx td { font-size:1.05rem; height:30px; line-height:1; }
+    table.fg tr.fg-gust td, table.fg tr.fg-temp td { font-size:.7rem; color:var(--tdim); }
+    table.fg tr.fg-kite td { color:#5dd4f0; font-weight:700; }
+    table.fg tr.fg-kite td.fg-dim { color:var(--tdim); font-weight:400; }
     .fg-arrow { display:inline-block; color:var(--accent); font-size:.85rem; line-height:1; }
     .fg-foot { padding:9px 13px 11px; }
     .fg-more { background:none; border:1px solid var(--border); border-radius:8px; color:var(--gray);
@@ -7439,6 +7444,9 @@ function selectSessionStart(timeStr, dateStr, rowEl){
   _attendSessionStart=timeStr; _attendDateStr=dateStr;
   if(rowEl) rowEl.classList.add('selected-start');
   attendLabel.innerHTML=`🏄 Starting at <strong style="color:#4ade80">${timeStr}</strong>`;
+  // One button, two jobs — so it has to name the one it will do.
+  const cancelBtn=$('mAttendCancel');
+  if(cancelBtn) cancelBtn.textContent=_attendCache[dateStr]?'\u2715 Cancel session':'\u2715 Dismiss';
   attendBar.style.display='flex';
 }
 
@@ -11156,9 +11164,15 @@ $('ppMasterToggle').classList.toggle('on', notifMasterEnabled());
 // Wire persistent attend bar buttons
 const _cancelBtn=$('mAttendCancel'), _confirmBtn=$('mAttendConfirm');
 if(_cancelBtn) _cancelBtn.onclick=function(){
+  const d=_attendDateStr;
   document.querySelectorAll('.modal-hour-row.selected-start').forEach(r=>r.classList.remove('selected-start'));
   _attendSessionStart=null; _attendDateStr=null;
   $('mAttendBar').style.display='none';
+  // This used to stop here, which is why the button looked broken: it dropped
+  // the pending selection and left a confirmed session untouched, so the row
+  // still said "Going" afterwards. The only other way out was a small text
+  // link in a separate bar, easy to miss and easy not to reach on a phone.
+  if(d&&_attendCache[d]) cancelAttendance(d);
 };
 if(_confirmBtn) _confirmBtn.onclick=function(){
   if(_attendSessionStart&&_attendDateStr) confirmSessionFromModal(_attendDateStr,_attendSessionStart);
