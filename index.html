@@ -2792,8 +2792,13 @@ let pendingFav=null; // fav to execute after sign-in
 let _deferredInstallPrompt=null; // PWA install prompt event
 
 // ── Constants (must be top-level to avoid TDZ when initAuth() runs) ──────────
-const WEBHOOK_URL    = 'https://hook.eu1.make.com/6t9fgm6btixri2wf5lnx47requf416vs';
-const REMINDER_HOURS = [72, 48, 24, 6, 1];
+// Must match REMINDER_HOURS in check-new-sessions. It did not: the backend
+// dropped to [24, 1] so a rider gets one email per session instead of five,
+// but this copy kept the old ladder and went on creating all five rows from
+// the browser — 14 of them for one spot. The send-time guard meant only one
+// email still went out, but it was the 72h one, which is the least reliable
+// forecast of the five.
+const REMINDER_HOURS = [24, 1];
 const SB_URL  = 'https://kpwmajtxmcfpakvonimf.supabase.co';
 const SB_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtwd21hanR4bWNmcGFrdm9uaW1mIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUxNTcyMjYsImV4cCI6MjA5MDczMzIyNn0.QfQuIQbnfVUOApPbOdvCRbNsVdb0SBAwMX-hvioGJmg';
 // Up here with the others, not beside fetchForecastBundle where it used to sit:
@@ -6754,98 +6759,12 @@ async function removeDayNotif(spotName,date){
   renderHintChips();
 }
 
-async function fireWebhook(spot,sessInfo,reminderHours,emailOverride){
-  const p=loadProfile();
-  const email=emailOverride||p.email;
-  if(!email||!WEBHOOK_URL)return;
-  const knownSpot=SPOTS.find(s=>s.name===spot.name);
-  const spotCity=knownSpot?.loc?knownSpot.loc.split(', ').slice(0,-1).join(', '):'';
-  const spotCountry=knownSpot?.loc?knownSpot.loc.split(', ').pop():'';
-  const dateStr=sessInfo.sessionStart.slice(0,10);
-  const{full:dateLabel}=fmtDate(dateStr);
-  const appUrl=`${location.origin}${location.pathname}?spot=${encodeURIComponent(spot.name)}&date=${dateStr}`;
-  const userDirs=(sessInfo._dirs||[...windDirs]).map(d=>typeof d==='number'?compass(d):d);
-  const rh=reminderHours??0;
-  try{
-    await fetch(WEBHOOK_URL,{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        notification_type: sessInfo.notifType||'spot',
-        reminder_label: rh===0?'immediate':`${rh} hour${rh>1?'s':''} before`,
-        email,
-        spot: spot.name,
-        spot_city: spotCity,
-        spot_country: spotCountry,
-        spot_map_link: `https://www.google.com/maps?q=${spot.lat||spot.latitude},${spot.lon||spot.longitude}`,
-        date: dateStr,
-        day_of_week: new Date(dateStr+'T12:00:00').toLocaleDateString('en',{weekday:'long'}),
-        date_label: dateLabel,
-        app_link: appUrl,
-        session:{
-          start_time: sessInfo.sessionStart,
-          end_time: sessInfo.sessionEnd||'',
-          start_time_formatted: (sessInfo.sessionStart||'').slice(11,16),
-          end_time_formatted: (sessInfo.sessionEnd||'').slice(11,16),
-          duration_hours: sessInfo.duration_hours||0,
-          wind_speed_peak_kn: sessInfo.peakKn||0,
-          wind_speed_min_kn: sessInfo.windMin||0,
-          wind_gusts_kn: sessInfo.gusts||0,
-          wind_direction: sessInfo.domDir||'—',
-          wind_consistency_pct: sessInfo.wind_consistency_pct||0,
-          rating: sessInfo.rating_label||'',
-        },
-        conditions:{
-          weather: sessInfo.weather_description||'',
-          temperature_max_c: sessInfo.temperature_max||null,
-          temperature_min_c: sessInfo.temperature_min||null,
-          sunrise: sessInfo.sunrise||'',
-          sunset: sessInfo.sunset||'',
-          daylight_hours: sessInfo.daylight_hours||0,
-        },
-        user_good_wind_dirs: userDirs,
-      })
-    });
-  }catch(e){console.warn('Webhook failed',e);}
-}
-
-// ── Build session info for a list of dates from cachedWx ──
-function _buildSessionsForDates(spotName, dates){
-  if(!cachedWx) return [];
-  const {daily} = cachedWx;
-  return dates.sort().reduce((arr, dateStr) => {
-    const i = daily.time.indexOf(dateStr);
-    if(i === -1) return arr;
-    const {good, peakKn, domDir, day} = buildDay(dateStr, daily.sunrise[i], daily.sunset[i]);
-    const code = daylightWeatherCode(day, daily.weather_code[i]);
-    const [, weatherDesc] = wmoInfo(code);
-    const rating = rateDay(good.length, peakKn, code, day.some(h=>h.type==='lightdir'), day.length?Math.max(...day.map(h=>h.kn)):0);
-    const gusts = good.length ? Math.max(...good.map(h=>h.gustKn||0)) : 0;
-    const windMin = good.length ? Math.min(...good.map(h=>h.kn)) : 0;
-    const consistencyPct = day.length ? Math.round(good.length/day.length*100) : 0;
-    arr.push({
-      dateStr,
-      sessionStart: good.length ? good[0].tStr : dateStr+'T10:00',
-      sessionEnd:   good.length ? good[good.length-1].tStr : '',
-      duration_hours: good.length,
-      peakKn, windMin, gusts,
-      domDir: domDir !== null ? compass(domDir) : '—',
-      weather_description: weatherDesc,
-      rating_label: rating.label,
-      temperature_max: Math.round(daily.temperature_2m_max[i]),
-      temperature_min: Math.round(daily.temperature_2m_min[i]),
-      sunrise: daily.sunrise[i].slice(11,16),
-      sunset:  daily.sunset[i].slice(11,16),
-      daylight_hours: day.length,
-      wind_consistency_pct: consistencyPct,
-    });
-    return arr;
-  }, []);
-}
-
+// fireWebhook lived here. Nothing called it, and it was the last thing in the
+// client posting to the Make webhook.
 // ── CONFIRMATION WEBHOOK ──
 async function fireConfirmationWebhook(spot, sessions){
   const p=loadProfile();
-  if(!p.email||!WEBHOOK_URL) return;
+  if(!p.email) return;
   const knownSpot=SPOTS.find(s=>s.name===spot.name);
   const spotCity=knownSpot?.loc?knownSpot.loc.split(', ').slice(0,-1).join(', '):'';
   const spotCountry=knownSpot?.loc?knownSpot.loc.split(', ').pop():'';
@@ -6894,12 +6813,18 @@ async function fireConfirmationWebhook(spot, sessions){
     };
   });
 
+  // Sent by an edge function, not from here. Posting to Make from the browser
+  // is what stopped this email arriving: that route still went out through the
+  // consumer Outlook mailbox. The function decides the recipient from the
+  // caller's access token rather than anything sent here, so it cannot be used
+  // to mail anyone else.
+  const token=_authSession?.access_token||(await ensureSession())?.access_token;
+  if(!token) return;
   try{
-    await fetch(WEBHOOK_URL,{
-      method:'POST', headers:{'Content-Type':'application/json'},
+    await fetch(`${SB_URL}/functions/v1/subscribe-confirm`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json','apikey':SB_ANON,'Authorization':`Bearer ${token}`},
       body: JSON.stringify({
-        notification_type: 'confirmation',
-        email:             p.email,
         spot:              spot.name,
         spot_city:         spotCity,
         spot_country:      spotCountry,
@@ -6909,7 +6834,7 @@ async function fireConfirmationWebhook(spot, sessions){
         days,
       })
     });
-  }catch(e){ console.warn('Confirmation webhook failed',e); }
+  }catch(e){ console.warn('Confirmation email failed',e); }
 }
 
 // ── PROFILE PANEL ──
