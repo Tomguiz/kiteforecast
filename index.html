@@ -2035,11 +2035,6 @@ const STALE_AFTER_MS=2*60*60*1000;   // re-fetch on open only past this
 function refreshIfStale(){
   if(!lastFetchTime) return false;
   if(Date.now()-lastFetchTime<=STALE_AFTER_MS) return false;
-  // On the home screen it is the chip cache that holds the data, and
-  // lastFetchTime may be days old simply because no spot has been opened since.
-  // Wiping a chip epoch that is still warm made every card fetch twice on open:
-  // once on load, then again 900ms later, mid-flight.
-  if(!cachedLoc&&_chipCacheTs&&Date.now()-_chipCacheTs<CHIP_CACHE_TTL) return false;
   refreshForecast();
   return true;
 }
@@ -4068,16 +4063,24 @@ function refreshHomeChips(){
   localStorage.removeItem(CHIP_CACHE_LS_KEY);
   // The stale bar is driven by lastFetchTime, so a home refresh has to stamp
   // it too — otherwise the bar sits there forever, unclearable from here.
-  // It must say when the DATA was fetched, though, not when this rider asked:
-  // stamping Date.now() here claimed "Updated now" before a single byte had
-  // arrived, and again when every card came back from a two-hour-old row.
-  prefetchChipBundles(_homeScreenSpots(),true).then(()=>{
-    lastFetchTime=_chipBundleOldest||Date.now();
-    try{localStorage.setItem('kf_lastFetch',lastFetchTime);}catch(e){}
-    updateFetchTimestamp();
+  lastFetchTime=Date.now();
+  try{localStorage.setItem('kf_lastFetch',lastFetchTime);}catch(e){}
+  updateFetchTimestamp();
+  // Forced, and issued BEFORE the render: it registers itself as in flight
+  // synchronously, so the render's own prefetch joins it instead of opening a
+  // second batch for the same spots.
+  const _batch=prefetchChipBundles(_homeScreenSpots(),true);
+  renderHintChips();
+  _batch.then(()=>{
+    // A row older than the stamp above means some spot did not actually come
+    // back fresh. Say so rather than keep claiming the time we hoped for.
+    if(_chipBundleOldest&&_chipBundleOldest<lastFetchTime){
+      lastFetchTime=_chipBundleOldest;
+      try{localStorage.setItem('kf_lastFetch',lastFetchTime);}catch(e){}
+      updateFetchTimestamp();
+    }
     renderHintChips();
   });
-  renderHintChips();
 }
 function setChipDayBadge(el,n,isFav=false){
   if(n===null){
