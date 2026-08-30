@@ -12,7 +12,6 @@
 export type PremiumStage = 'has_friends' | 'active_alerts' | 'default'
 
 export interface PremiumState {
-  favCount: number
   reminderCount: number
   friendCount: number
 }

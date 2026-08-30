@@ -160,7 +160,6 @@ const PREMIUM_PITCH: Pass = {
     if (isPremium(profile)) return { skip: 'already premium' }
 
     const state = {
-      favCount: 0,
       reminderCount: rems.get(email) ?? 0,
       friendCount: friends.get(email) ?? 0,
     }
