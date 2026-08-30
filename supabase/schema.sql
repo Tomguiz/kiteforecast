@@ -441,6 +441,46 @@ SELECT cron.schedule(
   $$
 );
 
+-- Runs hourly at :17 — the two lifecycle emails, welcome at 24h and the premium
+-- pitch at 14 days. Hourly because both pick riders out of an age window rather
+-- than firing on an event; :17 keeps it off the same minute as the others.
+--
+-- This job was missing until now. The onboarding function shipped, was deployed
+-- and was wired to Resend, but nothing ever called it — so no rider had ever
+-- received a welcome email. Both passes are safe to run repeatedly: email_log is
+-- the dedupe, and each has a go-live cutoff on the signup date.
+--
+-- Unlike the crons above, this one authenticates with the SERVICE-ROLE key, not
+-- the anon key. The function is operator-only (isServiceRoleCaller) because it
+-- mails people, and the anon key is public — it would be rejected with a 401.
+-- The service-role key must never be committed, so it is read from Vault at
+-- send time. Seed it once per environment, outside this file:
+--
+--   SELECT vault.create_secret('<service-role key>', 'service_role_key',
+--                              'Bearer token for cron-invoked operator functions');
+--
+-- If the secret is missing the header comes out as NULL, the function answers
+-- 401 and nothing is sent — it fails closed rather than mailing anyone.
+SELECT cron.unschedule('lifecycle-emails') WHERE EXISTS (
+  SELECT 1 FROM cron.job WHERE jobname = 'lifecycle-emails'
+);
+SELECT cron.schedule(
+  'lifecycle-emails',
+  '17 * * * *',
+  $$
+  SELECT net.http_post(
+    url     := 'https://kpwmajtxmcfpakvonimf.supabase.co/functions/v1/onboarding',
+    headers := jsonb_build_object(
+      'Content-Type',  'application/json',
+      'Authorization', 'Bearer ' || (
+        SELECT decrypted_secret FROM vault.decrypted_secrets WHERE name = 'service_role_key'
+      )
+    ),
+    body    := '{}'::jsonb
+  );
+  $$
+);
+
 -- User-submitted spot update suggestions
 CREATE TABLE IF NOT EXISTS spot_update_suggestions (
   id               uuid             PRIMARY KEY DEFAULT gen_random_uuid(),

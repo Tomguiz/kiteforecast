@@ -66,6 +66,7 @@ describe('subjects render against a realistic payload', () => {
     spot_update:           { spot_name: 'Riverwoods' },
     spot_request_approved: { spot_name: 'Riverwoods' },
     onboarding:            {},
+    premium_pitch:         {},
   }
   for (const [kind, vars] of Object.entries(samples)) {
     it(`${kind} leaves no placeholder in its subject`, () => {

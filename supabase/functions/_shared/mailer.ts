@@ -104,6 +104,9 @@ export const DELIVERIES: Record<string, Delivery> = {
   spot_update:            { template: 'spot-update',       subject: '\u270D\uFE0F New spot update by the community \u2014 [[spot_name]]' },
   spot_request_approved:  { template: 'claim-accepted',    subject: '\u{1F389} Your spot request has been approved \u2014 [[spot_name]]' },
   onboarding:             { template: 'onboarding',        subject: 'Welcome to KiteForecast \u{1FA81}' },
+  // Two weeks after signup, and the only email that sells. Separate kind from
+  // 'onboarding' so email_log dedupes them independently.
+  premium_pitch:          { template: 'premium-pitch',    subject: 'The half of KiteForecast you haven\'t used yet \u{1F451}' },
 }
 
 // Reminders pick their template from the ladder step and whether the session is
