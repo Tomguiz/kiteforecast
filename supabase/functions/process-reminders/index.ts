@@ -13,6 +13,12 @@ import { recordEmail } from '../_shared/email-log-client.ts'
 const SUPABASE_URL            = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_KEY    = Deno.env.get('SB_SERVICE_ROLE_KEY')!
 const MAKE_WEBHOOK_URL        = 'https://hook.eu1.make.com/6t9fgm6btixri2wf5lnx47requf416vs'
+
+// Which steps of the ladder are allowed to email. The 1h reminder still runs —
+// it records the ground-truth wind the Stats page reads and fires the premium
+// SMS — it simply does not send a second email about a session the rider was
+// already told about.
+const REMINDER_EMAIL_HOURS    = [24]
 const TWILIO_ACCOUNT_SID      = Deno.env.get('TWILIO_ACCOUNT_SID') ?? ''
 const TWILIO_AUTH_TOKEN       = Deno.env.get('TWILIO_AUTH_TOKEN') ?? ''
 const TWILIO_FROM_NUMBER      = Deno.env.get('TWILIO_FROM_NUMBER') ?? ''
@@ -209,6 +215,25 @@ Deno.serve(async () => {
       //         informed even if forecast degraded), OR if forecast is good now
       //         (last-minute good session that had no 72h)
       const rh = r.reminder_hours as number
+
+      // One email per rider, per spot, per session date — answered once here
+      // and used by both the degraded-forecast rule below and the send itself.
+      // notif_type is deliberately NOT part of the key: a 'spot' and a 'day'
+      // reminder for the same spot on the same date are still two emails about
+      // one session. Enforced at send time rather than only at creation, so it
+      // also holds for the rows already sitting in the table.
+      const { data: priorEmail } = await supabase
+        .from('reminders')
+        .select('id')
+        .eq('email', r.email)
+        .eq('spot_name', r.spot_name)
+        .eq('session_date', r.session_date)
+        .eq('sent', true)
+        .eq('skipped', false)
+        .neq('id', r.id)
+        .limit(1)
+      const alreadyToldThem = !!(priorEmail && priorEmail.length)
+
       if (rh === 72 && !isGoodNow) {
         // Bad forecast at 72h — mark skipped (not emailed) so follow-up reminders
         // don't treat this as a successful send
@@ -217,25 +242,15 @@ Deno.serve(async () => {
       }
 
       if (rh !== 72 && !isGoodNow) {
-        // Check if 72h was actually emailed (sent=true AND skipped=false/null)
-        const { data: sent72 } = await supabase
-          .from('reminders')
-          .select('id')
-          .eq('email', r.email)
-          .eq('spot_name', r.spot_name)
-          .eq('session_date', r.session_date)
-          .eq('notif_type', r.notif_type)
-          .eq('reminder_hours', 72)
-          .eq('sent', true)
-          .eq('skipped', false)
-          .limit(1)
-
-        if (!sent72 || sent72.length === 0) {
-          // 72h was never emailed and forecast is bad — skip this one too
+        // The rule used to ask specifically whether the 72h step had been
+        // emailed. That step no longer exists, so the question is now the
+        // general one: were they already told about this session at all? If so
+        // this run is a forecast update and should proceed; if not, there is
+        // nothing to correct and a bad forecast is not worth an email.
+        if (!alreadyToldThem) {
           await supabase.from('reminders').update({ sent: true, skipped: true }).eq('id', r.id)
           continue
         }
-        // 72h was actually emailed → fall through and send this reminder (forecast update)
       }
       // ─────────────────────────────────────────────────────────────────────
 
@@ -334,17 +349,21 @@ Deno.serve(async () => {
         user_good_wind_dirs: spotDirs.map(compass),
       }
 
-      await fetch(MAKE_WEBHOOK_URL, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify(payload),
-      })
+      const sendEmail = REMINDER_EMAIL_HOURS.includes(rh) && !alreadyToldThem
 
-      // Never throws, so a logging failure cannot cost a rider their reminder.
-      await recordEmail({
-        email: r.email, kind: r.notif_type,
-        meta: { spot_name: r.spot_name, hours_before: rh },
-      })
+      if (sendEmail) {
+        await fetch(MAKE_WEBHOOK_URL, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify(payload),
+        })
+
+        // Never throws, so a logging failure cannot cost a rider their reminder.
+        await recordEmail({
+          email: r.email, kind: r.notif_type,
+          meta: { spot_name: r.spot_name, hours_before: rh },
+        })
+      }
 
       // SMS via Twilio — premium users only, 1h reminder only
       if (rh === 1 && TWILIO_ACCOUNT_SID) {
