@@ -8220,6 +8220,24 @@ function _actDay(dateStr){
   return new Date(dateStr+'T12:00:00').toLocaleDateString('en',{weekday:'short',day:'numeric',month:'short'});
 }
 
+// True once a confirmed session has finished. start_time is a local "HH:MM"
+// against session_date, and duration_h defaults to a short session rather than
+// zero, so a row without one does not vanish the moment it starts.
+function _sessionIsOver(r){
+  if(!r||!r.session_date) return false;
+  const today=new Date().toISOString().slice(0,10);
+  if(r.session_date>today) return false;      // still ahead
+  if(r.session_date<today) return true;       // yesterday or older
+  if(!r.start_time) return false;             // today, no time given — keep it
+  // Parsed as LOCAL time on purpose, not through localForecastToUtcMs: that
+  // helper shifts by the loaded spot's utc_offset_seconds, so its answer here
+  // would depend on which spot happens to be cached — or be silently wrong when
+  // none is. "Has this finished?" is a question about the rider's own clock.
+  const end=new Date(`${r.session_date}T${r.start_time}:00`).getTime()
+    + Math.max(1,Number(r.duration_h)||2)*3600*1000;
+  return Number.isFinite(end) && Date.now()>end;
+}
+
 async function renderActivity(){
   const el=$('activityFeed'); if(!el) return;
   const sb=getSb(); const email=_authSession?.user?.email||loadProfile().email;
@@ -8247,8 +8265,14 @@ async function renderActivity(){
   ]);
 
   const incoming=fr.data||[];
-  const sessions=att.data||[];
-  const alerts=rem.data||[];
+  // The query can only filter by DATE, so a session that ended at 17:00 was
+  // still listed under "Riding soon" at 20:00. Drop anything already over,
+  // using its own start time and duration; a row with no start time stays for
+  // the whole of its day, since there is nothing better to go on.
+  const sessions=(att.data||[]).filter(r=>!_sessionIsOver(r));
+  // Same for an alert whose moment has passed but which the cron has not yet
+  // picked up: "we will email you" is not true once the send time is behind us.
+  const alerts=(rem.data||[]).filter(a=>!a.send_at||new Date(a.send_at).getTime()>Date.now());
   const emails=log.data||[];
 
   // Nicknames for everyone who appears, in one lookup.
