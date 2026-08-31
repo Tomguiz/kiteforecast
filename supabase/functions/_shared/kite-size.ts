@@ -50,7 +50,10 @@ export interface KiteSizeInput {
   windKn: number
 }
 
-export interface KiteSizeResult { size: number; exact: number }
+// `limit` is what stops this being either a lie or a shrug. 'over' means the
+// rider needs more kite than the quiver holds — take the biggest and expect it
+// to be marginal. 'under' is the mirror. The UI renders these as 14 m+ / 5 m-.
+export interface KiteSizeResult { size: number; exact: number; limit: 'over' | 'under' | null }
 
 // null means "cannot say", never "use a default".
 export function suggestKiteSize(i: KiteSizeInput): KiteSizeResult | null {
@@ -61,13 +64,44 @@ export function suggestKiteSize(i: KiteSizeInput): KiteSizeResult | null {
   if (!(level in LEVEL_FACTOR)) return null
   const pref: PowerPref = (i.pref && i.pref in PREF_FACTOR) ? i.pref : 'neutral'
   const exact = KITE_SIZE_K * weightKg / windKn * powerFactor(level, pref)
-  // Snapping only makes sense inside the quiver. An 80 kg rider who likes
-  // being overpowered wants 18.3 m at 14 kn; answering "14 m" is not a
-  // recommendation, it is the largest number in the list pretending to be
-  // one. Outside the range there is no honest answer.
-  if (exact > QUIVER_SIZES[QUIVER_SIZES.length - 1] + 1) return null
-  if (exact < QUIVER_SIZES[0] - 1) return null
+  // An 80 kg rider who likes being overpowered computes 17.1 m at 15 kn.
+  // Snapping that silently to 14 is a lie; returning nothing is a shrug, and
+  // it removes the number the rider opened the card for. So it caps, and says
+  // that it capped.
+  const MAXS = QUIVER_SIZES[QUIVER_SIZES.length - 1], MINS = QUIVER_SIZES[0]
+  if (exact > MAXS) return { size: MAXS, exact: Math.round(exact * 10) / 10, limit: 'over' }
+  if (exact < MINS) return { size: MINS, exact: Math.round(exact * 10) / 10, limit: 'under' }
   const size = QUIVER_SIZES.reduce((best, s) =>
     Math.abs(s - exact) < Math.abs(best - exact) ? s : best, QUIVER_SIZES[0])
-  return { size, exact: Math.round(exact * 10) / 10 }
+  return { size, exact: Math.round(exact * 10) / 10, limit: null }
+}
+
+// How far the wind may drift before the advice changes size. Without this the
+// hour-by-hour column flickers 13/12/13/12 across a couple of knots, which is
+// noise dressed as advice — a rider does not land to swap kite because the
+// forecast moved 1 kn. Only a real shift earns a change.
+export const SIZE_HYSTERESIS_M = 1.5
+
+export interface HourWind { hr: number; kn: number }
+export interface HourSize { hr: number; size: number; limit: 'over' | 'under' | null }
+
+// Walks the hours in order and holds the current size until the requirement
+// leaves a band around it. Sequential on purpose: the answer for an hour
+// depends on what the rider is already flying, not only on that hour's wind.
+export function smoothKiteSizes(
+  hours: HourWind[], base: Omit<KiteSizeInput, 'windKn'>,
+): HourSize[] {
+  const out: HourSize[] = []
+  let held: KiteSizeResult | null = null
+  for (const h of hours) {
+    const raw = suggestKiteSize({ ...base, windKn: h.kn })
+    if (!raw) { held = null; continue }          // gap in the day resets the hold
+    if (held && Math.abs(raw.exact - held.size) <= SIZE_HYSTERESIS_M) {
+      out.push({ hr: h.hr, size: held.size, limit: raw.limit })
+      continue
+    }
+    held = raw
+    out.push({ hr: h.hr, size: raw.size, limit: raw.limit })
+  }
+  return out
 }

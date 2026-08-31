@@ -101,29 +101,34 @@ describe('the number is usable', () => {
 // overpowered computes 18.3 m at 14 kn; answering "14 m" is not advice, it is
 // the largest number in the list pretending to be advice — and 14 m in 14 kn
 // for someone who wanted 18 is a materially different session.
-describe('outside the quiver it says nothing', () => {
-  it('refuses when the rider would need more kite than the list holds', () => {
-    const r = suggestKiteSize({ weightKg: 80, level: 'Advanced', pref: 'overpowered', windKn: 14 })
-    expect(r).toBeNull()
+describe('outside the quiver it caps, and says that it capped', () => {
+  // Snapping 17.1 silently to 14 is a lie. Returning null is a shrug that
+  // removes the number the rider opened the card for. Capping with a marker
+  // is the only option that is both true and useful.
+  it('caps at the top and flags it, rather than pretending', () => {
+    const r = suggestKiteSize({ weightKg: 80, level: 'Advanced', pref: 'overpowered', windKn: 15 })!
+    expect(r.size).toBe(14)
+    expect(r.limit).toBe('over')
+    expect(r.exact).toBeGreaterThan(14)   // the honest number survives for the tooltip
   })
 
-  it('answers again as soon as the number lands in the quiver', () => {
-    const r = suggestKiteSize({ weightKg: 80, level: 'Advanced', pref: 'overpowered', windKn: 18 })
+  it('caps at the bottom the same way', () => {
+    const r = suggestKiteSize({ weightKg: 45, level: 'Beginner', pref: 'underpowered', windKn: 40 })
+    if (r) { expect(r.size).toBe(5); expect(r.limit).toBe('under') }
+  })
+
+  it('marks nothing when the size lands inside the quiver', () => {
+    const r = suggestKiteSize({ weightKg: 75, level: 'Intermediate', windKn: 20 })!
+    expect(r.size).toBe(10)
+    expect(r.limit).toBeNull()
+  })
+
+  it('still shows a size in the case that prompted this', () => {
+    // Oesterdam, 15 kn, the profile on the screenshot. Before: a bare "14 m",
+    // silently 3 m off. After the first attempt: nothing at all, which was
+    // worse. Now: 14 m flagged as the top of the range.
+    const r = suggestKiteSize({ weightKg: 80, level: 'Advanced', pref: 'overpowered', windKn: 15 })
     expect(r).not.toBeNull()
-    expect(r!.size).toBe(14)
-  })
-
-  it('never returns the biggest size for a wildly bigger requirement', () => {
-    // the shape of the old bug: exact far above the quiver, snapped to its top
-    for (const kn of [14, 15, 16, 17]) {
-      const r = suggestKiteSize({ weightKg: 95, level: 'Advanced', pref: 'overpowered', windKn: kn })
-      if (r) expect(r.exact).toBeLessThanOrEqual(15)
-    }
-  })
-
-  it('still answers normally for an ordinary rider in ordinary wind', () => {
-    // the guard must not swallow the common case it was added around
-    expect(suggestKiteSize({ weightKg: 75, level: 'Intermediate', windKn: 20 })!.size).toBe(10)
-    expect(suggestKiteSize({ weightKg: 60, level: 'Beginner', windKn: 25 })!.size).toBeGreaterThan(0)
+    expect(r!.limit).toBe('over')
   })
 })

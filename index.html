@@ -4491,12 +4491,12 @@ function suggestKiteSize({weightKg,level,pref,windKn}){
   if(!(level in _LEVEL_FACTOR)) return null;
   const p=(pref&&pref in _PREF_FACTOR)?pref:'neutral';
   const exact=KITE_SIZE_K*weightKg/windKn*kitePowerFactor(level,p);
-  // Outside the quiver there is no honest answer — snapping 18.3 down to the
-  // biggest size in the list would look like advice and would not be any.
-  if(exact>QUIVER_SIZES[QUIVER_SIZES.length-1]+1) return null;
-  if(exact<QUIVER_SIZES[0]-1) return null;
+  // Caps rather than lying or shrugging — see _shared/kite-size.ts.
+  const _MAXS=QUIVER_SIZES[QUIVER_SIZES.length-1], _MINS=QUIVER_SIZES[0];
+  if(exact>_MAXS) return {size:_MAXS, exact:Math.round(exact*10)/10, limit:'over'};
+  if(exact<_MINS) return {size:_MINS, exact:Math.round(exact*10)/10, limit:'under'};
   const size=QUIVER_SIZES.reduce((b,s)=>Math.abs(s-exact)<Math.abs(b-exact)?s:b,QUIVER_SIZES[0]);
-  return {size, exact:Math.round(exact*10)/10};
+  return {size, exact:Math.round(exact*10)/10, limit:null};
 }
 const riderLevelIdx = lvl => RIDER_LEVELS.indexOf(lvl);
 const spotLevelIdx  = lvl => SPOT_SKILL_LEVELS.indexOf(lvl);
@@ -5348,7 +5348,12 @@ function openModal(dateStr,dayIdx){
     ${win?`<span class="m-badge green">🪁 ${win}</span>`:''}
     ${peakKn>0?`<span class="m-badge accent">Avg ${peakKn} kn</span>`:''}
     ${(()=>{const _pf=loadProfile();const k=suggestKiteSize({weightKg:_pf.weightKg,level:_pf.kiteLevel,pref:_pf.powerPref,windKn:peakKn});
-      return k?`<span class="m-badge accent" title="Suggested for ${_pf.weightKg} kg, ${_pf.kiteLevel}, ${peakKn} kn">\uD83E\uDE81 ${k.size} m</span>`:'';})()}
+      if(!k) return '';
+      const _sfx=k.limit==='over'?'+':k.limit==='under'?'\u2212':'';
+      const _tip=k.limit==='over'?`You'd want about ${k.exact} m — bigger than the ${k.size} m top of the range, so expect to be under-powered`
+                :k.limit==='under'?`You'd want about ${k.exact} m — smaller than the ${k.size} m bottom of the range`
+                :`Suggested for ${_pf.weightKg} kg, ${_pf.kiteLevel}, ${peakKn} kn`;
+      return `<span class="m-badge accent" title="${_tip}">\uD83E\uDE81 ${k.size} m${_sfx}</span>`;})()}
     <button id="mBadgeMore" onclick="(function(b){var x=$('mBadgeExtra');var open=x.classList.toggle('open');var tr=$('mTideRow');if(tr)tr.style.display=open?'flex':'none';b.textContent=open?'▲ Less':'▼ More';})(this)">▼ More</button>
     <span id="mBadgeExtra">
     ${maxGust>0?`<span class="m-badge">Gusts ${maxGust} kn</span>`:''}
