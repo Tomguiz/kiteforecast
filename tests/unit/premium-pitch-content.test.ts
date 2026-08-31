@@ -92,3 +92,34 @@ describe('buildPremiumHookHtml', () => {
     }
   })
 })
+
+// The planner became premium, so the day-14 email stopped pitching an
+// abstraction and started explaining the padlock the rider has already seen on
+// the home screen.
+describe('the default pitch leads with the planner', () => {
+  const html = buildPremiumHookHtml({ reminderCount: 0, friendCount: 0 }, LINKS, 'Tom')
+
+  it('names the button they could not press', () => {
+    expect(html).toContain('Where to ride?')
+    // A raw apostrophe, like the other labels in this file — valid in HTML
+    // text content, and what label() actually emits.
+    expect(html).toMatch(/CAN'T PRESS/i)
+  })
+
+  it('keeps the spot cap as the supporting reason, not the headline', () => {
+    expect(html).toMatch(/one-spot cap/i)
+    expect(html.indexOf('Where to ride?')).toBeLessThan(html.indexOf('one-spot cap'))
+  })
+
+  it('sends them where checkout actually lives', () => {
+    expect(html).toContain(LINKS.upgrade)
+  })
+
+  it('does not override a stronger signal', () => {
+    // A rider with friends or alerts still gets the pitch matching what they do.
+    const friends = buildPremiumHookHtml({ reminderCount: 0, friendCount: 2 }, LINKS, 'Tom')
+    const alerts  = buildPremiumHookHtml({ reminderCount: 3, friendCount: 0 }, LINKS, 'Tom')
+    expect(friends).not.toContain('Where to ride?')
+    expect(alerts).not.toContain('Where to ride?')
+  })
+})

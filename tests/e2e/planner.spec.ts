@@ -11,13 +11,17 @@ const withHome = (page: any) => page.evaluate(() => {
   saveProfile(p);
 });
 
+// The planner is premium. These tests therefore sign in as a premium rider —
+// a free one is stopped at the gate, which is what planner-premium-gate.spec.ts
+// covers.
+
 test('the button is on the home screen', async ({ gotoApp, page }) => {
-  await gotoApp('signedIn');
+  await gotoApp('premium');
   await expect(page.locator('#planBtn')).toBeVisible();
 });
 
 test('without a home location it sends you to set one, rather than guessing', async ({ gotoApp, page }) => {
-  await gotoApp('signedIn');
+  await gotoApp('premium');
   await page.evaluate(() => { const p = loadProfile(); p.homeLat = null; p.homeLon = null; saveProfile(p); });
   await page.locator('#planBtn').click();
 
@@ -26,7 +30,7 @@ test('without a home location it sends you to set one, rather than guessing', as
 });
 
 test('opens with the rider’s home, the day window and car spelled out', async ({ gotoApp, page }) => {
-  await gotoApp('signedIn');
+  await gotoApp('premium');
   await withHome(page);
   await page.locator('#planBtn').click();
 
@@ -40,7 +44,7 @@ test('opens with the rider’s home, the day window and car spelled out', async 
 
 test('the shortlist is capped before any forecast is requested', async ({ gotoApp, page }) => {
   // This is the guard that keeps one search from firing 399 requests.
-  await gotoApp('signedIn');
+  await gotoApp('premium');
   const n = await page.evaluate(async () => {
     await (window as any)._spotsReady;
     return shortlistCandidates(
@@ -53,7 +57,7 @@ test('the shortlist is capped before any forecast is requested', async ({ gotoAp
 });
 
 test('a failed routing call degrades to estimates instead of failing the search', async ({ gotoApp, page }) => {
-  await gotoApp('signedIn');
+  await gotoApp('premium');
   await page.route(/router\.project-osrm\.org/, r => r.abort());
   const res = await page.evaluate(async () => {
     await (window as any)._spotsReady;
@@ -67,7 +71,7 @@ test('a failed routing call degrades to estimates instead of failing the search'
 });
 
 test('ranking drops spots with no day worth the drive', async ({ gotoApp, page }) => {
-  await gotoApp('signedIn');
+  await gotoApp('premium');
   const names = await page.evaluate(() => rankPlan([
     { name: 'calm', lat: 51, lon: 3, driveMin: 40, days: [{ dateStr: 'a', goodHours: 4, peakKn: 11 }] },
     { name: 'windy', lat: 51, lon: 3, driveMin: 40, days: [{ dateStr: 'a', goodHours: 4, peakKn: 26 }] },
@@ -76,7 +80,7 @@ test('ranking drops spots with no day worth the drive', async ({ gotoApp, page }
 });
 
 test('the date window really is capped at four days', async ({ gotoApp, page }) => {
-  await gotoApp('signedIn');
+  await gotoApp('premium');
   const d = await page.evaluate(() => planDates('2026-08-28', 14));
   expect(d).toHaveLength(4);
   expect(d[3]).toBe('2026-08-31');
@@ -100,20 +104,20 @@ const openPlanner = async (page: any) => {
 };
 
 test('offers exactly the four days the window allows', async ({ gotoApp, page }) => {
-  await gotoApp('signedIn');
+  await gotoApp('premium');
   await openPlanner(page);
   const btns = page.locator('#plannerBody button[onclick^="togglePlanDay"]');
   await expect(btns).toHaveCount(4);
 });
 
 test('defaults to today and tomorrow, not the whole window', async ({ gotoApp, page }) => {
-  await gotoApp('signedIn');
+  await gotoApp('premium');
   await openPlanner(page);
   expect(await page.evaluate(() => _planSelectedDays().length)).toBe(2);
 });
 
 test('a day can be turned off and the search follows', async ({ gotoApp, page }) => {
-  await gotoApp('signedIn');
+  await gotoApp('premium');
   await openPlanner(page);
   const before = await page.evaluate(() => _planSelectedDays());
   await page.evaluate((d: string) => togglePlanDay(d), before[1]);
@@ -126,7 +130,7 @@ test('the last selected day can be turned off', async ({ gotoApp, page }) => {
   // the tap on the last chip was dropped, so the chip looked broken. The
   // "at least one day" rule now lives on the CTA, where it is visible —
   // see 'the last day can be deselected, and the CTA then says why'.
-  await gotoApp('signedIn');
+  await gotoApp('premium');
   await openPlanner(page);
   const after = await page.evaluate(() => {
     const d = _planSelectedDays();
@@ -139,7 +143,7 @@ test('the last selected day can be turned off', async ({ gotoApp, page }) => {
 });
 
 test('a day outside the window cannot be smuggled in', async ({ gotoApp, page }) => {
-  await gotoApp('signedIn');
+  await gotoApp('premium');
   await openPlanner(page);
   const got = await page.evaluate(() => {
     _planState.days = ['2027-01-01'];
@@ -157,7 +161,7 @@ test('a day outside the window cannot be smuggled in', async ({ gotoApp, page })
 // about" is exactly the kind of thing a planner exists to say.
 
 test('mentions a good day the rider did not select', async ({ gotoApp, page }) => {
-  await gotoApp('signedIn');
+  await gotoApp('premium');
   await page.evaluate(() => {
     const p = loadProfile();
     p.homeLat = 50.7175; p.homeLon = 4.3978; p.homeLabel = 'Waterloo'; saveProfile(p);
@@ -184,7 +188,7 @@ test('mentions a good day the rider did not select', async ({ gotoApp, page }) =
 });
 
 test('says nothing about other days when there is nothing to say', async ({ gotoApp, page }) => {
-  await gotoApp('signedIn');
+  await gotoApp('premium');
   await page.evaluate(() => {
     const p = loadProfile(); p.homeLat = 50.7175; p.homeLon = 4.3978; saveProfile(p);
   });
@@ -207,7 +211,7 @@ test('says nothing about other days when there is nothing to say', async ({ goto
 });
 
 test('offers another day instead of a dead end', async ({ gotoApp, page }) => {
-  await gotoApp('signedIn');
+  await gotoApp('premium');
   await page.evaluate(() => {
     const p = loadProfile(); p.homeLat = 50.7175; p.homeLon = 4.3978; saveProfile(p);
   });
@@ -239,7 +243,7 @@ test('offers another day instead of a dead end', async ({ gotoApp, page }) => {
 // the CTA carries the rule instead.
 
 test('the last day can be deselected, and the CTA then says why it cannot run', async ({ gotoApp, page }) => {
-  await gotoApp('signedIn');
+  await gotoApp('premium');
   await page.evaluate(() => {
     const p = loadProfile(); p.homeLat = 50.7175; p.homeLon = 4.3978; p.homeLabel = 'Waterloo'; saveProfile(p);
   });
@@ -266,7 +270,7 @@ test('the last day can be deselected, and the CTA then says why it cannot run', 
 });
 
 test('an empty selection cannot search even if the CTA is forced', async ({ gotoApp, page }) => {
-  await gotoApp('signedIn');
+  await gotoApp('premium');
   await page.evaluate(() => {
     const p = loadProfile(); p.homeLat = 50.7175; p.homeLon = 4.3978; saveProfile(p);
   });
@@ -284,7 +288,7 @@ test('an empty selection cannot search even if the CTA is forced', async ({ goto
 // ── The drive time is a control, not a label ───────────────────────────────
 
 test('the drive time opens directions and does not open the spot', async ({ gotoApp, page }) => {
-  await gotoApp('signedIn');
+  await gotoApp('premium');
   await page.evaluate(() => {
     const p = loadProfile(); p.homeLat = 50.7175; p.homeLon = 4.3978; saveProfile(p);
   });
