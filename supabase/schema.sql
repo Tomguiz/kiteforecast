@@ -39,6 +39,37 @@ CREATE INDEX IF NOT EXISTS forecast_cache_fetched_at_idx ON forecast_cache (fetc
 -- signed out too; the column is what carries it between devices.
 ALTER TABLE profiles ADD COLUMN IF NOT EXISTS display_prefs jsonb;
 
+-- Real names, so a rider can be found by the name their friends know them by
+-- rather than only a nickname. Optional; the nickname stays the identity.
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS first_name text;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS last_name  text;
+
+-- ── public_profiles ────────────────────────────────────────────────────────
+-- The friend search reads this. It was not declared anywhere in the repo, the
+-- same drift the RLS section had.
+--
+-- It runs with OWNER rights on purpose (no security_invoker): profiles is
+-- own-row under RLS, so an invoker-rights view could never find anybody else,
+-- which is the entire job. The safety therefore comes from the column list —
+-- five columns, no phone, no stripe ids — and from the grant.
+--
+-- THE GRANT MATTERS. This is a simple auto-updatable view, so writes through it
+-- reach profiles with the owner's rights and RLS does not apply. Supabase's
+-- default privileges had handed `authenticated` INSERT/UPDATE/DELETE/TRUNCATE
+-- here, which let any signed-in rider rewrite or delete any other rider's
+-- profile row — including setting is_premium on their own. Revoked 2026-08-31.
+-- SELECT only, and it must stay that way.
+CREATE OR REPLACE VIEW public_profiles AS
+  SELECT email, nickname, is_premium, first_name, last_name FROM profiles;
+
+REVOKE ALL ON public_profiles FROM anon, authenticated;
+GRANT SELECT ON public_profiles TO authenticated;
+
+-- Real names, so a rider can be found by the name their friends know them by
+-- rather than only by a nickname. Optional: nickname stays the identity.
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS first_name text;
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS last_name  text;
+
 
 -- 3. Favourites table
 CREATE TABLE IF NOT EXISTS favourites (

@@ -1742,6 +1742,11 @@
             <button onclick="$('ppAvatarInput').click()" style="position:absolute;bottom:-2px;right:-2px;width:18px;height:18px;border-radius:50%;background:#38bdf8;border:2px solid var(--surface);color:#000;font-size:.6rem;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0" title="Upload photo">✎</button>
           </div>
           <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:5px;">
+            <label class="pp-label" style="margin:0">Your name <span style="color:var(--tdim);font-weight:400;text-transform:none;letter-spacing:0">— so friends can find you</span></label>
+            <div style="display:flex;gap:6px;width:100%;margin-bottom:8px">
+              <input type="text" id="ppFirstNameInput" class="pp-input" placeholder="First name" maxlength="40" style="margin:0;flex:1 1 0;width:0;min-width:0"/>
+              <input type="text" id="ppLastNameInput" class="pp-input" placeholder="Last name" maxlength="40" style="margin:0;flex:1 1 0;width:0;min-width:0"/>
+            </div>
             <label class="pp-label" style="margin:0">Nickname <span id="ppNicknameReq" style="color:#f87171;font-weight:400;text-transform:none;letter-spacing:0">* required</span></label>
             <div style="display:flex;gap:6px;align-items:center;width:100%">
               <input type="text" id="ppNicknameInput" class="pp-input" placeholder="e.g. TomKite" maxlength="32" oninput="onNicknameInput()" style="margin:0;flex:1 1 0;width:0;min-width:0"/>
@@ -1837,7 +1842,7 @@
     <div id="ppPanelFriends" class="pp-body" style="display:none;flex-direction:column;gap:14px">
       <!-- Search -->
       <div style="position:relative">
-        <input type="text" id="friendSearchInput" class="pp-input" placeholder="Search by nickname…" maxlength="32"
+        <input type="text" id="friendSearchInput" class="pp-input" placeholder="Search by name or nickname…" maxlength="32"
           oninput="onFriendSearch()" style="padding-right:40px"/>
         <span style="position:absolute;right:12px;top:50%;transform:translateY(-50%);color:var(--tdim);font-size:.85rem;pointer-events:none">🔍</span>
       </div>
@@ -6966,6 +6971,8 @@ function openProfilePanel(tab){
     openProfileSheet();
     const _p=loadProfile();
     const _ni=$('ppNicknameInput'); if(_ni) _ni.value=_p.nickname||'';
+    const _fn=$('ppFirstNameInput'); if(_fn) _fn.value=_p.firstName||'';
+    const _ln=$('ppLastNameInput');  if(_ln) _ln.value=_p.lastName||'';
     const _hi=$('ppHomeInput'); if(_hi) _hi.value=_p.homeLabel||'';
     const _wi=$('ppWeightInput'); if(_wi) _wi.value=_p.weightKg??'';
     renderRiderLevelBtns();
@@ -8443,8 +8450,15 @@ function onFriendSearch(){
 async function doFriendSearch(query){
   const sb=getSb(); const email=_authSession?.user?.email||loadProfile().email;
   if(!sb||!email) return;
-  const{data}=await sb.from('public_profiles').select('email,nickname')
-    .ilike('nickname',`%${query}%`).neq('email',email).limit(8);
+  // Search the real name as well as the nickname — the whole point of asking
+  // for names is that "Damien" should find someone whose nickname is "dfx92".
+  // A comma inside or() is a separator, so a query containing one would build
+  // a malformed filter; strip it along with the PostgREST wildcards.
+  const q=query.replace(/[,%*()]/g,' ').trim();
+  if(!q){ $('friendSearchResults').style.display='none'; return; }
+  const{data}=await sb.from('public_profiles').select('email,nickname,first_name,last_name')
+    .or(`nickname.ilike.%${q}%,first_name.ilike.%${q}%,last_name.ilike.%${q}%`)
+    .neq('email',email).limit(8);
   const results=data||[];
   const el=$('friendSearchResults');
   if(!results.length){ el.style.display='flex'; el.innerHTML='<div class="stats-empty">No users found.</div>'; return; }
@@ -8463,6 +8477,9 @@ async function doFriendSearch(query){
   const pendingIn=new Set(_cache.filter(r=>r.status==='pending'&&r.recipient===email).map(r=>r.requester));
 
   el.style.display='flex';
+  // "Nickname · First Last" — the nickname stays the identity, the name is
+  // what makes it recognisable.
+  const fullName=u=>[u.first_name,u.last_name].filter(Boolean).join(' ').trim();
   el.innerHTML=results.map(u=>{
     const btn=acceptedEmails.has(u.email)
       ?`<span style="font-size:.72rem;color:#4ade80">✓ Friends</span>`
@@ -8483,7 +8500,10 @@ async function doFriendSearch(query){
     return `<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);">
       <div style="display:flex;align-items:center;gap:8px">
         <div style="width:30px;height:30px;border-radius:50%;background:var(--accent);display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:800;color:#000;flex-shrink:0">${escFriendName((u.nickname||'?')[0].toUpperCase())}</div>
-        <span style="font-size:.82rem;font-weight:600;color:var(--text)">${escFriendName(u.nickname)}</span>
+        <div>
+          <div style="font-size:.82rem;font-weight:600;color:var(--text)">${escFriendName(u.nickname)}</div>
+          ${fullName(u)?`<div style="font-size:.7rem;color:var(--tdim)">${escFriendName(fullName(u))}</div>`:''}
+        </div>
       </div>
       ${btn}
     </div>`;
@@ -9859,7 +9879,7 @@ function updatePremiumUI(){
 
 async function syncPremiumFromSupabase(email){
   const sb=getSb(); if(!sb||!email) return;
-  const{data,error}=await sb.from('profiles').select('is_premium,sms_enabled,phone_number,is_admin,nickname,friend_session_notifs,notify_friends_on_confirm,avatar_url,contribution_points,premium_until,notifs_enabled,home_lat,home_lon,home_label,digest_nearby_enabled,digest_nearby_km,kite_level,weight_kg,power_pref,display_prefs').eq('email',email).single();
+  const{data,error}=await sb.from('profiles').select('is_premium,sms_enabled,phone_number,is_admin,nickname,friend_session_notifs,notify_friends_on_confirm,avatar_url,contribution_points,premium_until,notifs_enabled,home_lat,home_lon,home_label,digest_nearby_enabled,digest_nearby_km,kite_level,weight_kg,power_pref,display_prefs,first_name,last_name').eq('email',email).single();
   console.log('[syncPremium] email=',email,'data=',data,'error=',error?.message);
   const p=loadProfile();
   if(data){
@@ -9879,6 +9899,7 @@ async function syncPremiumFromSupabase(email){
     p.premiumUntil=data.premium_until||null;
     p.homeLat=data.home_lat; p.homeLon=data.home_lon; p.homeLabel=data.home_label;
     p.kiteLevel=data.kite_level; p.weightKg=data.weight_kg; p.powerPref=data.power_pref;
+    p.firstName=data.first_name||''; p.lastName=data.last_name||'';
     p.digestNearbyEnabled=data.digest_nearby_enabled===true;
     p.digestNearbyKm=data.digest_nearby_km||120;
     saveProfile(p);
@@ -10254,7 +10275,15 @@ async function saveNickname(fromModal){
       if(btn){ btn.disabled=false; btn.textContent=fromModal?'Continue →':'Save'; }
       return;
     }
-    const {error}=await sb.from('profiles').upsert({email, nickname:val},{onConflict:'email'});
+    // The names ride along with the nickname's Save: one button for one block
+    // of identity. Only present on the profile panel, not the sign-up modal.
+    const row={email, nickname:val};
+    if(!fromModal){
+      const clean=v=>(v||'').trim().slice(0,40);
+      row.first_name=clean($('ppFirstNameInput')?.value)||null;
+      row.last_name =clean($('ppLastNameInput')?.value)||null;
+    }
+    const {error}=await sb.from('profiles').upsert(row,{onConflict:'email'});
     if(error){
       showToast('❌ Could not save — try again');
       if(btn){ btn.disabled=false; btn.textContent=fromModal?'Continue →':'Save'; }
@@ -10262,7 +10291,13 @@ async function saveNickname(fromModal){
     }
   }
 
-  const p=loadProfile(); p.nickname=val; saveProfile(p);
+  const p=loadProfile();
+  p.nickname=val;
+  if(!fromModal){
+    p.firstName=($('ppFirstNameInput')?.value||'').trim().slice(0,40);
+    p.lastName =($('ppLastNameInput')?.value||'').trim().slice(0,40);
+  }
+  saveProfile(p);
   if(btn){ btn.disabled=true; btn.classList.remove('dirty'); btn.classList.add('saved'); btn.textContent='✓ Saved'; }
 
   // Dismiss modal if called from it
