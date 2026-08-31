@@ -131,7 +131,7 @@ Deno.serve(async (req) => {
     // value everywhere digest_nearby_km is read below, including the email copy.
     const nearbyKm = Math.min(200, Math.max(25, prof.digest_nearby_km ?? 120))
 
-    const APP_BASE = 'https://tomguiz.github.io/kiteforecast/'
+    const APP_BASE = 'https://kiteforecast.app/'
 
     // Email CTAs use plain app URLs (not single-use magic links): magic links get
     // pre-consumed by email link-scanners and expire, breaking the CTA. The app

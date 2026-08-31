@@ -53,8 +53,8 @@ Deno.serve(async (req) => {
 
   // Join deep link — opens app, searches spot, auto-opens attend sheet for same date
   const joinData = btoa(JSON.stringify({ spot: spot_name, date: session_date, start_time }))
-  const joinUrl  = `https://tomguiz.github.io/kiteforecast/?join=${joinData}`
-  const appLink  = `https://tomguiz.github.io/kiteforecast/?spot=${encodeURIComponent(spot_name)}`
+  const joinUrl  = `https://kiteforecast.app/?join=${joinData}`
+  const appLink  = `https://kiteforecast.app/?spot=${encodeURIComponent(spot_name)}`
 
   // Sent in small batches, NOT all at once. Every webhook starts its own Make
   // execution, and each of those sends through one Outlook mailbox, which caps

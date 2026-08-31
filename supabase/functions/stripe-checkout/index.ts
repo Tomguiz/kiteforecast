@@ -6,9 +6,11 @@ const supabase = createClient(SUPABASE_URL, Deno.env.get('SB_SERVICE_ROLE_KEY')!
 const STRIPE_SECRET_KEY = Deno.env.get('STRIPE_SECRET_KEY')!
 const STRIPE_PRICE_ID   = Deno.env.get('STRIPE_PRICE_ID')!
 
-const ALLOWED_ORIGINS = new Set(['https://tomguiz.github.io'])
+// github.io stays allowed alongside the custom domain: it is the same site,
+// and old bookmarks reach it until GitHub's redirect has propagated.
+const ALLOWED_ORIGINS = new Set(['https://kiteforecast.app', 'https://tomguiz.github.io'])
 const corsFor = (origin: string | null) => ({
-  'Access-Control-Allow-Origin': origin && ALLOWED_ORIGINS.has(origin) ? origin : 'https://tomguiz.github.io',
+  'Access-Control-Allow-Origin': origin && ALLOWED_ORIGINS.has(origin) ? origin : 'https://kiteforecast.app',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, x-client-info',
 })
@@ -73,8 +75,8 @@ Deno.serve(async (req) => {
       mode:                  'payment',
       'line_items[0][price]': STRIPE_PRICE_ID,
       'line_items[0][quantity]': '1',
-      success_url:           success_url || 'https://tomguiz.github.io/kiteforecast/?premium=success',
-      cancel_url:            cancel_url  || 'https://tomguiz.github.io/kiteforecast/?premium=cancelled',
+      success_url:           success_url || 'https://kiteforecast.app/?premium=success',
+      cancel_url:            cancel_url  || 'https://kiteforecast.app/?premium=cancelled',
       allow_promotion_codes: 'true',
     })
 

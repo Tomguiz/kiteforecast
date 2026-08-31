@@ -51,7 +51,7 @@ because there is no run. A green PR page proves the merge, never the deploy.
 Check what is actually being served, not what `git log` says:
 
 ```bash
-curl -sI https://tomguiz.github.io/kiteforecast/index.html | grep -i last-modified
+curl -sI https://kiteforecast.app/index.html | grep -i last-modified
 gh run list --limit 5 --json headSha,workflowName,status \
   -q '.[]|"\(.headSha[0:7]) \(.workflowName) \(.status)"'
 ```
@@ -154,8 +154,50 @@ and longer in an installed PWA until it is reopened. If a released feature still
 looks gated on a device, check the served file before suspecting the code:
 
 ```bash
-curl -s https://tomguiz.github.io/kiteforecast/ | grep -o "NEARBY_RELEASED = [a-z]*"
+curl -s https://kiteforecast.app/ | grep -o "NEARBY_RELEASED = [a-z]*"
 ```
+
+## The domain
+
+The app is served at `https://kiteforecast.app`, from the same GitHub Pages
+build as before. The `CNAME` file at the repo root is what tells Pages to claim
+that domain — deleting it silently hands the site back to
+`tomguiz.github.io/kiteforecast/` and breaks every link already sitting in a
+sent email.
+
+DNS lives in Cloudflare. The apex is a CNAME to `tomguiz.github.io` (Cloudflare
+flattens it, which is legal at the apex where a raw CNAME is not), **DNS-only —
+grey cloud, not proxied**. Proxying breaks GitHub's certificate issuance: it
+answers the ACME challenge itself and Pages never gets its cert. Turn the proxy
+on afterwards if you want it, and only with SSL mode *Full*.
+
+**Order matters, and getting it backwards takes the site down.** The `CNAME`
+file makes Pages redirect `tomguiz.github.io/kiteforecast/` to the new domain,
+so if that domain does not resolve yet, both URLs are dead:
+
+1. Add the DNS record in Cloudflare. Nothing breaks — the domain simply starts
+   answering with a Pages 404, while `github.io` keeps serving the app.
+2. Then merge. Pages picks up `CNAME`, requests the certificate, and starts
+   redirecting.
+
+```bash
+dig +short kiteforecast.app                        # must answer before step 2
+curl -sI https://kiteforecast.app/ | head -1       # 200 once the cert is issued
+curl -sI https://tomguiz.github.io/kiteforecast/ | grep -i ^location  # the redirect
+```
+
+Two things live outside this repo and will not follow the merge:
+
+- **Google sign-in.** The One Tap client
+  (`927737240724-…apps.googleusercontent.com`) validates the page's origin.
+  Add `https://kiteforecast.app` to *Authorized JavaScript origins* in the
+  Google Cloud console, or sign-in fails with `origin_mismatch` on the new
+  domain. Keep `https://tomguiz.github.io` listed too.
+- **Stripe.** Nothing to change: checkout and portal URLs are sent by the
+  client per request, and the functions' fallbacks now point at the new domain.
+
+Supabase Auth needs nothing: sign-in is a six-digit code verified in the page
+(`verifyOtp`), never a redirect back from a magic link, so no allow-list.
 
 ## Checklist after any merge to `main`
 
