@@ -219,6 +219,10 @@
     /* Read-only wind-dir chips: display only, no interaction/hover. */
     .s-btn-static { cursor:default; }
     .s-btn-static:hover { border-color:var(--accent); color:var(--accent); } /* stay as active look */
+    /* A second opinion, not the headline — dimmer than Maps, and they wrap
+       together rather than pushing the favourite and bell buttons off a phone. */
+    .ext-link { color:var(--tdim); }
+    .ext-link:hover { color:var(--accent); }
     .shore-hint { font-size:.72rem; color:var(--tdim); }
     .lwd-edit-all { font-size:.72rem; color:var(--accent); cursor:pointer; white-space:nowrap; opacity:.85; }
     .lwd-edit-all:hover { opacity:1; text-decoration:underline; }
@@ -5756,6 +5760,22 @@ function bellSVG(size){
   </svg>`;
 }
 
+// Cross-checks against the two forecasts riders already trust.
+//
+// Both are built from COORDINATES, not from the spot's name. Windfinder does
+// have per-spot pages at /forecast/<slug>, but a slug derived from our name
+// only matches about a third of the time — Brouwersdam, Domburg and Tarifa
+// resolve; Oesterdam, Oostduinkerke and Sycod are 404s. A link that misses
+// half the time is worse than no link, so both go to the site's own map
+// centred on the spot, which is right for every spot in the catalogue.
+function windfinderUrl(lat,lon){
+  // Verified: the hash is kept and the map lands on the right coast.
+  return `https://www.windfinder.com/#9/${(+lat).toFixed(4)}/${(+lon).toFixed(4)}`;
+}
+function windguruUrl(lat,lon){
+  return `https://www.windguru.cz/map?lat=${(+lat).toFixed(4)}&lon=${(+lon).toFixed(4)}&zoom=10`;
+}
+
 function renderGrid(){
   // Nothing to repaint without a forecast. This used to destructure straight
   // through and throw, which mattered because cancelAttendance calls it AFTER
@@ -5784,7 +5804,7 @@ function renderGrid(){
   // is shown to every visitor of the spot. Escape it.
   $('locName').innerHTML=`${escFriendName(loc.name)}${loc.admin1&&loc.admin1!==loc.name?', '+escFriendName(loc.admin1):''} <span style="color:var(--tdim);font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em;vertical-align:middle">${escFriendName(loc.country)}</span>`;
   // Line 2: maps + icons + sessions
-  $('locSub').innerHTML=`<a class="map-link" href="${mapsUrl}" target="_blank" rel="noopener" title="Open in Google Maps"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Maps</a><button class="fav-btn${isFav?' active':''}" id="favBtn" title="${isFav?'Remove from favourites':'Add to favourites'}">${isFav?'★':'☆'}</button><button class="notif-btn${hasSpotNotif(loc.name)?' active':''}" id="notifBtn" title="Get notified">${bellSVG(16)}</button><button class="share-btn" id="shareBtn" onclick="shareSpot()" title="Share this spot"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></button>${qdLabel}`;
+  $('locSub').innerHTML=`<a class="map-link" href="${mapsUrl}" target="_blank" rel="noopener" title="Open in Google Maps"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Maps</a><a class="map-link ext-link" href="${windfinderUrl(loc.latitude,loc.longitude)}" target="_blank" rel="noopener noreferrer" title="Cross-check on Windfinder">Windfinder</a><a class="map-link ext-link" href="${windguruUrl(loc.latitude,loc.longitude)}" target="_blank" rel="noopener noreferrer" title="Cross-check on Windguru">Windguru</a><button class="fav-btn${isFav?' active':''}" id="favBtn" title="${isFav?'Remove from favourites':'Add to favourites'}">${isFav?'★':'☆'}</button><button class="notif-btn${hasSpotNotif(loc.name)?' active':''}" id="notifBtn" title="Get notified">${bellSVG(16)}</button><button class="share-btn" id="shareBtn" onclick="shareSpot()" title="Share this spot"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></button>${qdLabel}`;
   $('locHdr').style.display='block';
   document.body.classList.add('spot-loaded');
   checkShowMySpotTab();
