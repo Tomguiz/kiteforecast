@@ -42,7 +42,7 @@ test('they carry the spot coordinates, not its name', async ({ gotoApp, page }) 
   await openSpot(page, 51.3627, 3.3062);
   const wf = await page.locator('.fg-foot a', { hasText: 'Windfinder' }).getAttribute('href');
   const wg = await page.locator('.fg-foot a', { hasText: 'Windguru' }).getAttribute('href');
-  expect(wf).toBe('https://www.windfinder.com/maps/#13/51.3627/3.3062');
+  expect(wf).toBe('https://www.windfinder.com/#13/51.3627/3.3062');
   expect(wg).toBe('https://www.windguru.cz/map?lat=51.3627&lon=3.3062&zoom=13');
   // the apostrophe in the spot name must not appear anywhere in either
   expect(wf).not.toContain('Hekje');
@@ -77,21 +77,27 @@ test('the URL builders round consistently', async ({ gotoApp, page }) => {
   }));
   // four decimals is ~11 m — far finer than either site's map needs, and it
   // keeps the URL stable rather than jittering with float noise.
-  expect(r.wf).toBe('https://www.windfinder.com/maps/#13/51.3627/3.3062');
+  expect(r.wf).toBe('https://www.windfinder.com/#13/51.3627/3.3062');
   expect(r.wg).toContain('lat=51.3627&lon=3.3062');
 });
 
-test('the Windfinder path is one the iOS app actually claims', async ({ gotoApp, page }) => {
-  // Windfinder's apple-app-site-association claims /forecast/*,
-  // /weatherforecast/*, /report/*, /webcams/*, /maps/* and /map/* — and NOT the
-  // site root. A root URL therefore cannot hand off to the app on iOS, however
-  // it is opened, which is what the previous link did.
+test('the Windfinder path is one the iOS app does NOT claim', async ({ gotoApp, page }) => {
+  // Deliberate, and the reverse of what this test asserted before. Windfinder's
+  // apple-app-site-association claims /forecast/*, /weatherforecast/*,
+  // /report/*, /webcams/*, /maps/* and /map/* — and NOT the site root. A
+  // claimed path hands off to the native app, and the app ignores the
+  // #zoom/lat/lon fragment: it opens on wherever it was last, not on this spot.
+  // The root keeps the link in the browser, which does honour the fragment.
+  //
+  // A claimed path is only right once it NAMES the spot (/forecast/<slug>).
+  // Until then, this guards against quietly handing the rider back to an app
+  // that will show them the wrong beach.
   await gotoApp('signedOut');
   const url = await page.evaluate(() => windfinderUrl(51.3627, 3.3062));
   const path = new URL(url).pathname;
   const CLAIMED = ['/forecast/', '/weatherforecast/', '/report/', '/webcams/', '/maps/', '/map/'];
-  expect(CLAIMED.some(p => path.startsWith(p)), `${path} is not a claimed path`).toBe(true);
-  expect(path).not.toBe('/');
+  expect(CLAIMED.some(p => path.startsWith(p)), `${path} hands off to the app`).toBe(false);
+  expect(new URL(url).hash).toBe('#13/51.3627/3.3062');
 });
 
 test('both open close enough in to see the spot itself', async ({ gotoApp, page }) => {

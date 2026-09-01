@@ -5781,22 +5781,27 @@ function bellSVG(size){
 // day's wind.
 const EXT_MAP_ZOOM=13;
 function windfinderUrl(lat,lon){
-  // /maps/ rather than the site root, so this can open the native app.
+  // The site ROOT, deliberately — a path the iOS app does NOT claim.
   //
-  // Windfinder's apple-app-site-association lists exactly which paths the iOS
-  // app claims: /forecast/*, /weatherforecast/*, /report/*, /webcams/*,
-  // /maps/* and /map/*. The site ROOT is not among them, so the previous
-  // https://www.windfinder.com/#9/lat/lon could never hand off to the app on
-  // iOS however it was opened. /maps/ is claimed and serves a 200. (/map/ is
-  // listed too but 404s, so it is not the one to use.)
+  // This link used to be /maps/, chosen precisely because Windfinder's
+  // apple-app-site-association claims it (/forecast/*, /weatherforecast/*,
+  // /report/*, /webcams/*, /maps/* and /map/* are claimed; the root is not) and
+  // so it handed off to the native app. That turned out to be the bug rather
+  // than the feature: on a device the app opens and shows wherever it was last,
+  // not this spot. It does not honour the #zoom/lat/lon fragment, so the rider
+  // reading Riverwoods on a Tuesday lands on whatever they looked at last week.
   //
-  // Android needs nothing: assetlinks.json delegates handle_all_urls, so any
-  // windfinder.com link already opens the app there.
+  // The root is not claimed, so the link stays in the browser, where the
+  // fragment IS honoured and the map opens on this spot. A correct map in a
+  // browser tab beats the app on the wrong spot, which is the whole point of
+  // the link.
   //
-  // NOT verified: whether the app honours the #zoom/lat/lon fragment and lands
-  // on this spot rather than wherever it last was. Universal links do carry the
-  // fragment, but only a real device can answer that.
-  return `https://www.windfinder.com/maps/#${EXT_MAP_ZOOM}/${(+lat).toFixed(4)}/${(+lon).toFixed(4)}`;
+  // Android is not fixed by this: assetlinks.json delegates handle_all_urls, so
+  // ANY windfinder.com URL opens the app there, root included. Only a URL that
+  // NAMES the spot — /forecast/<slug> — can land the app in the right place,
+  // and a slug derived from our spot name resolves for about a third of the
+  // catalogue. Fixing Android for real needs a verified slug per spot.
+  return `https://www.windfinder.com/#${EXT_MAP_ZOOM}/${(+lat).toFixed(4)}/${(+lon).toFixed(4)}`;
 }
 function windguruUrl(lat,lon){
   return `https://www.windguru.cz/map?lat=${(+lat).toFixed(4)}&lon=${(+lon).toFixed(4)}&zoom=${EXT_MAP_ZOOM}`;
