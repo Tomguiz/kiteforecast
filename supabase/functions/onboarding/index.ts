@@ -36,7 +36,7 @@ const SUPABASE_URL         = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_KEY = Deno.env.get('SB_SERVICE_ROLE_KEY')!
 const MAKE_WEBHOOK_URL     = 'https://hook.eu1.make.com/6t9fgm6btixri2wf5lnx47requf416vs'
 
-const APP_BASE    = 'https://tomguiz.github.io/kiteforecast/'
+const APP_BASE    = 'https://kiteforecast.app/'
 const PROFILE_URL = `${APP_BASE}?tab=profile`
 const NOTIFS_URL  = `${APP_BASE}?tab=notifs`
 

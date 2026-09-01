@@ -5102,7 +5102,7 @@ function shareSpot(){
 }
 
 // ── Share app link ──
-const APP_URL='https://tomguiz.github.io/kiteforecast/';
+const APP_URL='https://kiteforecast.app/';
 function shareAppLink(){
   const title='KiteForecast — Never miss a session again';
   const text=`✅ 16-day hourly wind forecast for your favorite spots
@@ -9685,7 +9685,7 @@ async function adminSaveSpotInfo(){
               email:        requesterEmail,
               spot_name:    spotName,
               contact_name: sugg?.contact_name||'',
-              app_link:     `https://tomguiz.github.io/kiteforecast/?spot=${encodeURIComponent(spotName)}&tab=contrib`,
+              app_link:     `https://kiteforecast.app/?spot=${encodeURIComponent(spotName)}&tab=contrib`,
             }),
           }).catch(()=>{});
         }

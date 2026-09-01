@@ -33,7 +33,7 @@ Deno.serve(async (req) => {
   // Plain app URL (not a single-use magic link): magic links get pre-consumed by
   // email link-scanners and expire, breaking the CTA. The app restores the user's
   // saved session on load, so returning users land signed-in.
-  const app_link = 'https://tomguiz.github.io/kiteforecast/?tab=friends'
+  const app_link = 'https://kiteforecast.app/?tab=friends'
 
   const rNick = requester_nickname || requester_email.split('@')[0]
   const payload = {

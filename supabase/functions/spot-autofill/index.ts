@@ -12,8 +12,11 @@ const ANTHROPIC_API_KEY = Deno.env.get('ANTHROPIC_API_KEY') ?? ''
 const SUPABASE_URL      = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_ANON     = Deno.env.get('SUPABASE_ANON_KEY') ?? Deno.env.get('SB_ANON_KEY') ?? ''
 
-// Restrict to the real app origin(s). Add your custom domain here if you add one.
+// Restrict to the real app origin(s). github.io stays allowed alongside the
+// custom domain: it is the same site, and old bookmarks reach it until
+// GitHub's redirect has propagated.
 const ALLOWED_ORIGINS = new Set([
+  'https://kiteforecast.app',
   'https://tomguiz.github.io',
 ])
 const corsFor = (origin: string | null) => ({

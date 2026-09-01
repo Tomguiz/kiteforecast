@@ -55,7 +55,7 @@ Deno.serve(async (req) => {
   // Latin1). The frontend mirrors this with decodeURIComponent(escape(atob(x))).
   const reviewData  = { name, location, lat, lon, business, website, note, contact_name, contact_email }
   const reviewToken = btoa(unescape(encodeURIComponent(JSON.stringify(reviewData))))
-  const reviewUrl   = `https://tomguiz.github.io/kiteforecast/?review=${reviewToken}`
+  const reviewUrl   = `https://kiteforecast.app/?review=${reviewToken}`
 
   // Plain app URL (not a single-use magic link): magic links get pre-consumed by
   // email link-scanners and expire, breaking the CTA. The admin's saved session

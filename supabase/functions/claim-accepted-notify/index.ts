@@ -22,7 +22,7 @@ Deno.serve(async (req) => {
     spot_name,
     business_name:     business_name  || spot_name,
     contact_name:      contact_name   || '',
-    app_link:          `https://tomguiz.github.io/kiteforecast/?spot=${encodeURIComponent(spot_name)}&tab=myspot`,
+    app_link:          `https://kiteforecast.app/?spot=${encodeURIComponent(spot_name)}&tab=myspot`,
     accepted_at:       new Date().toLocaleString('en', { dateStyle: 'full', timeStyle: 'short' }),
   }
 

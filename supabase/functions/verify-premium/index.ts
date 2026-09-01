@@ -10,9 +10,11 @@ const SUPABASE_ANON = Deno.env.get('SUPABASE_ANON_KEY') ?? Deno.env.get('SB_ANON
 const supabase = createClient(SUPABASE_URL, Deno.env.get('SB_SERVICE_ROLE_KEY')!)
 const STRIPE_SECRET_KEY = Deno.env.get('STRIPE_SECRET_KEY')!
 
-const ALLOWED_ORIGINS = new Set(['https://tomguiz.github.io'])
+// github.io stays allowed alongside the custom domain: it is the same site,
+// and old bookmarks reach it until GitHub's redirect has propagated.
+const ALLOWED_ORIGINS = new Set(['https://kiteforecast.app', 'https://tomguiz.github.io'])
 const corsFor = (origin: string | null) => ({
-  'Access-Control-Allow-Origin': origin && ALLOWED_ORIGINS.has(origin) ? origin : 'https://tomguiz.github.io',
+  'Access-Control-Allow-Origin': origin && ALLOWED_ORIGINS.has(origin) ? origin : 'https://kiteforecast.app',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type, Authorization, apikey, x-client-info',
 })

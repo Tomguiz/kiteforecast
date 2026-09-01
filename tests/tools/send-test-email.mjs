@@ -35,7 +35,7 @@ const rh = Number(hours)
 
 const date = new Date(Date.now() + rh * 3600 * 1000)
 const dateStr = date.toISOString().slice(0, 10)
-const base = 'https://tomguiz.github.io/kiteforecast/'
+const base = 'https://kiteforecast.app/'
 
 // The Make.com scenario de-duplicates against a Google Sheet, matching on
 // email + spot + date_label + reminder_label all at once. reminder_label only

@@ -20,8 +20,8 @@ Deno.serve(async (req) => {
 
   // Deep-link: opens app as admin, scrolls to the pending claim card
   const claimDeepLink = claim_id
-    ? `https://tomguiz.github.io/kiteforecast/?claim=${btoa(JSON.stringify({ id: claim_id, spot_name, email }))}`
-    : `https://tomguiz.github.io/kiteforecast/`
+    ? `https://kiteforecast.app/?claim=${btoa(JSON.stringify({ id: claim_id, spot_name, email }))}`
+    : `https://kiteforecast.app/`
 
   const payload = {
     notification_type: 'claim',

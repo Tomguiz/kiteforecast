@@ -316,7 +316,7 @@ describe('nearby sessions carry the same CTAs as favourites', () => {
   // A nearby spot is a SUGGESTION — the one thing the section exists for is
   // acting on it. Favourite sessions have had "View forecast" / "I'm going!"
   // from the start; nearby ones shipped without any link at all.
-  const APP_BASE = 'https://tomguiz.github.io/kiteforecast/'
+  const APP_BASE = 'https://kiteforecast.app/'
   const buildLinks = (spot: string, sess: { date: string; win_start: string }) => ({
     forecast_link: `${APP_BASE}?spot=${encodeURIComponent(spot)}&date=${sess.date}`,
     join_link: `${APP_BASE}?join=${btoa(JSON.stringify({

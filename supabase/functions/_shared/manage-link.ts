@@ -6,7 +6,7 @@
 // reminders.app_link is nullable and rows predating it exist, so the base URL
 // is derived defensively rather than assumed: take everything before the '?'
 // of app_link, or fall back to the production origin.
-const FALLBACK_BASE = 'https://tomguiz.github.io/kiteforecast/'
+const FALLBACK_BASE = 'https://kiteforecast.app/'
 
 // Make.com injects this value with a raw replace() — no escaping anywhere in
 // the chain — so the result has to be safe in an HTML attribute on its own,

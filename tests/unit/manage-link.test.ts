@@ -2,11 +2,11 @@ import { describe, it, expect } from 'vitest'
 import { buildManageLink } from '../../supabase/functions/_shared/manage-link.ts'
 
 describe('buildManageLink', () => {
-  const APP_LINK = 'https://tomguiz.github.io/kiteforecast/?spot=Cadzand&date=2026-08-22'
+  const APP_LINK = 'https://kiteforecast.app/?spot=Cadzand&date=2026-08-22'
 
   it('points at the notifications tab for the spot and day that triggered the mail', () => {
     expect(buildManageLink(APP_LINK, 'Cadzand', '2026-08-22'))
-      .toBe('https://tomguiz.github.io/kiteforecast/?tab=notifs&spot=Cadzand&date=2026-08-22')
+      .toBe('https://kiteforecast.app/?tab=notifs&spot=Cadzand&date=2026-08-22')
   })
 
   it('drops app_link’s own query rather than appending to it', () => {
@@ -24,7 +24,7 @@ describe('buildManageLink', () => {
   it('falls back to production for rows with no app_link', () => {
     for (const empty of [null, undefined, '', '   ']) {
       expect(buildManageLink(empty, 'Cadzand', '2026-08-22'))
-        .toBe('https://tomguiz.github.io/kiteforecast/?tab=notifs&spot=Cadzand&date=2026-08-22')
+        .toBe('https://kiteforecast.app/?tab=notifs&spot=Cadzand&date=2026-08-22')
     }
   })
 
