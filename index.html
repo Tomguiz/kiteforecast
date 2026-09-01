@@ -5772,6 +5772,14 @@ function bellSVG(size){
 // resolve; Oesterdam, Oostduinkerke and Sycod are 404s. A link that misses
 // half the time is worse than no link, so both go to the site's own map
 // centred on the spot, which is right for every spot in the catalogue.
+// The zoom both links open at. It used to be 9 on Windfinder and 10 on
+// Windguru: the map was centred on the spot, but a screen at that zoom spans a
+// hundred kilometres of coast, so the rider arrived looking at a region and had
+// to hunt for the beach they had just been reading about. 13 spans a couple of
+// kilometres — the spot fills the screen, with its immediate neighbours still
+// visible, which is what "the same spot" means to someone cross-checking one
+// day's wind.
+const EXT_MAP_ZOOM=13;
 function windfinderUrl(lat,lon){
   // /maps/ rather than the site root, so this can open the native app.
   //
@@ -5788,10 +5796,10 @@ function windfinderUrl(lat,lon){
   // NOT verified: whether the app honours the #zoom/lat/lon fragment and lands
   // on this spot rather than wherever it last was. Universal links do carry the
   // fragment, but only a real device can answer that.
-  return `https://www.windfinder.com/maps/#9/${(+lat).toFixed(4)}/${(+lon).toFixed(4)}`;
+  return `https://www.windfinder.com/maps/#${EXT_MAP_ZOOM}/${(+lat).toFixed(4)}/${(+lon).toFixed(4)}`;
 }
 function windguruUrl(lat,lon){
-  return `https://www.windguru.cz/map?lat=${(+lat).toFixed(4)}&lon=${(+lon).toFixed(4)}&zoom=10`;
+  return `https://www.windguru.cz/map?lat=${(+lat).toFixed(4)}&lon=${(+lon).toFixed(4)}&zoom=${EXT_MAP_ZOOM}`;
 }
 
 function renderGrid(){

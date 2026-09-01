@@ -42,8 +42,8 @@ test('they carry the spot coordinates, not its name', async ({ gotoApp, page }) 
   await openSpot(page, 51.3627, 3.3062);
   const wf = await page.locator('.fg-foot a', { hasText: 'Windfinder' }).getAttribute('href');
   const wg = await page.locator('.fg-foot a', { hasText: 'Windguru' }).getAttribute('href');
-  expect(wf).toBe('https://www.windfinder.com/maps/#9/51.3627/3.3062');
-  expect(wg).toBe('https://www.windguru.cz/map?lat=51.3627&lon=3.3062&zoom=10');
+  expect(wf).toBe('https://www.windfinder.com/maps/#13/51.3627/3.3062');
+  expect(wg).toBe('https://www.windguru.cz/map?lat=51.3627&lon=3.3062&zoom=13');
   // the apostrophe in the spot name must not appear anywhere in either
   expect(wf).not.toContain('Hekje');
   expect(wg).not.toContain('Hekje');
@@ -77,7 +77,7 @@ test('the URL builders round consistently', async ({ gotoApp, page }) => {
   }));
   // four decimals is ~11 m — far finer than either site's map needs, and it
   // keeps the URL stable rather than jittering with float noise.
-  expect(r.wf).toBe('https://www.windfinder.com/maps/#9/51.3627/3.3062');
+  expect(r.wf).toBe('https://www.windfinder.com/maps/#13/51.3627/3.3062');
   expect(r.wg).toContain('lat=51.3627&lon=3.3062');
 });
 
@@ -92,4 +92,22 @@ test('the Windfinder path is one the iOS app actually claims', async ({ gotoApp,
   const CLAIMED = ['/forecast/', '/weatherforecast/', '/report/', '/webcams/', '/maps/', '/map/'];
   expect(CLAIMED.some(p => path.startsWith(p)), `${path} is not a claimed path`).toBe(true);
   expect(path).not.toBe('/');
+});
+
+test('both open close enough in to see the spot itself', async ({ gotoApp, page }) => {
+  // A rider clicking from one spot's day expects to arrive AT that spot. Zoom 9
+  // (Windfinder) and 10 (Windguru) were centred correctly but showed a hundred
+  // kilometres of coast, so the spot was a pixel among its neighbours. Anything
+  // from 12 up is close enough to recognise the beach; the two also stay in
+  // step with each other.
+  await gotoApp('signedOut');
+  const { wf, wg } = await page.evaluate(() => ({
+    wf: windfinderUrl(51.3627, 3.3062),
+    wg: windguruUrl(51.3627, 3.3062),
+  }));
+  const wfZoom = Number(new URL(wf).hash.slice(1).split('/')[0]);
+  const wgZoom = Number(new URL(wg).searchParams.get('zoom'));
+  expect(wfZoom).toBeGreaterThanOrEqual(12);
+  expect(wgZoom).toBeGreaterThanOrEqual(12);
+  expect(wfZoom).toBe(wgZoom);
 });
