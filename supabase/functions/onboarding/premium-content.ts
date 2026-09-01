@@ -110,10 +110,14 @@ export function buildPremiumHookHtml(
     }
 
     default:
+      // Leads with the planner rather than the spot cap: it is now the limit a
+      // free rider actually runs into, because the button is right there on the
+      // home screen with a padlock on it. An email that explains something they
+      // have already seen beats one introducing an abstraction.
       return row(
-        label('&#11088; YOU\'VE HIT THE EDGE OF FREE') +
-        heading(`${who}, one spot is the free plan &mdash; and the wind moves.`) +
-        body('The forecast that matters is rarely at the same beach twice. Premium lifts the one-spot cap, so you can watch the whole stretch of coast you\'d actually drive to and let the app tell you which one is worth it that day.') +
-        button(links.upgrade, '&#11088; Unlock every spot &rarr;'))
+        label('&#128274; THE BUTTON YOU CAN\'T PRESS') +
+        heading(`${who}, "Where to ride?" answers the only question that matters.`) +
+        body('Tell it how far you\'ll drive and which days you\'re free, and it checks every spot in range against your kite, your level and your weight &mdash; then ranks them by whether the session is worth the drive. It is the difference between reading seven forecasts and being told where to go. Premium also lifts the one-spot cap, because the forecast that matters is rarely at the same beach twice.') +
+        button(links.upgrade, '&#11088; Unlock the planner &mdash; &euro;19.99 once &rarr;'))
   }
 }

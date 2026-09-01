@@ -134,6 +134,12 @@
        a phone question — so it must NOT inherit .btn-map's mobile display:none.
        It gets its own row under the search bar instead. */
     .btn-plan { border-color:rgba(56,189,248,.45); color:var(--accent); }
+    /* Locked for free riders: dimmed, but still clickable — the click is what
+       explains why, and where to go. A disabled button explains nothing. */
+    .btn-plan.locked, .btn-plan-mobile.locked {
+      opacity:.55; border-color:var(--border) !important; color:var(--gray) !important;
+    }
+    .btn-plan.locked::after, .btn-plan-mobile.locked::after { content:' \1F512'; font-size:.85em; }
     .plan-drive { font-family:inherit; font-size:.74rem; color:var(--gray); white-space:nowrap;
       background:rgba(255,255,255,.04); border:1px solid var(--border); border-radius:8px;
       padding:4px 9px; cursor:pointer; transition:border-color .15s,color .15s; }
@@ -11584,10 +11590,23 @@ async function toggleSpotDay(spotName,dow){
   renderHintChips();
   if(cachedLoc) renderGrid();
 }
+// Called wherever premium state can change (sign-in, sync, checkout return).
+function refreshPlannerLock(){
+  const locked=!isPremium();
+  document.querySelectorAll('.btn-plan, .btn-plan-mobile').forEach(b=>{
+    b.classList.toggle('locked', locked);
+    b.title=locked?'Premium \u2014 plan a session from your home spot':'Find where to ride in the next few days';
+  });
+}
+
 function updateProfileDot(){
   // The profile-bubble badge now reflects the summed per-tab "needs action"
   // counts (recomputeProfileBtnBadge), not a bare has-notifications dot.
   recomputeProfileBtnBadge();
+  // Hooked here rather than at each call site: this already runs on every
+  // change that can flip premium — sign-in, profile sync, returning from
+  // checkout — so the lock cannot fall out of step with the plan.
+  refreshPlannerLock();
 }
 // ── INSTALL BANNER ──
 window.addEventListener('beforeinstallprompt', e => {
@@ -11961,6 +11980,13 @@ function togglePlanDay(d){
 }
 function openPlanner(){
   const p=loadProfile();
+  // Premium before home location: a free rider should learn the feature is not
+  // theirs, not be sent to set up a home address for something they cannot use.
+  if(!isPremium()){
+    showToast('\u26A1 Premium only \u2014 upgrade to plan where to ride', 4000, '#f59e0b');
+    openProfilePanel('profile');
+    return;
+  }
   if(!p.homeLat||!p.homeLon){
     showToast('Set your home location in your profile first');
     openProfilePanel('profile');
