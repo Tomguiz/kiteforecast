@@ -42,7 +42,7 @@ test('they carry the spot coordinates, not its name', async ({ gotoApp, page }) 
   await openSpot(page, 51.3627, 3.3062);
   const wf = await page.locator('.fg-foot a', { hasText: 'Windfinder' }).getAttribute('href');
   const wg = await page.locator('.fg-foot a', { hasText: 'Windguru' }).getAttribute('href');
-  expect(wf).toBe('https://www.windfinder.com/#9/51.3627/3.3062');
+  expect(wf).toBe('https://www.windfinder.com/maps/#9/51.3627/3.3062');
   expect(wg).toBe('https://www.windguru.cz/map?lat=51.3627&lon=3.3062&zoom=10');
   // the apostrophe in the spot name must not appear anywhere in either
   expect(wf).not.toContain('Hekje');
@@ -77,6 +77,19 @@ test('the URL builders round consistently', async ({ gotoApp, page }) => {
   }));
   // four decimals is ~11 m — far finer than either site's map needs, and it
   // keeps the URL stable rather than jittering with float noise.
-  expect(r.wf).toBe('https://www.windfinder.com/#9/51.3627/3.3062');
+  expect(r.wf).toBe('https://www.windfinder.com/maps/#9/51.3627/3.3062');
   expect(r.wg).toContain('lat=51.3627&lon=3.3062');
+});
+
+test('the Windfinder path is one the iOS app actually claims', async ({ gotoApp, page }) => {
+  // Windfinder's apple-app-site-association claims /forecast/*,
+  // /weatherforecast/*, /report/*, /webcams/*, /maps/* and /map/* — and NOT the
+  // site root. A root URL therefore cannot hand off to the app on iOS, however
+  // it is opened, which is what the previous link did.
+  await gotoApp('signedOut');
+  const url = await page.evaluate(() => windfinderUrl(51.3627, 3.3062));
+  const path = new URL(url).pathname;
+  const CLAIMED = ['/forecast/', '/weatherforecast/', '/report/', '/webcams/', '/maps/', '/map/'];
+  expect(CLAIMED.some(p => path.startsWith(p)), `${path} is not a claimed path`).toBe(true);
+  expect(path).not.toBe('/');
 });
