@@ -1837,6 +1837,8 @@
       <div id="ppAdminContent"></div>
     </div>
     <div id="ppPanelAdminUsers" class="pp-body" style="display:none">
+      <input type="text" id="ppUserSearch" class="pp-input" placeholder="Search by email or nickname…"
+             maxlength="64" autocomplete="off" oninput="onAdminUserSearch()" style="margin-bottom:12px"/>
       <div id="ppAdminUsersContent"></div>
     </div>
     <div id="ppPanelFriends" class="pp-body" style="display:none;flex-direction:column;gap:14px">
@@ -8760,16 +8762,37 @@ async function renderAdminUsers(){
   _renderAdminUsersList();
 }
 
+// Typed into the box that sits outside this list, so it survives the rebuild.
+let _adminUserQuery='';
+function onAdminUserSearch(){
+  _adminUserQuery=($('ppUserSearch')?.value||'').trim().toLowerCase();
+  _renderAdminUsersList();
+}
+function _filterAdminUsers(users){
+  if(!_adminUserQuery) return users;
+  const q=_adminUserQuery;
+  return users.filter(u=>
+    (u.email||'').toLowerCase().includes(q) ||
+    (u.nickname||'').toLowerCase().includes(q));
+}
+
 function _renderAdminUsersList(){
   const el=$('ppAdminUsersContent'); if(!el) return;
-  const users=_adminUsers||[];
-  if(!users.length){ el.innerHTML='<div class="stats-empty">No users.</div>'; return; }
+  const all=_adminUsers||[];
+  const users=_filterAdminUsers(all);
+  if(!all.length){ el.innerHTML='<div class="stats-empty">No users.</div>'; return; }
+  if(!users.length){
+    el.innerHTML=`<div class="stats-empty">No user matches \u201c${escFriendName(_adminUserQuery)}\u201d.</div>`;
+    return;
+  }
   el.innerHTML='';
 
   const header=document.createElement('div');
   header.className='stats-section-title';
   header.style.marginBottom='8px';
-  header.textContent=`Users (${users.length})`;
+  header.textContent=_adminUserQuery
+    ? `Users (${users.length} of ${all.length})`
+    : `Users (${users.length})`;
   el.appendChild(header);
 
   // Sort bar
