@@ -5773,8 +5773,22 @@ function bellSVG(size){
 // half the time is worse than no link, so both go to the site's own map
 // centred on the spot, which is right for every spot in the catalogue.
 function windfinderUrl(lat,lon){
-  // Verified: the hash is kept and the map lands on the right coast.
-  return `https://www.windfinder.com/#9/${(+lat).toFixed(4)}/${(+lon).toFixed(4)}`;
+  // /maps/ rather than the site root, so this can open the native app.
+  //
+  // Windfinder's apple-app-site-association lists exactly which paths the iOS
+  // app claims: /forecast/*, /weatherforecast/*, /report/*, /webcams/*,
+  // /maps/* and /map/*. The site ROOT is not among them, so the previous
+  // https://www.windfinder.com/#9/lat/lon could never hand off to the app on
+  // iOS however it was opened. /maps/ is claimed and serves a 200. (/map/ is
+  // listed too but 404s, so it is not the one to use.)
+  //
+  // Android needs nothing: assetlinks.json delegates handle_all_urls, so any
+  // windfinder.com link already opens the app there.
+  //
+  // NOT verified: whether the app honours the #zoom/lat/lon fragment and lands
+  // on this spot rather than wherever it last was. Universal links do carry the
+  // fragment, but only a real device can answer that.
+  return `https://www.windfinder.com/maps/#9/${(+lat).toFixed(4)}/${(+lon).toFixed(4)}`;
 }
 function windguruUrl(lat,lon){
   return `https://www.windguru.cz/map?lat=${(+lat).toFixed(4)}&lon=${(+lon).toFixed(4)}&zoom=10`;
