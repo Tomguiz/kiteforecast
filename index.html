@@ -1750,8 +1750,8 @@
           <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:5px;">
             <label class="pp-label" style="margin:0">Your name <span style="color:var(--tdim);font-weight:400;text-transform:none;letter-spacing:0">— so friends can find you</span></label>
             <div style="display:flex;gap:6px;width:100%;margin-bottom:8px">
-              <input type="text" id="ppFirstNameInput" class="pp-input" placeholder="First name" maxlength="40" style="margin:0;flex:1 1 0;width:0;min-width:0"/>
-              <input type="text" id="ppLastNameInput" class="pp-input" placeholder="Last name" maxlength="40" style="margin:0;flex:1 1 0;width:0;min-width:0"/>
+              <input type="text" id="ppFirstNameInput" class="pp-input" placeholder="First name" maxlength="40" oninput="onNicknameInput()" style="margin:0;flex:1 1 0;width:0;min-width:0"/>
+              <input type="text" id="ppLastNameInput" class="pp-input" placeholder="Last name" maxlength="40" oninput="onNicknameInput()" style="margin:0;flex:1 1 0;width:0;min-width:0"/>
             </div>
             <label class="pp-label" style="margin:0">Nickname <span id="ppNicknameReq" style="color:#f87171;font-weight:400;text-transform:none;letter-spacing:0">* required</span></label>
             <div style="display:flex;gap:6px;align-items:center;width:100%">
@@ -10174,9 +10174,18 @@ function onNicknameInput(){
   updateNicknameReq();
   const btn=$('ppNicknameSaveBtn');
   if(!btn) return;
-  const current=loadProfile().nickname||'';
+  const p=loadProfile();
   const val=($('ppNicknameInput')?.value||'').trim();
-  const changed=val&&val!==current;
+  // The names share this Save button, so they have to be able to make it live
+  // on their own. Watching only the nickname left them unsaveable: once the
+  // nickname was settled the button read "✓ Saved" and was disabled, so a
+  // rider could type their name and had no way to commit it.
+  const fn=($('ppFirstNameInput')?.value||'').trim();
+  const ln=($('ppLastNameInput')?.value||'').trim();
+  // A nickname is still required — an empty one can never be saved, whatever
+  // the names say.
+  const changed=!!val&&(
+    val!==(p.nickname||'') || fn!==(p.firstName||'') || ln!==(p.lastName||''));
   btn.classList.toggle('saved',!changed);
   btn.classList.toggle('dirty',!!changed);
   btn.textContent=changed?'Save':'✓ Saved';
