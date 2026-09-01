@@ -189,10 +189,13 @@ curl -sI https://tomguiz.github.io/kiteforecast/ | grep -i ^location  # the redi
 Two things live outside this repo and will not follow the merge:
 
 - **Google sign-in.** The One Tap client
-  (`927737240724-…apps.googleusercontent.com`) validates the page's origin.
-  Add `https://kiteforecast.app` to *Authorized JavaScript origins* in the
-  Google Cloud console, or sign-in fails with `origin_mismatch` on the new
-  domain. Keep `https://tomguiz.github.io` listed too.
+  (`927737240724-…apps.googleusercontent.com`) validates the page's origin, so
+  both origins are listed on it — done on 2026-09-01, alongside the switch. If
+  sign-in ever fails with `origin_mismatch`, that list is the first place to
+  look: console.cloud.google.com/auth/clients, project `kiteforecast-498013`.
+  Reach it by **project number** (`?project=927737240724`) or by that id — the
+  display name `kiteforecast` in the URL returns "You need additional access",
+  which reads like a permissions problem and is not one.
 - **Stripe.** Nothing to change: checkout and portal URLs are sent by the
   client per request, and the functions' fallbacks now point at the new domain.
 
