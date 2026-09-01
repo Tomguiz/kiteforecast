@@ -9,6 +9,9 @@ import { test, expect } from '../fixtures/auth';
 
 const D = '2026-09-01';
 
+// The links now live in the footer of an OPEN day, next to Details / Columns /
+// I'm going — where a rider is reading the very hours they might want a second
+// opinion on, rather than in the spot header two screens up.
 async function openSpot(page: any, lat: number, lon: number) {
   await page.evaluate(({ D, lat, lon }: any) => {
     const m = new Map();
@@ -21,21 +24,24 @@ async function openSpot(page: any, lat: number, lon: number) {
     windDirs = new Set([225, 270]);
     showOnly('results');
     renderGrid();
+    // Open it, do not toggle: this helper runs twice in one test, and a second
+    // toggle would close the day and take the footer with it.
+    if (!_openForecastDays.has(D)) toggleForecastDay(D, 0);
   }, { D, lat, lon });
 }
 
-test('both links appear on a spot', async ({ gotoApp, page }) => {
+test('both links appear in the open day', async ({ gotoApp, page }) => {
   await gotoApp('signedOut');
   await openSpot(page, 51.3627, 3.3062);
-  await expect(page.locator('#locSub a', { hasText: 'Windfinder' })).toBeVisible();
-  await expect(page.locator('#locSub a', { hasText: 'Windguru' })).toBeVisible();
+  await expect(page.locator('.fg-foot a', { hasText: 'Windfinder' })).toBeVisible();
+  await expect(page.locator('.fg-foot a', { hasText: 'Windguru' })).toBeVisible();
 });
 
 test('they carry the spot coordinates, not its name', async ({ gotoApp, page }) => {
   await gotoApp('signedOut');
   await openSpot(page, 51.3627, 3.3062);
-  const wf = await page.locator('#locSub a', { hasText: 'Windfinder' }).getAttribute('href');
-  const wg = await page.locator('#locSub a', { hasText: 'Windguru' }).getAttribute('href');
+  const wf = await page.locator('.fg-foot a', { hasText: 'Windfinder' }).getAttribute('href');
+  const wg = await page.locator('.fg-foot a', { hasText: 'Windguru' }).getAttribute('href');
   expect(wf).toBe('https://www.windfinder.com/#9/51.3627/3.3062');
   expect(wg).toBe('https://www.windguru.cz/map?lat=51.3627&lon=3.3062&zoom=10');
   // the apostrophe in the spot name must not appear anywhere in either
@@ -47,7 +53,7 @@ test('they follow the spot when it changes', async ({ gotoApp, page }) => {
   await gotoApp('signedOut');
   await openSpot(page, 51.3627, 3.3062);
   await openSpot(page, 36.0143, -5.6044);          // Tarifa
-  const wf = await page.locator('#locSub a', { hasText: 'Windfinder' }).getAttribute('href');
+  const wf = await page.locator('.fg-foot a', { hasText: 'Windfinder' }).getAttribute('href');
   expect(wf).toContain('36.0143');
   expect(wf).toContain('-5.6044');                  // a negative longitude survives
 });
@@ -56,7 +62,7 @@ test('they open in a new tab, without leaking the referrer', async ({ gotoApp, p
   await gotoApp('signedOut');
   await openSpot(page, 51.3627, 3.3062);
   for (const name of ['Windfinder', 'Windguru']) {
-    const a = page.locator('#locSub a', { hasText: name });
+    const a = page.locator('.fg-foot a', { hasText: name });
     await expect(a).toHaveAttribute('target', '_blank');
     await expect(a).toHaveAttribute('rel', /noopener/);
     await expect(a).toHaveAttribute('rel', /noreferrer/);
