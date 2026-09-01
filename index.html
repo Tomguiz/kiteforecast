@@ -221,8 +221,10 @@
     .s-btn-static:hover { border-color:var(--accent); color:var(--accent); } /* stay as active look */
     /* A second opinion, not the headline — dimmer than Maps, and they wrap
        together rather than pushing the favourite and bell buttons off a phone. */
-    .ext-link { color:var(--tdim); }
-    .ext-link:hover { color:var(--accent); }
+    /* Anchors sitting in a row of buttons: match their shape, stay quieter —
+       a second opinion, not a call to action. */
+    .fg-ext { text-decoration:none; display:inline-flex; align-items:center; color:var(--tdim); }
+    .fg-ext:hover { border-color:var(--accent); color:var(--accent); }
     .shore-hint { font-size:.72rem; color:var(--tdim); }
     .lwd-edit-all { font-size:.72rem; color:var(--accent); cursor:pointer; white-space:nowrap; opacity:.85; }
     .lwd-edit-all:hover { opacity:1; text-decoration:underline; }
@@ -5594,6 +5596,8 @@ function openForecastDay(dateStr,idx){
            old "Full detail" button without replacing this path would have quietly
            cost the rider the ability to confirm a session at all. -->
       ${goingBtnHTML(dateStr,idx)}
+      <a class="fg-more fg-ext" href="${windfinderUrl(cachedLoc.latitude,cachedLoc.longitude)}" target="_blank" rel="noopener noreferrer" title="Cross-check this spot on Windfinder">Windfinder \u2197</a>
+      <a class="fg-more fg-ext" href="${windguruUrl(cachedLoc.latitude,cachedLoc.longitude)}" target="_blank" rel="noopener noreferrer" title="Cross-check this spot on Windguru">Windguru \u2197</a>
     </div>`;
   body.hidden=false;
 }
@@ -5804,7 +5808,7 @@ function renderGrid(){
   // is shown to every visitor of the spot. Escape it.
   $('locName').innerHTML=`${escFriendName(loc.name)}${loc.admin1&&loc.admin1!==loc.name?', '+escFriendName(loc.admin1):''} <span style="color:var(--tdim);font-size:.72rem;font-weight:600;text-transform:uppercase;letter-spacing:.07em;vertical-align:middle">${escFriendName(loc.country)}</span>`;
   // Line 2: maps + icons + sessions
-  $('locSub').innerHTML=`<a class="map-link" href="${mapsUrl}" target="_blank" rel="noopener" title="Open in Google Maps"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Maps</a><a class="map-link ext-link" href="${windfinderUrl(loc.latitude,loc.longitude)}" target="_blank" rel="noopener noreferrer" title="Cross-check on Windfinder">Windfinder</a><a class="map-link ext-link" href="${windguruUrl(loc.latitude,loc.longitude)}" target="_blank" rel="noopener noreferrer" title="Cross-check on Windguru">Windguru</a><button class="fav-btn${isFav?' active':''}" id="favBtn" title="${isFav?'Remove from favourites':'Add to favourites'}">${isFav?'★':'☆'}</button><button class="notif-btn${hasSpotNotif(loc.name)?' active':''}" id="notifBtn" title="Get notified">${bellSVG(16)}</button><button class="share-btn" id="shareBtn" onclick="shareSpot()" title="Share this spot"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></button>${qdLabel}`;
+  $('locSub').innerHTML=`<a class="map-link" href="${mapsUrl}" target="_blank" rel="noopener" title="Open in Google Maps"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13S3 17 3 10a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>Maps</a><button class="fav-btn${isFav?' active':''}" id="favBtn" title="${isFav?'Remove from favourites':'Add to favourites'}">${isFav?'★':'☆'}</button><button class="notif-btn${hasSpotNotif(loc.name)?' active':''}" id="notifBtn" title="Get notified">${bellSVG(16)}</button><button class="share-btn" id="shareBtn" onclick="shareSpot()" title="Share this spot"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></button>${qdLabel}`;
   $('locHdr').style.display='block';
   document.body.classList.add('spot-loaded');
   checkShowMySpotTab();
@@ -6906,6 +6910,38 @@ async function fireConfirmationWebhook(spot, sessions){
 
 // ── PROFILE PANEL ──
 
+// Fills the profile form from the stored profile.
+//
+// Extracted so it can run TWICE. The panel used to fill once, on open, from
+// localStorage — which on a fresh sign-in is still empty, because the profile
+// is fetched from the server a moment later. The rider saw blank fields and had
+// to close and reopen the panel. Worse, the nickname box was blank too, and
+// saveNickname refuses an empty nickname: typing a first and last name and
+// pressing Save did nothing, which is why the names looked unsaveable a second
+// time. Both symptoms, one cause.
+function fillProfileForm(){
+  const p=loadProfile();
+  const set=(id,v)=>{ const el=$(id); if(el&&document.activeElement!==el) el.value=v; };
+  // activeElement is skipped on purpose: the sync can land while the rider is
+  // mid-word, and overwriting what they are typing is its own bug.
+  set('ppNicknameInput', p.nickname||'');
+  set('ppFirstNameInput', p.firstName||'');
+  set('ppLastNameInput', p.lastName||'');
+  set('ppHomeInput', p.homeLabel||'');
+  set('ppWeightInput', p.weightKg??'');
+  renderRiderLevelBtns();
+  renderPowerPrefBtns();
+  updateNicknameReq();
+  const btn=$('ppNicknameSaveBtn');
+  if(btn){
+    const hasSaved=!!p.nickname;
+    btn.classList.toggle('saved', hasSaved);
+    btn.classList.remove('dirty');
+    btn.textContent=hasSaved?'\u2713 Saved':'Save';
+    btn.disabled=hasSaved;
+  }
+}
+
 function renderSignInOnboarding(){
   const ctx=$('ppSignInContext');
   const div=$('ppSignInDivider');
@@ -6997,23 +7033,7 @@ function openProfilePanel(tab){
     _resetGoogleBtn(); // reset in case user cancelled OAuth and came back
     if(tab && tab!=='profile' && SECTIONS[tab]){ openSection(tab); return; }
     openProfileSheet();
-    const _p=loadProfile();
-    const _ni=$('ppNicknameInput'); if(_ni) _ni.value=_p.nickname||'';
-    const _fn=$('ppFirstNameInput'); if(_fn) _fn.value=_p.firstName||'';
-    const _ln=$('ppLastNameInput');  if(_ln) _ln.value=_p.lastName||'';
-    const _hi=$('ppHomeInput'); if(_hi) _hi.value=_p.homeLabel||'';
-    const _wi=$('ppWeightInput'); if(_wi) _wi.value=_p.weightKg??'';
-    renderRiderLevelBtns();
-    renderPowerPrefBtns();
-    updateNicknameReq();
-    // Set save button initial state: dim if nickname already saved, default if not yet set
-    (function(){ const btn=$('ppNicknameSaveBtn'); if(!btn) return;
-      const hasSaved=!!_p.nickname;
-      btn.classList.toggle('saved', hasSaved);
-      btn.classList.remove('dirty');
-      btn.textContent=hasSaved?'✓ Saved':'Save';
-      btn.disabled=hasSaved;
-    })();
+    fillProfileForm();
     renderSignInOnboarding();
     updateAuthUI();
     renderNotifList();
@@ -9971,14 +9991,24 @@ async function syncPremiumFromSupabase(email){
     p.contributionPoints=data.contribution_points||0;
     p.premiumUntil=data.premium_until||null;
     p.homeLat=data.home_lat; p.homeLon=data.home_lon; p.homeLabel=data.home_label;
-    p.kiteLevel=data.kite_level; p.weightKg=data.weight_kg; p.powerPref=data.power_pref;
-    p.firstName=data.first_name||''; p.lastName=data.last_name||'';
+    // ?? rather than =, so a server that has no value does not DESTROY one the
+    // rider set locally. This was invisible while the sync only touched storage;
+    // now that it repaints the open form, an overwrite with null would clear the
+    // weight box in front of the rider who had just typed it.
+    p.kiteLevel=data.kite_level ?? p.kiteLevel;
+    p.weightKg =data.weight_kg  ?? p.weightKg;
+    p.powerPref=data.power_pref ?? p.powerPref;
+    p.firstName=data.first_name ?? p.firstName ?? '';
+    p.lastName =data.last_name  ?? p.lastName  ?? '';
     p.digestNearbyEnabled=data.digest_nearby_enabled===true;
     p.digestNearbyKm=data.digest_nearby_km||120;
     saveProfile(p);
     // The stored copy wins: the whole point of the column is that a rider's
     // choices follow them onto a device that has never seen them.
     applyDayPrefsFromProfile(data);
+    // The panel may already be open and showing the blanks this call just
+    // filled in. Repaint it rather than making the rider close and reopen.
+    if($('profileOverlay')?.style.display==='flex') fillProfileForm();
     const fst=$('ppFriendSessionToggle');
     if(fst) fst.classList.toggle('on', p.friendSessionNotifs!==false);
     const nft=$('ppNotifyFriendsToggle');
