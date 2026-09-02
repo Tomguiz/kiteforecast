@@ -8923,9 +8923,12 @@ function onAdminUserSearch(){
 function _filterAdminUsers(users){
   if(!_adminUserQuery) return users;
   const q=_adminUserQuery;
+  // Searching the real name too: an admin who knows a rider as "Xavier" should
+  // not have to already know that Xavier is "Drifto" to find him.
   return users.filter(u=>
     (u.email||'').toLowerCase().includes(q) ||
-    (u.nickname||'').toLowerCase().includes(q));
+    (u.nickname||'').toLowerCase().includes(q) ||
+    (u.full_name||'').toLowerCase().includes(q));
 }
 
 function _renderAdminUsersList(){
@@ -8992,6 +8995,20 @@ function _renderAdminUsersList(){
     }
     hdr.appendChild(plan);
     card.appendChild(hdr);
+
+    // The real name, on its own line under the email. A nickname is chosen to
+    // be a handle, not an identity — "Drifto" and "Teletubeach 8" tell an admin
+    // nothing about who they are looking at. admin_list_users prefers what the
+    // rider typed into their profile and falls back to the name their identity
+    // provider vouched for, so this is populated for most accounts without
+    // anyone filling a form. textContent: it is user-supplied either way.
+    if(u.full_name){
+      const nameEl=document.createElement('div');
+      nameEl.className='pp-user-name';
+      nameEl.style.cssText='font-size:.74rem;color:var(--text);font-weight:600;margin-top:1px';
+      nameEl.textContent=u.full_name;
+      card.appendChild(nameEl);
+    }
 
     const created=u.created_at
       ? new Date(u.created_at).toLocaleDateString('en',{day:'numeric',month:'short',year:'numeric'})
