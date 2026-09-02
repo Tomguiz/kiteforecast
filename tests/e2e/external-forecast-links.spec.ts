@@ -46,8 +46,8 @@ test('they carry the spot coordinates, not its name', async ({ gotoApp, page }) 
   await openSpot(page, 51.3627, 3.3062);
   const wf = await page.locator('.fg-foot a', { hasText: 'Windfinder' }).getAttribute('href');
   const wg = await page.locator('.fg-foot a', { hasText: 'Windguru' }).getAttribute('href');
-  expect(wf).toBe('https://www.windfinder.com/#13/51.3627/3.3062');
-  expect(wg).toBe('https://www.windguru.cz/map?lat=51.3627&lon=3.3062&zoom=13');
+  expect(wf).toBe('https://www.windfinder.com/maps/#13/51.3627/3.3062');
+  expect(wg).toBe('https://www.windguru.cz/map/spot/?lat=51.3627&lon=3.3062&zoom=13');
   // the apostrophe in the spot name must not appear anywhere in either
   expect(wf).not.toContain('Hekje');
   expect(wg).not.toContain('Hekje');
@@ -81,45 +81,36 @@ test('the URL builders round consistently', async ({ gotoApp, page }) => {
   }));
   // four decimals is ~11 m — far finer than either site's map needs, and it
   // keeps the URL stable rather than jittering with float noise.
-  expect(r.wf).toBe('https://www.windfinder.com/#13/51.3627/3.3062');
+  expect(r.wf).toBe('https://www.windfinder.com/maps/#13/51.3627/3.3062');
   expect(r.wg).toContain('lat=51.3627&lon=3.3062');
 });
 
-test('the coordinate fallback uses a path the iOS app does NOT claim', async ({ gotoApp, page }) => {
-  // Deliberate, and the reverse of what this test asserted before. Windfinder's
-  // apple-app-site-association claims /forecast/*, /weatherforecast/*,
-  // /report/*, /webcams/*, /maps/* and /map/* — and NOT the site root. A
-  // claimed path hands off to the native app, and the app ignores the
-  // #zoom/lat/lon fragment: it opens on wherever it was last, not on this spot.
-  // The root keeps the link in the browser, which does honour the fragment.
-  //
-  // A claimed path is only right once it NAMES the spot (/forecast/<slug>).
-  // Until then, this guards against quietly handing the rider back to an app
-  // that will show them the wrong beach.
+test('the coordinate fallback uses a path the iOS app claims', async ({ gotoApp, page }) => {
+  // Windfinder's apple-app-site-association claims /forecast/*,
+  // /weatherforecast/*, /report/*, /webcams/*, /maps/* and /map/* — and NOT the
+  // site root. A root URL cannot hand off to the app at all, however it is
+  // opened. The fallback uses /maps/, which is claimed and which a rider on a
+  // device confirms lands on the right coast.
   await gotoApp('signedOut');
   const url = await page.evaluate(() => windfinderUrl(51.3627, 3.3062));
   const path = new URL(url).pathname;
-  const CLAIMED = ['/forecast/', '/weatherforecast/', '/report/', '/webcams/', '/maps/', '/map/'];
-  expect(CLAIMED.some(p => path.startsWith(p)), `${path} hands off to the app`).toBe(false);
-  expect(new URL(url).hash).toBe('#13/51.3627/3.3062');
+  const CLAIMED = ['/forecast/', '/weatherforecast/', '/report/', '/webcams/', '/maps/'];
+  expect(CLAIMED.some(p => path.startsWith(p)), `${path} is not a claimed path`).toBe(true);
+  expect(path).not.toBe('/');
 });
 
-test('both open close enough in to see the spot itself', async ({ gotoApp, page }) => {
-  // A rider clicking from one spot's day expects to arrive AT that spot. Zoom 9
-  // (Windfinder) and 10 (Windguru) were centred correctly but showed a hundred
-  // kilometres of coast, so the spot was a pixel among its neighbours. Anything
-  // from 12 up is close enough to recognise the beach; the two also stay in
-  // step with each other.
+test('the Windguru fallback uses the route that reads lat/lon', async ({ gotoApp, page }) => {
+  // The bug this pins: /map?lat=..&lon=.. is not a Windguru route, so the query
+  // was dropped and a rider clicking a Belgian spot landed on Windguru's own
+  // default spot, in Spain. The routes that read the coordinates are /map/,
+  // /map/spot/ and /map/station/ — all with the trailing slash.
   await gotoApp('signedOut');
-  const { wf, wg } = await page.evaluate(() => ({
-    wf: windfinderUrl(51.3627, 3.3062),
-    wg: windguruUrl(51.3627, 3.3062),
-  }));
-  const wfZoom = Number(new URL(wf).hash.slice(1).split('/')[0]);
-  const wgZoom = Number(new URL(wg).searchParams.get('zoom'));
-  expect(wfZoom).toBeGreaterThanOrEqual(12);
-  expect(wgZoom).toBeGreaterThanOrEqual(12);
-  expect(wfZoom).toBe(wgZoom);
+  const url = await page.evaluate(() => windguruUrl(51.3627, 3.3062));
+  const u = new URL(url);
+  expect(u.pathname).toMatch(/^\/map\/(spot|station)?\/?$/);
+  expect(u.pathname.endsWith('/')).toBe(true);
+  expect(u.searchParams.get('lat')).toBe('51.3627');
+  expect(u.searchParams.get('lon')).toBe('3.3062');
 });
 
 // ── the per-spot route ───────────────────────────────────────────────────────
@@ -142,7 +133,7 @@ test('a spot without ids still falls back to the map', async ({ gotoApp, page })
   await gotoApp('signedOut');
   await openSpot(page, 51.3627, 3.3062);
   const wf = await page.locator('.fg-foot a', { hasText: 'Windfinder' }).getAttribute('href');
-  expect(wf).toBe('https://www.windfinder.com/#13/51.3627/3.3062');
+  expect(wf).toBe('https://www.windfinder.com/maps/#13/51.3627/3.3062');
 });
 
 test('ids belong to the spot at those exact coordinates', async ({ gotoApp, page }) => {
@@ -155,7 +146,7 @@ test('ids belong to the spot at those exact coordinates', async ({ gotoApp, page
     nearby: windfinderUrl(51.3300, 3.1705),   // 220 m away — not the same spot
   }));
   expect(urls.exact).toBe('https://www.windfinder.com/forecast/zeebrugge');
-  expect(urls.nearby).toContain('/#13/');
+  expect(urls.nearby).toContain('/maps/#13/');
 });
 
 test('every id in the catalogue is well formed', async ({ gotoApp, page }) => {

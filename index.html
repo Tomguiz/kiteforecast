@@ -5774,17 +5774,14 @@ function bellSVG(size){
 //      app ON the spot. Only a URL that names the spot can do that.
 //   2. Failing that, the provider's map at the spot's COORDINATES.
 //
-// (2) is the fallback because it is right for every spot in the catalogue
-// including the ones riders add themselves, but it only works in a BROWSER: the
-// Windfinder app ignores the #zoom/lat/lon fragment and opens on wherever it
-// was last, which is what riders reported. So the coordinate form deliberately
-// uses the site root — a path the iOS app does NOT claim (its
-// apple-app-site-association claims /forecast/*, /weatherforecast/*, /report/*,
-// /webcams/*, /maps/* and /map/*) — to keep the link in the browser, where the
-// fragment IS honoured. A correct map in a browser beats the app on the wrong
-// beach. Android cannot be steered this way at all: assetlinks.json delegates
-// handle_all_urls, so ANY windfinder.com URL opens the app there. Route (1) is
-// the only fix that works on both, which is why the ids are worth carrying.
+// (2) is the fallback because it is right for every spot in the catalogue,
+// including the ones riders add themselves through the OSM search. It is the
+// weaker of the two: a map centred on the water near the spot, rather than the
+// spot's own forecast. Windfinder honours it — reported from a device, the map
+// opens on the right coast — but each provider has its own route for it, and
+// getting that route wrong is not a graceful failure. Windguru dropped a rider
+// clicking a Belgian spot onto its default spot in Spain, because the URL said
+// /map when the route that reads lat/lon/zoom is /map/spot/.
 //
 // The ids live on the SPOTS entries as `wf` and `wg`. They are NOT derived from
 // the spot name: a guessed slug resolves for about a third of the catalogue
@@ -5805,12 +5802,24 @@ function windfinderUrl(lat,lon){
   const s=extSpotIds(lat,lon);
   // /forecast/ is claimed by the app, and names one spot — the app lands here.
   if(s&&s.wf) return `https://www.windfinder.com/forecast/${s.wf}`;
-  return `https://www.windfinder.com/#${EXT_MAP_ZOOM}/${(+lat).toFixed(4)}/${(+lon).toFixed(4)}`;
+  // /maps/ for the coordinate fallback: also a claimed path, so it opens the
+  // app, and the rider who reported this confirms it lands on the right coast.
+  // (Claimed paths per Windfinder's apple-app-site-association: /forecast/*,
+  // /weatherforecast/*, /report/*, /webcams/*, /maps/* and /map/*. The site
+  // root is not among them and cannot open the app at all, which is why it is
+  // not used here. /map/ is claimed but 404s.)
+  return `https://www.windfinder.com/maps/#${EXT_MAP_ZOOM}/${(+lat).toFixed(4)}/${(+lon).toFixed(4)}`;
 }
 function windguruUrl(lat,lon){
   const s=extSpotIds(lat,lon);
   if(s&&s.wg) return `https://www.windguru.cz/${s.wg}`;
-  return `https://www.windguru.cz/map?lat=${(+lat).toFixed(4)}&lon=${(+lon).toFixed(4)}&zoom=${EXT_MAP_ZOOM}`;
+  // /map/spot/ with the trailing slash, NOT /map. A rider clicking a Belgian
+  // spot landed in Spain: /map?lat=..&lon=.. is not the map route, so Windguru
+  // dropped the query and opened its own default spot. The routes that read
+  // lat/lon/zoom are /map/ (forecast), /map/spot/ (the spots) and /map/station/
+  // (the live stations); /map/spot/ is the one that shows the kite spots this
+  // link is a cross-check for.
+  return `https://www.windguru.cz/map/spot/?lat=${(+lat).toFixed(4)}&lon=${(+lon).toFixed(4)}&zoom=${EXT_MAP_ZOOM}`;
 }
 
 function renderGrid(){
