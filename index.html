@@ -7,8 +7,28 @@
   <meta http-equiv="Pragma" content="no-cache" />
   <meta http-equiv="Expires" content="0" />
   <title>KiteForecast — Never miss a session again</title>
+  <meta name="description" content="10-day kitesurf forecast &amp; wind alerts for your spots." />
+  <!-- Share preview (iMessage, WhatsApp, Slack, X…). Without og:image the apps
+       fell back to the apple-touch-icon: the badge alone, cut off at the waves,
+       with no wordmark. This is the full logo on a 1200x630 card. -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="KiteForecast" />
+  <meta property="og:title" content="KiteForecast — Never miss a session again" />
+  <meta property="og:description" content="10-day kitesurf forecast &amp; wind alerts for your spots." />
+  <meta property="og:url" content="https://kiteforecast.app/" />
+  <meta property="og:image" content="https://kiteforecast.app/assets/og-image.jpg" />
+  <meta property="og:image:secure_url" content="https://kiteforecast.app/assets/og-image.jpg" />
+  <meta property="og:image:type" content="image/jpeg" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="KiteForecast logo" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="KiteForecast — Never miss a session again" />
+  <meta name="twitter:description" content="10-day kitesurf forecast &amp; wind alerts for your spots." />
+  <meta name="twitter:image" content="https://kiteforecast.app/assets/og-image.jpg" />
   <link rel="manifest" href="manifest.json" />
-  <link rel="apple-touch-icon" href="logo.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+  <link rel="apple-touch-icon" href="icon-512.png" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="KiteForecast" />
@@ -95,19 +115,23 @@
     .logo span { -webkit-text-fill-color:var(--text); }
     .home-btn { background:none; border:none; cursor:pointer; padding:0; line-height:1; display:block; margin:0; flex-shrink:0; }
     .home-btn:hover { opacity:.82; transition:opacity .15s; }
+    /* logo.png is the full logo: badge over the "KiteForecast" wordmark, on a
+       transparent square. It used to be the badge alone, cropped to a circle,
+       which cut the waves off the bottom and lost the wordmark entirely. So:
+       no circle, no cover-crop — the whole image, scaled by height. */
     .site-logo {
       display:block; margin:0;
-      width:clamp(44px,7vw,58px); height:clamp(44px,7vw,58px);
-      border-radius:50%; object-fit:cover;
-      box-shadow:0 4px 16px rgba(0,0,0,.5);
+      height:clamp(60px,9vw,80px); width:auto;
+      object-fit:contain;
+      filter:drop-shadow(0 4px 10px rgba(0,0,0,.45));
     }
     @media (max-width:599px) {
-      .site-logo { width:46px; height:46px; }
+      .site-logo { height:62px; }
     }
     /* modal logo */
     .modal-logo-btn { background:none; border:none; cursor:pointer; padding:0; flex-shrink:0; opacity:.85; transition:opacity .15s; }
     .modal-logo-btn:hover { opacity:1; }
-    .modal-logo { height:36px; width:36px; border-radius:50%; object-fit:cover; }
+    .modal-logo { height:40px; width:auto; object-fit:contain; filter:none; }
     .tagline { color:var(--gray); margin:5px 0 11px; font-size:clamp(.72rem,.8rem + .15vw,.83rem); }
 
     /* ── SEARCH ── */
@@ -1304,7 +1328,7 @@
       animation:slideUp .3s cubic-bezier(.22,.68,0,1.2);
     }
     @keyframes slideUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
-    #installBanner img { width:40px; height:40px; border-radius:10px; flex-shrink:0; }
+    #installBanner img { width:44px; height:44px; object-fit:contain; flex-shrink:0; }
     #installBanner .ib-text { flex:1; min-width:0; }
     #installBanner .ib-title { font-size:.85rem; font-weight:700; color:var(--text); margin-bottom:2px; }
     #installBanner .ib-sub { font-size:.72rem; color:var(--gray); line-height:1.4; }
