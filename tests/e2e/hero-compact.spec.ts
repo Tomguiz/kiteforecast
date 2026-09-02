@@ -28,24 +28,29 @@ for (const [label, w, h, max] of [
   });
 }
 
-test('the brand still shows: logo and wordmark side by side', async ({ gotoApp, page }) => {
+test('the brand still shows: the full logo, centred, with no text wordmark beside it', async ({ gotoApp, page }) => {
   await gotoApp('signedIn');
   await page.waitForTimeout(600);
 
   const row = await page.evaluate(() => {
     const img = document.querySelector('.site-logo') as HTMLElement;
-    const word = document.querySelector('#logoHome') as HTMLElement;
-    const a = img.getBoundingClientRect(), b = word.getBoundingClientRect();
-    return { sameRow: Math.abs((a.top + a.height / 2) - (b.top + b.height / 2)) < 12, logoW: Math.round(a.width) };
+    const a = img.getBoundingClientRect();
+    return {
+      logoW: Math.round(a.width),
+      centred: Math.abs((a.left + a.width / 2) - window.innerWidth / 2) < 8,
+      wordmark: !!document.querySelector('#logoHome'),
+    };
   });
   // shrinking it is the point, but not to the point of vanishing
   expect(row.logoW).toBeGreaterThanOrEqual(40);
-  expect(row.sameRow).toBe(true);
+  // the logo image carries the "KiteForecast" wordmark itself now
+  expect(row.wordmark).toBe(false);
+  expect(row.centred).toBe(true);
 });
 
 test('opening a spot still collapses the header on mobile', async ({ gotoApp, page }) => {
-  // The mobile compact mode hides the logo and wordmark. They now live inside a
-  // flex row, which could have left an empty row holding its gap open.
+  // The mobile compact mode hides the logo. It lives inside a flex row, which
+  // could have left an empty row open.
   await page.setViewportSize({ width: 390, height: 844 });
   await gotoApp('signedIn');
   await page.waitForTimeout(600);

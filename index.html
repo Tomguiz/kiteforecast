@@ -106,13 +106,12 @@
       position: sticky; top: 0; z-index: 300; overflow: visible;
     }
     .hero::before { content:''; position:absolute; inset:0; background:radial-gradient(ellipse at 50% 0%,rgba(0,212,255,.07) 0%,transparent 65%); pointer-events:none; overflow:hidden; border-radius:inherit; }
-    /* Brand identity on ONE row. Stacked — 110px badge over a 50px wordmark
-       over a tagline — the header ate 37% of a 900px desktop screen and 34% of
-       a phone, before a single forecast was visible. Side by side it keeps the
-       same pieces at a third of the height. */
-    .brand-row { display:flex; align-items:center; justify-content:center; gap:12px; }
-    .logo { font-size: clamp(1.35rem,3.2vw,1.7rem); font-weight:800; letter-spacing:-1px; background:linear-gradient(135deg,var(--accent),var(--accent2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; background-clip:text; margin-top:0; }
-    .logo span { -webkit-text-fill-color:var(--text); }
+    /* Brand identity on ONE row, centred. It used to be the badge beside a
+       text wordmark ("🪁Forecast"); the logo image now carries the wordmark
+       itself, so the text went. Kept compact: a 110px badge stacked over a
+       wordmark over a tagline once ate a third of the screen before a single
+       forecast was visible, and hero-compact.spec.ts pins that ceiling. */
+    .brand-row { display:flex; align-items:center; justify-content:center; }
     .home-btn { background:none; border:none; cursor:pointer; padding:0; line-height:1; display:block; margin:0; flex-shrink:0; }
     .home-btn:hover { opacity:.82; transition:opacity .15s; }
     /* logo.png is the full logo: badge over the "KiteForecast" wordmark, on a
@@ -121,12 +120,12 @@
        no circle, no cover-crop — the whole image, scaled by height. */
     .site-logo {
       display:block; margin:0;
-      height:clamp(60px,9vw,80px); width:auto;
+      height:clamp(64px,9vw,84px); width:auto;
       object-fit:contain;
       filter:drop-shadow(0 4px 10px rgba(0,0,0,.45));
     }
     @media (max-width:599px) {
-      .site-logo { height:62px; }
+      .site-logo { height:70px; }
     }
     /* modal logo */
     .modal-logo-btn { background:none; border:none; cursor:pointer; padding:0; flex-shrink:0; opacity:.85; transition:opacity .15s; }
@@ -188,7 +187,6 @@
       /* Keep Back button clear of the absolutely-positioned profile bubble */
       body.spot-loaded .search-wrap { padding-right: 52px; }
       .search-input-wrap input { font-size:16px; padding:11px 12px; text-align:center; }
-      body.spot-loaded #logoHome,
       body.spot-loaded .tagline {
         display: none;
       }
@@ -1425,7 +1423,6 @@
     </svg>
     <span class="profile-btn-dot" id="profileDot"></span>
   </button>
-    <div class="logo" id="logoHome" onclick="resetSearch()" style="cursor:pointer">🪁<span>Forecast</span></div>
   </div>
   <p class="tagline">Life starts at 25 knots 💨</p>
   <div class="search-wrap">
