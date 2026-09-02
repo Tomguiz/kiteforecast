@@ -183,6 +183,9 @@ test('each link wears its own provider colour and mark', async ({ gotoApp, page 
   expect(colors.wf).not.toBe(colors.wg);
   // The marks come from the providers, and stay decorative: an empty alt, so a
   // screen reader reads the label once rather than "image, link, Windfinder".
+  // They are asserted present whether or not they LOADED: CI has no route to
+  // either provider, so here they are hidden by the onerror handler rather than
+  // painted. What is pinned is where the mark comes from, which is markup.
   await expect(wf.locator('img.fg-ext-ico')).toHaveAttribute('src', /windfinder\.com/);
   await expect(wg.locator('img.fg-ext-ico')).toHaveAttribute('src', /windguru\.cz/);
   await expect(wf.locator('img.fg-ext-ico')).toHaveAttribute('alt', '');

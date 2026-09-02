@@ -5610,10 +5610,13 @@ function openForecastDay(dateStr,idx){
       <!-- The mark is each provider's own favicon, fetched from their site
            rather than committed here: their logo, always current, and nothing
            of theirs to keep in this repo. It is decoration, so alt is empty and
-           a failure removes the image rather than showing a broken one \u2014 the
-           chip then reads exactly as it did before, in its brand colour. -->
-      <a class="fg-more fg-ext fg-ext--wf" href="${windfinderUrl(cachedLoc.latitude,cachedLoc.longitude)}" target="_blank" rel="noopener noreferrer" title="Cross-check this spot on Windfinder"><img class="fg-ext-ico" src="https://www.windfinder.com/favicon.ico" alt="" width="14" height="14" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">Windfinder \u2197</a>
-      <a class="fg-more fg-ext fg-ext--wg" href="${windguruUrl(cachedLoc.latitude,cachedLoc.longitude)}" target="_blank" rel="noopener noreferrer" title="Cross-check this spot on Windguru"><img class="fg-ext-ico" src="https://www.windguru.cz/favicon.ico" alt="" width="14" height="14" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">Windguru \u2197</a>
+           a failure HIDES the image rather than showing a broken one \u2014 the chip
+           then reads exactly as it did before, in its brand colour. Hidden and
+           not removed: a network that cannot reach the providers is the normal
+           case in CI, and removing the element left the test asserting where
+           the mark comes from with nothing to look at. -->
+      <a class="fg-more fg-ext fg-ext--wf" href="${windfinderUrl(cachedLoc.latitude,cachedLoc.longitude)}" target="_blank" rel="noopener noreferrer" title="Cross-check this spot on Windfinder"><img class="fg-ext-ico" src="https://www.windfinder.com/favicon.ico" alt="" width="14" height="14" loading="lazy" referrerpolicy="no-referrer" onerror="this.hidden=true">Windfinder \u2197</a>
+      <a class="fg-more fg-ext fg-ext--wg" href="${windguruUrl(cachedLoc.latitude,cachedLoc.longitude)}" target="_blank" rel="noopener noreferrer" title="Cross-check this spot on Windguru"><img class="fg-ext-ico" src="https://www.windguru.cz/favicon.ico" alt="" width="14" height="14" loading="lazy" referrerpolicy="no-referrer" onerror="this.hidden=true">Windguru \u2197</a>
     </div>`;
   body.hidden=false;
 }
