@@ -160,3 +160,30 @@ test('every id in the catalogue is well formed', async ({ gotoApp, page }) => {
     .map(s => s.name));
   expect(bad).toEqual([]);
 });
+
+// ── the look ─────────────────────────────────────────────────────────────────
+
+test('each link wears its own provider colour and mark', async ({ gotoApp, page }) => {
+  // In a footer where every other control is the same slate grey, the colour is
+  // what tells the two apart before the label is read. The mark is the
+  // provider's own favicon, so it must be their URL and not a copy in this repo.
+  await gotoApp('signedOut');
+  await openSpot(page, 51.3627, 3.3062);
+  const wf = page.locator('.fg-foot a', { hasText: 'Windfinder' });
+  const wg = page.locator('.fg-foot a', { hasText: 'Windguru' });
+  await expect(wf).toHaveClass(/fg-ext--wf/);
+  await expect(wg).toHaveClass(/fg-ext--wg/);
+  const colors = await page.evaluate(() => {
+    const pick = (t: string) => [...document.querySelectorAll('.fg-foot a')]
+      .find(a => a.textContent!.includes(t))!;
+    return { wf: getComputedStyle(pick('Windfinder')).color, wg: getComputedStyle(pick('Windguru')).color };
+  });
+  expect(colors.wf).toBe('rgb(255, 138, 147)');   // Windfinder red, lightened
+  expect(colors.wg).toBe('rgb(143, 176, 238)');   // Windguru blue, lightened
+  expect(colors.wf).not.toBe(colors.wg);
+  // The marks come from the providers, and stay decorative: an empty alt, so a
+  // screen reader reads the label once rather than "image, link, Windfinder".
+  await expect(wf.locator('img.fg-ext-ico')).toHaveAttribute('src', /windfinder\.com/);
+  await expect(wg.locator('img.fg-ext-ico')).toHaveAttribute('src', /windguru\.cz/);
+  await expect(wf.locator('img.fg-ext-ico')).toHaveAttribute('alt', '');
+});

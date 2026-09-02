@@ -225,6 +225,17 @@
        a second opinion, not a call to action. */
     .fg-ext { text-decoration:none; display:inline-flex; align-items:center; color:var(--tdim); }
     .fg-ext:hover { border-color:var(--accent); color:var(--accent); }
+    /* Each in its provider's own colour, so the rider recognises where the link
+       goes before reading it — and so the two are told apart at a glance in a
+       row where every other control is the same slate grey. Windfinder's red is
+       their brand #D0021B; Windguru's is the blue of their swoosh, #4472C4.
+       Both are lightened for the text: the brand values themselves are for
+       white backgrounds and go muddy on this one. */
+    .fg-ext-ico { width:14px; height:14px; margin-right:6px; border-radius:3px; flex-shrink:0; }
+    .fg-ext.fg-ext--wf { color:#ff8a93; border-color:rgba(208,2,27,.45); }
+    .fg-ext.fg-ext--wf:hover { color:#ff9ba3; border-color:#d0021b; background:rgba(208,2,27,.14); }
+    .fg-ext.fg-ext--wg { color:#8fb0ee; border-color:rgba(68,114,196,.5); }
+    .fg-ext.fg-ext--wg:hover { color:#a4c1f5; border-color:#4472c4; background:rgba(68,114,196,.16); }
     .shore-hint { font-size:.72rem; color:var(--tdim); }
     .lwd-edit-all { font-size:.72rem; color:var(--accent); cursor:pointer; white-space:nowrap; opacity:.85; }
     .lwd-edit-all:hover { opacity:1; text-decoration:underline; }
@@ -5596,8 +5607,13 @@ function openForecastDay(dateStr,idx){
            old "Full detail" button without replacing this path would have quietly
            cost the rider the ability to confirm a session at all. -->
       ${goingBtnHTML(dateStr,idx)}
-      <a class="fg-more fg-ext" href="${windfinderUrl(cachedLoc.latitude,cachedLoc.longitude)}" target="_blank" rel="noopener noreferrer" title="Cross-check this spot on Windfinder">Windfinder \u2197</a>
-      <a class="fg-more fg-ext" href="${windguruUrl(cachedLoc.latitude,cachedLoc.longitude)}" target="_blank" rel="noopener noreferrer" title="Cross-check this spot on Windguru">Windguru \u2197</a>
+      <!-- The mark is each provider's own favicon, fetched from their site
+           rather than committed here: their logo, always current, and nothing
+           of theirs to keep in this repo. It is decoration, so alt is empty and
+           a failure removes the image rather than showing a broken one \u2014 the
+           chip then reads exactly as it did before, in its brand colour. -->
+      <a class="fg-more fg-ext fg-ext--wf" href="${windfinderUrl(cachedLoc.latitude,cachedLoc.longitude)}" target="_blank" rel="noopener noreferrer" title="Cross-check this spot on Windfinder"><img class="fg-ext-ico" src="https://www.windfinder.com/favicon.ico" alt="" width="14" height="14" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">Windfinder \u2197</a>
+      <a class="fg-more fg-ext fg-ext--wg" href="${windguruUrl(cachedLoc.latitude,cachedLoc.longitude)}" target="_blank" rel="noopener noreferrer" title="Cross-check this spot on Windguru"><img class="fg-ext-ico" src="https://www.windguru.cz/favicon.ico" alt="" width="14" height="14" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()">Windguru \u2197</a>
     </div>`;
   body.hidden=false;
 }
