@@ -2920,19 +2920,19 @@ function buildLegendHTML(){
 const SPOTS=[
   // ── BELGIUM ──
   {name:'Riverwoods Beachclub',loc:'Knokke-Heist, Belgium',lat:51.3627,lon:3.3062,dirs:[0,45,270,315]},
-  {name:'Knokke Beach',loc:'Knokke-Heist, Belgium',lat:51.3613,lon:3.3273,dirs:[270,315]},
-  {name:'Duinbergen',loc:'Knokke-Heist, Belgium',lat:51.3468,lon:3.2660,dirs:[270,315]},
-  {name:'Heist',loc:'Knokke-Heist, Belgium',lat:51.3427,lon:3.2326,dirs:[270,315]},
+  {name:'Knokke Beach',loc:'Knokke-Heist, Belgium',lat:51.3613,lon:3.3273,dirs:[270,315],wf:'knokke_het_zoute',wg:461440},
+  {name:'Duinbergen',loc:'Knokke-Heist, Belgium',lat:51.3468,lon:3.2660,dirs:[270,315],wf:'duinbergen_knokke-heist',wg:148105},
+  {name:'Heist',loc:'Knokke-Heist, Belgium',lat:51.3427,lon:3.2326,dirs:[270,315],wg:48331},
   {name:'Icarus Kite School',loc:'Zeebrugge, Belgium',lat:51.3459,lon:3.1989,dirs:[0,45,225,270,315]},
-  {name:'Zeebrugge',loc:'Zeebrugge, Belgium',lat:51.3280,lon:3.1705,dirs:[270,315]},
-  {name:'Blankenberge',loc:'Blankenberge, Belgium',lat:51.3187,lon:3.1348,dirs:[270,315]},
-  {name:'De Haan',loc:'De Haan, Belgium',lat:51.2794,lon:3.0328,dirs:[270,315]},
+  {name:'Zeebrugge',loc:'Zeebrugge, Belgium',lat:51.3280,lon:3.1705,dirs:[270,315],wf:'zeebrugge',wg:48332},
+  {name:'Blankenberge',loc:'Blankenberge, Belgium',lat:51.3187,lon:3.1348,dirs:[270,315],wf:'blankenberge',wg:48333},
+  {name:'De Haan',loc:'De Haan, Belgium',lat:51.2794,lon:3.0328,dirs:[270,315],wf:'de_haan',wg:48335},
   {name:'Bredene',loc:'Bredene, Belgium',lat:51.2471,lon:2.9526,dirs:[270,315]},
-  {name:'Oostende',loc:'Oostende, Belgium',lat:51.2266,lon:2.9013,dirs:[270,315]},
-  {name:'Middelkerke',loc:'Middelkerke, Belgium',lat:51.1867,lon:2.8105,dirs:[270,315]},
-  {name:'Westende',loc:'Middelkerke, Belgium',lat:51.1662,lon:2.7628,dirs:[270,315]},
-  {name:'Oostduinkerke',loc:'Koksijde, Belgium',lat:51.1420,lon:2.6976,dirs:[0,45,225,270,315]},
-  {name:'De Panne',loc:'De Panne, Belgium',lat:51.1009,lon:2.5817,dirs:[270,315]},
+  {name:'Oostende',loc:'Oostende, Belgium',lat:51.2266,lon:2.9013,dirs:[270,315],wf:'oostende_pier',wg:1726},
+  {name:'Middelkerke',loc:'Middelkerke, Belgium',lat:51.1867,lon:2.8105,dirs:[270,315],wf:'middelkerke_flanders_belgium',wg:48338},
+  {name:'Westende',loc:'Middelkerke, Belgium',lat:51.1662,lon:2.7628,dirs:[270,315],wg:48339},
+  {name:'Oostduinkerke',loc:'Koksijde, Belgium',lat:51.1420,lon:2.6976,dirs:[0,45,225,270,315],wf:'oostduinkerke_flanders_belgium',wg:3628},
+  {name:'De Panne',loc:'De Panne, Belgium',lat:51.1009,lon:2.5817,dirs:[270,315],wg:48341},
   {name:'Surfers Paradise',loc:'Koksijde, Belgium',lat:51.1150,lon:2.6350,dirs:[225,270,315]},
   // ── NETHERLANDS – ZEELAND ──
   {name:'Brouwersdam',loc:'Zeeland, Netherlands',lat:51.7629,lon:3.8512,dirs:[225,270,315]},
@@ -5766,32 +5766,60 @@ function bellSVG(size){
 
 // Cross-checks against the two forecasts riders already trust.
 //
-// Both are built from COORDINATES, not from the spot's name. Windfinder does
-// have per-spot pages at /forecast/<slug>, but a slug derived from our name
-// only matches about a third of the time — Brouwersdam, Domburg and Tarifa
-// resolve; Oesterdam, Oostduinkerke and Sycod are 404s. A link that misses
-// half the time is worse than no link, so both go to the site's own map
-// centred on the spot, which is right for every spot in the catalogue.
+// Two ways to name where the rider wants to land, and the difference matters
+// on a phone:
+//
+//   1. The provider's own page for THIS spot — /forecast/<slug> on Windfinder,
+//      /<id> on Windguru. Both apps claim their site's links, so this opens the
+//      app ON the spot. Only a URL that names the spot can do that.
+//   2. Failing that, the provider's map at the spot's COORDINATES.
+//
+// (2) is the fallback because it is right for every spot in the catalogue,
+// including the ones riders add themselves through the OSM search. It is the
+// weaker of the two: a map centred on the water near the spot, rather than the
+// spot's own forecast. Windfinder honours it — reported from a device, the map
+// opens on the right coast — but each provider has its own route for it, and
+// getting that route wrong is not a graceful failure. Windguru dropped a rider
+// clicking a Belgian spot onto its default spot in Spain, because the URL said
+// /map when the route that reads lat/lon/zoom is /map/spot/.
+//
+// The ids live on the SPOTS entries as `wf` and `wg`. They are NOT derived from
+// the spot name: a guessed slug resolves for about a third of the catalogue
+// (Brouwersdam, Domburg and Tarifa work; Oesterdam and Oostduinkerke are 404s),
+// and the misses are silent. Each one is looked up against the provider and
+// added by hand, so an unmapped spot falls back to (2) rather than to a 404.
+const EXT_MAP_ZOOM=13;
+// Match on the coordinates the link itself is built from, rounded the same way.
+// Name matching would be looser in the wrong direction: a spot a rider added
+// through the OSM search can carry the same name as a catalogue entry a hundred
+// kilometres away, and would inherit its ids.
+function extSpotIds(lat,lon){
+  const la=(+lat).toFixed(4),lo=(+lon).toFixed(4);
+  return (typeof SPOTS!=='undefined'&&SPOTS||[]).find(s=>
+    (+s.lat).toFixed(4)===la&&(+s.lon).toFixed(4)===lo&&(s.wf||s.wg))||null;
+}
 function windfinderUrl(lat,lon){
-  // /maps/ rather than the site root, so this can open the native app.
-  //
-  // Windfinder's apple-app-site-association lists exactly which paths the iOS
-  // app claims: /forecast/*, /weatherforecast/*, /report/*, /webcams/*,
-  // /maps/* and /map/*. The site ROOT is not among them, so the previous
-  // https://www.windfinder.com/#9/lat/lon could never hand off to the app on
-  // iOS however it was opened. /maps/ is claimed and serves a 200. (/map/ is
-  // listed too but 404s, so it is not the one to use.)
-  //
-  // Android needs nothing: assetlinks.json delegates handle_all_urls, so any
-  // windfinder.com link already opens the app there.
-  //
-  // NOT verified: whether the app honours the #zoom/lat/lon fragment and lands
-  // on this spot rather than wherever it last was. Universal links do carry the
-  // fragment, but only a real device can answer that.
-  return `https://www.windfinder.com/maps/#9/${(+lat).toFixed(4)}/${(+lon).toFixed(4)}`;
+  const s=extSpotIds(lat,lon);
+  // /forecast/ is claimed by the app, and names one spot — the app lands here.
+  if(s&&s.wf) return `https://www.windfinder.com/forecast/${s.wf}`;
+  // /maps/ for the coordinate fallback: also a claimed path, so it opens the
+  // app, and the rider who reported this confirms it lands on the right coast.
+  // (Claimed paths per Windfinder's apple-app-site-association: /forecast/*,
+  // /weatherforecast/*, /report/*, /webcams/*, /maps/* and /map/*. The site
+  // root is not among them and cannot open the app at all, which is why it is
+  // not used here. /map/ is claimed but 404s.)
+  return `https://www.windfinder.com/maps/#${EXT_MAP_ZOOM}/${(+lat).toFixed(4)}/${(+lon).toFixed(4)}`;
 }
 function windguruUrl(lat,lon){
-  return `https://www.windguru.cz/map?lat=${(+lat).toFixed(4)}&lon=${(+lon).toFixed(4)}&zoom=10`;
+  const s=extSpotIds(lat,lon);
+  if(s&&s.wg) return `https://www.windguru.cz/${s.wg}`;
+  // /map/spot/ with the trailing slash, NOT /map. A rider clicking a Belgian
+  // spot landed in Spain: /map?lat=..&lon=.. is not the map route, so Windguru
+  // dropped the query and opened its own default spot. The routes that read
+  // lat/lon/zoom are /map/ (forecast), /map/spot/ (the spots) and /map/station/
+  // (the live stations); /map/spot/ is the one that shows the kite spots this
+  // link is a cross-check for.
+  return `https://www.windguru.cz/map/spot/?lat=${(+lat).toFixed(4)}&lon=${(+lon).toFixed(4)}&zoom=${EXT_MAP_ZOOM}`;
 }
 
 function renderGrid(){
