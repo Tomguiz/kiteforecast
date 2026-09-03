@@ -113,7 +113,7 @@ describe('speedTier', () => {
 
 // ── Day rating ──────────────────────────────────────────────────────────────
 import {
-  bestWindowAvg, sessionStats, rateSession, RATING_TIERS, RATING_STYLE, CHILL_MIN_KN,
+  topHoursAvg, sessionStats, rateSession, RATING_TIERS, RATING_STYLE, CHILL_MIN_KN,
 } from '../../supabase/functions/_shared/rideability.ts'
 
 // hours 10:00.. at the given speeds
@@ -121,30 +121,18 @@ const run = (...kns: number[]) => kns.map((kn, i) => ({ hr: 10 + i, kn }))
 const rate = (kns: number[], code = 0, badDir = false, peakDay = 0) =>
   rateSession(sessionStats(kns.map((kn, i) => ({ hr: 10 + i, kn }))), code, badDir, peakDay)
 
-describe('bestWindowAvg', () => {
-  it('is the mean of the whole run when the run is long enough', () => {
-    expect(bestWindowAvg(run(20, 30, 40), 3)).toBe(30)
-  })
-
-  it('finds the strongest window inside a longer run', () => {
+describe('topHoursAvg', () => {
+  it('is the mean of the strongest n hours, wherever they sit in the day', () => {
+    expect(topHoursAvg(run(20, 30, 40), 3)).toBe(30)
     // 15,16,17 then 30,31,32: the afternoon carries the day
-    expect(bestWindowAvg(run(15, 16, 17, 30, 31, 32), 3)).toBe(31)
-    expect(bestWindowAvg(run(15, 16, 17, 30, 31, 32), 2)).toBe(31.5)
+    expect(topHoursAvg(run(15, 16, 17, 30, 31, 32), 3)).toBe(31)
+    // the best hours need not be back to back
+    expect(topHoursAvg(run(26, 15, 25, 15, 24), 3)).toBe(25)
   })
 
-  it('never bridges a gap in the clock hours', () => {
-    const hrs = [{ hr: 10, kn: 40 }, { hr: 11, kn: 40 }, { hr: 13, kn: 40 }]
-    expect(bestWindowAvg(hrs, 3)).toBe(0)
-    expect(bestWindowAvg(hrs, 2)).toBe(40)
-  })
-
-  it('is 0 when no window is long enough, and for no hours at all', () => {
-    expect(bestWindowAvg(run(30, 30), 3)).toBe(0)
-    expect(bestWindowAvg([], 2)).toBe(0)
-  })
-
-  it('does not care about input order', () => {
-    expect(bestWindowAvg(run(30, 31, 32).reverse(), 3)).toBe(31)
+  it('is 0 when there are fewer than n hours', () => {
+    expect(topHoursAvg(run(30, 30), 3)).toBe(0)
+    expect(topHoursAvg([], 2)).toBe(0)
   })
 })
 
@@ -153,11 +141,19 @@ describe('sessionStats', () => {
     const s = sessionStats([{ hr: 9, kn: 40 }, { hr: 12, kn: 16 }, { hr: 13, kn: 18 }])
     expect(s.goodHours).toBe(2)
     expect(s.avgKn).toBe(17)
-    expect(s.avg2Kn).toBe(17)
-    expect(s.avg3Kn).toBe(0)
+    expect(s.bestHours).toBe(2)     // a 2h session is rated on both hours
+    expect(s.bestKn).toBe(17)
   })
 
-  it('rounds the whole-window average to whole knots', () => {
+  it('reads the best three hours of a full session', () => {
+    const s = sessionStats(run(18, 21, 21, 24, 26, 25))
+    expect(s.goodHours).toBe(6)
+    expect(s.avgKn).toBe(23)
+    expect(s.bestHours).toBe(3)
+    expect(s.bestKn).toBe(25)
+  })
+
+  it('rounds the whole-session average to whole knots', () => {
     expect(sessionStats(run(20, 21, 21)).avgKn).toBe(21)
   })
 })
@@ -208,9 +204,19 @@ describe('rateSession — the expert scale', () => {
     expect(rate([16, 16, 34, 16, 16])).toMatchObject({ tier: 'good' })
   })
 
-  it('rates the best window, so a light morning does not hide an epic afternoon', () => {
-    // whole-day average is 24; the afternoon is 3h at 31
+  it('rates the best hours, so a light morning does not hide an epic afternoon', () => {
+    // whole-day average is 24; the best three hours average 31
     expect(rate([15, 16, 17, 30, 31, 32])).toMatchObject({ tier: 'epic', label: '✅ 6h · Epic' })
+  })
+
+  it('a long day at 21-26 kn is Very Good, not merely Good', () => {
+    // The day that prompted the rule: 09-11 at 21/21/24, an hour lost to
+    // direction, then 13-14 at 26/25. No three consecutive hours average 25,
+    // but the best three of the day do — and a rider has the whole day.
+    const hours = [[8, 18], [9, 21], [10, 21], [11, 24], [13, 26], [14, 25]].map(([hr, kn]) => ({ hr, kn }))
+    const s = sessionStats(hours)
+    expect(s.goodHours).toBe(6)
+    expect(rateSession(s, 3, false, 26)).toMatchObject({ tier: 'verygood', label: '✅ 6h · Very Good' })
   })
 
   it('a session below 15 kn can only be a gust-rule day: light wind, not sold as a session', () => {
@@ -238,7 +244,7 @@ describe('rateSession — the expert scale', () => {
   it('a lone hour is not a session', () => {
     // sessionStats already drops it, so this reads as "no wind" at the day level
     expect(rate([40], 0, false, 40).label.startsWith('❌')).toBe(true)
-    expect(rateSession({ goodHours: 1, avgKn: 40, avg3Kn: 0, avg2Kn: 0 }, 0, false, 40))
+    expect(rateSession({ goodHours: 1, avgKn: 40, bestKn: 40, bestHours: 1 }, 0, false, 40))
       .toMatchObject({ tier: 'brief', label: '❌ Too brief (1h)' })
   })
 

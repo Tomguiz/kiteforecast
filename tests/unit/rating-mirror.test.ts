@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import {
   RATING_TIERS, RATING_STYLE, CHILL_MIN_KN, FULL_SESSION_HOURS,
-  bestWindowAvg, sessionStats, rateSession, isRainy, isSnowy,
+  topHoursAvg, sessionStats, rateSession, isRainy, isSnowy,
 } from '../../supabase/functions/_shared/rideability.ts'
 
 // index.html is a plain script and cannot import the shared module, so the
@@ -17,10 +17,10 @@ function appRating() {
   if (start < 0 || end < 0) throw new Error('DAY RATING markers missing from index.html')
   const block = html.slice(start, end)
   const factory = new Function('isRainy', 'isSnowy',
-    `${block}\nreturn { RATING_TIERS, CHILL_MIN_KN, FULL_SESSION_HOURS, bestWindowAvg, sessionStats, rateSession };`)
+    `${block}\nreturn { RATING_TIERS, CHILL_MIN_KN, FULL_SESSION_HOURS, topHoursAvg, sessionStats, rateSession };`)
   return factory(isRainy, isSnowy) as {
     RATING_TIERS: typeof RATING_TIERS; CHILL_MIN_KN: number; FULL_SESSION_HOURS: number;
-    bestWindowAvg: typeof bestWindowAvg; sessionStats: typeof sessionStats; rateSession: typeof rateSession
+    topHoursAvg: typeof topHoursAvg; sessionStats: typeof sessionStats; rateSession: typeof rateSession
   }
 }
 
@@ -61,10 +61,10 @@ describe('the two copies of the day rating agree', () => {
     expect(sessions).toBeGreaterThan(100)   // the sample actually exercises the tiers
   })
 
-  it('same window average', () => {
+  it('same best-hours average', () => {
     for (const d of days(11, 300))
-      for (const len of [2, 3])
-        expect(app.bestWindowAvg(d.hours, len)).toBe(bestWindowAvg(d.hours, len))
+      for (const n of [2, 3])
+        expect(app.topHoursAvg(d.hours, n)).toBe(topHoursAvg(d.hours, n))
   })
 
   it('the app paints every style with the colours the emails receive', () => {

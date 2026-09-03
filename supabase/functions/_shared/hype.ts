@@ -11,7 +11,9 @@
 
 export interface HypeContext {
   spot: string
-  avgKn: number
+  // The rating's number: mean of the best `bestHours` rideable hours.
+  bestKn: number
+  bestHours: number
   peakKn: number
   goodHours: number
   dir: string
@@ -47,12 +49,13 @@ export function whenWord(hoursBefore: number, dayOfWeek: string): string {
 export function sessionHype(tier: string, c: HypeContext): Hype {
   const spot = esc(c.spot)
   const dir = esc(c.dir)
-  const avg = Math.round(c.avgKn)
+  const avg = Math.round(c.bestKn)
   const peak = Math.round(c.peakKn)
   const h = c.goodHours
   const when = c.when
   const W = cap(when)
-  const stats = `${avg} knots on average for ${h} hours, ${dir} at ${spot}`
+  const best = c.bestHours >= 3 ? 'over the best three hours' : 'over both hours'
+  const stats = `${avg} knots ${best}, ${h} rideable, ${dir} at ${spot}`
 
   switch (tier) {
     case 'expert': return {
@@ -84,7 +87,7 @@ export function sessionHype(tier: string, c: HypeContext): Hype {
       subject: `\u{1F514} ${W} at ${spot} — conditions confirmed, ${avg} kts avg ${dir}`,
       title: W,
       title_accent: 'is the day.',
-      tease: `${spot} is on — ${avg} knots on average for ${h} hours, ${dir}. `
+      tease: `${spot} is on — ${avg} knots ${best}, ${h} hours rideable, ${dir}. `
         + `A proper session; bring your everyday kite.`,
     }
     case 'chill': return {
@@ -99,7 +102,7 @@ export function sessionHype(tier: string, c: HypeContext): Hype {
       subject: `\u{1F514} ${W} at ${spot} — light but rideable, gusts doing the work`,
       title: W,
       title_accent: 'is light, but rideable.',
-      tease: `Around ${avg} knots with the gusts doing the work at ${spot}, for ${h} hours. `
+      tease: `Around ${avg} knots with the gusts doing the work at ${spot}, ${h} hours rideable. `
         + `Bring the biggest kite you own, or the foil.`,
     }
     default: return {

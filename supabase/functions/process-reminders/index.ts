@@ -262,7 +262,7 @@ Deno.serve(async () => {
       const startFmt = sessionStart.slice(11, 16)
       const endFmt   = calEndIso.slice(11, 16)
       const calTitle = encodeURIComponent(`Kite session - ${r.spot_name}`)
-      const calDesc  = encodeURIComponent(`${avgKn}kn avg (peak ${peakKn}) · ${goodHours}h of good wind. Forecast: ${r.app_link}`)
+      const calDesc  = encodeURIComponent(`${Math.round(stats.bestKn)}kn avg over the best ${stats.bestHours}h (peak ${peakKn}) · ${goodHours}h of good wind. Forecast: ${r.app_link}`)
       const calLoc   = encodeURIComponent(r.spot_name)
       // &amp; because this HTML is injected directly into the email body
       const gcalUrl  = `https://calendar.google.com/calendar/render?action=TEMPLATE&amp;text=${calTitle}&amp;dates=${calStart}/${calEnd}&amp;details=${calDesc}&amp;location=${calLoc}`
@@ -320,7 +320,7 @@ Deno.serve(async () => {
         // tuned to the tier, so a fire day reads like one and a chill day
         // does not overpromise.
         hype: sessionHype(rated.tier, {
-          spot: r.spot_name, avgKn, peakKn, goodHours,
+          spot: r.spot_name, bestKn: stats.bestKn, bestHours: stats.bestHours, peakKn, goodHours,
           dir: domDir !== null ? compass(domDir) : '\u2014',
           when: whenWord(rh, dayOfWeek),
         }),
@@ -331,7 +331,10 @@ Deno.serve(async () => {
           end_time_formatted:   sessionEnd ? sessionEnd.slice(11, 16) : '',
           duration_hours:       goodHours,
           wind_speed_peak_kn:   peakKn,
-          wind_speed_avg_kn:    avgKn,
+          // The rating's own number: the mean of the best `best_hours` hours.
+          wind_speed_avg_kn:    Math.round(stats.bestKn),
+          best_hours:           stats.bestHours,
+          wind_speed_session_avg_kn: avgKn,
           wind_speed_min_kn:    windMin,
           wind_gusts_kn:        gusts,
           wind_direction:       domDir !== null ? compass(domDir) : '—',
@@ -390,7 +393,7 @@ Deno.serve(async () => {
           .eq('email', r.email).single()
         if (prof?.is_premium && prof?.sms_enabled && prof?.phone_number) {
           const sessionLabel = goodHours >= 2
-            ? `${payload.session.start_time_formatted}–${payload.session.end_time_formatted} · ${avgKn}kn avg`
+            ? `${payload.session.start_time_formatted}–${payload.session.end_time_formatted} · ${Math.round(stats.bestKn)}kn`
             : rating
           const smsBody = `🪁 Kite alert — ${r.spot_name} · ${payload.day_of_week} ${sessionLabel}. 1h before your session. tichkes.com`
           const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`

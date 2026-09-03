@@ -65,7 +65,8 @@ describe('against the real templates', () => {
     session: {
       start_time: '2026-08-30T09:00', end_time: '2026-08-30T13:00',
       start_time_formatted: '09:00', end_time_formatted: '13:00',
-      duration_hours: 4, wind_speed_peak_kn: 22, wind_speed_avg_kn: 19, wind_speed_min_kn: 16,
+      duration_hours: 4, wind_speed_peak_kn: 22, wind_speed_avg_kn: 21, best_hours: 3,
+      wind_speed_session_avg_kn: 19, wind_speed_min_kn: 16,
       wind_gusts_kn: 28, wind_direction: 'SW', wind_consistency_pct: 81,
       rating: '✅ 4h · Good',
       rating_fg: '#4ade80', rating_bg: 'rgba(34,197,94,.16)', rating_border: 'rgba(34,197,94,.34)',

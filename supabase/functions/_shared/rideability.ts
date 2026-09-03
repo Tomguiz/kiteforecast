@@ -64,10 +64,15 @@ export function consecutiveRuns<T>(qualifying: T[], hourOf: (h: T) => number): T
 // app. It is EXPERT-tuned on purpose: the tiers are named for riders who want
 // power, so "Good" starts at 18 kn and the top tiers sit at 30 and 38 kn.
 //
-// It rates the AVERAGE over a window of consecutive good hours, not the peak.
+// It rates the AVERAGE of the day's best three rideable hours, not the peak.
 // A single 30 kn hour inside a 17 kn afternoon is not an epic day; three
-// hours averaging 30 kn are. Each tier asks for a 3h+ window at its average;
-// a 2h window at the same average lands one tier lower.
+// hours averaging 30 kn are — and they need not be back to back, because a
+// rider who has the whole day rides all of it. A session of only two hours is
+// rated on those two and lands one tier lower.
+//
+// Why the best three and not the whole session: a 7h day at 21-26 kn, gusting
+// 36, averages 22 over all its hours and 25 over its best three. Riders call
+// that day very good, and the second number says so; the first does not.
 //
 // MIRRORED in index.html between the DAY RATING markers, because the app is a
 // plain script and cannot import this file. tests/unit/rating-mirror.test.ts
@@ -86,7 +91,8 @@ export const RATING_TIERS: RatingTier[] = [
 // Below that only the gust rule (12 kn + gusts >= 20) can have qualified the
 // hours, and that is labelled light wind rather than sold as a session.
 export const CHILL_MIN_KN = 15
-// Windows shorter than this earn the tier below.
+// How many of the best hours the rating averages. A session shorter than this
+// is averaged whole and earns the tier below.
 export const FULL_SESSION_HOURS = 3
 
 // Colours for the tiers, hottest at the top: the stronger the wind, the redder
@@ -106,23 +112,16 @@ export const RATING_STYLE: Record<string, { fg: string; bg: string; border: stri
 }
 
 export interface RatedHour { hr: number; kn: number }
-export interface SessionStats { goodHours: number; avgKn: number; avg3Kn: number; avg2Kn: number }
+// goodHours: rideable hours (in 2h+ runs). avgKn: mean over all of them.
+// bestKn: mean over the best FULL_SESSION_HOURS of them — or over both hours
+// of a 2h session — which is what the rating reads. bestHours says which.
+export interface SessionStats { goodHours: number; avgKn: number; bestKn: number; bestHours: number }
 
-// The best mean over every run of consecutive clock hours at least `minLen`
-// long. 0 when no window is long enough. Hours may arrive in any order.
-export function bestWindowAvg(good: RatedHour[], minLen: number): number {
-  const hrs = [...good].sort((a, b) => a.hr - b.hr)
-  let best = 0
-  for (let i = 0; i < hrs.length; i++) {
-    let sum = 0
-    for (let j = i; j < hrs.length; j++) {
-      if (j > i && hrs[j].hr !== hrs[j - 1].hr + 1) break
-      sum += hrs[j].kn
-      const len = j - i + 1
-      if (len >= minLen) best = Math.max(best, sum / len)
-    }
-  }
-  return best
+// Mean of the strongest `n` hours. 0 when there are fewer than `n`.
+export function topHoursAvg(good: RatedHour[], n: number): number {
+  if (good.length < n || n <= 0) return 0
+  const top = good.map(h => h.kn).sort((a, b) => b - a).slice(0, n)
+  return top.reduce((s, k) => s + k, 0) / n
 }
 
 // Everything rateSession needs, from the qualifying hours of one day. Lone
@@ -131,12 +130,8 @@ export function bestWindowAvg(good: RatedHour[], minLen: number): number {
 export function sessionStats(good: RatedHour[]): SessionStats {
   const run = consecutiveRuns(good, h => h.hr)
   const avgKn = run.length ? Math.round(run.reduce((s, h) => s + h.kn, 0) / run.length) : 0
-  return {
-    goodHours: run.length,
-    avgKn,
-    avg3Kn: bestWindowAvg(run, FULL_SESSION_HOURS),
-    avg2Kn: bestWindowAvg(run, 2),
-  }
+  const bestHours = Math.min(run.length, FULL_SESSION_HOURS)
+  return { goodHours: run.length, avgKn, bestKn: topHoursAvg(run, bestHours), bestHours }
 }
 
 export const isSnowy = (code: number) => [71,73,75,77,85,86].includes(code)
@@ -157,13 +152,14 @@ export function rateSession(s: SessionStats, code: number, badDir: boolean, peak
     return                                { tier: 'nowind',   style: 'none', label: '❌ No wind' }
   }
   if (gh === 1) return { tier: 'brief', style: 'bad', label: '❌ Too brief (1h)' }
-  for (const t of RATING_TIERS) {
-    if (s.avg3Kn >= t.minKn) return { tier: t.key, style: t.key, label: `✅ ${gh}h · ${t.label}` }
-    if (s.avg2Kn >= t.minKn) {
-      const b = RATING_TIERS.find(x => x.key === t.below)!
-      return { tier: b.key, style: b.key, label: `✅ ${gh}h · ${b.label}` }
-    }
+  // A full session is rated on its best three hours; a 2h session on both of
+  // its hours, one tier lower.
+  const short = gh < FULL_SESSION_HOURS
+  const t = RATING_TIERS.find(x => s.bestKn >= x.minKn)
+  if (t) {
+    const r = short ? RATING_TIERS.find(x => x.key === t.below)! : t
+    return { tier: r.key, style: r.key, label: `✅ ${gh}h · ${r.label}` }
   }
-  if (s.avg2Kn >= CHILL_MIN_KN) return { tier: 'chill', style: 'chill', label: `✅ ${gh}h · Chill` }
+  if (s.bestKn >= CHILL_MIN_KN) return { tier: 'chill', style: 'chill', label: `✅ ${gh}h · Chill` }
   return { tier: 'lightwind', style: 'lightwind', label: `⚡ ${gh}h · Light wind` }
 }

@@ -2729,10 +2729,10 @@ function conditionLabel(kn,dir,code,temp,gustKn=0){
 // it. tests/unit/rating-mirror.test.ts evaluates this block and the shared
 // module over the same inputs; change one, it fails until you change the other.
 //
-// Expert-tuned: it rates the AVERAGE over a window of consecutive good hours,
-// not the peak. Each tier wants a 3h+ window at its average; a 2h window at the
-// same average lands one tier lower. Below 18 kn a 15+ average is a chill
-// session; below that only the gust rule could have qualified the hours.
+// Expert-tuned: it rates the AVERAGE of the day's best three rideable hours,
+// not the peak and not the whole day. A 2h session is rated on both its hours
+// and lands one tier lower. Below 18 kn a 15+ average is a chill session;
+// below that only the gust rule could have qualified the hours.
 const RATING_TIERS=[
   {key:'expert',minKn:38,label:'Expert mode',below:'epic'},
   {key:'epic',minKn:30,label:'Epic',below:'verygood'},
@@ -2742,27 +2742,21 @@ const RATING_TIERS=[
 const CHILL_MIN_KN=15;
 const FULL_SESSION_HOURS=3;
 const isStormy=code=>[82,95,96,99].includes(code);
-// Best mean over every run of consecutive clock hours at least minLen long.
-function bestWindowAvg(good,minLen){
-  const hrs=good.slice().sort((a,b)=>a.hr-b.hr);
-  let best=0;
-  for(let i=0;i<hrs.length;i++){
-    let sum=0;
-    for(let j=i;j<hrs.length;j++){
-      if(j>i&&hrs[j].hr!==hrs[j-1].hr+1) break;
-      sum+=hrs[j].kn;
-      const len=j-i+1;
-      if(len>=minLen) best=Math.max(best,sum/len);
-    }
-  }
-  return best;
+// Mean of the strongest n hours; 0 when there are fewer than n.
+function topHoursAvg(good,n){
+  if(good.length<n||n<=0) return 0;
+  const top=good.map(h=>h.kn).sort((a,b)=>b-a).slice(0,n);
+  return top.reduce((s,k)=>s+k,0)/n;
 }
 // From a day's qualifying hours ({hr,kn}); lone hours are dropped here.
+// bestKn is the mean of the best FULL_SESSION_HOURS hours (both hours of a 2h
+// session) — the number the rating reads; bestHours says which.
 function sessionStats(good){
   const set=new Set(good.map(h=>h.hr));
   const run=good.filter(h=>set.has(h.hr-1)||set.has(h.hr+1));
   const avgKn=run.length?Math.round(run.reduce((s,h)=>s+h.kn,0)/run.length):0;
-  return {goodHours:run.length,avgKn,avg3Kn:bestWindowAvg(run,FULL_SESSION_HOURS),avg2Kn:bestWindowAvg(run,2)};
+  const bestHours=Math.min(run.length,FULL_SESSION_HOURS);
+  return {goodHours:run.length,avgKn,bestKn:topHoursAvg(run,bestHours),bestHours};
 }
 function rateSession(s,code,badDir,peakDayKn){
   if(isStormy(code)) return {tier:'storm',style:'danger',label:'❌ Storm ⚡'};
@@ -2774,14 +2768,15 @@ function rateSession(s,code,badDir,peakDayKn){
     return                                  {tier:'nowind',  style:'none',label:'❌ No wind'};
   }
   if(gh===1) return {tier:'brief',style:'bad',label:'❌ Too brief (1h)'};
-  for(const t of RATING_TIERS){
-    if(s.avg3Kn>=t.minKn) return {tier:t.key,style:t.key,label:`✅ ${gh}h · ${t.label}`};
-    if(s.avg2Kn>=t.minKn){
-      const b=RATING_TIERS.find(x=>x.key===t.below);
-      return {tier:b.key,style:b.key,label:`✅ ${gh}h · ${b.label}`};
-    }
+  // A full session is rated on its best three hours; a 2h session on both of
+  // its hours, one tier lower.
+  const short=gh<FULL_SESSION_HOURS;
+  const t=RATING_TIERS.find(x=>s.bestKn>=x.minKn);
+  if(t){
+    const r=short?RATING_TIERS.find(x=>x.key===t.below):t;
+    return {tier:r.key,style:r.key,label:`✅ ${gh}h · ${r.label}`};
   }
-  if(s.avg2Kn>=CHILL_MIN_KN) return {tier:'chill',style:'chill',label:`✅ ${gh}h · Chill`};
+  if(s.bestKn>=CHILL_MIN_KN) return {tier:'chill',style:'chill',label:`✅ ${gh}h · Chill`};
   return {tier:'lightwind',style:'lightwind',label:`⚡ ${gh}h · Light wind`};
 }
 // ── END DAY RATING ──
@@ -2795,7 +2790,7 @@ function rateDay(stats,code,badDir,peakDayKn){
 // that old can offer.
 function cachedDayStats(d){
   const gh=d.goodHours??d.qh??0, pk=d.peakKn||0;
-  return {goodHours:gh,avgKn:d.avgKn??pk,avg3Kn:d.avg3Kn??pk,avg2Kn:d.avg2Kn??pk};
+  return {goodHours:gh,avgKn:d.avgKn??pk,bestKn:d.bestKn??pk,bestHours:d.bestHours??Math.min(gh,FULL_SESSION_HOURS)};
 }
 
 function fmtDate(str){
@@ -2968,7 +2963,7 @@ function buildLegendHTML(){
   return `<h3>How to read</h3>
   <div class="legend-cols">
     <div>
-      <div class="legend-sub">Day rating <span style="font-weight:500;color:var(--tdim)">· avg wind over the session</span></div>
+      <div class="legend-sub">Day rating <span style="font-weight:500;color:var(--tdim)">· avg of the best 3 hours</span></div>
       <div class="legend-item"><div class="legend-dot" style="background:#fca5a5"></div><span class="legend-kpi">Expert mode</span><span class="legend-desc">38+ kn avg · 3h+ session (Epic if 2h)</span></div>
       <div class="legend-item"><div class="legend-dot" style="background:#fdba74"></div><span class="legend-kpi">Epic</span><span class="legend-desc">30+ kn avg · 3h+ session (Very Good if 2h)</span></div>
       <div class="legend-item"><div class="legend-dot" style="background:#fde047"></div><span class="legend-kpi">Very Good</span><span class="legend-desc">25+ kn avg · 3h+ session (Good if 2h)</span></div>
@@ -3482,7 +3477,7 @@ const CHIP_CACHE_TTL=60*60*1000; // 1 hour
 // v3: entries written before CONFIDENT_DAYS hold sixteen days per spot, six of
 // them the GFS outlook this app no longer counts. Reading them back would put
 // day-14 sessions in the compare table for another hour.
-const CHIP_CACHE_LS_KEY='kf_chipCache_v4'; // v4: days10 gained the window averages the rating reads
+const CHIP_CACHE_LS_KEY='kf_chipCache_v5'; // v5: days10 carries the best-hours average the rating reads
 let _chipCacheTs=0; // timestamp when this cache epoch started
 
 function _loadChipCacheFromLS(){
@@ -3669,7 +3664,7 @@ function _chipDaysFromWx(spot,key,wx){
       goodHrs.forEach(h=>{ domDirSum[0]+=Math.sin(h.dir*Math.PI/180); domDirSum[1]+=Math.cos(h.dir*Math.PI/180); domDirN++; });
       const domDir=domDirN?['N','NE','E','SE','S','SW','W','NW'][Math.round((Math.atan2(domDirSum[0],domDirSum[1])*180/Math.PI+360)%360/45)%8]:null;
       const st=sessionStats(goodHrs);
-      days10.push({dateStr,qh,goodHours,peakKn:dayPeak,avgKn:st.avgKn,avg3Kn:st.avg3Kn,avg2Kn:st.avg2Kn,startHr:firstGoodHr,dir:domDir});
+      days10.push({dateStr,qh,goodHours,peakKn:dayPeak,avgKn:st.avgKn,bestKn:st.bestKn,bestHours:st.bestHours,startHr:firstGoodHr,dir:domDir});
     });
     chipBestCache[key]=bestDateStr?{dateStr:bestDateStr,peakKn:bestPeakKn,startHr:bestStartHr,nextDateStr,nextStartHr,nextPeakKn,spotName:spot.name,spot,days10}:null;
     if(!bestDateStr) chipBestCache[key]={dateStr:null,peakKn:0,startHr:null,nextDateStr:null,nextStartHr:null,nextPeakKn:0,spotName:spot.name,spot,days10};
@@ -3728,7 +3723,7 @@ function reconcileChipCacheFromDetail(){
       goodHrs.forEach(h=>{ domDirSum[0]+=Math.sin(h.dir*Math.PI/180); domDirSum[1]+=Math.cos(h.dir*Math.PI/180); domDirN++; });
       const domDir=domDirN?['N','NE','E','SE','S','SW','W','NW'][Math.round((Math.atan2(domDirSum[0],domDirSum[1])*180/Math.PI+360)%360/45)%8]:null;
       const st=sessionStats(goodHrs);
-      days10.push({dateStr,qh,goodHours,peakKn:dayPeak,avgKn:st.avgKn,avg3Kn:st.avg3Kn,avg2Kn:st.avg2Kn,startHr:firstGoodHr,dir:domDir});
+      days10.push({dateStr,qh,goodHours,peakKn:dayPeak,avgKn:st.avgKn,bestKn:st.bestKn,bestHours:st.bestHours,startHr:firstGoodHr,dir:domDir});
     });
     const spotMeta={name:loc.name,loc:`${loc.admin1?loc.admin1+', ':''}${loc.country}`,lat,lon,dirs:dirsArr};
     // Drop any stale entries for this lat/lon under OTHER dirs keys so the
@@ -4354,8 +4349,10 @@ function renderGoodDaysSection(){
       const kn=document.createElement('div');
       kn.className='gd-kn';
       const dStats=cachedDayStats(d);
-      kn.style.color=speedColor(dStats.avgKn);
-      kn.textContent=`\uD83D\uDCA8 ${dStats.avgKn} kn${d.dir?` \u00b7 ${d.dir}`:''}`;
+      // the number the rating is built on: the best hours' average
+      const dKn=Math.round(dStats.bestKn);
+      kn.style.color=speedColor(dKn);
+      kn.textContent=`\uD83D\uDCA8 ${dKn} kn${d.dir?` \u00b7 ${d.dir}`:''}`;
       c.appendChild(kn);
 
       if(d.startHr!==null&&d.startHr!==undefined){
@@ -6186,7 +6183,8 @@ function openModal(dateStr,dayIdx){
   $('mSession').innerHTML=`
     <span class="rating-badge ${rating.cls}" style="width:auto;padding:5px 14px">${rating.label}</span>
     ${win?`<span class="m-badge green">🪁 ${win}</span>`:''}
-    ${avgKn>0?`<span class="m-badge accent">Avg ${avgKn} kn</span>`:''}
+    ${stats.bestKn>0?`<span class="m-badge accent">Best ${stats.bestHours}h · ${Math.round(stats.bestKn)} kn</span>`:''}
+    ${avgKn>0?`<span class="m-badge">Avg ${avgKn} kn</span>`:''}
     ${peakKn>0?`<span class="m-badge">Peak ${peakKn} kn</span>`:''}
     <button id="mBadgeMore" onclick="(function(b){var x=$('mBadgeExtra');var open=x.classList.toggle('open');var tr=$('mTideRow');if(tr)tr.style.display=open?'flex':'none';b.textContent=open?'▲ Less':'▼ More';})(this)">▼ More</button>
     <span id="mBadgeExtra">
