@@ -58,6 +58,10 @@ describe('against the real templates', () => {
     app_link: 'https://app/x', manage_link: 'https://app/y',
     calendar_html: '<a>cal</a>', live_html: '',
     user_good_wind_dirs: ['SW', 'W'],
+    hype: {
+      fire: false, subject: 'Tomorrow at Riverwoods', title: 'Tomorrow',
+      title_accent: 'is the day.', tease: 'Riverwoods Beachclub is on.',
+    },
     session: {
       start_time: '2026-08-30T09:00', end_time: '2026-08-30T13:00',
       start_time_formatted: '09:00', end_time_formatted: '13:00',
@@ -72,7 +76,7 @@ describe('against the real templates', () => {
     },
   }
 
-  for (const name of ['reminderON24', 'reminderOFF24']) {
+  for (const name of ['reminderON24', 'reminderFIRE24', 'reminderOFF24']) {
     it(`${name} renders with nothing left unfilled`, () => {
       const { html, missing } = renderTemplate(read(name), payload)
       expect(missing).toEqual([])

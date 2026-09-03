@@ -8,6 +8,7 @@ import {
   type RwsStation, type FetchLike,
 } from '../_shared/rws.ts'
 import { renderLiveHtml } from '../_shared/live-html.ts'
+import { sessionHype, isHot, whenWord } from '../_shared/hype.ts'
 import { buildManageLink } from '../_shared/manage-link.ts'
 import { recordEmail } from '../_shared/email-log-client.ts'
 import { deliver, reminderDelivery } from '../_shared/mailer.ts'
@@ -244,6 +245,7 @@ Deno.serve(async () => {
       // The badge colour travels with the label so the inbox shows the same
       // green-to-red scale as the app.
       const ratingStyle     = RATING_STYLE[rated.style]
+      const dayOfWeek       = new Date(r.session_date + 'T12:00:00').toLocaleDateString('en', { weekday: 'long' })
       // When forecast degraded (no qualifying hours), fall back to all daylight hours for wind stats
       const sample          = good.length ? good : day
       const sessionStart    = good.length ? `${r.session_date}T${String(good[0].hour).padStart(2,'0')}:00` : `${r.session_date}T10:00`
@@ -308,12 +310,20 @@ Deno.serve(async () => {
         spot_country:       r.spot_country,
         spot_map_link:      r.spot_map_link,
         date:               r.session_date,
-        day_of_week:        new Date(r.session_date + 'T12:00:00').toLocaleDateString('en', { weekday: 'long' }),
+        day_of_week:        dayOfWeek,
         date_label:         fmtDateLabel(r.session_date),
         app_link:           r.app_link,
         manage_link:        buildManageLink(r.app_link, r.spot_name, r.session_date),
         calendar_html,
         live_html,
+        // The words the email says about the day — subject, headline, tease —
+        // tuned to the tier, so a fire day reads like one and a chill day
+        // does not overpromise.
+        hype: sessionHype(rated.tier, {
+          spot: r.spot_name, avgKn, peakKn, goodHours,
+          dir: domDir !== null ? compass(domDir) : '\u2014',
+          when: whenWord(rh, dayOfWeek),
+        }),
         session: {
           start_time:           sessionStart,
           end_time:             sessionEnd,
@@ -355,7 +365,7 @@ Deno.serve(async () => {
         // a light-wind session (⚡) does not carry.
         const sent = await deliver(payload, {
           to: r.email,
-          delivery: reminderDelivery(rh, isGoodNow),
+          delivery: reminderDelivery(rh, isGoodNow, isHot(rated.tier)),
           makeWebhookUrl: MAKE_WEBHOOK_URL,
         })
         if (!sent.ok) {

@@ -80,6 +80,23 @@ test('the day modal shows the real average next to the peak', async ({ gotoApp, 
   await expect(page.locator('#mSession .rating-badge')).toHaveText('✅ 6h · Epic');
 });
 
+test('the hourly Conditions column uses the same tiers and colours as the day badge', async ({ gotoApp, page }) => {
+  await gotoApp('signedOut');
+  await seed(page);
+  await page.evaluate((d: string) => openModal(d, 2), D[2]);   // 15,16,17 then 30,31,32
+  const pills = page.locator('.m-row .c-sp');
+  await expect(pills.nth(0)).toHaveText('✓ Chill');
+  await expect(pills.nth(0)).toHaveClass(/cond-chill/);
+  await expect(pills.nth(3)).toHaveText('⚡ Epic');
+  await expect(pills.nth(3)).toHaveClass(/cond-epic/);
+  // the hour pill and the day badge at the same tier share one colour
+  const pill = await pills.nth(3).evaluate((el: Element) => getComputedStyle(el).backgroundColor);
+  const badge = await page.locator('#mSession .rating-badge').evaluate((el: Element) => getComputedStyle(el).backgroundColor);
+  expect(pill).toBe(badge);
+  await page.evaluate((d: string) => openModal(d, 6), D[6]);   // 39,38,40,38
+  await expect(page.locator('.m-row .c-sp').first()).toHaveText('🔥 Expert mode');
+});
+
 test('the legend explains the expert scale', async ({ gotoApp, page }) => {
   await gotoApp('signedOut');
   const legend = await page.evaluate(() => buildLegendHTML());

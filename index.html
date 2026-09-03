@@ -838,12 +838,15 @@
     .c-gust-lbl { position:absolute; right:2px; top:50%; transform:translateY(-50%); font-size:.62rem; font-weight:700; color:rgba(255,255,255,.55); white-space:nowrap; pointer-events:none; }
     .c-gust-val { font-size:.62rem !important; opacity:.85; transform:translate(-100%,-50%) !important; }
     /* condition badge levels */
+    /* Per-hour pills wear the same tier colours as the day badge (.rating-*),
+       so an hour and a day at the same strength read the same. */
     .cond-bad       { background:rgba(239,68,68,.18);  color:#f87171; border:1px solid rgba(239,68,68,.3); }
-    .cond-lightwind { background:rgba(251,146,60,.15); color:#fb923c; border:1px solid rgba(251,146,60,.3); }
-    .cond-good      { background:rgba(34,197,94,.12);  color:#86efac; border:1px solid rgba(34,197,94,.25); }
-    .cond-vgood     { background:rgba(34,197,94,.20);  color:#4ade80; border:1px solid rgba(34,197,94,.4); }
-    .cond-excellent{ background:rgba(0,212,255,.15);  color:#67e8f9; border:1px solid rgba(0,212,255,.35); }
-    .cond-perfect  { background:rgba(250,204,21,.15); color:#fde047; border:1px solid rgba(250,204,21,.35); }
+    .cond-lightwind { background:rgba(217,249,157,.1); color:#d9f99d; border:1px solid rgba(217,249,157,.24); }
+    .cond-chill     { background:rgba(134,239,172,.1); color:#86efac; border:1px solid rgba(134,239,172,.24); }
+    .cond-good      { background:rgba(34,197,94,.16);  color:#4ade80; border:1px solid rgba(34,197,94,.34); }
+    .cond-verygood  { background:rgba(234,179,8,.16);  color:#fde047; border:1px solid rgba(234,179,8,.36); }
+    .cond-epic      { background:rgba(249,115,22,.2);  color:#fdba74; border:1px solid rgba(249,115,22,.42); }
+    .cond-expert    { background:rgba(239,68,68,.22);  color:#fca5a5; border:1px solid rgba(239,68,68,.45); }
 
     .burger-btn {
       position:absolute; left:clamp(12px,2.5vw,20px); top:clamp(10px,2.5vw,18px); z-index:30;
@@ -2713,11 +2716,11 @@ function conditionLabel(kn,dir,code,temp,gustKn=0){
     return {label:suffix,cls:'cond-bad'};
   }
   if(light&&kn>=12&&gustKn>=20) return {label:'⚡ Light wind',cls:'cond-lightwind'};
-  const warm=temp>=13;
-  if(sp>=3&&warm) return {label:'⚡ Perfect',   cls:'cond-perfect'};
-  if(sp>=3)       return {label:'⚡ Perfect',   cls:'cond-perfect'};
-  if(sp>=2)       return {label:'✓ Very good', cls:'cond-vgood'};
-  return                 {label:'✓ Good',      cls:'cond-good'};
+  // Same rungs as the day rating (RATING_TIERS), read off this one hour.
+  const tier=RATING_TIERS.find(t=>kn>=t.minKn);
+  if(!tier) return {label:'✓ Chill',cls:'cond-chill'};
+  const mark=tier.key==='expert'?'🔥':tier.key==='epic'?'⚡':'✓';
+  return {label:`${mark} ${tier.label}`,cls:'cond-'+tier.key};
 }
 
 // ── DAY RATING ──

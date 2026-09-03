@@ -77,6 +77,21 @@ describe('the two copies of the day rating agree', () => {
     }
   })
 
+  it('the hourly Conditions pills wear the same tier colours', () => {
+    for (const key of [...RATING_TIERS.map(t => t.key), 'chill', 'lightwind']) {
+      const c = RATING_STYLE[key]
+      const rule = html.match(new RegExp(`\\.cond-${key}\\s*\\{([^}]*)\\}`))
+      expect(rule, `.cond-${key} rule`).toBeTruthy()
+      expect(rule![1]).toContain(`background:${c.bg}`)
+      expect(rule![1]).toContain(`color:${c.fg}`)
+      expect(rule![1]).toContain(`border:1px solid ${c.border}`)
+    }
+    // and the hour labels come from the same tier table, not a second list
+    const fn = html.slice(html.indexOf('function conditionLabel'), html.indexOf('// ── DAY RATING ──'))
+    expect(fn).toContain('RATING_TIERS.find(')
+    expect(fn).not.toMatch(/Perfect|Very good/)
+  })
+
   it('the legend describes the tiers the rule actually uses', () => {
     const legend = html.slice(html.indexOf('<div class="legend-sub">Day rating'), html.indexOf('Wind speed (bar color)'))
     for (const t of RATING_TIERS) {

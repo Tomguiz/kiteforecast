@@ -46,6 +46,10 @@ const SAMPLE = {
   'conditions.temperature_min_c': '16',
   'conditions.sunrise': '06:41',
   'conditions.sunset': '20:58',
+  'hype.subject': 'Rivierwoods tomorrow is EPIC',
+  'hype.title': 'Cancel your plans.',
+  'hype.title_accent': 'Tomorrow is epic.',
+  'hype.tease': '31 knots on average for 5 hours, SW at Rivierwoods Beachclub, peaking at 34. Charge the camera, pump up early, and don\u2019t be the one who hears about it afterwards.',
   calendar_html: '',
   live_html: '',
 }

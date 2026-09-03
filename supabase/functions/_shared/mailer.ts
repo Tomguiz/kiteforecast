@@ -110,12 +110,16 @@ export const DELIVERIES: Record<string, Delivery> = {
 }
 
 // Reminders pick their template from the ladder step and whether the session is
-// on, so they are resolved separately rather than by notification_type.
-export function reminderDelivery(hours: number, isOn: boolean): Delivery {
-  const key = `${isOn ? 'ON' : 'OFF'}${hours}`
+// on, so they are resolved separately rather than by notification_type. A hot
+// day (Very Good, Epic, Expert mode — see _shared/hype.ts) gets the fire
+// template; the words inside it come from the payload's `hype` block, and so
+// does the subject, because the tease differs per tier.
+export function reminderDelivery(hours: number, isOn: boolean, hot = false): Delivery {
+  const key = !isOn ? `OFF${hours}` : (hot && hours === 24) ? 'FIRE24' : `ON${hours}`
   const subjects: Record<string, string> = {
-    ON24:  '\u{1F514} Tomorrow at [[spot]] \u2014 conditions confirmed, [[session.wind_speed_avg_kn]] kts avg [[session.wind_direction]]',
-    OFF24: '\u{1F62E}\u200D\u{1F4A8} [[spot]] tomorrow \u2014 the wind gods aren\'t cooperating',
+    FIRE24: '[[hype.subject]]',
+    ON24:   '[[hype.subject]]',
+    OFF24:  '\u{1F62E}\u200D\u{1F4A8} [[spot]] tomorrow \u2014 the wind gods aren\'t cooperating',
   }
   return { template: `reminder${key}`, subject: subjects[key] ?? '[[spot]] \u2014 [[date_label]]' }
 }
