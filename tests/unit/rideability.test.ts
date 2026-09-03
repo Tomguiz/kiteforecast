@@ -110,3 +110,155 @@ describe('speedTier', () => {
     expect(speedTier(25)).toBe(3)
   })
 })
+
+// ── Day rating ──────────────────────────────────────────────────────────────
+import {
+  bestWindowAvg, sessionStats, rateSession, RATING_TIERS, RATING_STYLE, CHILL_MIN_KN,
+} from '../../supabase/functions/_shared/rideability.ts'
+
+// hours 10:00.. at the given speeds
+const run = (...kns: number[]) => kns.map((kn, i) => ({ hr: 10 + i, kn }))
+const rate = (kns: number[], code = 0, badDir = false, peakDay = 0) =>
+  rateSession(sessionStats(kns.map((kn, i) => ({ hr: 10 + i, kn }))), code, badDir, peakDay)
+
+describe('bestWindowAvg', () => {
+  it('is the mean of the whole run when the run is long enough', () => {
+    expect(bestWindowAvg(run(20, 30, 40), 3)).toBe(30)
+  })
+
+  it('finds the strongest window inside a longer run', () => {
+    // 15,16,17 then 30,31,32: the afternoon carries the day
+    expect(bestWindowAvg(run(15, 16, 17, 30, 31, 32), 3)).toBe(31)
+    expect(bestWindowAvg(run(15, 16, 17, 30, 31, 32), 2)).toBe(31.5)
+  })
+
+  it('never bridges a gap in the clock hours', () => {
+    const hrs = [{ hr: 10, kn: 40 }, { hr: 11, kn: 40 }, { hr: 13, kn: 40 }]
+    expect(bestWindowAvg(hrs, 3)).toBe(0)
+    expect(bestWindowAvg(hrs, 2)).toBe(40)
+  })
+
+  it('is 0 when no window is long enough, and for no hours at all', () => {
+    expect(bestWindowAvg(run(30, 30), 3)).toBe(0)
+    expect(bestWindowAvg([], 2)).toBe(0)
+  })
+
+  it('does not care about input order', () => {
+    expect(bestWindowAvg(run(30, 31, 32).reverse(), 3)).toBe(31)
+  })
+})
+
+describe('sessionStats', () => {
+  it('drops lone hours before averaging — a lone windy hour is not a session', () => {
+    const s = sessionStats([{ hr: 9, kn: 40 }, { hr: 12, kn: 16 }, { hr: 13, kn: 18 }])
+    expect(s.goodHours).toBe(2)
+    expect(s.avgKn).toBe(17)
+    expect(s.avg2Kn).toBe(17)
+    expect(s.avg3Kn).toBe(0)
+  })
+
+  it('rounds the whole-window average to whole knots', () => {
+    expect(sessionStats(run(20, 21, 21)).avgKn).toBe(21)
+  })
+})
+
+describe('rateSession — the expert scale', () => {
+  it('names the tiers in descending order, 38 / 30 / 25 / 18', () => {
+    expect(RATING_TIERS.map(t => [t.key, t.minKn])).toEqual([
+      ['expert', 38], ['epic', 30], ['verygood', 25], ['good', 18],
+    ])
+    expect(CHILL_MIN_KN).toBe(15)
+  })
+
+  it('Expert mode: 38+ kn avg over 3h+', () => {
+    expect(rate([38, 38, 38])).toMatchObject({ tier: 'expert', label: '✅ 3h · Expert mode' })
+  })
+  it('… and the same wind over only 2h is Epic', () => {
+    expect(rate([40, 40])).toMatchObject({ tier: 'epic', label: '✅ 2h · Epic' })
+  })
+
+  it('Epic: 30+ kn avg over 3h+', () => {
+    expect(rate([30, 30, 30, 30])).toMatchObject({ tier: 'epic', label: '✅ 4h · Epic' })
+  })
+  it('… and 2h at 30+ is Very Good', () => {
+    expect(rate([30, 30])).toMatchObject({ tier: 'verygood', label: '✅ 2h · Very Good' })
+  })
+
+  it('Very Good: 25+ kn avg over 3h+', () => {
+    expect(rate([25, 25, 25])).toMatchObject({ tier: 'verygood' })
+  })
+  it('… and 2h at 25+ is Good', () => {
+    expect(rate([25, 26])).toMatchObject({ tier: 'good', label: '✅ 2h · Good' })
+  })
+
+  it('Good: 18+ kn avg, 2h or 3h alike', () => {
+    expect(rate([18, 18, 18])).toMatchObject({ tier: 'good' })
+    expect(rate([18, 19])).toMatchObject({ tier: 'good' })
+  })
+
+  it('Chill: a 15-18 kn average, however long the window', () => {
+    expect(rate([15, 16, 17, 16])).toMatchObject({ tier: 'chill', label: '✅ 4h · Chill' })
+    expect(rate([16, 17])).toMatchObject({ tier: 'chill', label: '✅ 2h · Chill' })
+    expect(rate([17, 17, 17])).toMatchObject({ tier: 'chill' })
+  })
+
+  it('rates the average, so one strong hour does not make an epic day', () => {
+    // peak 34 — the old rule would have called this Perfect. The best 2h
+    // window averages 25, which is a Good day, not an epic one.
+    expect(rate([16, 16, 34, 16, 16])).toMatchObject({ tier: 'good' })
+  })
+
+  it('rates the best window, so a light morning does not hide an epic afternoon', () => {
+    // whole-day average is 24; the afternoon is 3h at 31
+    expect(rate([15, 16, 17, 30, 31, 32])).toMatchObject({ tier: 'epic', label: '✅ 6h · Epic' })
+  })
+
+  it('a session below 15 kn can only be a gust-rule day: light wind, not sold as a session', () => {
+    expect(rate([13, 13, 14])).toMatchObject({ tier: 'lightwind', label: '⚡ 3h · Light wind' })
+  })
+
+  it('every session tier carries the ✅ the templates and the OFF rule key on', () => {
+    for (const kns of [[40, 40, 40], [30, 30, 30], [25, 25, 25], [18, 18, 18], [16, 16, 16], [20, 20]])
+      expect(rate(kns).label.startsWith('✅')).toBe(true)
+    expect(rate([13, 13]).label.startsWith('✅')).toBe(false)
+  })
+
+  it('a storm code trumps everything', () => {
+    expect(rate([40, 40, 40], 95)).toMatchObject({ tier: 'storm', style: 'danger', label: '❌ Storm ⚡' })
+  })
+
+  it('explains an empty day: rain, snow, direction, too light, no wind', () => {
+    expect(rate([], 61, false, 20)).toMatchObject({ tier: 'rain', label: '❌ 🌧 Rain' })
+    expect(rate([], 73, false, 20)).toMatchObject({ tier: 'snow', label: '❌ ❄️ Snow' })
+    expect(rate([], 0, true, 20)).toMatchObject({ tier: 'wrongdir', label: '❌ Wrong direction' })
+    expect(rate([], 0, false, 12)).toMatchObject({ tier: 'toolight', label: '❌ Too light' })
+    expect(rate([], 0, false, 5)).toMatchObject({ tier: 'nowind', label: '❌ No wind' })
+  })
+
+  it('a lone hour is not a session', () => {
+    // sessionStats already drops it, so this reads as "no wind" at the day level
+    expect(rate([40], 0, false, 40).label.startsWith('❌')).toBe(true)
+    expect(rateSession({ goodHours: 1, avgKn: 40, avg3Kn: 0, avg2Kn: 0 }, 0, false, 40))
+      .toMatchObject({ tier: 'brief', label: '❌ Too brief (1h)' })
+  })
+
+  it('every style a rating can name has colours', () => {
+    const styles = new Set<string>()
+    for (const kns of [[40, 40, 40], [30, 30, 30], [25, 25, 25], [18, 18, 18], [16, 16], [13, 13]])
+      styles.add(rate(kns).style)
+    styles.add(rate([], 95).style)
+    styles.add(rate([], 61, false, 20).style)
+    styles.add(rate([], 0, false, 5).style)
+    for (const s of styles) expect(RATING_STYLE[s], s).toBeDefined()
+  })
+
+  it('gets hotter as the wind gets stronger: red at the top, green at the bottom', () => {
+    // The pill's ink is what a rider reads; each tier gets its own.
+    const fg = ['expert', 'epic', 'verygood', 'good', 'chill'].map(k => RATING_STYLE[k].fg)
+    expect(new Set(fg).size).toBe(fg.length)
+    expect(RATING_STYLE.expert.bg).toMatch(/^rgba\(239,68,68/)   // red
+    expect(RATING_STYLE.epic.bg).toMatch(/^rgba\(249,115,22/)    // orange
+    expect(RATING_STYLE.verygood.bg).toMatch(/^rgba\(234,179,8/) // yellow
+    expect(RATING_STYLE.good.bg).toMatch(/^rgba\(34,197,94/)     // green
+  })
+})

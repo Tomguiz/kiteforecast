@@ -465,14 +465,19 @@
     .card-tide .td-lo { color:#7dd3fc; opacity:.8; }
     .card-tide .td-sep { color:var(--tdim); font-weight:400; }
     .rating-badge { width:100%; padding:5px 0; border-radius:7px; text-align:center; font-weight:700; font-size:.64rem; letter-spacing:.04em; text-transform:uppercase; }
-    .rating-perfect  { background:rgba(34,197,94,.18);   color:#4ade80; border:1px solid rgba(34,197,94,.32); }
-    .rating-verygood { background:rgba(34,197,94,.1);    color:#86efac; border:1px solid rgba(34,197,94,.2); }
-    .rating-good      { background:rgba(190,242,100,.1);  color:#bef264; border:1px solid rgba(190,242,100,.22); }
-    .rating-marginal  { background:rgba(234,179,8,.13);   color:#fde047; border:1px solid rgba(234,179,8,.28); }
-    .rating-lightwind { background:rgba(251,146,60,.12);  color:#fb923c; border:1px solid rgba(251,146,60,.28); }
+    /* Hottest at the top: the stronger the wind, the redder the badge. Values
+       mirror RATING_STYLE in supabase/functions/_shared/rideability.ts so the
+       reminder emails paint the same scale; tests/unit/rating-mirror.test.ts
+       fails when they drift. */
+    .rating-expert    { background:rgba(239,68,68,.22);   color:#fca5a5; border:1px solid rgba(239,68,68,.45); }
+    .rating-epic      { background:rgba(249,115,22,.2);   color:#fdba74; border:1px solid rgba(249,115,22,.42); }
+    .rating-verygood  { background:rgba(234,179,8,.16);   color:#fde047; border:1px solid rgba(234,179,8,.36); }
+    .rating-good      { background:rgba(34,197,94,.16);   color:#4ade80; border:1px solid rgba(34,197,94,.34); }
+    .rating-chill     { background:rgba(134,239,172,.1);  color:#86efac; border:1px solid rgba(134,239,172,.24); }
+    .rating-lightwind { background:rgba(217,249,157,.1);  color:#d9f99d; border:1px solid rgba(217,249,157,.24); }
     .rating-none      { background:rgba(148,163,184,.08); color:#7a8fa8; border:1px solid rgba(148,163,184,.16); }
     .rating-bad       { background:rgba(239,68,68,.08);   color:#fca5a5; border:1px solid rgba(239,68,68,.18); }
-    .rating-danger   { background:rgba(239,68,68,.16);   color:#f87171; border:1px solid rgba(239,68,68,.32); }
+    .rating-danger    { background:rgba(220,38,38,.45);   color:#fecaca; border:1px solid rgba(239,68,68,.7); }
 
     /* ── FETCH TIMESTAMP ── */
     /* Refresh is now a standing control, not an alarm: forecasts come from a
@@ -2715,28 +2720,79 @@ function conditionLabel(kn,dir,code,temp,gustKn=0){
   return                 {label:'✓ Good',      cls:'cond-good'};
 }
 
-function rateDay(gh,pk,code,badDir,peakDay){
-  if([82,95,96,99].includes(code)) return {cls:'rating-danger',label:'❌ Storm ⚡'};
+// ── DAY RATING ──
+// MIRRORED in supabase/functions/_shared/rideability.ts (RATING_TIERS ..
+// rateSession) so the reminder emails call a day exactly what the app calls
+// it. tests/unit/rating-mirror.test.ts evaluates this block and the shared
+// module over the same inputs; change one, it fails until you change the other.
+//
+// Expert-tuned: it rates the AVERAGE over a window of consecutive good hours,
+// not the peak. Each tier wants a 3h+ window at its average; a 2h window at the
+// same average lands one tier lower. Below 18 kn a 15+ average is a chill
+// session; below that only the gust rule could have qualified the hours.
+const RATING_TIERS=[
+  {key:'expert',minKn:38,label:'Expert mode',below:'epic'},
+  {key:'epic',minKn:30,label:'Epic',below:'verygood'},
+  {key:'verygood',minKn:25,label:'Very Good',below:'good'},
+  {key:'good',minKn:18,label:'Good',below:'good'},
+];
+const CHILL_MIN_KN=15;
+const FULL_SESSION_HOURS=3;
+const isStormy=code=>[82,95,96,99].includes(code);
+// Best mean over every run of consecutive clock hours at least minLen long.
+function bestWindowAvg(good,minLen){
+  const hrs=good.slice().sort((a,b)=>a.hr-b.hr);
+  let best=0;
+  for(let i=0;i<hrs.length;i++){
+    let sum=0;
+    for(let j=i;j<hrs.length;j++){
+      if(j>i&&hrs[j].hr!==hrs[j-1].hr+1) break;
+      sum+=hrs[j].kn;
+      const len=j-i+1;
+      if(len>=minLen) best=Math.max(best,sum/len);
+    }
+  }
+  return best;
+}
+// From a day's qualifying hours ({hr,kn}); lone hours are dropped here.
+function sessionStats(good){
+  const set=new Set(good.map(h=>h.hr));
+  const run=good.filter(h=>set.has(h.hr-1)||set.has(h.hr+1));
+  const avgKn=run.length?Math.round(run.reduce((s,h)=>s+h.kn,0)/run.length):0;
+  return {goodHours:run.length,avgKn,avg3Kn:bestWindowAvg(run,FULL_SESSION_HOURS),avg2Kn:bestWindowAvg(run,2)};
+}
+function rateSession(s,code,badDir,peakDayKn){
+  if(isStormy(code)) return {tier:'storm',style:'danger',label:'❌ Storm ⚡'};
+  const gh=s.goodHours;
   if(gh===0){
-    if(isRainy(code)&&peakDay>=10) return {cls:'rating-bad',  label:isSnowy(code)?'❌ ❄️ Snow':'❌ 🌧 Rain'};
-    if(badDir&&peakDay>=15)        return {cls:'rating-bad',  label:'❌ Wrong direction'};
-    if(peakDay>=10)                return {cls:'rating-none', label:'❌ Too light'};
-    return                                {cls:'rating-none', label:'❌ No wind'};
+    if(isRainy(code)&&peakDayKn>=10) return isSnowy(code)?{tier:'snow',style:'bad',label:'❌ ❄️ Snow'}:{tier:'rain',style:'bad',label:'❌ 🌧 Rain'};
+    if(badDir&&peakDayKn>=15)        return {tier:'wrongdir',style:'bad', label:'❌ Wrong direction'};
+    if(peakDayKn>=10)                return {tier:'toolight',style:'none',label:'❌ Too light'};
+    return                                  {tier:'nowind',  style:'none',label:'❌ No wind'};
   }
-  const isLightWind=pk<15; // qualifying only via gust rule (12kn + gust≥20)
-  if(gh===1) return isLightWind
-    ? {cls:'rating-lightwind', label:`⚡ 1h · Light wind`}
-    : {cls:'rating-bad',       label:'❌ Too brief (1h)'};
-  if(isLightWind) return {cls:'rating-lightwind', label:`⚡ ${gh}h · Light wind`};
-  if(gh===2) return {cls:'rating-marginal',label:`✅ 2h · ${pk}kn`};
-  if(gh<=4){
-    if(pk>=25) return {cls:'rating-good',label:`✅ ${gh}h · 25+ kn`};
-    if(pk>=20) return {cls:'rating-good',label:`✅ ${gh}h · 20+ kn`};
-    return {cls:'rating-marginal',label:`✅ ${gh}h · 15+ kn`};
+  if(gh===1) return {tier:'brief',style:'bad',label:'❌ Too brief (1h)'};
+  for(const t of RATING_TIERS){
+    if(s.avg3Kn>=t.minKn) return {tier:t.key,style:t.key,label:`✅ ${gh}h · ${t.label}`};
+    if(s.avg2Kn>=t.minKn){
+      const b=RATING_TIERS.find(x=>x.key===t.below);
+      return {tier:b.key,style:b.key,label:`✅ ${gh}h · ${b.label}`};
+    }
   }
-  if(pk>=25) return {cls:'rating-perfect', label:`✅ ${gh}h · Perfect! 🪁`};
-  if(pk>=20) return {cls:'rating-verygood',label:`✅ ${gh}h · Very Good`};
-  return {cls:'rating-good',label:`✅ ${gh}h · Good`};
+  if(s.avg2Kn>=CHILL_MIN_KN) return {tier:'chill',style:'chill',label:`✅ ${gh}h · Chill`};
+  return {tier:'lightwind',style:'lightwind',label:`⚡ ${gh}h · Light wind`};
+}
+// ── END DAY RATING ──
+// What the app paints: the shared rating plus the CSS class that colours it.
+function rateDay(stats,code,badDir,peakDayKn){
+  const r=rateSession(stats,code,badDir,peakDayKn);
+  return {cls:'rating-'+r.style,label:r.label,tier:r.tier};
+}
+// Stats for a day read back from chipBestCache.days10. Entries written before
+// the averages existed fall back to the peak, which is the best guess a cache
+// that old can offer.
+function cachedDayStats(d){
+  const gh=d.goodHours??d.qh??0, pk=d.peakKn||0;
+  return {goodHours:gh,avgKn:d.avgKn??pk,avg3Kn:d.avg3Kn??pk,avg2Kn:d.avg2Kn??pk};
 }
 
 function fmtDate(str){
@@ -2909,13 +2965,14 @@ function buildLegendHTML(){
   return `<h3>How to read</h3>
   <div class="legend-cols">
     <div>
-      <div class="legend-sub">Day rating</div>
-      <div class="legend-item"><div class="legend-dot" style="background:#4ade80"></div><span class="legend-kpi">Perfect</span><span class="legend-desc">25+ kn · 5h+ session</span></div>
-      <div class="legend-item"><div class="legend-dot" style="background:#86efac"></div><span class="legend-kpi">Very Good</span><span class="legend-desc">20+ kn · 4h+ session</span></div>
-      <div class="legend-item"><div class="legend-dot" style="background:#bef264"></div><span class="legend-kpi">Good</span><span class="legend-desc">15+ kn · 2h+ session</span></div>
-      <div class="legend-item"><div class="legend-dot" style="background:#fde047"></div><span class="legend-kpi">Marginal</span><span class="legend-desc">short window (2h)</span></div>
-      <div class="legend-item"><div class="legend-dot" style="background:#fca5a5"></div><span class="legend-kpi">Bad</span><span class="legend-desc">wrong dir · too light</span></div>
-      <div class="legend-item"><div class="legend-dot" style="background:#f87171"></div><span class="legend-kpi">Danger</span><span class="legend-desc">offshore / storm</span></div>
+      <div class="legend-sub">Day rating <span style="font-weight:500;color:var(--tdim)">· avg wind over the session</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#fca5a5"></div><span class="legend-kpi">Expert mode</span><span class="legend-desc">38+ kn avg · 3h+ session (Epic if 2h)</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#fdba74"></div><span class="legend-kpi">Epic</span><span class="legend-desc">30+ kn avg · 3h+ session (Very Good if 2h)</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#fde047"></div><span class="legend-kpi">Very Good</span><span class="legend-desc">25+ kn avg · 3h+ session (Good if 2h)</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#4ade80"></div><span class="legend-kpi">Good</span><span class="legend-desc">18+ kn avg · 2h+ session</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#86efac"></div><span class="legend-kpi">Chill</span><span class="legend-desc">15–18 kn avg · 2h+ session</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#fca5a5;opacity:.55"></div><span class="legend-kpi">Bad</span><span class="legend-desc">wrong dir · too light</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#dc2626"></div><span class="legend-kpi">Danger</span><span class="legend-desc">offshore / storm</span></div>
     </div>
     <div>
       <div class="legend-sub">Wind speed (bar color)</div>
@@ -3422,7 +3479,7 @@ const CHIP_CACHE_TTL=60*60*1000; // 1 hour
 // v3: entries written before CONFIDENT_DAYS hold sixteen days per spot, six of
 // them the GFS outlook this app no longer counts. Reading them back would put
 // day-14 sessions in the compare table for another hour.
-const CHIP_CACHE_LS_KEY='kf_chipCache_v3';
+const CHIP_CACHE_LS_KEY='kf_chipCache_v4'; // v4: days10 gained the window averages the rating reads
 let _chipCacheTs=0; // timestamp when this cache epoch started
 
 function _loadChipCacheFromLS(){
@@ -3608,7 +3665,8 @@ function _chipDaysFromWx(spot,key,wx){
       let domDirSum=[0,0],domDirN=0;
       goodHrs.forEach(h=>{ domDirSum[0]+=Math.sin(h.dir*Math.PI/180); domDirSum[1]+=Math.cos(h.dir*Math.PI/180); domDirN++; });
       const domDir=domDirN?['N','NE','E','SE','S','SW','W','NW'][Math.round((Math.atan2(domDirSum[0],domDirSum[1])*180/Math.PI+360)%360/45)%8]:null;
-      days10.push({dateStr,qh,goodHours,peakKn:dayPeak,startHr:firstGoodHr,dir:domDir});
+      const st=sessionStats(goodHrs);
+      days10.push({dateStr,qh,goodHours,peakKn:dayPeak,avgKn:st.avgKn,avg3Kn:st.avg3Kn,avg2Kn:st.avg2Kn,startHr:firstGoodHr,dir:domDir});
     });
     chipBestCache[key]=bestDateStr?{dateStr:bestDateStr,peakKn:bestPeakKn,startHr:bestStartHr,nextDateStr,nextStartHr,nextPeakKn,spotName:spot.name,spot,days10}:null;
     if(!bestDateStr) chipBestCache[key]={dateStr:null,peakKn:0,startHr:null,nextDateStr:null,nextStartHr:null,nextPeakKn:0,spotName:spot.name,spot,days10};
@@ -3666,7 +3724,8 @@ function reconcileChipCacheFromDetail(){
       let domDirSum=[0,0],domDirN=0;
       goodHrs.forEach(h=>{ domDirSum[0]+=Math.sin(h.dir*Math.PI/180); domDirSum[1]+=Math.cos(h.dir*Math.PI/180); domDirN++; });
       const domDir=domDirN?['N','NE','E','SE','S','SW','W','NW'][Math.round((Math.atan2(domDirSum[0],domDirSum[1])*180/Math.PI+360)%360/45)%8]:null;
-      days10.push({dateStr,qh,goodHours,peakKn:dayPeak,startHr:firstGoodHr,dir:domDir});
+      const st=sessionStats(goodHrs);
+      days10.push({dateStr,qh,goodHours,peakKn:dayPeak,avgKn:st.avgKn,avg3Kn:st.avg3Kn,avg2Kn:st.avg2Kn,startHr:firstGoodHr,dir:domDir});
     });
     const spotMeta={name:loc.name,loc:`${loc.admin1?loc.admin1+', ':''}${loc.country}`,lat,lon,dirs:dirsArr};
     // Drop any stale entries for this lat/lon under OTHER dirs keys so the
@@ -4291,8 +4350,9 @@ function renderGoodDaysSection(){
 
       const kn=document.createElement('div');
       kn.className='gd-kn';
-      kn.style.color=speedColor(d.peakKn);
-      kn.textContent=`\uD83D\uDCA8 ${d.peakKn} kn${d.dir?` \u00b7 ${d.dir}`:''}`;
+      const dStats=cachedDayStats(d);
+      kn.style.color=speedColor(dStats.avgKn);
+      kn.textContent=`\uD83D\uDCA8 ${dStats.avgKn} kn${d.dir?` \u00b7 ${d.dir}`:''}`;
       c.appendChild(kn);
 
       if(d.startHr!==null&&d.startHr!==undefined){
@@ -4306,7 +4366,7 @@ function renderGoodDaysSection(){
       // storm branch needs a weather code we do not keep — safe to pass 0here,
       // because isRainy() covers every storm code, so a stormy hour never
       // qualifies and such a day cannot reach the 2h bar above.
-      const r=rateDay(d.goodHours,d.peakKn,0,false,d.peakKn);
+      const r=rateDay(dStats,0,false,d.peakKn);
       const rEl=document.createElement('div');
       rEl.className='gd-rating '+r.cls;
       rEl.textContent=r.label;
@@ -5791,7 +5851,9 @@ function buildDay(dateStr,sunrise,sunset){
   const hasBadDir=day.some(h=>h.type==='lightdir');
   // shared definition: qualifying hours in a 2+ consecutive (by clock hour) run
   const goodHours=dayGoodHours(day.map(h=>({hr:h.hour,kn:h.kn,dir:h.dir,code:h.code,gustKn:h.gustKn})));
-  return{hours,day,good,goodHours,peakKn,peakDayKn,domDir,hasBadDir};
+  // window averages for the rating — see rateSession
+  const stats=sessionStats(good.map(h=>({hr:h.hour,kn:h.kn})));
+  return{hours,day,good,goodHours,peakKn,avgKn:stats.avgKn,stats,peakDayKn,domDir,hasBadDir};
 }
 
 // ══════════════════════════════════
@@ -5902,13 +5964,13 @@ function renderGrid(){
     const tMax=Math.round(daily.temperature_2m_max[i]);
     const tMin=Math.round(daily.temperature_2m_min[i]);
     const gust=toKnotsR(daily.windgusts_10m_max[i]);
-    const{goodHours,peakKn,peakDayKn,hasBadDir,domDir,day,good}=buildDay(dateStr,daily.sunrise[i],daily.sunset[i]);
+    const{goodHours,peakKn,stats,peakDayKn,hasBadDir,domDir,day,good}=buildDay(dateStr,daily.sunrise[i],daily.sunset[i]);
     // icon + rating reflect the DAYLIGHT weather, not Open-Meteo's 24h daily
     // code (which would flag night-only rain — see daylightWeatherCode)
     const code=daylightWeatherCode(day,daily.weather_code[i]);
     const[icon]=wmoInfo(code);
     const{short,num}=fmtDate(dateStr);
-    const rating=rateDay(goodHours,peakKn,code,hasBadDir,peakDayKn);
+    const rating=rateDay(stats,code,hasBadDir,peakDayKn);
     const _srH=parseInt(daily.sunrise[i].slice(11,13),10);
     const _ssH=parseInt(daily.sunset[i].slice(11,13),10);
     const tideLine='';
@@ -6095,10 +6157,10 @@ function openModal(dateStr,dayIdx){
   const daily=cachedWx.daily;
   const sunrise=daily.sunrise[dayIdx];
   const sunset=daily.sunset[dayIdx];
-  const{hours,day,good,goodHours,peakKn,domDir,hasBadDir}=buildDay(dateStr,sunrise,sunset);
+  const{hours,day,good,goodHours,peakKn,avgKn,stats,peakDayKn,domDir,hasBadDir}=buildDay(dateStr,sunrise,sunset);
   const{full}=fmtDate(dateStr);
   const loc=cachedLoc;
-  const rating=rateDay(goodHours,peakKn,daylightWeatherCode(day,daily.weather_code[dayIdx]),hasBadDir);
+  const rating=rateDay(stats,daylightWeatherCode(day,daily.weather_code[dayIdx]),hasBadDir,peakDayKn);
 
   $('mTitle').textContent=full;
   const mBell=$('mNotifBtn');
@@ -6121,7 +6183,8 @@ function openModal(dateStr,dayIdx){
   $('mSession').innerHTML=`
     <span class="rating-badge ${rating.cls}" style="width:auto;padding:5px 14px">${rating.label}</span>
     ${win?`<span class="m-badge green">🪁 ${win}</span>`:''}
-    ${peakKn>0?`<span class="m-badge accent">Avg ${peakKn} kn</span>`:''}
+    ${avgKn>0?`<span class="m-badge accent">Avg ${avgKn} kn</span>`:''}
+    ${peakKn>0?`<span class="m-badge">Peak ${peakKn} kn</span>`:''}
     <button id="mBadgeMore" onclick="(function(b){var x=$('mBadgeExtra');var open=x.classList.toggle('open');var tr=$('mTideRow');if(tr)tr.style.display=open?'flex':'none';b.textContent=open?'▲ Less':'▼ More';})(this)">▼ More</button>
     <span id="mBadgeExtra">
     ${maxGust>0?`<span class="m-badge">Gusts ${maxGust} kn</span>`:''}
@@ -7949,7 +8012,7 @@ async function confirmSessionFromModal(dateStr, startTime){
       if(dayIdx>=0){
         const sunrise=daily.sunrise[dayIdx];
         const sunset=daily.sunset[dayIdx];
-        const{good,peakKn,domDir,day}=buildDay(dateStr,sunrise,sunset);
+        const{good,peakKn,avgKn,stats,domDir,day}=buildDay(dateStr,sunrise,sunset);
         // Use user's confirmed start time — local time from Open-Meteo timezone
         const sessionStart=dateStr+'T'+startTime+':00';
         // End time = confirmed start + duration of good window (capped at sunset)
@@ -7959,10 +8022,10 @@ async function confirmSessionFromModal(dateStr, startTime){
         const windMin=good.length?Math.min(...good.map(h=>h.kn)):0;
         const _dayCode=daylightWeatherCode(day,daily.weather_code[dayIdx]);
         const[,weatherDesc]=wmoInfo(_dayCode);
-        const rating=rateDay(good.length,peakKn,_dayCode,false,0);
+        const rating=rateDay(stats,_dayCode,false,0);
         const sessInfo={
           sessionStart,sessionEnd,duration_hours:good.length,
-          peakKn,windMin,gusts,domDir:domDir!==null?compass(domDir):'—',
+          peakKn,avgKn,windMin,gusts,domDir:domDir!==null?compass(domDir):'—',
           weather_description:weatherDesc,rating_label:rating.label,
           temperature_max:Math.round(daily.temperature_2m_max[dayIdx]),
           temperature_min:Math.round(daily.temperature_2m_min[dayIdx]),
@@ -11881,7 +11944,7 @@ function getQualSessions(){
   if(!cachedWx)return[];
   const{daily}=cachedWx;
   return daily.time.reduce((arr,dateStr,i)=>{
-    const{good,peakKn,domDir,day}=buildDay(dateStr,daily.sunrise[i],daily.sunset[i]);
+    const{good,peakKn,avgKn,stats,domDir,day}=buildDay(dateStr,daily.sunrise[i],daily.sunset[i]);
     if(good.length>=2){
       const sessionStart=good[0].tStr;
       const sessionEnd=good[good.length-1].tStr;
@@ -11890,11 +11953,11 @@ function getQualSessions(){
       const consistencyPct=day.length?Math.round(good.length/day.length*100):0;
       const code=daylightWeatherCode(day,daily.weather_code[i]);
       const[,weatherDesc]=wmoInfo(code);
-      const rating=rateDay(good.length,peakKn,code,day.some(h=>h.type==='lightdir'),day.length?Math.max(...day.map(h=>h.kn)):0);
+      const rating=rateDay(stats,code,day.some(h=>h.type==='lightdir'),day.length?Math.max(...day.map(h=>h.kn)):0);
       arr.push({
         dateStr,sessionStart,sessionEnd,
         duration_hours:good.length,
-        peakKn,windMin,gusts,
+        peakKn,avgKn,windMin,gusts,
         domDir:domDir!==null?compass(domDir):'—',
         weather_description:weatherDesc,
         rating_label:rating.label,
@@ -11916,7 +11979,7 @@ function toggleDayNotif(e,dateStr,dayIdx){
   const loc=cachedLoc;
   if(!loc)return;
   const{daily}=cachedWx;
-  const{good,peakKn,domDir,day}=buildDay(dateStr,daily.sunrise[dayIdx],daily.sunset[dayIdx]);
+  const{good,peakKn,avgKn,stats,domDir,day}=buildDay(dateStr,daily.sunrise[dayIdx],daily.sunset[dayIdx]);
   const sessionStart=good.length?good[0].tStr:dateStr+'T10:00';
   const sessionEnd=good.length?good[good.length-1].tStr:dateStr+'T11:00';
   const gusts=good.length?Math.max(...good.map(h=>h.gustKn||0)):0;
@@ -11924,10 +11987,10 @@ function toggleDayNotif(e,dateStr,dayIdx){
   const consistencyPct=day.length?Math.round(good.length/day.length*100):0;
   const code=daylightWeatherCode(day,daily.weather_code[dayIdx]);
   const[,weatherDesc]=wmoInfo(code);
-  const rating=rateDay(good.length,peakKn,code,day.some(h=>h.type==='lightdir'),day.length?Math.max(...day.map(h=>h.kn)):0);
+  const rating=rateDay(stats,code,day.some(h=>h.type==='lightdir'),day.length?Math.max(...day.map(h=>h.kn)):0);
   const sessInfo={
     sessionStart,sessionEnd,duration_hours:good.length,
-    peakKn,windMin,gusts,domDir:domDir!==null?compass(domDir):'—',
+    peakKn,avgKn,windMin,gusts,domDir:domDir!==null?compass(domDir):'—',
     weather_description:weatherDesc,
     rating_label:rating.label,
     temperature_max:Math.round(daily.temperature_2m_max[dayIdx]),

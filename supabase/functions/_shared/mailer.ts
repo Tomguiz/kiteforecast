@@ -114,7 +114,7 @@ export const DELIVERIES: Record<string, Delivery> = {
 export function reminderDelivery(hours: number, isOn: boolean): Delivery {
   const key = `${isOn ? 'ON' : 'OFF'}${hours}`
   const subjects: Record<string, string> = {
-    ON24:  '\u{1F514} Tomorrow at [[spot]] \u2014 conditions confirmed, [[session.wind_speed_peak_kn]] kts [[session.wind_direction]]',
+    ON24:  '\u{1F514} Tomorrow at [[spot]] \u2014 conditions confirmed, [[session.wind_speed_avg_kn]] kts avg [[session.wind_direction]]',
     OFF24: '\u{1F62E}\u200D\u{1F4A8} [[spot]] tomorrow \u2014 the wind gods aren\'t cooperating',
   }
   return { template: `reminder${key}`, subject: subjects[key] ?? '[[spot]] \u2014 [[date_label]]' }
