@@ -1,12 +1,14 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import {
   toKnots, isRainy, speedTier, isWindDirOK, hourQualifies, consecutiveRuns,
+  sessionStats, rateSession, RATING_STYLE,
 } from '../_shared/rideability.ts'
 import {
   fetchStations, nearestStation, toLiveWind,
   type RwsStation, type FetchLike,
 } from '../_shared/rws.ts'
 import { renderLiveHtml } from '../_shared/live-html.ts'
+import { sessionHype, isHot, whenWord } from '../_shared/hype.ts'
 import { buildManageLink } from '../_shared/manage-link.ts'
 import { recordEmail } from '../_shared/email-log-client.ts'
 import { deliver, reminderDelivery } from '../_shared/mailer.ts'
@@ -85,29 +87,9 @@ function buildDay(dateStr: string, sunrise: string, sunset: string, hourlyMap: M
   const sample  = good.length ? good : day
   const domDir  = sample.length ? circMean(sample.map(h => h.dir)) : null
   const hasBadDir = day.some(h => h.type === 'lightdir')
-  return { day, good, goodHours: good.length, peakKn, peakDayKn, domDir, hasBadDir }
-}
-
-const isSnowy = (code: number) => [71,73,75,77,85,86].includes(code)
-
-function rateDay(gh: number, pk: number, code: number, badDir: boolean, peakDay: number): string {
-  if ([82,95,96,99].includes(code))       return '❌ Storm ⚡'
-  if (gh === 0) {
-    if (isRainy(code) && peakDay >= 10)   return isSnowy(code) ? '❌ ❄️ Snow' : '❌ 🌧 Rain'
-    if (badDir && peakDay >= 15)          return '❌ Wrong direction'
-    if (peakDay >= 10)                    return '❌ Too light'
-    return '❌ No wind'
-  }
-  if (gh === 1)  return '❌ Too brief (1h)'
-  if (gh === 2)  return `✅ 2h · ${pk}kn`
-  if (gh <= 4) {
-    if (pk >= 25) return `✅ ${gh}h · 25+ kn`
-    if (pk >= 20) return `✅ ${gh}h · 20+ kn`
-    return `✅ ${gh}h · 15+ kn`
-  }
-  if (pk >= 25) return `✅ ${gh}h · Perfect! 🪁`
-  if (pk >= 20) return `✅ ${gh}h · Very Good`
-  return `✅ ${gh}h · Good`
+  // The rating reads window averages, not the peak — see rateSession.
+  const stats   = sessionStats(good.map(h => ({ hr: h.hour, kn: h.kn })))
+  return { day, good, goodHours: good.length, peakKn, avgKn: stats.avgKn, stats, peakDayKn, domDir, hasBadDir }
 }
 
 function fmtDateLabel(dateStr: string): string {
@@ -208,7 +190,7 @@ Deno.serve(async () => {
       const code      = wx.daily.weather_code[dayIdx] as number
       const [, weatherDesc] = wmoInfo(code)
 
-      const { day, good, goodHours, peakKn, domDir, hasBadDir, peakDayKn } =
+      const { day, good, goodHours, peakKn, avgKn, stats, domDir, hasBadDir, peakDayKn } =
         buildDay(r.session_date, sunrise, sunset, hourlyMap, spotDirs)
 
       const isGoodNow = goodHours >= 2
@@ -258,7 +240,12 @@ Deno.serve(async () => {
       }
       // ─────────────────────────────────────────────────────────────────────
 
-      const rating          = rateDay(goodHours, peakKn, code, hasBadDir, peakDayKn)
+      const rated           = rateSession(stats, code, hasBadDir, peakDayKn)
+      const rating          = rated.label
+      // The badge colour travels with the label so the inbox shows the same
+      // green-to-red scale as the app.
+      const ratingStyle     = RATING_STYLE[rated.style]
+      const dayOfWeek       = new Date(r.session_date + 'T12:00:00').toLocaleDateString('en', { weekday: 'long' })
       // When forecast degraded (no qualifying hours), fall back to all daylight hours for wind stats
       const sample          = good.length ? good : day
       const sessionStart    = good.length ? `${r.session_date}T${String(good[0].hour).padStart(2,'0')}:00` : `${r.session_date}T10:00`
@@ -275,7 +262,7 @@ Deno.serve(async () => {
       const startFmt = sessionStart.slice(11, 16)
       const endFmt   = calEndIso.slice(11, 16)
       const calTitle = encodeURIComponent(`Kite session - ${r.spot_name}`)
-      const calDesc  = encodeURIComponent(`${peakKn}kn · ${goodHours}h of good wind. Forecast: ${r.app_link}`)
+      const calDesc  = encodeURIComponent(`${avgKn}kn avg (peak ${peakKn}) · ${goodHours}h of good wind. Forecast: ${r.app_link}`)
       const calLoc   = encodeURIComponent(r.spot_name)
       // &amp; because this HTML is injected directly into the email body
       const gcalUrl  = `https://calendar.google.com/calendar/render?action=TEMPLATE&amp;text=${calTitle}&amp;dates=${calStart}/${calEnd}&amp;details=${calDesc}&amp;location=${calLoc}`
@@ -323,12 +310,20 @@ Deno.serve(async () => {
         spot_country:       r.spot_country,
         spot_map_link:      r.spot_map_link,
         date:               r.session_date,
-        day_of_week:        new Date(r.session_date + 'T12:00:00').toLocaleDateString('en', { weekday: 'long' }),
+        day_of_week:        dayOfWeek,
         date_label:         fmtDateLabel(r.session_date),
         app_link:           r.app_link,
         manage_link:        buildManageLink(r.app_link, r.spot_name, r.session_date),
         calendar_html,
         live_html,
+        // The words the email says about the day — subject, headline, tease —
+        // tuned to the tier, so a fire day reads like one and a chill day
+        // does not overpromise.
+        hype: sessionHype(rated.tier, {
+          spot: r.spot_name, avgKn, peakKn, goodHours,
+          dir: domDir !== null ? compass(domDir) : '\u2014',
+          when: whenWord(rh, dayOfWeek),
+        }),
         session: {
           start_time:           sessionStart,
           end_time:             sessionEnd,
@@ -336,11 +331,15 @@ Deno.serve(async () => {
           end_time_formatted:   sessionEnd ? sessionEnd.slice(11, 16) : '',
           duration_hours:       goodHours,
           wind_speed_peak_kn:   peakKn,
+          wind_speed_avg_kn:    avgKn,
           wind_speed_min_kn:    windMin,
           wind_gusts_kn:        gusts,
           wind_direction:       domDir !== null ? compass(domDir) : '—',
           wind_consistency_pct: consistencyPct,
           rating,
+          rating_fg:            ratingStyle.fg,
+          rating_bg:            ratingStyle.bg,
+          rating_border:        ratingStyle.border,
         },
         conditions: {
           weather:           weatherDesc,
@@ -361,10 +360,12 @@ Deno.serve(async () => {
         // deploy — and setting the key back to empty rolls it straight back.
         // Reminders pick their template from the ladder step and whether the
         // session is on, so the delivery is resolved here and handed to the
-        // same door every other notification goes through.
+        // same door every other notification goes through. "On" is the same
+        // 2h+ window that decided to send at all — not the label's emoji, which
+        // a light-wind session (⚡) does not carry.
         const sent = await deliver(payload, {
           to: r.email,
-          delivery: reminderDelivery(rh, rating.includes('✅')),
+          delivery: reminderDelivery(rh, isGoodNow, isHot(rated.tier)),
           makeWebhookUrl: MAKE_WEBHOOK_URL,
         })
         if (!sent.ok) {
@@ -389,7 +390,7 @@ Deno.serve(async () => {
           .eq('email', r.email).single()
         if (prof?.is_premium && prof?.sms_enabled && prof?.phone_number) {
           const sessionLabel = goodHours >= 2
-            ? `${payload.session.start_time_formatted}–${payload.session.end_time_formatted} · ${peakKn}kn`
+            ? `${payload.session.start_time_formatted}–${payload.session.end_time_formatted} · ${avgKn}kn avg`
             : rating
           const smsBody = `🪁 Kite alert — ${r.spot_name} · ${payload.day_of_week} ${sessionLabel}. 1h before your session. tichkes.com`
           const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${TWILIO_ACCOUNT_SID}/Messages.json`

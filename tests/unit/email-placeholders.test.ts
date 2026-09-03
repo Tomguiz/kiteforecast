@@ -29,8 +29,8 @@ function payloadCarries(key: string): boolean {
 }
 
 describe('reminder email placeholders', () => {
-  it('finds all ten reminder templates', () => {
-    expect(templates).toHaveLength(10)
+  it('finds all eleven reminder templates', () => {
+    expect(templates).toHaveLength(11)
   })
 
   it.each(templates)('%s uses only placeholders the payload carries', file => {

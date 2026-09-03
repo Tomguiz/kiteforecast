@@ -58,12 +58,17 @@ describe('against the real templates', () => {
     app_link: 'https://app/x', manage_link: 'https://app/y',
     calendar_html: '<a>cal</a>', live_html: '',
     user_good_wind_dirs: ['SW', 'W'],
+    hype: {
+      fire: false, subject: 'Tomorrow at Riverwoods', title: 'Tomorrow',
+      title_accent: 'is the day.', tease: 'Riverwoods Beachclub is on.',
+    },
     session: {
       start_time: '2026-08-30T09:00', end_time: '2026-08-30T13:00',
       start_time_formatted: '09:00', end_time_formatted: '13:00',
-      duration_hours: 4, wind_speed_peak_kn: 22, wind_speed_min_kn: 16,
+      duration_hours: 4, wind_speed_peak_kn: 22, wind_speed_avg_kn: 19, wind_speed_min_kn: 16,
       wind_gusts_kn: 28, wind_direction: 'SW', wind_consistency_pct: 81,
-      rating: '✅ 4h · Very Good',
+      rating: '✅ 4h · Good',
+      rating_fg: '#4ade80', rating_bg: 'rgba(34,197,94,.16)', rating_border: 'rgba(34,197,94,.34)',
     },
     conditions: {
       weather: 'Partly cloudy', temperature_max_c: 20, temperature_min_c: 15,
@@ -71,7 +76,7 @@ describe('against the real templates', () => {
     },
   }
 
-  for (const name of ['reminderON24', 'reminderOFF24']) {
+  for (const name of ['reminderON24', 'reminderFIRE24', 'reminderOFF24']) {
     it(`${name} renders with nothing left unfilled`, () => {
       const { html, missing } = renderTemplate(read(name), payload)
       expect(missing).toEqual([])

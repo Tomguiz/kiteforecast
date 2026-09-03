@@ -20,7 +20,7 @@
 
     <!-- HEADER CARD -->
     <tr>
-      <td style="background-color:#0d5a8a;border-radius:14px 14px 0 0;padding:0;">
+      <td style="background-color:#9a3412;border-radius:14px 14px 0 0;padding:0;">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
 
           <!-- Brand row -->
@@ -41,7 +41,7 @@
               <table role="presentation" cellpadding="0" cellspacing="0" border="0">
                 <tr>
                   <td style="background-color:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);border-radius:20px;padding:4px 12px;font-size:11px;font-weight:700;letter-spacing:1px;color:rgba(255,255,255,0.8);white-space:nowrap;">&#9201; [[reminder_label]]</td>
-                  <td style='width:8px;'></td><td style='background-color:rgba(93,240,160,0.15);border:1px solid rgba(93,240,160,0.35);border-radius:20px;padding:4px 12px;font-size:11px;font-weight:700;letter-spacing:1px;color:#5df0a0;white-space:nowrap;'>&#9989; SESSION ON</td><td style='width:8px;'></td><td style='background-color:[[session.rating_bg]];border:1px solid [[session.rating_border]];border-radius:20px;padding:4px 12px;font-size:12px;font-weight:600;color:[[session.rating_fg]];white-space:nowrap;'>[[session.rating]]</td>
+                  <td style='width:8px;'></td><td style='background-color:rgba(93,240,160,0.15);border:1px solid rgba(93,240,160,0.35);border-radius:20px;padding:4px 12px;font-size:11px;font-weight:700;letter-spacing:1px;color:#5df0a0;white-space:nowrap;'>&#128293; SESSION ON</td><td style='width:8px;'></td><td style='background-color:[[session.rating_bg]];border:1px solid [[session.rating_border]];border-radius:20px;padding:4px 12px;font-size:12px;font-weight:600;color:[[session.rating_fg]];white-space:nowrap;'>[[session.rating]]</td>
                 </tr>
               </table>
             </td>
@@ -50,14 +50,15 @@
           <!-- Headline -->
           <tr>
             <td style="padding:0 32px 10px 32px;">
-              <h1 style="margin:0;font-family:'Bebas Neue',Arial,sans-serif;font-size:48px;line-height:1.0;font-weight:400;color:#ffffff;letter-spacing:1px;">Conditions<br/><span style="color:#5de8f0;">confirmed.</span></h1>
+              <p style="margin:0 0 8px 0;font-size:12px;font-weight:700;letter-spacing:3px;text-transform:uppercase;color:#fdba74;">&#128293; Fire forecast</p>
+              <h1 style="margin:0;font-family:'Bebas Neue',Arial,sans-serif;font-size:48px;line-height:1.0;font-weight:400;color:#ffffff;letter-spacing:1px;">[[hype.title]]<br/><span style="color:#fde047;">[[hype.title_accent]]</span></h1>
             </td>
           </tr>
 
           <!-- Subheadline -->
           <tr>
             <td style="padding:0 32px 20px 32px;">
-              <p style="margin:0;font-size:15px;line-height:1.5;color:rgba(255,255,255,0.7);">The forecast is holding strong at <strong style='color:#ffffff'>[[spot]]</strong> &mdash; two days and counting.</p>
+              <p style="margin:0;font-size:15px;line-height:1.5;color:rgba(255,255,255,0.7);">[[hype.tease]]</p>
             </td>
           </tr>
 
@@ -88,12 +89,12 @@
           <tr>
             <td width="25%" align="center" style="padding:20px 6px;">
               <p style="margin:0 0 4px 0;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4a5568;">Avg</p>
-              <p style="margin:0;font-family:'Bebas Neue',Arial,sans-serif;font-size:52px;line-height:1;color:#5de8f0;">[[session.wind_speed_avg_kn]]</p>
+              <p style="margin:0;font-family:'Bebas Neue',Arial,sans-serif;font-size:52px;line-height:1;color:#fde047;">[[session.wind_speed_avg_kn]]</p>
               <p style="margin:4px 0 0 0;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4a5568;">knots</p>
             </td>
             <td width="25%" align="center" style="padding:20px 6px;border-left:1px solid #1e2535;">
               <p style="margin:0 0 4px 0;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4a5568;">Peak</p>
-              <p style="margin:0;font-family:'Bebas Neue',Arial,sans-serif;font-size:40px;line-height:1;color:#5de8f0;">[[session.wind_speed_peak_kn]]</p>
+              <p style="margin:0;font-family:'Bebas Neue',Arial,sans-serif;font-size:40px;line-height:1;color:#fde047;">[[session.wind_speed_peak_kn]]</p>
               <p style="margin:4px 0 0 0;font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:#4a5568;">knots</p>
             </td>
             <td width="25%" align="center" style="padding:20px 6px;border-left:1px solid #1e2535;">
@@ -195,7 +196,7 @@
     <!-- CTA -->
     <tr>
       <td style="background-color:#141b27;border:1px solid #1e2535;border-top:none;padding:24px 32px;text-align:center;">
-        <a href="[[app_link]]" style="display:inline-block;background-color:#0a8ab4;color:#ffffff;font-family:'DM Sans',Arial,sans-serif;font-size:15px;font-weight:600;padding:14px 32px;border-radius:9px;text-decoration:none;">&#127993; Check the forecast</a>
+        <a href="[[app_link]]" style="display:inline-block;background-color:#ea580c;color:#ffffff;font-family:'DM Sans',Arial,sans-serif;font-size:15px;font-weight:600;padding:14px 32px;border-radius:9px;text-decoration:none;">&#127993; I&#8217;m in &mdash; open the forecast</a>
         <p style="margin:12px 0 0 0;font-size:12px;color:#4a5568;">See the full hourly breakdown on KiteForecast</p>
         <p style="margin:16px 0 0 0;"><a href="[[manage_link]]" style="display:inline-block;background-color:#1a2235;border:1px solid #242d42;color:#94a3b8;font-family:'DM Sans',Arial,sans-serif;font-size:13px;font-weight:600;padding:11px 22px;border-radius:8px;text-decoration:none;">&#128276; Manage this alert</a></p>
         <p style="margin:8px 0 0 0;font-size:12px;color:#4a5568;">Not free that day? Turn off its alerts.</p>
