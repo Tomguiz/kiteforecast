@@ -15,6 +15,8 @@ export interface HypeContext {
   bestKn: number
   bestHours: number
   peakKn: number
+  // Strongest gust in the session — part of what makes a day fire.
+  gustKn: number
   goodHours: number
   dir: string
   // "tomorrow", "today", "on Saturday" — from the reminder's ladder step.
@@ -51,6 +53,7 @@ export function sessionHype(tier: string, c: HypeContext): Hype {
   const dir = esc(c.dir)
   const avg = Math.round(c.bestKn)
   const peak = Math.round(c.peakKn)
+  const gust = Math.round(c.gustKn)
   const h = c.goodHours
   const when = c.when
   const W = cap(when)
@@ -63,7 +66,7 @@ export function sessionHype(tier: string, c: HypeContext): Hype {
       subject: `\u{1F525}\u{1F525} EXPERT MODE at ${spot} ${when} — ${avg} kts avg ${dir}`,
       title: 'Hold on tight.',
       title_accent: `Expert mode ${when}.`,
-      tease: `${stats}, peaking at ${peak}. Smallest kite in the bag, biggest grin of the season. `
+      tease: `${stats}, peaking at ${peak} with gusts to ${gust}. Smallest kite in the bag, biggest grin of the season. `
         + `This is the day you’ll still be talking about in winter.`,
     }
     case 'epic': return {
@@ -71,7 +74,7 @@ export function sessionHype(tier: string, c: HypeContext): Hype {
       subject: `\u{1F525} ${spot} ${when} is EPIC — ${avg} kts avg ${dir}`,
       title: 'Cancel your plans.',
       title_accent: `${W} is epic.`,
-      tease: `${stats}, peaking at ${peak}. Charge the camera, pump up early, `
+      tease: `${stats}, peaking at ${peak} with gusts to ${gust}. Charge the camera, pump up early, `
         + `and don’t be the one who hears about it afterwards.`,
     }
     case 'verygood': return {
@@ -79,7 +82,7 @@ export function sessionHype(tier: string, c: HypeContext): Hype {
       subject: `\u{1F525} Very good day at ${spot} ${when} — ${avg} kts avg ${dir}`,
       title: 'Clear your calendar.',
       title_accent: `${W} is very good.`,
-      tease: `${stats}. Solid power all session long — the kind of day `
+      tease: `${stats}, gusts to ${gust}. Solid power all session long — the kind of day `
         + `that reminds you why you bought the gear.`,
     }
     case 'good': return {

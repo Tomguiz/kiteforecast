@@ -29,12 +29,13 @@ function* days(seed: number, n: number) {
   let x = seed >>> 0
   const rnd = () => (x = (x * 1664525 + 1013904223) >>> 0) / 2 ** 32
   for (let i = 0; i < n; i++) {
-    const hours: { hr: number; kn: number }[] = []
+    const hours: { hr: number; kn: number; gustKn: number }[] = []
     const base = 8 + Math.floor(rnd() * 4)
     const len = Math.floor(rnd() * 9)
     for (let h = 0; h < len; h++) {
       if (rnd() < 0.15) continue                     // leave gaps in the clock
-      hours.push({ hr: base + h, kn: 12 + Math.floor(rnd() * 34) })
+      const kn = 12 + Math.floor(rnd() * 34)
+      hours.push({ hr: base + h, kn, gustKn: kn + Math.floor(rnd() * 16) })
     }
     const code = [0, 1, 3, 61, 73, 95][Math.floor(rnd() * 6)]
     yield { hours, code, badDir: rnd() < 0.3, peakDay: Math.floor(rnd() * 45) }
@@ -63,8 +64,10 @@ describe('the two copies of the day rating agree', () => {
 
   it('same best-hours average', () => {
     for (const d of days(11, 300))
-      for (const n of [2, 3])
+      for (const n of [2, 3]) {
         expect(app.topHoursAvg(d.hours, n)).toBe(topHoursAvg(d.hours, n))
+        expect(app.topHoursAvg(d.hours, n, 'gustKn')).toBe(topHoursAvg(d.hours, n, 'gustKn'))
+      }
   })
 
   it('the app paints every style with the colours the emails receive', () => {

@@ -5,7 +5,7 @@ import { test, expect } from '../fixtures/auth';
 // Chill 15-18. Each wants 3h+; a 2h window at the same average lands one tier
 // lower. The badge gets redder as the wind gets stronger.
 
-const D = ['2026-06-20', '2026-06-21', '2026-06-22', '2026-06-23', '2026-06-24', '2026-06-25', '2026-06-26', '2026-06-27'];
+const D = ['2026-06-20', '2026-06-21', '2026-06-22', '2026-06-23', '2026-06-24', '2026-06-25', '2026-06-26', '2026-06-27', '2026-06-28'];
 
 async function seed(page: any) {
   await page.evaluate((D: string[]) => {
@@ -25,10 +25,11 @@ async function seed(page: any) {
       [D[7], (() => {                               // 21-26 all day with an hour lost → Very Good
         const m = mk([18, 21, 21, 24], undefined, 8);
         m.set(12, { kn: 23, dir: 200, code: 1, gustKn: 30, temp: 18 });   // wrong direction
-        m.set(13, { kn: 26, dir: 315, code: 1, gustKn: 36, temp: 18 });
-        m.set(14, { kn: 25, dir: 315, code: 1, gustKn: 36, temp: 18 });
+        m.set(13, { kn: 26, dir: 315, code: 1, gustKn: 29, temp: 18 });
+        m.set(14, { kn: 25, dir: 315, code: 1, gustKn: 29, temp: 18 });
         return m;
       })()],
+      [D[8], mk([20, 20, 20, 20], () => 36)],       // 20 kn but gusting 36 → Epic by gusts
     ]);
     // @ts-expect-error app globals — script-level lets, not window props
     cachedHrMap = map;
@@ -66,6 +67,9 @@ test('each day carries the tier its window average earns', async ({ gotoApp, pag
   // the best three hours (26, 25, 24) average 25, even with a gap between them
   await expect(badge(7)).toHaveText('✅ 6h · Very Good');
   await expect(badge(7)).toHaveClass(/rating-verygood/);
+  // gusts reach the tiers too: 20 kn gusting 36 is an Epic day
+  await expect(badge(8)).toHaveText('✅ 4h · Epic');
+  await expect(badge(8)).toHaveClass(/rating-epic/);
 });
 
 test('the badge gets redder as the wind gets stronger', async ({ gotoApp, page }) => {
@@ -114,6 +118,7 @@ test('the legend explains the expert scale', async ({ gotoApp, page }) => {
   for (const t of ['Expert mode', 'Epic', 'Very Good', 'Good', 'Chill', 'Bad', 'Danger']) expect(legend).toContain(t);
   expect(legend).toContain('38+ kn avg');
   expect(legend).toContain('30+ kn avg');
+  expect(legend).toContain('gusts 35+');
   expect(legend).not.toContain('Perfect');
   expect(legend).not.toContain('Marginal');
 });

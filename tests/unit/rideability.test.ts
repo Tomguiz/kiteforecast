@@ -116,10 +116,13 @@ import {
   topHoursAvg, sessionStats, rateSession, RATING_TIERS, RATING_STYLE, CHILL_MIN_KN,
 } from '../../supabase/functions/_shared/rideability.ts'
 
-// hours 10:00.. at the given speeds
-const run = (...kns: number[]) => kns.map((kn, i) => ({ hr: 10 + i, kn }))
+// hours 10:00.. at the given speeds, gusting a little over each
+const run = (...kns: number[]) => kns.map((kn, i) => ({ hr: 10 + i, kn, gustKn: kn + 3 }))
 const rate = (kns: number[], code = 0, badDir = false, peakDay = 0) =>
-  rateSession(sessionStats(kns.map((kn, i) => ({ hr: 10 + i, kn }))), code, badDir, peakDay)
+  rateSession(sessionStats(run(...kns)), code, badDir, peakDay)
+// the same hours with one gust figure across them
+const rateGusty = (kns: number[], gustKn: number) =>
+  rateSession(sessionStats(kns.map((kn, i) => ({ hr: 10 + i, kn, gustKn }))), 0, false, 0)
 
 describe('topHoursAvg', () => {
   it('is the mean of the strongest n hours, wherever they sit in the day', () => {
@@ -145,12 +148,17 @@ describe('sessionStats', () => {
     expect(s.bestKn).toBe(17)
   })
 
-  it('reads the best three hours of a full session', () => {
+  it('reads the best three hours of a full session, for wind and for gusts', () => {
     const s = sessionStats(run(18, 21, 21, 24, 26, 25))
     expect(s.goodHours).toBe(6)
     expect(s.avgKn).toBe(23)
     expect(s.bestHours).toBe(3)
     expect(s.bestKn).toBe(25)
+    expect(s.bestGustKn).toBe(28)   // run() gusts kn+3
+  })
+
+  it('treats a missing gust as no gust', () => {
+    expect(sessionStats([{ hr: 10, kn: 20 }, { hr: 11, kn: 20 }]).bestGustKn).toBe(0)
   })
 
   it('rounds the whole-session average to whole knots', () => {
@@ -219,6 +227,40 @@ describe('rateSession — the expert scale', () => {
     expect(rateSession(s, 3, false, 26)).toMatchObject({ tier: 'verygood', label: '✅ 6h · Very Good' })
   })
 
+  describe('gusts reach the tiers too', () => {
+    it('Epic from gusts 35+, Very Good from 30+, Good from 25+', () => {
+      expect(RATING_TIERS.map(t => [t.key, t.minGustKn])).toEqual([
+        ['expert', Infinity], ['epic', 35], ['verygood', 30], ['good', 25],
+      ])
+      expect(rateGusty([20, 20, 20], 36)).toMatchObject({ tier: 'epic' })
+      expect(rateGusty([20, 20, 20], 31)).toMatchObject({ tier: 'verygood' })
+      expect(rateGusty([16, 16, 16], 26)).toMatchObject({ tier: 'good' })
+    })
+
+    it('the higher of wind and gusts wins, never the lower', () => {
+      expect(rateGusty([31, 31, 31], 33)).toMatchObject({ tier: 'epic' })       // wind says epic, gusts only very good
+      expect(rateGusty([20, 20, 20], 24)).toMatchObject({ tier: 'good' })       // gusts under 25 change nothing
+    })
+
+    it('gusts never make Expert mode on their own', () => {
+      expect(rateGusty([30, 30, 30], 60)).toMatchObject({ tier: 'epic' })
+    })
+
+    it('a 2h session still lands one tier lower', () => {
+      expect(rateGusty([20, 20], 36)).toMatchObject({ tier: 'verygood', label: '✅ 2h · Very Good' })
+    })
+
+    it('do not lift a light-wind day — that is the gust rule already, not a session', () => {
+      expect(rateGusty([13, 13, 13], 26)).toMatchObject({ tier: 'lightwind' })
+    })
+
+    it('the same Sycod day, with its 30-36 kn gusts, reads Epic', () => {
+      const hours = [[8, 18, 26], [9, 21, 30], [10, 21, 30], [11, 24, 33], [13, 26, 36], [14, 25, 36]]
+        .map(([hr, kn, gustKn]) => ({ hr, kn, gustKn }))
+      expect(rateSession(sessionStats(hours), 3, false, 26)).toMatchObject({ tier: 'epic' })
+    })
+  })
+
   it('a session below 15 kn can only be a gust-rule day: light wind, not sold as a session', () => {
     expect(rate([13, 13, 14])).toMatchObject({ tier: 'lightwind', label: '⚡ 3h · Light wind' })
   })
@@ -244,7 +286,7 @@ describe('rateSession — the expert scale', () => {
   it('a lone hour is not a session', () => {
     // sessionStats already drops it, so this reads as "no wind" at the day level
     expect(rate([40], 0, false, 40).label.startsWith('❌')).toBe(true)
-    expect(rateSession({ goodHours: 1, avgKn: 40, bestKn: 40, bestHours: 1 }, 0, false, 40))
+    expect(rateSession({ goodHours: 1, avgKn: 40, bestKn: 40, bestGustKn: 45, bestHours: 1 }, 0, false, 40))
       .toMatchObject({ tier: 'brief', label: '❌ Too brief (1h)' })
   })
 

@@ -2733,19 +2733,21 @@ function conditionLabel(kn,dir,code,temp,gustKn=0){
 // not the peak and not the whole day. A 2h session is rated on both its hours
 // and lands one tier lower. Below 18 kn a 15+ average is a chill session;
 // below that only the gust rule could have qualified the hours.
+// A tier is reached by wind (minKn) OR by gusts (minGustKn); the higher rung
+// wins. Gusts never reach Expert mode on their own.
 const RATING_TIERS=[
-  {key:'expert',minKn:38,label:'Expert mode',below:'epic'},
-  {key:'epic',minKn:30,label:'Epic',below:'verygood'},
-  {key:'verygood',minKn:25,label:'Very Good',below:'good'},
-  {key:'good',minKn:18,label:'Good',below:'good'},
+  {key:'expert',minKn:38,minGustKn:Infinity,label:'Expert mode',below:'epic'},
+  {key:'epic',minKn:30,minGustKn:35,label:'Epic',below:'verygood'},
+  {key:'verygood',minKn:25,minGustKn:30,label:'Very Good',below:'good'},
+  {key:'good',minKn:18,minGustKn:25,label:'Good',below:'good'},
 ];
 const CHILL_MIN_KN=15;
 const FULL_SESSION_HOURS=3;
 const isStormy=code=>[82,95,96,99].includes(code);
-// Mean of the strongest n hours; 0 when there are fewer than n.
-function topHoursAvg(good,n){
+// Mean of the strongest n hours by key; 0 when there are fewer than n.
+function topHoursAvg(good,n,key='kn'){
   if(good.length<n||n<=0) return 0;
-  const top=good.map(h=>h.kn).sort((a,b)=>b-a).slice(0,n);
+  const top=good.map(h=>h[key]||0).sort((a,b)=>b-a).slice(0,n);
   return top.reduce((s,k)=>s+k,0)/n;
 }
 // From a day's qualifying hours ({hr,kn}); lone hours are dropped here.
@@ -2756,7 +2758,7 @@ function sessionStats(good){
   const run=good.filter(h=>set.has(h.hr-1)||set.has(h.hr+1));
   const avgKn=run.length?Math.round(run.reduce((s,h)=>s+h.kn,0)/run.length):0;
   const bestHours=Math.min(run.length,FULL_SESSION_HOURS);
-  return {goodHours:run.length,avgKn,bestKn:topHoursAvg(run,bestHours),bestHours};
+  return {goodHours:run.length,avgKn,bestHours,bestKn:topHoursAvg(run,bestHours),bestGustKn:topHoursAvg(run,bestHours,'gustKn')};
 }
 function rateSession(s,code,badDir,peakDayKn){
   if(isStormy(code)) return {tier:'storm',style:'danger',label:'❌ Storm ⚡'};
@@ -2769,9 +2771,13 @@ function rateSession(s,code,badDir,peakDayKn){
   }
   if(gh===1) return {tier:'brief',style:'bad',label:'❌ Too brief (1h)'};
   // A full session is rated on its best three hours; a 2h session on both of
-  // its hours, one tier lower.
+  // its hours, one tier lower. Wind and gusts each reach a rung; the higher
+  // one counts, and gusts only lift a day that already averages 15+.
   const short=gh<FULL_SESSION_HOURS;
-  const t=RATING_TIERS.find(x=>s.bestKn>=x.minKn);
+  const byWind=RATING_TIERS.findIndex(x=>s.bestKn>=x.minKn);
+  const byGust=s.bestKn>=CHILL_MIN_KN?RATING_TIERS.findIndex(x=>(s.bestGustKn||0)>=x.minGustKn):-1;
+  const idx=[byWind,byGust].filter(i=>i>=0).reduce((a,b)=>Math.min(a,b),Infinity);
+  const t=Number.isFinite(idx)?RATING_TIERS[idx]:undefined;
   if(t){
     const r=short?RATING_TIERS.find(x=>x.key===t.below):t;
     return {tier:r.key,style:r.key,label:`✅ ${gh}h · ${r.label}`};
@@ -2790,7 +2796,7 @@ function rateDay(stats,code,badDir,peakDayKn){
 // that old can offer.
 function cachedDayStats(d){
   const gh=d.goodHours??d.qh??0, pk=d.peakKn||0;
-  return {goodHours:gh,avgKn:d.avgKn??pk,bestKn:d.bestKn??pk,bestHours:d.bestHours??Math.min(gh,FULL_SESSION_HOURS)};
+  return {goodHours:gh,avgKn:d.avgKn??pk,bestKn:d.bestKn??pk,bestGustKn:d.bestGustKn??0,bestHours:d.bestHours??Math.min(gh,FULL_SESSION_HOURS)};
 }
 
 function fmtDate(str){
@@ -2963,11 +2969,11 @@ function buildLegendHTML(){
   return `<h3>How to read</h3>
   <div class="legend-cols">
     <div>
-      <div class="legend-sub">Day rating <span style="font-weight:500;color:var(--tdim)">· avg of the best 3 hours</span></div>
+      <div class="legend-sub">Day rating <span style="font-weight:500;color:var(--tdim)">· wind or gusts, avg of the best 3 hours</span></div>
       <div class="legend-item"><div class="legend-dot" style="background:#fca5a5"></div><span class="legend-kpi">Expert mode</span><span class="legend-desc">38+ kn avg · 3h+ session (Epic if 2h)</span></div>
-      <div class="legend-item"><div class="legend-dot" style="background:#fdba74"></div><span class="legend-kpi">Epic</span><span class="legend-desc">30+ kn avg · 3h+ session (Very Good if 2h)</span></div>
-      <div class="legend-item"><div class="legend-dot" style="background:#fde047"></div><span class="legend-kpi">Very Good</span><span class="legend-desc">25+ kn avg · 3h+ session (Good if 2h)</span></div>
-      <div class="legend-item"><div class="legend-dot" style="background:#4ade80"></div><span class="legend-kpi">Good</span><span class="legend-desc">18+ kn avg · 2h+ session</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#fdba74"></div><span class="legend-kpi">Epic</span><span class="legend-desc">30+ kn avg or gusts 35+ · 3h+ (Very Good if 2h)</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#fde047"></div><span class="legend-kpi">Very Good</span><span class="legend-desc">25+ kn avg or gusts 30+ · 3h+ (Good if 2h)</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#4ade80"></div><span class="legend-kpi">Good</span><span class="legend-desc">18+ kn avg or gusts 25+ · 2h+ session</span></div>
       <div class="legend-item"><div class="legend-dot" style="background:#86efac"></div><span class="legend-kpi">Chill</span><span class="legend-desc">15–18 kn avg · 2h+ session</span></div>
       <div class="legend-item"><div class="legend-dot" style="background:#fca5a5;opacity:.55"></div><span class="legend-kpi">Bad</span><span class="legend-desc">wrong dir · too light</span></div>
       <div class="legend-item"><div class="legend-dot" style="background:#dc2626"></div><span class="legend-kpi">Danger</span><span class="legend-desc">offshore / storm</span></div>
@@ -3477,7 +3483,7 @@ const CHIP_CACHE_TTL=60*60*1000; // 1 hour
 // v3: entries written before CONFIDENT_DAYS hold sixteen days per spot, six of
 // them the GFS outlook this app no longer counts. Reading them back would put
 // day-14 sessions in the compare table for another hour.
-const CHIP_CACHE_LS_KEY='kf_chipCache_v5'; // v5: days10 carries the best-hours average the rating reads
+const CHIP_CACHE_LS_KEY='kf_chipCache_v6'; // v6: days10 carries the best-hours wind and gust averages the rating reads
 let _chipCacheTs=0; // timestamp when this cache epoch started
 
 function _loadChipCacheFromLS(){
@@ -3664,7 +3670,7 @@ function _chipDaysFromWx(spot,key,wx){
       goodHrs.forEach(h=>{ domDirSum[0]+=Math.sin(h.dir*Math.PI/180); domDirSum[1]+=Math.cos(h.dir*Math.PI/180); domDirN++; });
       const domDir=domDirN?['N','NE','E','SE','S','SW','W','NW'][Math.round((Math.atan2(domDirSum[0],domDirSum[1])*180/Math.PI+360)%360/45)%8]:null;
       const st=sessionStats(goodHrs);
-      days10.push({dateStr,qh,goodHours,peakKn:dayPeak,avgKn:st.avgKn,bestKn:st.bestKn,bestHours:st.bestHours,startHr:firstGoodHr,dir:domDir});
+      days10.push({dateStr,qh,goodHours,peakKn:dayPeak,avgKn:st.avgKn,bestKn:st.bestKn,bestGustKn:st.bestGustKn,bestHours:st.bestHours,startHr:firstGoodHr,dir:domDir});
     });
     chipBestCache[key]=bestDateStr?{dateStr:bestDateStr,peakKn:bestPeakKn,startHr:bestStartHr,nextDateStr,nextStartHr,nextPeakKn,spotName:spot.name,spot,days10}:null;
     if(!bestDateStr) chipBestCache[key]={dateStr:null,peakKn:0,startHr:null,nextDateStr:null,nextStartHr:null,nextPeakKn:0,spotName:spot.name,spot,days10};
@@ -3723,7 +3729,7 @@ function reconcileChipCacheFromDetail(){
       goodHrs.forEach(h=>{ domDirSum[0]+=Math.sin(h.dir*Math.PI/180); domDirSum[1]+=Math.cos(h.dir*Math.PI/180); domDirN++; });
       const domDir=domDirN?['N','NE','E','SE','S','SW','W','NW'][Math.round((Math.atan2(domDirSum[0],domDirSum[1])*180/Math.PI+360)%360/45)%8]:null;
       const st=sessionStats(goodHrs);
-      days10.push({dateStr,qh,goodHours,peakKn:dayPeak,avgKn:st.avgKn,bestKn:st.bestKn,bestHours:st.bestHours,startHr:firstGoodHr,dir:domDir});
+      days10.push({dateStr,qh,goodHours,peakKn:dayPeak,avgKn:st.avgKn,bestKn:st.bestKn,bestGustKn:st.bestGustKn,bestHours:st.bestHours,startHr:firstGoodHr,dir:domDir});
     });
     const spotMeta={name:loc.name,loc:`${loc.admin1?loc.admin1+', ':''}${loc.country}`,lat,lon,dirs:dirsArr};
     // Drop any stale entries for this lat/lon under OTHER dirs keys so the
@@ -5852,7 +5858,7 @@ function buildDay(dateStr,sunrise,sunset){
   // shared definition: qualifying hours in a 2+ consecutive (by clock hour) run
   const goodHours=dayGoodHours(day.map(h=>({hr:h.hour,kn:h.kn,dir:h.dir,code:h.code,gustKn:h.gustKn})));
   // window averages for the rating — see rateSession
-  const stats=sessionStats(good.map(h=>({hr:h.hour,kn:h.kn})));
+  const stats=sessionStats(good.map(h=>({hr:h.hour,kn:h.kn,gustKn:h.gustKn||0})));
   return{hours,day,good,goodHours,peakKn,avgKn:stats.avgKn,stats,peakDayKn,domDir,hasBadDir};
 }
 

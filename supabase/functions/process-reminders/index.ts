@@ -88,7 +88,7 @@ function buildDay(dateStr: string, sunrise: string, sunset: string, hourlyMap: M
   const domDir  = sample.length ? circMean(sample.map(h => h.dir)) : null
   const hasBadDir = day.some(h => h.type === 'lightdir')
   // The rating reads window averages, not the peak — see rateSession.
-  const stats   = sessionStats(good.map(h => ({ hr: h.hour, kn: h.kn })))
+  const stats   = sessionStats(good.map(h => ({ hr: h.hour, kn: h.kn, gustKn: h.gustKn })))
   return { day, good, goodHours: good.length, peakKn, avgKn: stats.avgKn, stats, peakDayKn, domDir, hasBadDir }
 }
 
@@ -320,7 +320,7 @@ Deno.serve(async () => {
         // tuned to the tier, so a fire day reads like one and a chill day
         // does not overpromise.
         hype: sessionHype(rated.tier, {
-          spot: r.spot_name, bestKn: stats.bestKn, bestHours: stats.bestHours, peakKn, goodHours,
+          spot: r.spot_name, bestKn: stats.bestKn, bestHours: stats.bestHours, peakKn, gustKn: gusts, goodHours,
           dir: domDir !== null ? compass(domDir) : '\u2014',
           when: whenWord(rh, dayOfWeek),
         }),

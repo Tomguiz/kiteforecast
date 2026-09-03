@@ -78,14 +78,18 @@ export function consecutiveRuns<T>(qualifying: T[], hourOf: (h: T) => number): T
 // plain script and cannot import this file. tests/unit/rating-mirror.test.ts
 // runs both copies over the same inputs and fails when they disagree.
 
-export interface RatingTier { key: string; minKn: number; label: string; below: string }
+export interface RatingTier { key: string; minKn: number; minGustKn: number; label: string; below: string }
 
-// Top to bottom. `below` is the tier a 2h window earns instead of the 3h one.
+// Top to bottom. A day reaches a tier by wind (minKn, the best-hours average)
+// OR by gusts (minGustKn, the best-hours gust average) — whichever rung is
+// higher wins, because a 20 kn day gusting 36 rides like a much stronger one.
+// Gusts never reach Expert mode on their own. `below` is the tier a 2h
+// session earns instead.
 export const RATING_TIERS: RatingTier[] = [
-  { key: 'expert',   minKn: 38, label: 'Expert mode', below: 'epic' },
-  { key: 'epic',     minKn: 30, label: 'Epic',        below: 'verygood' },
-  { key: 'verygood', minKn: 25, label: 'Very Good',   below: 'good' },
-  { key: 'good',     minKn: 18, label: 'Good',        below: 'good' },
+  { key: 'expert',   minKn: 38, minGustKn: Infinity, label: 'Expert mode', below: 'epic' },
+  { key: 'epic',     minKn: 30, minGustKn: 35,       label: 'Epic',        below: 'verygood' },
+  { key: 'verygood', minKn: 25, minGustKn: 30,       label: 'Very Good',   below: 'good' },
+  { key: 'good',     minKn: 18, minGustKn: 25,       label: 'Good',        below: 'good' },
 ]
 // Under the lowest tier, a 15-18 kn average is still a session — a chill one.
 // Below that only the gust rule (12 kn + gusts >= 20) can have qualified the
@@ -111,16 +115,19 @@ export const RATING_STYLE: Record<string, { fg: string; bg: string; border: stri
   danger:    { fg: '#fecaca', bg: 'rgba(220,38,38,.45)',    border: 'rgba(239,68,68,.7)' },
 }
 
-export interface RatedHour { hr: number; kn: number }
+export interface RatedHour { hr: number; kn: number; gustKn?: number }
 // goodHours: rideable hours (in 2h+ runs). avgKn: mean over all of them.
 // bestKn: mean over the best FULL_SESSION_HOURS of them — or over both hours
-// of a 2h session — which is what the rating reads. bestHours says which.
-export interface SessionStats { goodHours: number; avgKn: number; bestKn: number; bestHours: number }
+// of a 2h session — which is what the rating reads; bestGustKn the same for
+// the gusts. bestHours says how many hours those two average.
+export interface SessionStats {
+  goodHours: number; avgKn: number; bestKn: number; bestGustKn: number; bestHours: number
+}
 
-// Mean of the strongest `n` hours. 0 when there are fewer than `n`.
-export function topHoursAvg(good: RatedHour[], n: number): number {
+// Mean of the strongest `n` hours by `key`. 0 when there are fewer than `n`.
+export function topHoursAvg(good: RatedHour[], n: number, key: 'kn' | 'gustKn' = 'kn'): number {
   if (good.length < n || n <= 0) return 0
-  const top = good.map(h => h.kn).sort((a, b) => b - a).slice(0, n)
+  const top = good.map(h => h[key] || 0).sort((a, b) => b - a).slice(0, n)
   return top.reduce((s, k) => s + k, 0) / n
 }
 
@@ -131,7 +138,11 @@ export function sessionStats(good: RatedHour[]): SessionStats {
   const run = consecutiveRuns(good, h => h.hr)
   const avgKn = run.length ? Math.round(run.reduce((s, h) => s + h.kn, 0) / run.length) : 0
   const bestHours = Math.min(run.length, FULL_SESSION_HOURS)
-  return { goodHours: run.length, avgKn, bestKn: topHoursAvg(run, bestHours), bestHours }
+  return {
+    goodHours: run.length, avgKn, bestHours,
+    bestKn: topHoursAvg(run, bestHours),
+    bestGustKn: topHoursAvg(run, bestHours, 'gustKn'),
+  }
 }
 
 export const isSnowy = (code: number) => [71,73,75,77,85,86].includes(code)
@@ -153,9 +164,14 @@ export function rateSession(s: SessionStats, code: number, badDir: boolean, peak
   }
   if (gh === 1) return { tier: 'brief', style: 'bad', label: '❌ Too brief (1h)' }
   // A full session is rated on its best three hours; a 2h session on both of
-  // its hours, one tier lower.
+  // its hours, one tier lower. Wind and gusts each reach a rung; the higher
+  // one counts. Gusts only lift a day that is already a real session (a 15+
+  // average) — a gust-rule day at 13 kn stays light wind however it gusts.
   const short = gh < FULL_SESSION_HOURS
-  const t = RATING_TIERS.find(x => s.bestKn >= x.minKn)
+  const byWind = RATING_TIERS.findIndex(x => s.bestKn >= x.minKn)
+  const byGust = s.bestKn >= CHILL_MIN_KN ? RATING_TIERS.findIndex(x => s.bestGustKn >= x.minGustKn) : -1
+  const idx = [byWind, byGust].filter(i => i >= 0).reduce((a, b) => Math.min(a, b), Infinity)
+  const t = Number.isFinite(idx) ? RATING_TIERS[idx] : undefined
   if (t) {
     const r = short ? RATING_TIERS.find(x => x.key === t.below)! : t
     return { tier: r.key, style: r.key, label: `✅ ${gh}h · ${r.label}` }
