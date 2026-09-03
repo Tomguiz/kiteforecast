@@ -333,12 +333,26 @@ DROP FUNCTION IF EXISTS _drop_all_policies(regclass);
 DROP FUNCTION IF EXISTS admin_list_users();
 CREATE OR REPLACE FUNCTION admin_list_users()
 RETURNS TABLE(email text, created_at timestamptz, last_seen_at timestamptz, nickname text,
-              is_premium boolean, fav_count integer, follow_count integer)
+              full_name text, is_premium boolean, fav_count integer, follow_count integer)
 LANGUAGE sql
 SECURITY DEFINER
 SET search_path = public
 AS $$
   SELECT u.email::text, u.created_at, p.last_seen_at, p.nickname,
+         -- The real name, which a nickname deliberately hides: "Drifto" tells an
+         -- admin nothing about who mailed them. Two sources, in order of trust.
+         -- What the rider typed into their profile wins; otherwise the name the
+         -- identity provider vouched for. Read here rather than copied into
+         -- profiles because this function already reads auth.users, and a copy
+         -- would need backfilling and would then drift as people rename.
+         -- Only 4 of 29 riders had filled first/last in by hand; 19 had a Google
+         -- name sitting unused.
+         NULLIF(TRIM(COALESCE(
+           NULLIF(TRIM(CONCAT_WS(' ', p.first_name, p.last_name)), ''),
+           NULLIF(u.raw_user_meta_data->>'full_name', ''),
+           NULLIF(u.raw_user_meta_data->>'name', ''),
+           ''
+         )), '')::text AS full_name,
          COALESCE(p.is_premium, false) AS is_premium,
          (SELECT count(*) FROM favourites f WHERE f.email = u.email)::int AS fav_count,
          -- "following" is a spot subscription: distinct spots with live reminder rows.
