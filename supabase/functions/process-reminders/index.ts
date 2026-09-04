@@ -12,6 +12,7 @@ import { sessionHype, isHot, whenWord } from '../_shared/hype.ts'
 import { buildManageLink } from '../_shared/manage-link.ts'
 import { recordEmail } from '../_shared/email-log-client.ts'
 import { deliver, reminderDelivery } from '../_shared/mailer.ts'
+import { fetchSharedForecast } from '../_shared/forecast-client.ts'
 
 const SUPABASE_URL            = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE_KEY    = Deno.env.get('SB_SERVICE_ROLE_KEY')!
@@ -149,19 +150,9 @@ Deno.serve(async () => {
         continue
       }
 
-      // Re-fetch live forecast
-      const params = new URLSearchParams({
-        latitude:      String(r.spot_lat),
-        longitude:     String(r.spot_lon),
-        hourly:        'weather_code,windspeed_10m,winddirection_10m,windgusts_10m,temperature_2m',
-        daily:         'weather_code,temperature_2m_max,temperature_2m_min,windgusts_10m_max,sunrise,sunset',
-        forecast_days: '10',
-        timezone:      'auto',
-        windspeed_unit:'ms',
-      })
-      const wxRes = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`)
-      const wx    = await wxRes.json()
-      if (wx.error) throw new Error(wx.reason)
+      // Re-fetch the forecast — the shared, Stormglass-backed row the app
+      // draws, trimmed to the ten days a reminder may look ahead.
+      const wx = await fetchSharedForecast(r.spot_lat, r.spot_lon, 10)
 
       const dayIdx = (wx.daily.time as string[]).indexOf(r.session_date)
       if (dayIdx === -1) {

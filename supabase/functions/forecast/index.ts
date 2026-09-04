@@ -1,9 +1,20 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { fetchForecastBundle, QuotaGuard, CELL_SELECTION } from '../_shared/forecast-source.ts'
 
 const SUPABASE_URL     = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE = Deno.env.get('SB_SERVICE_ROLE_KEY')!
+// The paid source. Without the key every row is Open-Meteo's, which is how
+// the app ran before — nothing breaks, the numbers are just the free ones.
+// The key is the same one tide-proxy reads.
+const STORMGLASS_KEY    = Deno.env.get('STORMGLASS_KEY') ?? null
+// Which Stormglass model feeds the row. `sg` is their per-point pick of the
+// best model; a named one (icon, ecmwf, meteofrance, ...) pins it instead.
+const STORMGLASS_SOURCE = Deno.env.get('STORMGLASS_SOURCE') || undefined
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE)
+// One guard per isolate: it learns the day's quota from each answer and stops
+// asking before the tide badge is starved of its share.
+const quota = new QuotaGuard()
 
 // A forecast fetched by one rider answers for every rider looking at the same
 // spot. Two hours matches how often the rider's app re-checks on open, so a
@@ -33,14 +44,19 @@ export const FORECAST_TTL_MS = 2 * 60 * 60 * 1000
 // `sea` prefers a cell with little land in it; where none is near enough (an
 // inland lake in a coarse model) Open-Meteo falls back to the nearest cell,
 // which is what this app already got. So the worst case is today's behaviour.
-const CELL_SELECTION = 'sea'
+//
+// The constant itself lives in _shared/forecast-source.ts, next to the URL it
+// shapes; it is re-exported here so the pin in tests/unit still reads it.
+export { CELL_SELECTION }
 
 // Rows are keyed by coordinate, so a change to what we ASK Open-Meteo for has
 // to change the key too — otherwise every spot keeps serving land-cell numbers
 // out of the cache for two hours after deploy, and the stale fallback for a
 // week. Bump this whenever the request shape changes; old rows age out on the
 // sweep below.
-const REQUEST_VERSION = 'v2sea'
+//   v2sea  the sea grid cell
+//   v3sg   Stormglass wind, gusts, waves and weather over the first ten days
+const REQUEST_VERSION = 'v3sg'
 
 // 3 decimals ≈ 110 m — the same key tide-proxy uses, and far finer than the
 // weather model's own grid, so two riders on one spot always share a row.
@@ -66,25 +82,6 @@ const CORS = {
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...CORS } })
 
-function forecastUrl(lat: number, lon: number) {
-  const p = new URLSearchParams({
-    latitude: String(lat), longitude: String(lon),
-    hourly: 'temperature_2m,weather_code,windspeed_10m,winddirection_10m,windgusts_10m',
-    daily: 'weather_code,temperature_2m_max,temperature_2m_min,windgusts_10m_max,sunrise,sunset',
-    forecast_days: '16', timezone: 'auto', windspeed_unit: 'ms',
-    cell_selection: CELL_SELECTION,
-  })
-  return `https://api.open-meteo.com/v1/forecast?${p}`
-}
-function marineUrl(lat: number, lon: number) {
-  const p = new URLSearchParams({
-    latitude: String(lat), longitude: String(lon),
-    hourly: 'wave_height,wave_period,wave_direction',
-    forecast_days: '16', timezone: 'auto',
-    cell_selection: CELL_SELECTION,
-  })
-  return `https://marine-api.open-meteo.com/v1/marine?${p}`
-}
 
 // ── Slim projection ─────────────────────────────────────────────────────────
 // The home-screen badge counts rideable days. It reads wind, gusts, the weather
@@ -105,21 +102,18 @@ function slimWx(wx: any) {
   return { ...wx, hourly: pick(wx.hourly, SLIM_HOURLY), daily: pick(wx.daily, SLIM_DAILY) }
 }
 
+// Which upstream the wind in a row came from. Rows written before the
+// provider field existed are Open-Meteo's by construction.
+const providerOf = (wx: any) => wx?.provider ?? { name: 'open-meteo' }
+
 type Row = { wx: any; marine: any; fetched_at: string }
 
 async function fetchUpstream(lat: number, lon: number): Promise<Row> {
-  const [wxRes, mRes] = await Promise.all([
-    fetch(forecastUrl(lat, lon)),
-    fetch(marineUrl(lat, lon)).catch(() => null),
-  ])
-  const wx = await wxRes.json()
-  if (wx?.error) throw new Error(wx.reason || 'forecast API error')
-  // Marine has no data inland, and that is not a failure worth reporting.
-  let marine: any = null
-  if (mRes && mRes.ok) {
-    const m = await mRes.json()
-    if (!m?.error) marine = m
-  }
+  // Stormglass on Open-Meteo's calendar, or Open-Meteo alone when Stormglass
+  // has nothing for us today — see _shared/forecast-source.ts.
+  const { wx, marine } = await fetchForecastBundle(lat, lon, {
+    stormglassKey: STORMGLASS_KEY, source: STORMGLASS_SOURCE, quota,
+  })
   return { wx, marine, fetched_at: new Date().toISOString() }
 }
 
@@ -170,7 +164,7 @@ async function serveSingle(lat: number, lon: number, force: boolean, slim: boole
 
     if (data && Date.now() - new Date(data.fetched_at).getTime() < FORECAST_TTL_MS) {
       return json({ wx: slim ? slimWx(data.wx) : data.wx, marine: slim ? null : data.marine,
-                    fetched_at: data.fetched_at, source: 'cache' })
+                    fetched_at: data.fetched_at, source: 'cache', provider: providerOf(data.wx) })
     }
   }
 
@@ -186,7 +180,7 @@ async function serveSingle(lat: number, lon: number, force: boolean, slim: boole
       .eq('spot_key', spotKey)
       .maybeSingle()
     if (stale) return json({ wx: slim ? slimWx(stale.wx) : stale.wx, marine: slim ? null : stale.marine,
-                             fetched_at: stale.fetched_at, source: 'stale' })
+                             fetched_at: stale.fetched_at, source: 'stale', provider: providerOf(stale.wx) })
     return json({ error: String(err) }, 502)
   }
 
@@ -194,7 +188,7 @@ async function serveSingle(lat: number, lon: number, force: boolean, slim: boole
   await storeRows([{ spot_key: spotKey, lat, lon, ...row }])
 
   return json({ wx: slim ? slimWx(row.wx) : row.wx, marine: slim ? null : row.marine,
-                fetched_at: row.fetched_at, source: 'live' })
+                fetched_at: row.fetched_at, source: 'live', provider: providerOf(row.wx) })
 }
 
 // ── Many spots, one round trip ──────────────────────────────────────────────
@@ -264,7 +258,7 @@ async function serveBatch(tokens: string[], force: boolean, slim: boolean) {
       q: w.q, lat: w.lat, lon: w.lon,
       wx: slim ? slimWx(row.wx) : row.wx,
       marine: slim ? null : row.marine,
-      fetched_at: row.fetched_at, source,
+      fetched_at: row.fetched_at, source, provider: providerOf(row.wx),
     }
   })
 
