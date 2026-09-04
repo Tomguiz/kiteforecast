@@ -66,4 +66,11 @@ describe('sessionHype', () => {
     expect(h.tease).toContain('&lt;b&gt;Knokke&lt;/b&gt; &amp; co')
     expect(h.tease).not.toContain('<b>')
   })
+
+  it('makes the spot stand out in the tease, and keeps the subject plain text', () => {
+    const h = sessionHype('chill', ctx)
+    expect(h.tease).toContain('<strong style="color:#ffffff;">Riverwoods Beachclub</strong>')
+    expect(h.subject).toContain('Riverwoods Beachclub')
+    expect(h.subject).not.toContain('<')
+  })
 })

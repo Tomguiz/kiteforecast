@@ -35,6 +35,8 @@ export interface Hype {
 // Spot names are user-supplied and land inside email HTML.
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, c =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c] as string))
+// The spot is the one thing the reader must not miss, so it is bold in the tease.
+const bold = (s: string) => `<strong style="color:#ffffff;">${s}</strong>`
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
@@ -49,7 +51,7 @@ export function whenWord(hoursBefore: number, dayOfWeek: string): string {
 }
 
 export function sessionHype(tier: string, c: HypeContext): Hype {
-  const spot = esc(c.spot)
+  const spot = bold(esc(c.spot))
   const dir = esc(c.dir)
   const avg = Math.round(c.bestKn)
   const peak = Math.round(c.peakKn)
@@ -60,10 +62,11 @@ export function sessionHype(tier: string, c: HypeContext): Hype {
   const best = c.bestHours >= 3 ? 'over the best three hours' : 'over both hours'
   const stats = `${avg} knots ${best}, ${h} rideable, ${dir} at ${spot}`
 
+  const plainSpot = esc(c.spot)   // subjects are plain text, no markup
   switch (tier) {
     case 'expert': return {
       fire: true,
-      subject: `\u{1F525}\u{1F525} EXPERT MODE at ${spot} ${when} — ${avg} kts avg ${dir}`,
+      subject: `\u{1F525}\u{1F525} EXPERT MODE at ${plainSpot} ${when} — ${avg} kts avg ${dir}`,
       title: 'Hold on tight.',
       title_accent: `Expert mode ${when}.`,
       tease: `${stats}, peaking at ${peak} with gusts to ${gust}. Smallest kite in the bag, biggest grin of the season. `
@@ -71,7 +74,7 @@ export function sessionHype(tier: string, c: HypeContext): Hype {
     }
     case 'epic': return {
       fire: true,
-      subject: `\u{1F525} ${spot} ${when} is EPIC — ${avg} kts avg ${dir}`,
+      subject: `\u{1F525} ${plainSpot} ${when} is EPIC — ${avg} kts avg ${dir}`,
       title: 'Cancel your plans.',
       title_accent: `${W} is epic.`,
       tease: `${stats}, peaking at ${peak} with gusts to ${gust}. Charge the camera, pump up early, `
@@ -79,7 +82,7 @@ export function sessionHype(tier: string, c: HypeContext): Hype {
     }
     case 'verygood': return {
       fire: true,
-      subject: `\u{1F525} Very good day at ${spot} ${when} — ${avg} kts avg ${dir}`,
+      subject: `\u{1F525} Very good day at ${plainSpot} ${when} — ${avg} kts avg ${dir}`,
       title: 'Clear your calendar.',
       title_accent: `${W} is very good.`,
       tease: `${stats}, gusts to ${gust}. Solid power all session long — the kind of day `
@@ -87,7 +90,7 @@ export function sessionHype(tier: string, c: HypeContext): Hype {
     }
     case 'good': return {
       fire: false,
-      subject: `\u{1F514} ${W} at ${spot} — conditions confirmed, ${avg} kts avg ${dir}`,
+      subject: `\u{1F514} ${W} at ${plainSpot} — conditions confirmed, ${avg} kts avg ${dir}`,
       title: W,
       title_accent: 'is the day.',
       tease: `${spot} is on — ${avg} knots ${best}, ${h} hours rideable, ${dir}. `
@@ -95,14 +98,14 @@ export function sessionHype(tier: string, c: HypeContext): Hype {
     }
     case 'chill': return {
       fire: false,
-      subject: `\u{1F514} ${W} at ${spot} — a chill session, ${avg} kts avg ${dir}`,
+      subject: `\u{1F514} ${W} at ${plainSpot} — a chill session, ${avg} kts avg ${dir}`,
       title: W,
       title_accent: 'is a chill one.',
       tease: `${stats}. Easy-going wind — big kite, cruisy laps, no drama.`,
     }
     case 'lightwind': return {
       fire: false,
-      subject: `\u{1F514} ${W} at ${spot} — light but rideable, gusts doing the work`,
+      subject: `\u{1F514} ${W} at ${plainSpot} — light but rideable, gusts doing the work`,
       title: W,
       title_accent: 'is light, but rideable.',
       tease: `Around ${avg} knots with the gusts doing the work at ${spot}, ${h} hours rideable. `
@@ -110,7 +113,7 @@ export function sessionHype(tier: string, c: HypeContext): Hype {
     }
     default: return {
       fire: false,
-      subject: `${spot} — ${when}`,
+      subject: `${plainSpot} — ${when}`,
       title: 'The wind gods',
       title_accent: 'aren’t cooperating.',
       tease: `${spot} ${when} is off — conditions have dropped.`,
