@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { sessionHype, isHot, whenWord, HOT_TIERS } from '../../supabase/functions/_shared/hype.ts'
 import { reminderDelivery } from '../../supabase/functions/_shared/mailer.ts'
 
-const ctx = { spot: 'Riverwoods Beachclub', avgKn: 31, peakKn: 34, goodHours: 5, dir: 'SW', when: 'tomorrow' }
+const ctx = { spot: 'Riverwoods Beachclub', bestKn: 31, bestHours: 3, peakKn: 34, gustKn: 39, goodHours: 5, dir: 'SW', when: 'tomorrow' }
 
 describe('which days are fire', () => {
   it('Very Good, Epic and Expert mode are; Good and below are not', () => {
@@ -36,8 +36,10 @@ describe('sessionHype', () => {
 
   it('the tease carries the numbers the rating is built on', () => {
     const h = sessionHype('epic', ctx)
-    expect(h.tease).toContain('31 knots on average')
-    expect(h.tease).toContain('5 hours')
+    expect(h.tease).toContain('31 knots over the best three hours')
+    expect(h.tease).toContain('5 rideable')
+    expect(h.tease).toContain('gusts to 39')
+    expect(sessionHype('epic', { ...ctx, bestHours: 2, goodHours: 2 }).tease).toContain('over both hours')
     expect(h.tease).toContain('SW')
     expect(h.tease).toContain('Riverwoods Beachclub')
     expect(h.subject).toContain('31 kts avg')
@@ -63,5 +65,12 @@ describe('sessionHype', () => {
     const h = sessionHype('epic', { ...ctx, spot: '<b>Knokke</b> & co' })
     expect(h.tease).toContain('&lt;b&gt;Knokke&lt;/b&gt; &amp; co')
     expect(h.tease).not.toContain('<b>')
+  })
+
+  it('makes the spot stand out in the tease, and keeps the subject plain text', () => {
+    const h = sessionHype('chill', ctx)
+    expect(h.tease).toContain('<strong style="color:#ffffff;">Riverwoods Beachclub</strong>')
+    expect(h.subject).toContain('Riverwoods Beachclub')
+    expect(h.subject).not.toContain('<')
   })
 })

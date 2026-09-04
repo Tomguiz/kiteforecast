@@ -5,7 +5,7 @@ import { test, expect } from '../fixtures/auth';
 // Chill 15-18. Each wants 3h+; a 2h window at the same average lands one tier
 // lower. The badge gets redder as the wind gets stronger.
 
-const D = ['2026-06-20', '2026-06-21', '2026-06-22', '2026-06-23', '2026-06-24', '2026-06-25', '2026-06-26'];
+const D = ['2026-06-20', '2026-06-21', '2026-06-22', '2026-06-23', '2026-06-24', '2026-06-25', '2026-06-26', '2026-06-27', '2026-06-28'];
 
 async function seed(page: any) {
   await page.evaluate((D: string[]) => {
@@ -22,6 +22,14 @@ async function seed(page: any) {
       [D[4], mk([13, 13, 13], () => 22)],           // gust rule only → Light wind
       [D[5], mk([20, 20, 20])],                     // 18+ → Good
       [D[6], mk([39, 38, 40, 38])],                 // 4h at 38+ → Expert mode
+      [D[7], (() => {                               // 21-26 all day with an hour lost → Very Good
+        const m = mk([18, 21, 21, 24], undefined, 8);
+        m.set(12, { kn: 23, dir: 200, code: 1, gustKn: 30, temp: 18 });   // wrong direction
+        m.set(13, { kn: 26, dir: 315, code: 1, gustKn: 29, temp: 18 });
+        m.set(14, { kn: 25, dir: 315, code: 1, gustKn: 29, temp: 18 });
+        return m;
+      })()],
+      [D[8], mk([20, 20, 20, 20], () => 38)],       // 20 kn but gusting 38 → Epic by gusts
     ]);
     // @ts-expect-error app globals — script-level lets, not window props
     cachedHrMap = map;
@@ -56,6 +64,12 @@ test('each day carries the tier its window average earns', async ({ gotoApp, pag
   await expect(badge(5)).toHaveClass(/rating-good/);
   await expect(badge(6)).toHaveText('✅ 4h · Expert mode');
   await expect(badge(6)).toHaveClass(/rating-expert/);
+  // the best three hours (26, 25, 24) average 25, even with a gap between them
+  await expect(badge(7)).toHaveText('✅ 6h · Very Good');
+  await expect(badge(7)).toHaveClass(/rating-verygood/);
+  // gusts reach the tiers too: 20 kn gusting 38 is an Epic day
+  await expect(badge(8)).toHaveText('✅ 4h · Epic');
+  await expect(badge(8)).toHaveClass(/rating-epic/);
 });
 
 test('the badge gets redder as the wind gets stronger', async ({ gotoApp, page }) => {
@@ -75,6 +89,7 @@ test('the day modal shows the real average next to the peak', async ({ gotoApp, 
   await gotoApp('signedOut');
   await seed(page);
   await page.evaluate((d: string) => openModal(d, 2), D[2]);
+  await expect(page.locator('#mSession')).toContainText('Best 3h · 31 kn');
   await expect(page.locator('#mSession')).toContainText('Avg 24 kn');
   await expect(page.locator('#mSession')).toContainText('Peak 32 kn');
   await expect(page.locator('#mSession .rating-badge')).toHaveText('✅ 6h · Epic');
@@ -101,8 +116,9 @@ test('the legend explains the expert scale', async ({ gotoApp, page }) => {
   await gotoApp('signedOut');
   const legend = await page.evaluate(() => buildLegendHTML());
   for (const t of ['Expert mode', 'Epic', 'Very Good', 'Good', 'Chill', 'Bad', 'Danger']) expect(legend).toContain(t);
-  expect(legend).toContain('38+ kn avg');
+  expect(legend).toContain('35+ kn avg');
   expect(legend).toContain('30+ kn avg');
+  expect(legend).toContain('gusts 37+');
   expect(legend).not.toContain('Perfect');
   expect(legend).not.toContain('Marginal');
 });

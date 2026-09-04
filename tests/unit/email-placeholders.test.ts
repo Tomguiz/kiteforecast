@@ -38,6 +38,17 @@ describe('reminder email placeholders', () => {
     expect(unbacked).toEqual([])
   })
 
+  // The spot was only named mid-sentence in the tease, and a rider skimming
+  // the inbox missed which spot the email was about. It now sits directly
+  // above the headline, with its town.
+  it.each(templates)('%s names the spot right above the headline', file => {
+    const html = readFileSync(join(EMAILS, file), 'utf8')
+    const h1 = html.indexOf('<h1 ')
+    const before = html.slice(Math.max(0, h1 - 600), h1)
+    expect(before).toContain('[[spot]]')
+    expect(before).toContain('[[spot_city]]')
+  })
+
   it.each(templates)('%s has the manage-alert button', file => {
     expect(placeholders(file)).toContain('manage_link')
   })
