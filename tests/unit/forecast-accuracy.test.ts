@@ -39,6 +39,15 @@ describe('which grid cell the wind is read from', () => {
     expect(html.match(/cell_selection:'sea'/g) || []).toHaveLength(2)
   })
 
+  it('Stormglass wind is opt-in: the sea cell is the default until a model beats it', () => {
+    // Measured at Riverwoods on 4 Sep 2026 against the Cadzand mast, the
+    // Stormglass blend read low and gusty — the land-cell signature — while the
+    // sea cell read close in shape. The key must only be read behind the switch,
+    // so turning the wind off never touches the tide badge.
+    expect(fn).toMatch(/const STORMGLASS_FORECAST = \(Deno\.env\.get\('STORMGLASS_FORECAST'\) \|\| ''\)\.toLowerCase\(\) === 'on'/)
+    expect(fn).toMatch(/const STORMGLASS_KEY\s*=\s*STORMGLASS_FORECAST \? Deno\.env\.get\('STORMGLASS_KEY'\) \?\? null : null/)
+  })
+
   it('the stored row is keyed by the request shape, not only the coordinate', () => {
     // Rows live two hours, and the stale fallback serves them for a week. A
     // change to what we ASK for that did not change the key would keep handing

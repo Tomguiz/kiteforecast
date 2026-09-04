@@ -3,10 +3,18 @@ import { fetchForecastBundle, QuotaGuard, CELL_SELECTION } from '../_shared/fore
 
 const SUPABASE_URL     = Deno.env.get('SUPABASE_URL')!
 const SUPABASE_SERVICE = Deno.env.get('SB_SERVICE_ROLE_KEY')!
-// The paid source. Without the key every row is Open-Meteo's, which is how
-// the app ran before — nothing breaks, the numbers are just the free ones.
-// The key is the same one tide-proxy reads.
-const STORMGLASS_KEY    = Deno.env.get('STORMGLASS_KEY') ?? null
+// The paid source, OFF unless asked for. Measured at Riverwoods on 4 Sep 2026
+// against the Cadzand mast (5 km): Stormglass's `sg` blend read 4-5 kn low
+// with gusts 5 kn high (gust factor 1.9 against a measured 1.2), the land-cell
+// signature all over again — it has no sea-cell option, so a beach coordinate
+// gets half-land numbers. The Open-Meteo sea cell read 3-4 kn high with the
+// right gust factor. Two hours is a thin sample, so the pipeline stays, behind
+// STORMGLASS_FORECAST=on, until a week of tests/tools/forecast-accuracy.mjs
+// --rws names a Stormglass model that beats the sea cell. The key itself is
+// the one tide-proxy reads; it is read here only when the switch is on, so
+// turning the wind off never touches the tide badge.
+const STORMGLASS_FORECAST = (Deno.env.get('STORMGLASS_FORECAST') || '').toLowerCase() === 'on'
+const STORMGLASS_KEY    = STORMGLASS_FORECAST ? Deno.env.get('STORMGLASS_KEY') ?? null : null
 // Which Stormglass model feeds the row. `sg` is their per-point pick of the
 // best model; a named one (icon, ecmwf, meteofrance, ...) pins it instead.
 const STORMGLASS_SOURCE = Deno.env.get('STORMGLASS_SOURCE') || undefined
@@ -56,7 +64,8 @@ export { CELL_SELECTION }
 // sweep below.
 //   v2sea  the sea grid cell
 //   v3sg   Stormglass wind, gusts, waves and weather over the first ten days
-const REQUEST_VERSION = 'v3sg'
+//   v4om   back to the sea cell by default; Stormglass only behind the switch
+const REQUEST_VERSION = 'v4om'
 
 // 3 decimals ≈ 110 m — the same key tide-proxy uses, and far finer than the
 // weather model's own grid, so two riders on one spot always share a row.
@@ -113,6 +122,7 @@ async function fetchUpstream(lat: number, lon: number): Promise<Row> {
   // has nothing for us today — see _shared/forecast-source.ts.
   const { wx, marine } = await fetchForecastBundle(lat, lon, {
     stormglassKey: STORMGLASS_KEY, source: STORMGLASS_SOURCE, quota,
+    disabledReason: STORMGLASS_FORECAST ? undefined : 'STORMGLASS_FORECAST is off',
   })
   return { wx, marine, fetched_at: new Date().toISOString() }
 }

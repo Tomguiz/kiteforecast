@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   toWmoCode, localHourKey, overlayStormglass, fetchForecastBundle, trimDays,
   stormglassUrl, openMeteoForecastUrl, openMeteoMarineUrl, QuotaGuard,
-  STORMGLASS_PARAMS, FORECAST_DAYS,
+  STORMGLASS_PARAMS, FORECAST_DAYS, WET_MM_H,
 } from '../../supabase/functions/_shared/forecast-source.ts'
 import { fetchSharedForecast } from '../../supabase/functions/_shared/forecast-client.ts'
 
@@ -45,12 +45,16 @@ describe('the weather picture derived from cloud and rain', () => {
     expect(toWmoCode(60, 0, 15)).toBe(2)
     expect(toWmoCode(95, 0, 15)).toBe(3)
   })
-  it('counts as rain from a tenth of a millimetre — the rideability rule reads code >= 51', () => {
-    expect(toWmoCode(80, 0.05, 15)).toBeLessThan(51)
-    expect(toWmoCode(80, 0.2, 15)).toBe(51)
+  it('counts as rain only from drizzle you would notice — the rideability rule reads code >= 51', () => {
+    // A model leaks trace precipitation under a cloudy sky; at 0.1 mm/h that
+    // flagged seven dry hours at Riverwoods as rain and killed the day.
+    expect(toWmoCode(80, 0.05, 15)).toBe(3)
+    expect(toWmoCode(80, 0.2, 15)).toBe(3)
+    expect(toWmoCode(80, WET_MM_H, 15)).toBe(51)
     expect(toWmoCode(80, 1, 15)).toBe(61)
     expect(toWmoCode(80, 4, 15)).toBe(63)
     expect(toWmoCode(80, 9, 15)).toBe(65)
+    expect(WET_MM_H).toBeGreaterThanOrEqual(0.3)
   })
   it('turns to snow at freezing', () => {
     expect(toWmoCode(80, 1, -1)).toBe(71)
@@ -271,6 +275,13 @@ describe('fetching the bundle', () => {
     expect(calls.some(c => c.url.includes('stormglass'))).toBe(false)
   })
 
+  it('says so when the caller switched Stormglass off, rather than blaming a missing key', async () => {
+    const { fn, calls } = fakeFetch({ 'api.open-meteo.com': { body: scaffold() }, 'marine-api.open-meteo.com': { status: 404 } })
+    const b = await fetchForecastBundle(51.36, 3.31, { fetchFn: fn, disabledReason: 'STORMGLASS_FORECAST is off' })
+    expect(b.provider).toEqual({ name: 'open-meteo', reason: 'STORMGLASS_FORECAST is off' })
+    expect(calls.some(c => c.url.includes('stormglass'))).toBe(false)
+  })
+
   it('still fails when Open-Meteo fails — there is no calendar to lay Stormglass on', async () => {
     const { fn } = fakeFetch({ 'api.open-meteo.com': { body: { error: true, reason: 'nope' } }, 'marine-api.open-meteo.com': { status: 404 }, 'api.stormglass.io': { body: sgBody } })
     await expect(fetchForecastBundle(51.36, 3.31, { stormglassKey: 'k', fetchFn: fn })).rejects.toThrow('nope')
@@ -296,6 +307,20 @@ describe('the jobs read the shared row', () => {
     expect(calls).toHaveLength(1)
     expect((calls[0].init!.headers as any).Authorization).toBe('Bearer svc')
     expect(calls[0].url).toContain('lat=51.36&lon=3.31')
+  })
+
+  it('leave Stormglass alone by default when they go upstream themselves', async () => {
+    // No STORMGLASS_FORECAST in this process, so the switch reads as off: the
+    // job's own fetch must land on the same source the app is on.
+    const { fn, calls } = fakeFetch({
+      '/functions/v1/forecast': { status: 503 },
+      'api.open-meteo.com': { body: scaffold() }, 'marine-api.open-meteo.com': { status: 404 },
+      'api.stormglass.io': { body: { hours: [sgHour('2026-09-04T12:00:00+00:00', { windSpeed: 9.5 })], meta: {} } },
+    })
+    const wx = await fetchSharedForecast(51.36, 3.31, 10, { fetchFn: fn, functionUrl: 'https://x.supabase.co', serviceKey: 'svc' })
+    expect(wx.hourly.windspeed_10m[14]).toBe(3)
+    expect(wx.provider).toEqual({ name: 'open-meteo', reason: 'STORMGLASS_FORECAST is off' })
+    expect(calls.some(c => c.url.includes('stormglass'))).toBe(false)
   })
 
   it('fetch upstream themselves when the function is down', async () => {

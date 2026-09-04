@@ -49,9 +49,13 @@ export async function fetchSharedForecast(lat: number, lon: number, days: number
     }
   }
 
+  // The same switch the forecast function honours, so a job that has to go
+  // upstream itself reads the same source the app does.
+  const sgOn = (env('STORMGLASS_FORECAST') || '').toLowerCase() === 'on'
   const { wx } = await fetchForecastBundle(lat, lon, {
     fetchFn,
-    stormglassKey: opts.stormglassKey === undefined ? env('STORMGLASS_KEY') ?? null : opts.stormglassKey,
+    stormglassKey: opts.stormglassKey === undefined ? (sgOn ? env('STORMGLASS_KEY') ?? null : null) : opts.stormglassKey,
+    disabledReason: opts.stormglassKey === undefined && !sgOn ? 'STORMGLASS_FORECAST is off' : undefined,
     source: opts.source ?? env('STORMGLASS_SOURCE'),
     days: Math.max(days, 10),
   })

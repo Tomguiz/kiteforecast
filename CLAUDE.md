@@ -16,14 +16,16 @@ merged. The only reason to hold a merge is a red or conflicted head.
   twice on purpose: once in `supabase/functions/_shared/`, once in
   `index.html` between marker comments. A mirror test in `tests/unit/` pins
   each pair; change both sides together.
-- Forecasts come from `supabase/functions/_shared/forecast-source.ts`:
-  Stormglass (paid, the `STORMGLASS_KEY` secret, shared with the tide badge)
-  supplies the wind, gusts, waves and weather for the first ten days, laid over
-  an Open-Meteo scaffold that supplies the calendar, sunrise/sunset and the
-  days 11–16 outlook. Without the key, or once the day's quota is spent, a row
-  is Open-Meteo's alone and says so in `wx.provider`. The `forecast` function
-  caches one row per spot; the reminder, new-session and digest jobs read that
-  same row through `_shared/forecast-client.ts` rather than fetching their own.
+- Forecasts come from `supabase/functions/_shared/forecast-source.ts`.
+  Open-Meteo, read from the sea grid cell, is the default for everything.
+  Stormglass (paid, the `STORMGLASS_KEY` secret shared with the tide badge)
+  can be laid over the first ten days with `STORMGLASS_FORECAST=on`, but it
+  measured low and gusty against the Cadzand mast (see `DEPLOY.md`), so it
+  stays off until `tests/tools/forecast-accuracy.mjs --rws` shows a model of
+  its beating the sea cell. Every row says where it came from in
+  `wx.provider`. The `forecast` function caches one row per spot; the
+  reminder, new-session and digest jobs read that same row through
+  `_shared/forecast-client.ts` rather than fetching their own.
 - Email templates in `emails/` are fetched from `main` at send time, so
   merging a template change is deploying it. Edge functions deploy from
   `main` through `.github/workflows/deploy-functions.yml`.

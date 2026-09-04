@@ -6,17 +6,18 @@
 // `daily.sunrise/sunset`. That shape stays. What changes is where the numbers
 // inside it come from.
 //
-//   Stormglass  — the paid, marine-first source. Its `sg` source picks the
-//                 best model for the point (ECMWF, ICON, Météo-France, NOAA,
-//                 UKMO, ...), hourly, 10 days ahead. It is what the tide badge
-//                 already reads. The wind, gusts, direction, temperature,
-//                 waves and the weather picture for the next ten days are its.
-//   Open-Meteo  — free. Still asked, for the three things Stormglass does not
-//                 hand back: the spot's timezone, sunrise/sunset, and the days
-//                 11–16 outlook (already faded as low-confidence in the app).
-//                 It is also the whole answer when Stormglass is unreachable
-//                 or the daily quota is spent — an older-quality forecast beats
-//                 no forecast.
+//   Open-Meteo  — free, and the default. Asked for everything: the calendar,
+//                 sunrise/sunset, and the wind itself, read from the SEA grid
+//                 cell (see forecast/index.ts for the measurement behind
+//                 that). Days 11–16 are always its.
+//   Stormglass  — the paid, marine-first source the tide badge reads, hourly,
+//                 10 days ahead. Opt-in: when the forecast function is given
+//                 its key, its wind, gusts, direction, temperature, waves and
+//                 weather picture are laid over Open-Meteo's for the days it
+//                 covers. Measured once against a mast it read LOW and gusty
+//                 (it has no sea-cell option), so it stays off until a model
+//                 of its is shown to beat the sea cell — the accuracy tool in
+//                 tests/tools scores them side by side.
 //
 // `wx.provider` says which of the two the wind came from, so the app can show
 // it and the accuracy tool can score it. Pure where it can be: the merge and
@@ -67,15 +68,21 @@ export function stormglassUrl(lat: number, lon: number, source = STORMGLASS_DEFA
 // ── The weather picture ─────────────────────────────────────────────────────
 // Stormglass has no WMO code; it has cloud cover (%) and precipitation (mm/h).
 // The app only ever asks two things of the code: which icon to draw, and
-// whether it is raining (rideability's `isRainy` is `code >= 51`). Standard
-// intensity classes: light under 2.5 mm/h, moderate to 7.6, heavy above.
+// whether it is raining (rideability's `isRainy` is `code >= 51`), and a wet
+// hour is a dead hour for the rating. So the wet threshold is the one that
+// matters: a model leaks trace precipitation all afternoon under a cloudy
+// sky, and at 0.1 mm/h that turned a rideable, dry day at Riverwoods into
+// "❌ RAIN" (4 Sep 2026, seven hours flagged). Drizzle you would notice starts
+// around 0.3 mm/h; below that the hour is merely overcast. Standard intensity
+// classes above it: light under 2.5 mm/h, moderate to 7.6, heavy beyond.
+export const WET_MM_H = 0.3
 export function toWmoCode(cloudPct: number | null, precipMmH: number | null, tempC: number | null): number {
   const p = precipMmH ?? 0
   const snow = tempC != null && tempC <= 0
   if (p > 7.6) return snow ? 75 : 65
   if (p >= 2.5) return snow ? 73 : 63
-  if (p >= 0.5) return snow ? 71 : 61
-  if (p > 0.1)  return snow ? 71 : 51
+  if (p >= 1.0) return snow ? 71 : 61
+  if (p >= WET_MM_H) return snow ? 71 : 51
   const c = cloudPct ?? 0
   if (c <= 12) return 0
   if (c <= 37) return 1
@@ -220,6 +227,10 @@ export class QuotaGuard {
 // ── Fetching ────────────────────────────────────────────────────────────────
 export interface FetchOptions {
   stormglassKey?: string | null
+  // Why Stormglass is not being asked, when the caller has decided that. It
+  // lands in `provider.reason`, so a row can say "off by choice" rather than
+  // looking like a missing key.
+  disabledReason?: string
   source?: string
   days?: number
   quota?: QuotaGuard
@@ -273,9 +284,10 @@ async function fetchStormglass(lat: number, lon: number, key: string, source: st
   return { hours: body.hours, meta: body.meta }
 }
 
-// The one call every consumer makes. Open-Meteo and Stormglass are asked at
-// the same time; the answer is Stormglass's numbers on Open-Meteo's calendar
-// when both come back, Open-Meteo's alone when Stormglass does not.
+// The one call every consumer makes. Open-Meteo is always asked; Stormglass
+// only when a key is passed, at the same time. The answer is Stormglass's
+// numbers on Open-Meteo's calendar when both come back, Open-Meteo's alone
+// otherwise.
 export async function fetchForecastBundle(lat: number, lon: number, opts: FetchOptions = {}): Promise<Bundle> {
   const fetchFn = opts.fetchFn ?? fetch
   const days = opts.days ?? FORECAST_DAYS
@@ -286,7 +298,7 @@ export async function fetchForecastBundle(lat: number, lon: number, opts: FetchO
   const [om, sg] = await Promise.all([
     fetchOpenMeteo(lat, lon, days, fetchFn, timeoutMs),
     key ? fetchStormglass(lat, lon, key, source, fetchFn, timeoutMs, opts.quota, opts.now)
-        : Promise.resolve<SgResult>({ reason: 'no STORMGLASS_KEY' }),
+        : Promise.resolve<SgResult>({ reason: opts.disabledReason || 'no STORMGLASS_KEY' }),
   ])
 
   if ('reason' in sg) {

@@ -50,14 +50,28 @@ call time, so a change takes effect on the next request, no redeploy needed.
 
 | Secret | Read by | Without it |
 |---|---|---|
-| `STORMGLASS_KEY` | `forecast`, `tide-proxy` | Forecasts fall back to Open-Meteo and say so in `wx.provider`; the tide badge is empty |
-| `STORMGLASS_SOURCE` (optional) | `forecast` | Defaults to `sg`, Stormglass's per-point pick of the best model. Set a named source (`icon`, `ecmwf`, `meteofrance`, ...) to pin one |
+| `STORMGLASS_KEY` | `tide-proxy`, and `forecast` when the switch below is on | The tide badge is empty; forecasts are unaffected |
+| `STORMGLASS_FORECAST` (optional) | `forecast`, the reminder/digest jobs | **Off by default.** Set to `on` to lay Stormglass wind, gusts, waves and weather over the first ten days. Rows say which source they are in `wx.provider` |
+| `STORMGLASS_SOURCE` (optional) | `forecast` | Defaults to `sg`, Stormglass's per-point pick of the best model. Set a named source (`icon`, `meteo`, `ukmo`, ...) to pin one |
 | `SB_SERVICE_ROLE_KEY` | every function that writes | Nothing works |
 
-The forecast function counts Stormglass's daily quota from each answer and
-stops asking a few requests short of it, so the tide badge keeps its share.
-Once that reserve is reached, or Stormglass answers 402, the rest of the day
-is served from Open-Meteo — the app keeps working, on the free numbers.
+Why the switch is off: measured at Riverwoods on 4 Sep 2026 against the
+Cadzand mast (5 km away), Stormglass's `sg` blend read 4–5 kn low with gusts
+5 kn high — a gust factor of 1.9 against a measured 1.2, the land-cell
+signature. It has no sea-cell option, so a beach coordinate gets half-land
+numbers. The Open-Meteo sea cell read 3–4 kn high with the right gust factor.
+Before turning it on, score its models against the masts for a week:
+
+```bash
+STORMGLASS_KEY=... node tests/tools/forecast-accuracy.mjs --spot "Riverwoods Beachclub" --rws --save-ref tests/tools/refs
+```
+
+One Stormglass request per run scores every model it has for the point.
+
+When the switch is on, the forecast function counts Stormglass's daily quota
+from each answer and stops asking a few requests short of it, so the tide
+badge keeps its share. Once that reserve is reached, or Stormglass answers
+402, the rest of the day is served from Open-Meteo.
 
 ## When a push event goes missing
 
