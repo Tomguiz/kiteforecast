@@ -29,7 +29,7 @@ async function seed(page: any) {
         m.set(14, { kn: 25, dir: 315, code: 1, gustKn: 29, temp: 18 });
         return m;
       })()],
-      [D[8], mk([20, 20, 20, 20], () => 36)],       // 20 kn but gusting 36 → Epic by gusts
+      [D[8], mk([20, 20, 20, 20], () => 38)],       // 20 kn but gusting 38 → Epic by gusts
     ]);
     // @ts-expect-error app globals — script-level lets, not window props
     cachedHrMap = map;
@@ -67,7 +67,7 @@ test('each day carries the tier its window average earns', async ({ gotoApp, pag
   // the best three hours (26, 25, 24) average 25, even with a gap between them
   await expect(badge(7)).toHaveText('✅ 6h · Very Good');
   await expect(badge(7)).toHaveClass(/rating-verygood/);
-  // gusts reach the tiers too: 20 kn gusting 36 is an Epic day
+  // gusts reach the tiers too: 20 kn gusting 38 is an Epic day
   await expect(badge(8)).toHaveText('✅ 4h · Epic');
   await expect(badge(8)).toHaveClass(/rating-epic/);
 });
@@ -116,9 +116,9 @@ test('the legend explains the expert scale', async ({ gotoApp, page }) => {
   await gotoApp('signedOut');
   const legend = await page.evaluate(() => buildLegendHTML());
   for (const t of ['Expert mode', 'Epic', 'Very Good', 'Good', 'Chill', 'Bad', 'Danger']) expect(legend).toContain(t);
-  expect(legend).toContain('38+ kn avg');
+  expect(legend).toContain('35+ kn avg');
   expect(legend).toContain('30+ kn avg');
-  expect(legend).toContain('gusts 35+');
+  expect(legend).toContain('gusts 37+');
   expect(legend).not.toContain('Perfect');
   expect(legend).not.toContain('Marginal');
 });

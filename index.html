@@ -2734,14 +2734,15 @@ function conditionLabel(kn,dir,code,temp,gustKn=0){
 // and lands one tier lower. Below 18 kn a 15+ average is a chill session;
 // below that only the gust rule could have qualified the hours.
 // A tier is reached by wind (minKn) OR by gusts (minGustKn); the higher rung
-// wins. Gusts never reach Expert mode on their own.
+// wins. Good has no gust rung: gusts lift a day into the strong tiers, they
+// do not make a session out of a light one.
 const RATING_TIERS=[
-  {key:'expert',minKn:38,minGustKn:Infinity,label:'Expert mode',below:'epic'},
-  {key:'epic',minKn:30,minGustKn:35,label:'Epic',below:'verygood'},
+  {key:'expert',minKn:35,minGustKn:40,label:'Expert mode',below:'epic'},
+  {key:'epic',minKn:30,minGustKn:37,label:'Epic',below:'verygood'},
   {key:'verygood',minKn:25,minGustKn:30,label:'Very Good',below:'good'},
-  {key:'good',minKn:18,minGustKn:25,label:'Good',below:'good'},
+  {key:'good',minKn:18,minGustKn:Infinity,label:'Good',below:'good'},
 ];
-const CHILL_MIN_KN=15;
+const CHILL_MIN_KN=14;
 const FULL_SESSION_HOURS=3;
 const isStormy=code=>[82,95,96,99].includes(code);
 // Mean of the strongest n hours by key; 0 when there are fewer than n.
@@ -2772,7 +2773,7 @@ function rateSession(s,code,badDir,peakDayKn){
   if(gh===1) return {tier:'brief',style:'bad',label:'❌ Too brief (1h)'};
   // A full session is rated on its best three hours; a 2h session on both of
   // its hours, one tier lower. Wind and gusts each reach a rung; the higher
-  // one counts, and gusts only lift a day that already averages 15+.
+  // one counts, and gusts only lift a day that already averages 14+.
   const short=gh<FULL_SESSION_HOURS;
   const byWind=RATING_TIERS.findIndex(x=>s.bestKn>=x.minKn);
   const byGust=s.bestKn>=CHILL_MIN_KN?RATING_TIERS.findIndex(x=>(s.bestGustKn||0)>=x.minGustKn):-1;
@@ -2970,11 +2971,11 @@ function buildLegendHTML(){
   <div class="legend-cols">
     <div>
       <div class="legend-sub">Day rating <span style="font-weight:500;color:var(--tdim)">· wind or gusts, avg of the best 3 hours</span></div>
-      <div class="legend-item"><div class="legend-dot" style="background:#fca5a5"></div><span class="legend-kpi">Expert mode</span><span class="legend-desc">38+ kn avg · 3h+ session (Epic if 2h)</span></div>
-      <div class="legend-item"><div class="legend-dot" style="background:#fdba74"></div><span class="legend-kpi">Epic</span><span class="legend-desc">30+ kn avg or gusts 35+ · 3h+ (Very Good if 2h)</span></div>
-      <div class="legend-item"><div class="legend-dot" style="background:#fde047"></div><span class="legend-kpi">Very Good</span><span class="legend-desc">25+ kn avg or gusts 30+ · 3h+ (Good if 2h)</span></div>
-      <div class="legend-item"><div class="legend-dot" style="background:#4ade80"></div><span class="legend-kpi">Good</span><span class="legend-desc">18+ kn avg or gusts 25+ · 2h+ session</span></div>
-      <div class="legend-item"><div class="legend-dot" style="background:#86efac"></div><span class="legend-kpi">Chill</span><span class="legend-desc">15–18 kn avg · 2h+ session</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#fca5a5"></div><span class="legend-kpi">Expert mode</span><span class="legend-desc">35+ kn avg · 3h+ session (Epic if 2h) or gusts 40+</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#fdba74"></div><span class="legend-kpi">Epic</span><span class="legend-desc">30+ kn avg · 3h+ session (Very Good if 2h) or gusts 37+</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#fde047"></div><span class="legend-kpi">Very Good</span><span class="legend-desc">25+ kn avg · 3h+ session (Good if 2h) or gusts 30+</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#4ade80"></div><span class="legend-kpi">Good</span><span class="legend-desc">18+ kn avg · 2h+ session</span></div>
+      <div class="legend-item"><div class="legend-dot" style="background:#86efac"></div><span class="legend-kpi">Chill</span><span class="legend-desc">14–18 kn avg · 2h+ session</span></div>
       <div class="legend-item"><div class="legend-dot" style="background:#fca5a5;opacity:.55"></div><span class="legend-kpi">Bad</span><span class="legend-desc">wrong dir · too light</span></div>
       <div class="legend-item"><div class="legend-dot" style="background:#dc2626"></div><span class="legend-kpi">Danger</span><span class="legend-desc">offshore / storm</span></div>
     </div>

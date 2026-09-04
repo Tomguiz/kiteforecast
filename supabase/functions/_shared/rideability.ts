@@ -82,19 +82,20 @@ export interface RatingTier { key: string; minKn: number; minGustKn: number; lab
 
 // Top to bottom. A day reaches a tier by wind (minKn, the best-hours average)
 // OR by gusts (minGustKn, the best-hours gust average) — whichever rung is
-// higher wins, because a 20 kn day gusting 36 rides like a much stronger one.
-// Gusts never reach Expert mode on their own. `below` is the tier a 2h
-// session earns instead.
+// higher wins, because a 22 kn day gusting 34 rides like a much stronger one.
+// Good has no gust rung: gusts lift a day into the strong tiers, they do not
+// make a session out of a light one. `below` is the tier a 2h session earns
+// instead.
 export const RATING_TIERS: RatingTier[] = [
-  { key: 'expert',   minKn: 38, minGustKn: Infinity, label: 'Expert mode', below: 'epic' },
-  { key: 'epic',     minKn: 30, minGustKn: 35,       label: 'Epic',        below: 'verygood' },
+  { key: 'expert',   minKn: 35, minGustKn: 40,       label: 'Expert mode', below: 'epic' },
+  { key: 'epic',     minKn: 30, minGustKn: 37,       label: 'Epic',        below: 'verygood' },
   { key: 'verygood', minKn: 25, minGustKn: 30,       label: 'Very Good',   below: 'good' },
-  { key: 'good',     minKn: 18, minGustKn: 25,       label: 'Good',        below: 'good' },
+  { key: 'good',     minKn: 18, minGustKn: Infinity, label: 'Good',        below: 'good' },
 ]
-// Under the lowest tier, a 15-18 kn average is still a session — a chill one.
+// Under the lowest tier, a 14-18 kn average is still a session — a chill one.
 // Below that only the gust rule (12 kn + gusts >= 20) can have qualified the
 // hours, and that is labelled light wind rather than sold as a session.
-export const CHILL_MIN_KN = 15
+export const CHILL_MIN_KN = 14
 // How many of the best hours the rating averages. A session shorter than this
 // is averaged whole and earns the tier below.
 export const FULL_SESSION_HOURS = 3
@@ -165,7 +166,7 @@ export function rateSession(s: SessionStats, code: number, badDir: boolean, peak
   if (gh === 1) return { tier: 'brief', style: 'bad', label: '❌ Too brief (1h)' }
   // A full session is rated on its best three hours; a 2h session on both of
   // its hours, one tier lower. Wind and gusts each reach a rung; the higher
-  // one counts. Gusts only lift a day that is already a real session (a 15+
+  // one counts. Gusts only lift a day that is already a real session (a 14+
   // average) — a gust-rule day at 13 kn stays light wind however it gusts.
   const short = gh < FULL_SESSION_HOURS
   const byWind = RATING_TIERS.findIndex(x => s.bestKn >= x.minKn)

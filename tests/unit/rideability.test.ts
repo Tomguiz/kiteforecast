@@ -167,15 +167,16 @@ describe('sessionStats', () => {
 })
 
 describe('rateSession — the expert scale', () => {
-  it('names the tiers in descending order, 38 / 30 / 25 / 18', () => {
+  it('names the tiers in descending order, 35 / 30 / 25 / 18', () => {
     expect(RATING_TIERS.map(t => [t.key, t.minKn])).toEqual([
-      ['expert', 38], ['epic', 30], ['verygood', 25], ['good', 18],
+      ['expert', 35], ['epic', 30], ['verygood', 25], ['good', 18],
     ])
-    expect(CHILL_MIN_KN).toBe(15)
+    expect(CHILL_MIN_KN).toBe(14)
   })
 
-  it('Expert mode: 38+ kn avg over 3h+', () => {
-    expect(rate([38, 38, 38])).toMatchObject({ tier: 'expert', label: '✅ 3h · Expert mode' })
+  it('Expert mode: 35+ kn avg over 3h+', () => {
+    expect(rate([35, 35, 35])).toMatchObject({ tier: 'expert', label: '✅ 3h · Expert mode' })
+    expect(rate([34, 34, 34])).toMatchObject({ tier: 'epic' })
   })
   it('… and the same wind over only 2h is Epic', () => {
     expect(rate([40, 40])).toMatchObject({ tier: 'epic', label: '✅ 2h · Epic' })
@@ -200,10 +201,11 @@ describe('rateSession — the expert scale', () => {
     expect(rate([18, 19])).toMatchObject({ tier: 'good' })
   })
 
-  it('Chill: a 15-18 kn average, however long the window', () => {
+  it('Chill: a 14-18 kn average, however long the window', () => {
     expect(rate([15, 16, 17, 16])).toMatchObject({ tier: 'chill', label: '✅ 4h · Chill' })
     expect(rate([16, 17])).toMatchObject({ tier: 'chill', label: '✅ 2h · Chill' })
-    expect(rate([17, 17, 17])).toMatchObject({ tier: 'chill' })
+    expect(rate([14, 14, 14])).toMatchObject({ tier: 'chill' })
+    expect(rate([13, 14, 14])).toMatchObject({ tier: 'lightwind' })
   })
 
   it('rates the average, so one strong hour does not make an epic day', () => {
@@ -228,36 +230,44 @@ describe('rateSession — the expert scale', () => {
   })
 
   describe('gusts reach the tiers too', () => {
-    it('Epic from gusts 35+, Very Good from 30+, Good from 25+', () => {
+    it('Expert mode from gusts 40+, Epic from 37+, Very Good from 30+; Good has no gust rung', () => {
       expect(RATING_TIERS.map(t => [t.key, t.minGustKn])).toEqual([
-        ['expert', Infinity], ['epic', 35], ['verygood', 30], ['good', 25],
+        ['expert', 40], ['epic', 37], ['verygood', 30], ['good', Infinity],
       ])
-      expect(rateGusty([20, 20, 20], 36)).toMatchObject({ tier: 'epic' })
+      expect(rateGusty([20, 20, 20], 41)).toMatchObject({ tier: 'expert' })
+      expect(rateGusty([20, 20, 20], 38)).toMatchObject({ tier: 'epic' })
+      expect(rateGusty([20, 20, 20], 36)).toMatchObject({ tier: 'verygood' })   // 36 is short of Epic's 37
       expect(rateGusty([20, 20, 20], 31)).toMatchObject({ tier: 'verygood' })
-      expect(rateGusty([16, 16, 16], 26)).toMatchObject({ tier: 'good' })
+      expect(rateGusty([16, 16, 16], 28)).toMatchObject({ tier: 'chill' })      // gusts do not make a Good day
     })
 
     it('the higher of wind and gusts wins, never the lower', () => {
       expect(rateGusty([31, 31, 31], 33)).toMatchObject({ tier: 'epic' })       // wind says epic, gusts only very good
-      expect(rateGusty([20, 20, 20], 24)).toMatchObject({ tier: 'good' })       // gusts under 25 change nothing
-    })
-
-    it('gusts never make Expert mode on their own', () => {
-      expect(rateGusty([30, 30, 30], 60)).toMatchObject({ tier: 'epic' })
+      expect(rateGusty([20, 20, 20], 29)).toMatchObject({ tier: 'good' })       // gusts under 30 change nothing
     })
 
     it('a 2h session still lands one tier lower', () => {
-      expect(rateGusty([20, 20], 36)).toMatchObject({ tier: 'verygood', label: '✅ 2h · Very Good' })
+      expect(rateGusty([20, 20], 38)).toMatchObject({ tier: 'verygood', label: '✅ 2h · Very Good' })
     })
 
     it('do not lift a light-wind day — that is the gust rule already, not a session', () => {
-      expect(rateGusty([13, 13, 13], 26)).toMatchObject({ tier: 'lightwind' })
+      expect(rateGusty([13, 13, 13], 32)).toMatchObject({ tier: 'lightwind' })
     })
 
-    it('the same Sycod day, with its 30-36 kn gusts, reads Epic', () => {
+    it('the same Sycod day, with its 30-36 kn gusts, stays Very Good', () => {
       const hours = [[8, 18, 26], [9, 21, 30], [10, 21, 30], [11, 24, 33], [13, 26, 36], [14, 25, 36]]
         .map(([hr, kn, gustKn]) => ({ hr, kn, gustKn }))
-      expect(rateSession(sessionStats(hours), 3, false, 26)).toMatchObject({ tier: 'epic' })
+      expect(rateSession(sessionStats(hours), 3, false, 26)).toMatchObject({ tier: 'verygood' })
+    })
+
+    it('a 22 kn day gusting 30-34 all day is Very Good, not Good', () => {
+      // Sep 4: 07-13 at 22/22/22/20/23/23/25 gusting 30-34, 14h lost to a
+      // shower, then 22/21/19/16/17/17. Wind alone averages 24 over the best
+      // three hours; the gusts carry it over the Very Good rung.
+      const kn = [22, 22, 22, 20, 23, 23, 25, null, 22, 21, 19, 16, 17, 17]
+      const gust = [30, 30, 31, 29, 33, 33, 34, 36, 33, 30, 28, 25, 22, 23]
+      const hours = kn.flatMap((k, i) => k === null ? [] : [{ hr: 7 + i, kn: k, gustKn: gust[i] }])
+      expect(rateSession(sessionStats(hours), 3, false, 25)).toMatchObject({ tier: 'verygood', label: '✅ 13h · Very Good' })
     })
   })
 
