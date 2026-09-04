@@ -42,6 +42,23 @@ running.
   redeployed by hand to a 30-degree tolerance while Pages still served the
   build from the previous day at 22.5. See **When a push event goes missing**.
 
+## Secrets the functions read
+
+Set with `supabase secrets set NAME=value --project-ref kpwmajtxmcfpakvonimf`
+(or in the dashboard under Edge Functions → Secrets). A function reads them at
+call time, so a change takes effect on the next request, no redeploy needed.
+
+| Secret | Read by | Without it |
+|---|---|---|
+| `STORMGLASS_KEY` | `forecast`, `tide-proxy` | Forecasts fall back to Open-Meteo and say so in `wx.provider`; the tide badge is empty |
+| `STORMGLASS_SOURCE` (optional) | `forecast` | Defaults to `sg`, Stormglass's per-point pick of the best model. Set a named source (`icon`, `ecmwf`, `meteofrance`, ...) to pin one |
+| `SB_SERVICE_ROLE_KEY` | every function that writes | Nothing works |
+
+The forecast function counts Stormglass's daily quota from each answer and
+stops asking a few requests short of it, so the tide badge keeps its share.
+Once that reserve is reached, or Stormglass answers 402, the rest of the day
+is served from Open-Meteo — the app keeps working, on the free numbers.
+
 ## When a push event goes missing
 
 Everything here triggers on `push` to `main`. If GitHub does not emit that

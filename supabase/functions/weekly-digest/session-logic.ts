@@ -7,6 +7,7 @@
 import {
   hourQualifies, consecutiveRuns, toKnots, isRainy, speedTier, angleDiff, isWindDirOK,
 } from '../_shared/rideability.ts'
+import { fetchSharedForecast } from '../_shared/forecast-client.ts'
 
 export { hourQualifies, consecutiveRuns, toKnots, isRainy, speedTier, angleDiff, isWindDirOK }
 
@@ -15,17 +16,10 @@ const ARROWS8 = ['\u2193', '\u2199', '\u2190', '\u2196', '\u2191', '\u2197', '\u
 export const compass  = (deg: number) => DIRS8[Math.round(((deg % 360) + 360) % 360 / 45) % 8]
 export const dirArrow = (deg: number) => ARROWS8[Math.round(((deg % 360) + 360) % 360 / 45) % 8]
 
+// The digest reads the same shared, Stormglass-backed row the app draws, so
+// what it mails on Sunday is what the rider sees on Monday.
 export async function fetchForecast(lat: number, lon: number) {
-  const params = new URLSearchParams({
-    latitude: String(lat), longitude: String(lon),
-    hourly: 'weather_code,windspeed_10m,windgusts_10m,winddirection_10m',
-    daily: 'sunrise,sunset',
-    forecast_days: '7', timezone: 'auto', windspeed_unit: 'ms',
-  })
-  const resp = await fetch(`https://api.open-meteo.com/v1/forecast?${params}`)
-  const wx = await resp.json()
-  if (wx.error) throw new Error(wx.reason)
-  return wx
+  return await fetchSharedForecast(lat, lon, 7)
 }
 
 export interface Hour { hr: number; kn: number; gust: number; dir: number; code: number }

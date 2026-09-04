@@ -15,14 +15,21 @@ import { readFileSync } from 'node:fs'
 const html = readFileSync(new URL('../../index.html', import.meta.url), 'utf8')
 const fn = readFileSync(
   new URL('../../supabase/functions/forecast/index.ts', import.meta.url), 'utf8')
+// The request itself moved next to its Stormglass sibling; the cell it asks
+// for is pinned there now.
+const src = readFileSync(
+  new URL('../../supabase/functions/_shared/forecast-source.ts', import.meta.url), 'utf8')
 
 describe('which grid cell the wind is read from', () => {
   it('the function asks Open-Meteo for a sea cell', () => {
-    expect(fn).toMatch(/const CELL_SELECTION = 'sea'/)
+    expect(src).toMatch(/export const CELL_SELECTION = 'sea'/)
+    // The measurement that justifies it stays with the function, where the
+    // next person to wonder will look.
+    expect(fn).toContain('export { CELL_SELECTION }')
   })
 
   it('it asks for that cell on BOTH the forecast and the marine call', () => {
-    expect(fn.match(/cell_selection: CELL_SELECTION/g) || []).toHaveLength(2)
+    expect(src.match(/cell_selection: CELL_SELECTION/g) || []).toHaveLength(2)
   })
 
   it('the client fallback asks for the same cell', () => {

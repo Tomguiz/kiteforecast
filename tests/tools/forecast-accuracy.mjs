@@ -3,8 +3,9 @@
 //
 // The app read 4.6 kn low and 2.9 kn gusty against Windfinder at Riverwoods on
 // 31 Aug, and the only way to stop arguing about why is to measure it. This
-// fetches the same spot under several request shapes and scores each one, so a
-// change to the forecast request is defended by numbers rather than by a story.
+// fetches the same spot under several request shapes — and, with STORMGLASS_KEY
+// set, every Stormglass model for the point — and scores each one, so a change
+// to the forecast source is defended by numbers rather than by a story.
 //
 //   node tests/tools/forecast-accuracy.mjs --spot "Riverwoods Beachclub"
 //   node tests/tools/forecast-accuracy.mjs --lat 51.3627 --lon 3.3062 \
@@ -183,6 +184,43 @@ const CASES = [
   { label: 'sea + meteofrance_seamless', params: { cell_selection: 'sea', models: 'meteofrance_seamless' } },
 ]
 
+// Stormglass, the paid source the app now reads for its first ten days. One
+// request without a source filter answers with EVERY model Stormglass has for
+// the point, so a single request scores them all — `sg` (their pick) next to
+// icon, noaa, meteo, ukmo and whatever else is there. Needs STORMGLASS_KEY in
+// the environment; without it the rows are simply absent. Stormglass answers
+// in UTC and m/s; bucket by the spot's local hour, in knots, like the rest.
+async function fetchStormglassCases(lat, lon, date, tzOffsetMin) {
+  const key = process.env.STORMGLASS_KEY
+  if (!key) return []
+  const startMs = Date.parse(`${date}T00:00:00Z`) - tzOffsetMin * 60000
+  const p = new URLSearchParams({
+    lat: String(lat), lng: String(lon), params: 'windSpeed,gust',
+    start: String(Math.floor(startMs / 1000)), end: String(Math.floor(startMs / 1000) + 24 * 3600),
+  })
+  const r = await fetch(`https://api.stormglass.io/v2/weather/point?${p}`, { headers: { Authorization: key } })
+  if (!r.ok) throw new Error(`Stormglass HTTP ${r.status} ${await r.text()}`)
+  const d = await r.json()
+  const bySource = new Map()
+  for (const h of d.hours || []) {
+    const t = Date.parse(h.time)
+    if (Number.isNaN(t)) continue
+    const local = new Date(t + tzOffsetMin * 60000)
+    if (local.toISOString().slice(0, 10) !== date) continue
+    const hr = local.getUTCHours()
+    for (const [src, ws] of Object.entries(h.windSpeed || {})) {
+      if (typeof ws !== 'number') continue
+      const g = h.gust?.[src]
+      if (!bySource.has(src)) bySource.set(src, new Map())
+      bySource.get(src).set(hr, [ws * MS_TO_KN, typeof g === 'number' ? g * MS_TO_KN : null])
+    }
+  }
+  const quota = d.meta ? ` (quota ${d.meta.requestCount}/${d.meta.dailyQuota})` : ''
+  return [...bySource.entries()].map(([src, hours]) => ({
+    label: `stormglass ${src}${src === 'sg' ? ' (what the app now reads)' : ''}`, hours, elevation: null, quota,
+  }))
+}
+
 async function fetchCase(lat, lon, params, window) {
   const p = new URLSearchParams({
     latitude: String(lat), longitude: String(lon),
@@ -230,7 +268,7 @@ function score(got, ref) {
     maeWind: mean(dw.map(Math.abs)), biasWind: mean(dw),
     maeGust: dg.length ? mean(dg.map(Math.abs)) : null,
     biasGust: dg.length ? mean(dg) : null,
-    gustFactor: mean(hs.filter(h => got.get(h)[0] > 0).map(h => got.get(h)[1] / got.get(h)[0])),
+    gustFactor: mean(hs.filter(h => got.get(h)[0] > 0 && got.get(h)[1] != null).map(h => got.get(h)[1] / got.get(h)[0])),
   }
 }
 
@@ -299,15 +337,26 @@ if (useRws) console.log(
   '      are a floor for every row alike. Read the RANKING, not the absolute numbers.')
 console.log()
 const results = []
+let tzOffsetMinForSg = 0
 for (const c of CASES) {
   try {
     const data = await fetchCase(here.lat, here.lon, c.params, window)
+    tzOffsetMinForSg = Math.round((data.utc_offset_seconds ?? 0) / 60)
     const hours = hoursOf(data, date)
     if (!hours.size) { console.log(`${c.label.padEnd(38)} no data for ${date}`); continue }
     results.push({ ...c, hours, elevation: data.elevation, score: refHours && score(hours, refHours) })
   } catch (e) {
     console.log(`${c.label.padEnd(38)} FAILED: ${e.message}`)
   }
+}
+try {
+  for (const c of await fetchStormglassCases(here.lat, here.lon, date, tzOffsetMinForSg)) {
+    if (!c.hours.size) { console.log(`${c.label.padEnd(38)} no data for ${date}`); continue }
+    results.push({ ...c, score: refHours && score(c.hours, refHours) })
+  }
+  if (!process.env.STORMGLASS_KEY) console.log('(set STORMGLASS_KEY to score the Stormglass sources alongside)')
+} catch (e) {
+  console.log(`${'stormglass'.padEnd(38)} FAILED: ${e.message}`)
 }
 
 if (refHours) {
@@ -356,7 +405,7 @@ for (const h of hourList) {
   }
   for (const r of results) {
     const v = r.hours.get(h)
-    line += v ? `${Math.round(v[0])}/${Math.round(v[1])}`.padStart(13) : '-'.padStart(13)
+    line += v ? `${Math.round(v[0])}/${v[1] == null ? '-' : Math.round(v[1])}`.padStart(13) : '-'.padStart(13)
   }
   console.log(line)
 }

@@ -10,6 +10,8 @@ import { readFileSync } from 'node:fs'
 const html = readFileSync(new URL('../../index.html', import.meta.url), 'utf8')
 const fn = readFileSync(
   new URL('../../supabase/functions/forecast/index.ts', import.meta.url), 'utf8')
+const src = readFileSync(
+  new URL('../../supabase/functions/_shared/forecast-source.ts', import.meta.url), 'utf8')
 
 const TWO_HOURS = 2 * 60 * 60 * 1000
 
@@ -35,10 +37,15 @@ describe('the shared forecast cache window', () => {
 
   it('the function asks Open-Meteo for the full 16-day window', () => {
     // The "16-day overview" is the app's headline promise. Building the
-    // Open-Meteo URL moved from the client into the function, so this is where
-    // the window now has to be pinned — for the forecast and the marine call
-    // alike, which must cover the same days or the wave data runs short.
-    expect(fn.match(/forecast_days: '16'/g) || []).toHaveLength(2)
+    // Open-Meteo URL moved from the client into _shared/forecast-source.ts, so
+    // this is where the window now has to be pinned — for the forecast and the
+    // marine call alike, which must cover the same days or the wave data runs
+    // short. Stormglass covers the first ten of them; Open-Meteo the rest.
+    expect(src).toMatch(/export const FORECAST_DAYS = 16\b/)
+    expect(src.match(/days = FORECAST_DAYS\)/g) || []).toHaveLength(2)
+    expect(src).toMatch(/export const STORMGLASS_DAYS = 10\b/)
+    // And the function does not quietly ask for less.
+    expect(fn).not.toMatch(/days:/)
   })
 
   it('forecasts go through the shared cache, not straight to Open-Meteo', () => {

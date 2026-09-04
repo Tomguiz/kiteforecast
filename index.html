@@ -2117,9 +2117,12 @@ function updateFetchTimestamp(){
   // Structure from literals, text through textContent — nothing interpolated
   // into innerHTML, so there is still no injection surface here.
   el.innerHTML='<span class="fetch-ts-label"></span><span class="fetch-ts-btn">\u21BB Refresh</span>';
+  // Name the source when it is the paid one, so a rider (and Tom) can see at
+  // a glance whether this screen is Stormglass or the Open-Meteo fallback.
+  const prov=cachedWx?.provider?.name==='stormglass'?' \u00B7 Stormglass':'';
   el.querySelector('.fetch-ts-label').textContent = stale
     ? '\u26A0\uFE0F Forecast may be outdated'
-    : `Updated ${sameDay?'':`${pad(d.getDate())}/${pad(d.getMonth()+1)} `}${pad(d.getHours())}h${pad(d.getMinutes())}`;
+    : `Updated ${sameDay?'':`${pad(d.getDate())}/${pad(d.getMonth()+1)} `}${pad(d.getHours())}h${pad(d.getMinutes())}${prov}`;
   el.className='fetch-ts'+(stale?' stale':'');
   // Always tappable now — the rider can ask for fresh data whenever they like,
   // instead of only once the app has decided the data went off.
