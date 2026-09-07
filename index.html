@@ -577,6 +577,28 @@
     .hint-step.done:hover { border-color:var(--border); }
     .hint-step.done .hint-step-num { background:rgba(74,222,128,.18); border-color:rgba(74,222,128,.5); color:#4ade80; }
     .hint-step.done strong { text-decoration:line-through; text-decoration-color:rgba(255,255,255,.35); }
+    /* the same checklist, one line, under the spot header */
+    #gsSpotBar { max-width:640px; margin:0 auto 12px; padding:0 12px; }
+    .gs-spot-bar {
+      display:flex; align-items:center; gap:10px; width:100%; text-align:left;
+      border:1.5px solid rgba(56,189,248,.5); background:rgba(56,189,248,.08);
+      border-radius:12px; padding:9px 12px; cursor:pointer; font-family:inherit; color:inherit;
+      transition:border-color .2s, background .2s;
+    }
+    .gs-spot-bar:hover { border-color:rgba(56,189,248,.8); background:rgba(56,189,248,.12); }
+    .gs-spot-dots { display:flex; gap:3px; flex-shrink:0; }
+    .gs-spot-dot {
+      width:18px; height:18px; border-radius:50%; font-size:.62rem; font-weight:800;
+      display:flex; align-items:center; justify-content:center;
+      border:1.5px solid var(--border); color:var(--tdim);
+    }
+    .gs-spot-dot.done { background:rgba(74,222,128,.18); border-color:rgba(74,222,128,.5); color:#4ade80; }
+    .gs-spot-dot.next { background:var(--accent); border-color:var(--accent); color:#04121f; }
+    .gs-spot-icon { font-size:1.1rem; line-height:1; flex-shrink:0; }
+    .gs-spot-txt { flex:1; min-width:0; display:flex; flex-direction:column; gap:1px; }
+    .gs-spot-txt strong { font-size:.8rem; color:var(--text); line-height:1.3; }
+    .gs-spot-txt span { font-size:.7rem; color:var(--tdim); line-height:1.35; }
+    .gs-spot-arrow { color:var(--accent); font-size:1.1rem; flex-shrink:0; }
     /* best window bar */
     .best-window-bar {
       display:flex; align-items:center; gap:6px; justify-content:center;
@@ -1615,6 +1637,8 @@
       <!-- Line 2: country + action icons + sessions count -->
       <p id="locSub"></p>
     </div>
+    <!-- Get-started checklist, one line, while steps remain; see renderGetStartedSpotBar() -->
+    <div id="gsSpotBar" style="display:none"></div>
 
     <div id="spotInfoCard"></div>
 
@@ -3759,13 +3783,9 @@ function reconcileChipCacheFromDetail(){
 // What a new rider should do next, in order, with each step a button that
 // does it. Progress is read from what the app already stores: a recent or
 // saved spot ticks step 1, a favourite ticks step 2, a spot alert ticks 3.
-// It goes away once all three are done, or when dismissed.
-const GS_DISMISS_KEY='kf_gs_dismissed';
-function _gsDismissed(){ try{ return localStorage.getItem(GS_DISMISS_KEY)==='1'; }catch(e){ return false; } }
-function dismissGetStarted(){
-  try{ localStorage.setItem(GS_DISMISS_KEY,'1'); }catch(e){}
-  renderGetStarted();
-}
+// It goes away only once all three are done: no dismiss, no expiry. A rider
+// who has not finished sees it on the home screen, and folded to one line
+// under the spot header when a spot is open (renderGetStartedSpotBar).
 // Wait for a spot to be open, then pulse one of its header buttons so the
 // rider sees where the step happens. Gives up quietly after ~6s.
 function _gsPulseWhenOpen(spotName,btnId,msg){
@@ -3820,16 +3840,14 @@ function renderGetStarted(){
   const el=$('hintSteps'); if(!el) return;
   const steps=getStartedSteps();
   const doneCount=steps.filter(s=>s.done).length;
-  if(doneCount===steps.length||_gsDismissed()){ el.style.display='none'; el.innerHTML=''; return; }
+  renderGetStartedSpotBar();
+  if(doneCount===steps.length){ el.style.display='none'; el.innerHTML=''; return; }
   el.style.display='';
   el.innerHTML='';
   const head=document.createElement('div'); head.className='hint-steps-head';
   const title=document.createElement('div'); title.className='hint-steps-title';
   title.textContent=doneCount===0?'Get started in 3 steps':`${steps.length-doneCount} step${steps.length-doneCount>1?'s':''} left`;
   head.appendChild(title);
-  const x=document.createElement('button'); x.className='hint-steps-dismiss'; x.title='Hide this checklist'; x.setAttribute('aria-label','Hide this checklist');
-  x.textContent='\u2715'; x.addEventListener('click',dismissGetStarted);
-  head.appendChild(x);
   el.appendChild(head);
   if(doneCount>0){
     const sub=document.createElement('div'); sub.className='hint-steps-sub';
@@ -3854,6 +3872,60 @@ function renderGetStarted(){
     else b.disabled=true;
     el.appendChild(b);
   });
+}
+// The same checklist folded to one line under the spot header. This is where
+// ★ and 🔔 live, so the next step is done right where it is read: tapping
+// the bar saves the open spot, or turns its alerts on.
+function renderGetStartedSpotBar(){
+  const bar=$('gsSpotBar'); if(!bar) return;
+  const loc=cachedLoc;
+  const steps=getStartedSteps();
+  const doneCount=steps.filter(s=>s.done).length;
+  if(!loc||doneCount===steps.length){ bar.style.display='none'; bar.innerHTML=''; return; }
+  const signedIn=!!_authSession?.user;
+  const favs=signedIn?loadFavs():[];
+  const thisFav=signedIn&&isFavSpot(loc.name);
+  let stepNo, icon, title, sub, act;
+  if(!signedIn){
+    stepNo=2; icon='⭐';
+    title='Step 2 of 3: sign in and save '+loc.name+' as a favourite';
+    sub='Free, no password. Then tap ★ up here.';
+    act=()=>{ _signinContext='fav'; openProfilePanel('profile'); };
+  } else if(!favs.length){
+    stepNo=2; icon='⭐';
+    title='Step 2 of 3: tap ★ to save '+loc.name+' as a favourite';
+    sub='Your favourites sit on your home screen, one tap from their forecast.';
+    act=()=>{ toggleFavorite(); renderGetStarted(); };
+  } else if(thisFav){
+    stepNo=3; icon='🔔';
+    title='Step 3 of 3: tap 🔔 to get wind alerts for '+loc.name;
+    sub='An email 72h, 24h and 1h before every good session here.';
+    act=()=>{ toggleSpotNotif(); renderGetStarted(); };
+  } else {
+    stepNo=3; icon='🔔';
+    title='Step 3 of 3: turn on wind alerts on your favourite spot';
+    sub='Tap 🔔 on '+favs[0].name+', or save '+loc.name+' with ★ first.';
+    act=()=>{ pickFav(favs[0]); _gsPulseWhenOpen(favs[0].name,'notifBtn','Tap the bell to get alerts for '+favs[0].name); };
+  }
+  bar.innerHTML='';
+  const b=document.createElement('button'); b.type='button'; b.className='gs-spot-bar'; b.dataset.step=String(stepNo);
+  const dots=document.createElement('span'); dots.className='gs-spot-dots';
+  for(let i=1;i<=3;i++){
+    const d=document.createElement('span');
+    d.className='gs-spot-dot'+(i<stepNo?' done':i===stepNo?' next':'');
+    d.textContent=i<stepNo?'✓':String(i);
+    dots.appendChild(d);
+  }
+  const ico=document.createElement('span'); ico.className='gs-spot-icon'; ico.textContent=icon;
+  const txt=document.createElement('span'); txt.className='gs-spot-txt';
+  const strong=document.createElement('strong'); strong.textContent=title;
+  const small=document.createElement('span'); small.textContent=sub;
+  txt.appendChild(strong); txt.appendChild(small);
+  const ar=document.createElement('span'); ar.className='gs-spot-arrow'; ar.textContent='›';
+  b.appendChild(dots); b.appendChild(ico); b.appendChild(txt); b.appendChild(ar);
+  b.addEventListener('click',()=>{ try{ act(); }catch(e){ console.error('[get-started]',e); } });
+  bar.appendChild(b);
+  bar.style.display='';
 }
 
 function updateBestWindowBar(){
@@ -4277,6 +4349,7 @@ function toggleFavorite(){
   const isFav=idx<0;
   const btn=$('favBtn');
   if(btn){ btn.textContent=isFav?'★':'☆'; btn.classList.toggle('active',isFav); btn.title=isFav?'Remove from favourites':'Add to favourites'; }
+  renderGetStarted();
   }catch(err){ console.error('toggleFavorite error:',err); showToast('Error: '+err.message); }
 }
 
@@ -6247,6 +6320,7 @@ function renderGrid(){
   updateFetchTimestamp();
 
   showOnly('results');
+  renderGetStartedSpotBar();
   renderSpotInfoCard(loc.name);
   renderLiveWindPanel(loc);
   if(_authSession?.user) loadAttendances();
