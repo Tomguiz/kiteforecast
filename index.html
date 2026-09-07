@@ -538,16 +538,45 @@
     .hints .big { font-size:2.8rem; margin-bottom:10px; }
     .hints p { font-size:.88rem; line-height:1.6; }
     .hints .examples { display:flex; flex-wrap:wrap; justify-content:center; gap:7px; margin-top:14px; }
-    /* 3-step instruction cards */
+    /* Get-started checklist. Three steps, each one a button that does the
+       step, each one ticked off as the rider gets there. The card stays until
+       all three are done (or it is dismissed), so a rider who saved a spot
+       but never turned alerts on still sees what is left. */
     .hint-steps { display:flex; flex-direction:column; align-items:stretch; gap:8px; justify-content:center; margin-bottom:18px; max-width:420px; margin-left:auto; margin-right:auto; }
+    .hint-steps-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:6px; }
+    .hint-steps-title { font-size:1.05rem; font-weight:700; color:var(--text); letter-spacing:-.01em; text-align:left; }
+    .hint-steps-sub { font-size:.74rem; color:var(--tdim); text-align:left; margin:-4px 0 6px; }
+    .hint-steps-dismiss { background:none; border:none; color:var(--tdim); font-size:1rem; cursor:pointer; padding:2px 6px; line-height:1; flex-shrink:0; }
+    .hint-steps-dismiss:hover { color:var(--gray); }
     .hint-step {
-      display:flex; flex-direction:row; align-items:flex-start; gap:12px;
-      text-align:left; min-width:0;
+      display:flex; flex-direction:row; align-items:center; gap:12px;
+      text-align:left; min-width:0; width:100%;
+      border:1.5px solid var(--border); background:rgba(255,255,255,.02);
+      border-radius:12px; padding:10px 14px; cursor:pointer;
+      transition:border-color .2s, background .2s; font-family:inherit; color:inherit;
     }
-    .hint-step-icon { font-size:1.4rem; line-height:1; flex-shrink:0; margin-top:2px; }
-    .hint-step strong { font-size:.82rem; color:var(--text); display:block; margin-bottom:2px; }
+    .hint-step:hover { border-color:rgba(56,189,248,.45); }
+    .hint-step-num {
+      width:26px; height:26px; border-radius:50%; flex-shrink:0;
+      display:flex; align-items:center; justify-content:center;
+      font-size:.78rem; font-weight:800; color:var(--gray);
+      border:1.5px solid var(--border);
+    }
+    .hint-step-icon { font-size:1.25rem; line-height:1; flex-shrink:0; }
+    .hint-step strong { font-size:.84rem; color:var(--text); display:block; margin-bottom:2px; }
     .hint-step span { font-size:.72rem; color:var(--tdim); line-height:1.4; }
-    .hint-step > div { flex:1; }
+    .hint-step > div { flex:1; min-width:0; }
+    .hint-step-arrow { color:var(--tdim); font-size:1rem; flex-shrink:0; }
+    /* the step to do now */
+    .hint-step.next { border-color:rgba(56,189,248,.55); background:rgba(56,189,248,.08); box-shadow:0 0 0 3px rgba(56,189,248,.08); }
+    .hint-step.next .hint-step-num { background:var(--accent); border-color:var(--accent); color:#04121f; }
+    .hint-step.next .hint-step-arrow { color:var(--accent); }
+    .hint-step-next-tag { font-size:.62rem; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color:var(--accent); margin-left:6px; }
+    /* a step already done */
+    .hint-step.done { cursor:default; opacity:.6; }
+    .hint-step.done:hover { border-color:var(--border); }
+    .hint-step.done .hint-step-num { background:rgba(74,222,128,.18); border-color:rgba(74,222,128,.5); color:#4ade80; }
+    .hint-step.done strong { text-decoration:line-through; text-decoration-color:rgba(255,255,255,.35); }
     /* best window bar */
     .best-window-bar {
       display:flex; align-items:center; gap:6px; justify-content:center;
@@ -1454,30 +1483,8 @@
 <main>
   <!-- hint state -->
   <div class="hints" id="hintState">
-    <div class="hint-steps" id="hintSteps">
-      <div style="font-size:1.05rem;font-weight:700;color:var(--text);margin-bottom:14px;letter-spacing:-.01em;">Get started in 3 steps</div>
-      <div class="hint-step" onclick="$('searchInput').focus()" style="cursor:pointer;border:1.5px solid rgba(56,189,248,.25);background:rgba(56,189,248,.06);border-radius:12px;padding:10px 14px;transition:border-color .2s;" onmouseover="this.style.borderColor='rgba(56,189,248,.55)'" onmouseout="this.style.borderColor='rgba(56,189,248,.25)'">
-        <span class="hint-step-icon">🔍</span>
-        <div>
-          <strong>Search for your kite spot</strong>
-          <span>Type a beach, city or spot name above</span>
-        </div>
-      </div>
-      <div class="hint-step" style="border:1.5px solid rgba(251,191,36,.2);background:rgba(251,191,36,.04);border-radius:12px;padding:10px 14px;">
-        <span class="hint-step-icon">⭐</span>
-        <div>
-          <strong>Star it as a favourite</strong>
-          <span>Sign in free — we'll track it for you across devices</span>
-        </div>
-      </div>
-      <div class="hint-step" style="border:1.5px solid rgba(74,222,128,.15);background:rgba(74,222,128,.04);border-radius:12px;padding:10px 14px;">
-        <span class="hint-step-icon">🔔</span>
-        <div>
-          <strong>Get wind alerts</strong>
-          <span>Email reminders 72h, 24h &amp; 1h before your session</span>
-        </div>
-      </div>
-    </div>
+    <!-- Get-started checklist; filled by renderGetStarted() -->
+    <div class="hint-steps" id="hintSteps"></div>
     <div id="bestWindowBar" style="display:none"></div>
     <div id="compareBar" style="display:none"></div>
     <div class="examples" id="hintChips"></div>
@@ -3748,15 +3755,115 @@ function reconcileChipCacheFromDetail(){
   }catch(e){ /* non-fatal: badge will just refresh on its own 1-hour cycle */ }
 }
 
+// ── Get-started checklist ─────────────────────────────────────────────────
+// What a new rider should do next, in order, with each step a button that
+// does it. Progress is read from what the app already stores: a recent or
+// saved spot ticks step 1, a favourite ticks step 2, a spot alert ticks 3.
+// It goes away once all three are done, or when dismissed.
+const GS_DISMISS_KEY='kf_gs_dismissed';
+function _gsDismissed(){ try{ return localStorage.getItem(GS_DISMISS_KEY)==='1'; }catch(e){ return false; } }
+function dismissGetStarted(){
+  try{ localStorage.setItem(GS_DISMISS_KEY,'1'); }catch(e){}
+  renderGetStarted();
+}
+// Wait for a spot to be open, then pulse one of its header buttons so the
+// rider sees where the step happens. Gives up quietly after ~6s.
+function _gsPulseWhenOpen(spotName,btnId,msg){
+  let tries=0;
+  const tick=()=>{
+    const btn=$(btnId);
+    if(cachedLoc&&cachedLoc.name===spotName&&btn){
+      btn.style.animation='none'; btn.offsetHeight; btn.style.animation='pulse .4s 3';
+      if(msg) showToast(msg,4000);
+      return;
+    }
+    if(++tries<20) setTimeout(tick,300);
+  };
+  setTimeout(tick,300);
+}
+function getStartedSteps(){
+  const signedIn=!!_authSession?.user;
+  const favs=signedIn?loadFavs():[];
+  const recent=loadRecent();
+  const hasAlert=signedIn&&loadNotifs().some(n=>n.type==='spot');
+  const s1={ done:favs.length>0||recent.length>0, icon:'🔍',
+    title:'Find your spot',
+    sub:'Search a beach, city or spot name, or pick one of the popular spots below.',
+    act:()=>{ $('searchInput').focus(); } };
+  const s2={ done:favs.length>0, icon:'⭐' };
+  if(!signedIn){
+    s2.title='Sign in and save it as a favourite';
+    s2.sub='Free, no password. Your spots follow you on every device.';
+    s2.act=()=>{ _signinContext='fav'; openProfilePanel('profile'); };
+  } else {
+    s2.title='Save it as a favourite';
+    s2.sub='Open the spot and tap ★. It lands here, on your home screen.';
+    s2.act=()=>{
+      if(recent.length){ pickFav(recent[0]); _gsPulseWhenOpen(recent[0].name,'favBtn','Tap ★ to save '+recent[0].name); }
+      else { $('searchInput').focus(); showToast('Search for a spot first'); }
+    };
+  }
+  const s3={ done:hasAlert, icon:'🔔',
+    title:'Turn on wind alerts',
+    sub:'An email 72h, 24h and 1h before every good session at your spot.' };
+  if(!signedIn){
+    s3.act=()=>{ _signinContext='notif'; openProfilePanel('profile'); };
+  } else if(favs.length){
+    s3.act=()=>{ pickFav(favs[0]); _gsPulseWhenOpen(favs[0].name,'notifBtn','Tap the bell to get alerts for '+favs[0].name); };
+  } else {
+    s3.sub='Save a favourite first, then tap its bell.';
+    s3.act=s2.act;
+  }
+  return [s1,s2,s3];
+}
+function renderGetStarted(){
+  const el=$('hintSteps'); if(!el) return;
+  const steps=getStartedSteps();
+  const doneCount=steps.filter(s=>s.done).length;
+  if(doneCount===steps.length||_gsDismissed()){ el.style.display='none'; el.innerHTML=''; return; }
+  el.style.display='';
+  el.innerHTML='';
+  const head=document.createElement('div'); head.className='hint-steps-head';
+  const title=document.createElement('div'); title.className='hint-steps-title';
+  title.textContent=doneCount===0?'Get started in 3 steps':`${steps.length-doneCount} step${steps.length-doneCount>1?'s':''} left`;
+  head.appendChild(title);
+  const x=document.createElement('button'); x.className='hint-steps-dismiss'; x.title='Hide this checklist'; x.setAttribute('aria-label','Hide this checklist');
+  x.textContent='\u2715'; x.addEventListener('click',dismissGetStarted);
+  head.appendChild(x);
+  el.appendChild(head);
+  if(doneCount>0){
+    const sub=document.createElement('div'); sub.className='hint-steps-sub';
+    sub.textContent=`${doneCount} of ${steps.length} done. Never miss a session again.`;
+    el.appendChild(sub);
+  }
+  let nextMarked=false;
+  steps.forEach((s,i)=>{
+    const b=document.createElement('button'); b.type='button';
+    const isNext=!s.done&&!nextMarked; if(isNext) nextMarked=true;
+    b.className='hint-step'+(s.done?' done':'')+(isNext?' next':'');
+    b.dataset.step=String(i+1); b.dataset.done=s.done?'1':'0';
+    const num=document.createElement('span'); num.className='hint-step-num'; num.textContent=s.done?'\u2713':String(i+1);
+    const ico=document.createElement('span'); ico.className='hint-step-icon'; ico.textContent=s.icon;
+    const txt=document.createElement('div');
+    const strong=document.createElement('strong'); strong.textContent=s.title;
+    if(isNext){ const tag=document.createElement('em'); tag.className='hint-step-next-tag'; tag.textContent='next'; strong.appendChild(tag); }
+    const span=document.createElement('span'); span.textContent=s.sub;
+    txt.appendChild(strong); txt.appendChild(span);
+    b.appendChild(num); b.appendChild(ico); b.appendChild(txt);
+    if(!s.done){ const ar=document.createElement('span'); ar.className='hint-step-arrow'; ar.textContent='\u203a'; b.appendChild(ar); b.addEventListener('click',()=>{ try{ s.act(); }catch(e){ console.error('[get-started]',e); } }); }
+    else b.disabled=true;
+    el.appendChild(b);
+  });
+}
+
 function updateBestWindowBar(){
   const bar=$('bestWindowBar');
   if(!bar) return;
   const favs=loadFavs();
   const hasFavs=!!_authSession?.user&&favs.length>0;
 
-  // Hide steps, show bar when user has favs
-  const steps=$('hintSteps');
-  if(steps) steps.style.display=hasFavs?'none':'';
+  // The checklist decides for itself what is left to show
+  renderGetStarted();
 
   if(!hasFavs){ bar.style.display='none'; return; }
 
@@ -4424,6 +4531,7 @@ function renderHintChips(){
   Object.keys(chipBestCache).forEach(k=>{ if(!favKeySet.has(k.split('|')[0])){ delete chipBestCache[k]; delete chipFxCache[k]; } });
   const wrap=$('hintChips');
   wrap.innerHTML='';
+  renderGetStarted();
 
   if(favs.length){
     const lbl=document.createElement('div');
