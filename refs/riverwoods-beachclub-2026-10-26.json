@@ -1,0 +1,20 @@
+{
+  "date": "2026-10-26",
+  "unit": "kn",
+  "source": "RWS mast Cadzand wind (5.4 km) — measured",
+  "spot": "Riverwoods Beachclub",
+  "hours": {
+    "4": [
+      21.7,
+      26.5
+    ],
+    "5": [
+      22.7,
+      28.9
+    ]
+  },
+  "samples": {
+    "4": 26,
+    "5": 33
+  }
+}
