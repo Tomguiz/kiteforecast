@@ -1,0 +1,20 @@
+{
+  "date": "2026-11-07",
+  "unit": "kn",
+  "source": "RWS mast Vlakte v/d Raan (16.3 km) — measured",
+  "spot": "Riverwoods Beachclub",
+  "hours": {
+    "0": [
+      5.7,
+      7.6
+    ],
+    "1": [
+      7,
+      7.6
+    ]
+  },
+  "samples": {
+    "0": 57,
+    "1": 2
+  }
+}
