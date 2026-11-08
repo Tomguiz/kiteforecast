@@ -1,7 +1,7 @@
 {
   "date": "2026-11-08",
   "unit": "kn",
-  "source": "RWS mast Vlakte v/d Raan (16.3 km) — measured",
+  "source": "RWS mast Cadzand wind (5.4 km) — measured",
   "spot": "Riverwoods Beachclub",
   "hours": {
     "5": [
@@ -19,12 +19,22 @@
     "14": [
       10.8,
       12.7
+    ],
+    "18": [
+      5.1,
+      7.4
+    ],
+    "19": [
+      6.2,
+      9.1
     ]
   },
   "samples": {
     "5": 9,
     "6": 49,
     "13": 47,
-    "14": 11
+    "14": 11,
+    "18": 14,
+    "19": 45
   }
 }
